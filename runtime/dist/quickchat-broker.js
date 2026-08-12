@@ -19292,30 +19292,30 @@ var QuickchatBroker = class {
     this.#emit({ type: "dictation", state: "idle" });
   }
   async #continue(chatId) {
+    const existing = this.#handoffs.get(chatId);
+    if (existing !== void 0) {
+      await existing;
+      return;
+    }
+    const flight = this.#runContinue(chatId);
+    this.#handoffs.set(chatId, flight);
+    try {
+      await flight;
+    } finally {
+      if (this.#handoffs.get(chatId) === flight) this.#handoffs.delete(chatId);
+    }
+  }
+  async #runContinue(chatId) {
     const chat = await this.#history.get(chatId);
     if (chat === void 0) {
       this.#emit({ type: "herdr", chatId, state: "failed", message: "Saved chat was not found" });
       return;
     }
-    let flight = this.#handoffs.get(chatId);
-    if (flight === void 0) {
-      const promise2 = this.#herdrContinue(chat, this.#env);
-      flight = { promise: promise2, listeners: 1 };
-      this.#handoffs.set(chatId, flight);
-      this.#emit({ type: "herdr", chatId, state: "opening" });
-      void promise2.finally(() => this.#handoffs.delete(chatId)).catch(() => void 0);
-    } else {
-      flight.listeners += 1;
-    }
+    this.#emit({ type: "herdr", chatId, state: "opening" });
     try {
-      const result = await flight.promise;
-      if (flight.listeners > 0) {
-        flight.listeners = 0;
-        this.#emit({ type: "herdr", chatId, state: "continued", mode: result.mode });
-      }
+      const result = await this.#herdrContinue(chat, this.#env);
+      this.#emit({ type: "herdr", chatId, state: "continued", mode: result.mode });
     } catch (error48) {
-      if (flight.listeners === 0) return;
-      flight.listeners = 0;
       const failure = describeHerdrError(error48);
       this.#emit({ type: "herdr", chatId, ...failure });
     }
