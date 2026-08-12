@@ -3,7 +3,7 @@
 Quickchat is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget for fast, disposable AI answers. It uses the Codex, Claude, or OpenCode harness already authenticated on your machine, renders Markdown in a themed panel, remembers the latest 30 completed chats, and can hand an answer to Herdr when you want to keep working.
 
 > [!IMPORTANT]
-> Quickchat 0.1.0 is a release candidate. The remaining marketplace step is
+> Quickchat 0.1.0 is published. The remaining marketplace-listing approval is
 > tracked in [`TODO.md`](TODO.md).
 
 ## Preview
