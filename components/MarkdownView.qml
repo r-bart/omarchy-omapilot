@@ -117,7 +117,7 @@ Item {
     id: markdownBlock
 
     TextEdit {
-      required property var block
+      property var block: ({ kind: "markdown", text: "" })
       width: content.width
       height: implicitHeight
       text: block.text
@@ -138,7 +138,7 @@ Item {
     id: codeBlock
 
     BorderSurface {
-      required property var block
+      property var block: ({ kind: "code", language: "", text: "" })
       width: content.width
       height: codeHeader.height + codeFlick.height + contentTopInset + contentBottomInset
       color: Style.normalFillFor(root.foreground, root.accent)
