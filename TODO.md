@@ -43,16 +43,16 @@ a dedicated Herdr Quickchat workspace.
 ## Gates
 
 - [x] Inspect and merge all three stream diffs deliberately.
-- [ ] Static checks and focused tests pass at the final release commit.
+- [x] Static checks and focused tests pass at the current reviewed commit.
 - [x] `omarchy plugin validate .` passes from a clean staged archive.
-- [ ] Independent review has no unresolved actionable findings.
+- [x] Independent review has no unresolved actionable findings.
 - [ ] Live shell: open, submit, stream/stop, history, dismissal/reopen, error, keyboard, theme, and narrow layout verified.
 - [ ] `design-qa.md` says `final result: passed`.
 - [ ] Public main branch and release assets are published.
 
 ## Release blockers
 
-- [ ] Reproduce and fix the owner-reported **Continue in Herdr** failure on the
+- [x] Reproduce and fix the owner-reported **Continue in Herdr** failure on the
   installed Quattro plugin. Do not accept command-construction tests or a
   single successful development probe as completion.
 - [ ] Prove the complete handoff matrix in the live desktop: launch Herdr when
@@ -61,14 +61,14 @@ a dedicated Herdr Quickchat workspace.
   native Codex, Claude, and OpenCode session where supported; repeat a handoff
   from the same chat without losing focus; and complete the transcript fallback
   when native resume is unavailable.
-- [ ] Capture the actual failing command/event and surface a truthful in-panel
+- [x] Capture the actual failing command/event and surface a truthful in-panel
   error when any Herdr launch, session, or focus stage fails.
 
 ## Open checkpoints
 
-- Continue in Herdr is currently **not verified and is release-blocking** after
-  the owner's installed-plugin test failed. Reproduce the exact user path before
-  revising this status.
+- Continue in Herdr's installed Codex/OpenCode cold, warm, exact-window focus,
+  and repeated-chat paths are verified. Native Claude and installed transcript
+  fallback remain release-blocking live matrix entries.
 - Codex must remain `on-request` while Quickchat rejects every ACP permission
   request; a live tool-denial probe is required before release.
 - Release asset publication follows final local runtime and UI verification.
