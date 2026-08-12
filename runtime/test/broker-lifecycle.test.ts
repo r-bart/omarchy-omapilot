@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { deleteAcpSession } from "../src/acp.js";
 import { QuickchatBroker } from "../src/broker.js";
 import { HerdrHandoffError } from "../src/herdr.js";
@@ -110,8 +110,7 @@ describe("Herdr handoff serialization", () => {
     });
     const first = broker.handle({ type: "continue_in_herdr", chatId: saved.id });
     const second = broker.handle({ type: "continue_in_herdr", chatId: saved.id });
-    await new Promise((resolveTurn) => setTimeout(resolveTurn, 0));
-    expect(handoffCount).toBe(1);
+    await vi.waitFor(() => expect(handoffCount).toBe(1));
     finish({ mode: "native", reused: false });
     await Promise.all([first, second]);
     expect(events.filter((event) => event.type === "herdr" && event.state === "opening")).toHaveLength(1);
@@ -125,15 +124,16 @@ describe("Herdr handoff serialization", () => {
     const events: BrokerEvent[] = [];
     let fail: (error: Error) => void = () => undefined;
     const result = new Promise<{ mode: "native"; reused: boolean }>((_resolveResult, rejectResult) => { fail = rejectResult; });
+    let handoffCount = 0;
     const broker = new QuickchatBroker(events.push.bind(events), {
       history: fixture.history,
       images: new ImageStore(fixture.paths),
       env: fixture.env,
-      herdrContinue: () => result
+      herdrContinue: () => { handoffCount += 1; return result; }
     });
     const first = broker.handle({ type: "continue_in_herdr", chatId: saved.id });
     const second = broker.handle({ type: "continue_in_herdr", chatId: saved.id });
-    await new Promise((resolveTurn) => setTimeout(resolveTurn, 0));
+    await vi.waitFor(() => expect(handoffCount).toBe(1));
     fail(new HerdrHandoffError("focus", "window_not_focused"));
     await Promise.all([first, second]);
     expect(events.filter((event) => event.type === "herdr" && event.state === "failed")).toEqual([{
