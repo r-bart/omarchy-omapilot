@@ -50,7 +50,7 @@ a dedicated Herdr Quickchat workspace.
   narrow-layout, and Herdr flows are verified; stream/stop, error, and keyboard
   contracts pass the focused QML/runtime suites.
 - [x] `design-qa.md` says `final result: passed`.
-- [x] Public main branch and signed-tag release assets are published.
+- [x] Public main branch and annotated-tag release assets are published.
 
 ## Release blockers
 
