@@ -1,4 +1,4 @@
-import { chmod, mkdir } from "node:fs/promises";
+import { chmod, mkdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -34,8 +34,11 @@ for (const adapter of [
     target: "node22",
     format: "esm",
     sourcemap: false,
-    banner: { js: "#!/usr/bin/env node" },
     legalComments: "external"
   });
+  const adapterSource = await readFile(adapterOutput, "utf8");
+  if (!adapterSource.startsWith("#!/usr/bin/env node\n") || adapterSource.startsWith("#!/usr/bin/env node\n#!")) {
+    throw new Error(`${adapter.name} must contain exactly one leading Node.js shebang`);
+  }
   await chmod(adapterOutput, 0o755);
 }

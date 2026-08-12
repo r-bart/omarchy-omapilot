@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-#!/usr/bin/env node
 
 // node_modules/@agentclientprotocol/codex-acp/dist/index.js
 import { createRequire as __createRequire } from "module";
