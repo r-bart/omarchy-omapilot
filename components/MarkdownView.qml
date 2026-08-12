@@ -130,7 +130,7 @@ Item {
       selectByMouse: true
       onLinkActivated: function(link) { root.linkActivated(String(link)) }
       Accessible.role: Accessible.StaticText
-      Accessible.name: plainText
+      Accessible.name: block.text
     }
   }
 

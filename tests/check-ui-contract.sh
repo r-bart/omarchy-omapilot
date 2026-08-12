@@ -23,6 +23,10 @@ grep -Fq 'Quickshell.env("QUICKCHAT_BROKER_PATH") || bundledBrokerPath' \
 grep -Fq 'signal escapeRequested()' "$repo_dir/components/Composer.qml"
 grep -Fq 'readonly property bool opened:' "$repo_dir/BarWidget.qml"
 grep -Fq 'function closeForPopoutSwitch()' "$repo_dir/BarWidget.qml"
+if grep -Fq 'Accessible.name: plainText' "$repo_dir/components/MarkdownView.qml"; then
+  printf 'MarkdownView uses TextEdit.plainText, which is unavailable in Qt Quick\n' >&2
+  exit 1
+fi
 
 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -input "$repo_dir/tests/tst_protocol.qml" \
