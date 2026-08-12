@@ -50,8 +50,25 @@ a dedicated Herdr Quickchat workspace.
 - [ ] `design-qa.md` says `final result: passed`.
 - [ ] Public main branch and release assets are published.
 
+## Release blockers
+
+- [ ] Reproduce and fix the owner-reported **Continue in Herdr** failure on the
+  installed Quattro plugin. Do not accept command-construction tests or a
+  single successful development probe as completion.
+- [ ] Prove the complete handoff matrix in the live desktop: launch Herdr when
+  closed; raise its existing window; create or reuse the Quickchat workspace;
+  create and focus the intended tab; focus the intended agent pane; resume a
+  native Codex, Claude, and OpenCode session where supported; repeat a handoff
+  from the same chat without losing focus; and complete the transcript fallback
+  when native resume is unavailable.
+- [ ] Capture the actual failing command/event and surface a truthful in-panel
+  error when any Herdr launch, session, or focus stage fails.
+
 ## Open checkpoints
 
+- Continue in Herdr is currently **not verified and is release-blocking** after
+  the owner's installed-plugin test failed. Reproduce the exact user path before
+  revising this status.
 - Codex must remain `on-request` while Quickchat rejects every ACP permission
   request; a live tool-denial probe is required before release.
 - Release asset publication follows final local runtime and UI verification.
