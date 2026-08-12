@@ -50,7 +50,7 @@ a dedicated Herdr Quickchat workspace.
   narrow-layout, and Herdr flows are verified; stream/stop, error, and keyboard
   contracts pass the focused QML/runtime suites.
 - [x] `design-qa.md` says `final result: passed`.
-- [ ] Public main branch and release assets are published.
+- [x] Public main branch and signed-tag release assets are published.
 
 ## Release blockers
 
@@ -76,12 +76,12 @@ a dedicated Herdr Quickchat workspace.
 - Codex remains `on-request` while Quickchat rejects every ACP permission
   request; the live exact `/etc/hostname` denial probe passed with no streamed
   or persisted content.
-- Release asset publication follows final local runtime and UI verification.
+- Release `v0.1.0` and its checksum, SBOM, and provenance assets are published.
 - Marketplace submission requires the owner's approval of the exact issue body.
 - The README uses a verified completed-answer capture from the installed active
   Omarchy theme.
 - The checked-in runtime layout works after a plain Omarchy clone without hooks;
-  rerun the deterministic packaging proof at the final commit.
+  final-tag CI rebuilt the archive twice and proved it deterministic.
 
 ## Post-v0.1: OmaAsk rebrand
 
