@@ -421,7 +421,7 @@ function shellWord(value: string): string {
 }
 
 export function herdrLauncherCommand(herdr: string, launcher: string, tuiLauncher: string): HerdrCommand {
-  const launchCommand = `${shellWord(tuiLauncher)} --app-id=org.omarchy.herdr --title=herdr ${shellWord(herdr)}`;
+  const launchCommand = `${shellWord(tuiLauncher)} --app-id=org.omarchy.herdr ${shellWord(herdr)}`;
   return { executable: launcher, args: [HERDR_WINDOW_PATTERN, launchCommand] };
 }
 

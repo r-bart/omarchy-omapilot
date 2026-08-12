@@ -36,7 +36,7 @@ describe("Herdr handoff", () => {
   it("matches official and legacy Herdr windows through the Omarchy helper", () => {
     expect(herdrLauncherCommand(paths.herdr, paths.launcher, paths.tuiLauncher)).toEqual({
       executable: paths.launcher,
-      args: ["herdr", "'/test/omarchy-launch-tui' --app-id=org.omarchy.herdr --title=herdr '/test/herdr'"]
+      args: ["herdr", "'/test/omarchy-launch-tui' --app-id=org.omarchy.herdr '/test/herdr'"]
     });
   });
 

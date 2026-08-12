@@ -18954,7 +18954,7 @@ function shellWord(value) {
   return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 function herdrLauncherCommand(herdr, launcher, tuiLauncher) {
-  const launchCommand = `${shellWord(tuiLauncher)} --app-id=org.omarchy.herdr --title=herdr ${shellWord(herdr)}`;
+  const launchCommand = `${shellWord(tuiLauncher)} --app-id=org.omarchy.herdr ${shellWord(herdr)}`;
   return { executable: launcher, args: [HERDR_WINDOW_PATTERN, launchCommand] };
 }
 function herdrSessionFocusCommands(herdr, workspaceId, tabId, agentName) {
