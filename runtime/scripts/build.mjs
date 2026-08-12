@@ -9,7 +9,7 @@ const projectRoot = await realpath(resolve(runtimeRoot, ".."));
 
 await mkdir(dirname(output), { recursive: true });
 await build({
-  entryPoints: [resolve(runtimeRoot, "src/index.ts")],
+  entryPoints: ["runtime/src/index.ts"],
   outfile: output,
   bundle: true,
   platform: "node",
@@ -20,6 +20,18 @@ await build({
   legalComments: "external",
   absWorkingDir: projectRoot
 });
+const generatedBroker = await readFile(output, "utf8");
+const brokerSource = generatedBroker.replaceAll(/^\/\/ .*\/node_modules\//gm, "// node_modules/");
+if (brokerSource !== generatedBroker) await writeFile(output, brokerSource);
+const mapPath = `${output}.map`;
+const sourceMap = JSON.parse(await readFile(mapPath, "utf8"));
+if (!Array.isArray(sourceMap.sources)) throw new Error("broker source map must contain sources");
+sourceMap.sources = sourceMap.sources.map((source) => {
+  if (typeof source !== "string") throw new Error("broker source map source must be a string");
+  const nodeModules = source.indexOf("node_modules/");
+  return nodeModules < 0 ? source : `../../${source.slice(nodeModules)}`;
+});
+await writeFile(mapPath, `${JSON.stringify(sourceMap)}\n`);
 await chmod(output, 0o755);
 
 for (const adapter of [

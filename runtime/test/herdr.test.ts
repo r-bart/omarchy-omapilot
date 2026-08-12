@@ -36,7 +36,7 @@ describe("Herdr handoff", () => {
   it("matches official and legacy Herdr windows through the Omarchy helper", () => {
     expect(herdrLauncherCommand(paths.herdr, paths.launcher, paths.tuiLauncher)).toEqual({
       executable: paths.launcher,
-      args: ["herdr", "'/test/omarchy-launch-tui' --app-id=org.omarchy.herdr '/test/herdr'"]
+      args: ["herdr", "'/test/omarchy-launch-tui' --app-id=org.omarchy.herdr --title=herdr '/test/herdr'"]
     });
   });
 
@@ -126,6 +126,22 @@ describe("Herdr handoff", () => {
     expect(callsContaining(fixture.calls, ["tab", "close"])[0]?.args).toEqual(["tab", "close", "w11:t4"]);
   });
 
+  it("uses the transcript agent name consistently when no native session exists", async () => {
+    const fixture = harness({ enforceNamedAgents: true });
+    await expect(continueInHerdr(chat({ resumable: false }), env, fixture)).resolves.toEqual({ mode: "transcript", reused: false });
+    expect(callsContaining(fixture.calls, ["agent", "start"])[0]?.args[2]).toBe("quickchat-11111111-context");
+    expect(callsContaining(fixture.calls, ["agent", "prompt"])[0]?.args[2]).toBe("quickchat-11111111-context");
+    expect(callsContaining(fixture.calls, ["agent", "focus"]).at(-1)?.args[2]).toBe("quickchat-11111111-context");
+  });
+
+  it("does not claim success when the failed-native tab cannot be cleaned up", async () => {
+    const fixture = harness({ failNative: true, failTabClose: true });
+    await expect(continueInHerdr(chat({ provider: "claude", resumable: true }), env, fixture)).rejects.toMatchObject({
+      stage: "workspace", errorCode: "tab_close_failed"
+    });
+    expect(callsContaining(fixture.calls, ["tab", "close", "w11:t4"])).toHaveLength(4);
+  });
+
   it("returns safe structured stage diagnostics", () => {
     expect(describeHerdrError(Object.assign(new Error(), { stage: "session" }))).toEqual({
       state: "failed", message: "Could not continue this chat in Herdr"
@@ -175,12 +191,15 @@ function harness(options: {
   busyStarts?: number;
   activeWindowMisses?: number;
   workspaceMisses?: number;
+  enforceNamedAgents?: boolean;
+  failTabClose?: boolean;
 } = {}): HerdrDependencies & { calls: Call[]; launch: ReturnType<typeof vi.fn> } {
   const calls: Call[] = [];
   let tab = 3;
   let busyStarts = options.busyStarts ?? 0;
   let activeWindowMisses = options.activeWindowMisses ?? 0;
   let workspaceMisses = options.workspaceMisses ?? 0;
+  const runningAgents = new Set<string>();
   const launch = options.launch === undefined ? vi.fn(() => Promise.resolve()) : vi.fn(options.launch);
   const run = vi.fn(async (executable: string, args: string[]): Promise<Result> => {
     calls.push({ executable, args });
@@ -200,11 +219,15 @@ function harness(options: {
       tab += 1;
       return ok({ tab: { tab_id: `w11:t${tab}` }, root_pane: { pane_id: `w11:p${tab}` } });
     }
+    if (options.failTabClose && args[0] === "tab" && args[1] === "close") return error("tab_close_failed");
     if (args[0] === "agent" && args[1] === "start") {
       if (busyStarts > 0) { busyStarts -= 1; return error("agent_pane_busy"); }
       if (options.failNative && args.includes("--")) return error("native_resume_failed");
       if (options.failTranscript && !args.includes("--")) return error("agent_start_failed");
+      if (args[2] !== undefined) runningAgents.add(args[2]);
     }
+    if (options.enforceNamedAgents && args[0] === "agent" && (args[1] === "prompt" || args[1] === "focus") && !runningAgents.has(args[2] ?? ""))
+      return error("agent_not_found");
     return ok();
   });
   return {

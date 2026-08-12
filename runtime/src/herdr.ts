@@ -145,14 +145,15 @@ export async function continueInHerdr(
       ? undefined
       : nativeResumeArgs(chat.provider, chat.session.acpId, cwd);
     let mode: "native" | "transcript" = resume === undefined ? "transcript" : "native";
-    let started = await startAgent(commands.herdr, chat.provider, agentName, target.paneId, resume, run, wait);
+    const initialAgentName = resume === undefined ? transcriptAgentName : agentName;
+    let started = await startAgent(commands.herdr, chat.provider, initialAgentName, target.paneId, resume, run, wait);
 
     if (started.code !== 0) {
       const racedAgents = await run(commands.herdr, ["agent", "list"]);
       const raced = racedAgents.code === 0 ? findExistingAgent(parseResult(racedAgents.stdout), [agentName]) : undefined;
       if (raced !== undefined) {
         handoffStarted = true;
-        await rollbackCreatedTabs(commands.herdr, createdTabs, run);
+        await rollbackCreatedTabs(commands.herdr, createdTabs, run, wait);
         await focusSessionAndWindow(commands, raced, agentName, windowAddress, run, wait);
         return { mode: nativeMode(chat), reused: true };
       }
@@ -165,7 +166,7 @@ export async function continueInHerdr(
       started = await startAgent(commands.herdr, chat.provider, transcriptAgentName, target.paneId, undefined, run, wait);
       if (started.code !== 0)
         throw new HerdrHandoffError("session", herdrCliErrorCode(started) ?? "agent_start_failed");
-      await closeCreatedTab(commands.herdr, nativeTabId, createdTabs, run);
+      await closeCreatedTab(commands.herdr, nativeTabId, createdTabs, run, wait);
     }
 
     handoffStarted = true;
@@ -175,7 +176,7 @@ export async function continueInHerdr(
         "--until", "idle", "--until", "done", "--until", "blocked", "--timeout", "30000"
       ]);
       if (prompted.code !== 0) {
-        await rollbackCreatedTabs(commands.herdr, createdTabs, run);
+        await rollbackCreatedTabs(commands.herdr, createdTabs, run, wait);
         throw new HerdrHandoffError("transcript", herdrCliErrorCode(prompted) ?? "prompt_failed");
       }
     }
@@ -183,7 +184,7 @@ export async function continueInHerdr(
     await focusSessionAndWindow(commands, target, focusedAgentName, windowAddress, run, wait);
     return { mode, reused: false };
   } catch (error) {
-    if (!handoffStarted) await rollbackCreatedTabs(commands.herdr, createdTabs, run);
+    if (!handoffStarted) await rollbackCreatedTabs(commands.herdr, createdTabs, run, wait);
     throw error;
   }
 }
@@ -356,13 +357,18 @@ async function runFocusCommands(
   }
 }
 
-async function rollbackCreatedTabs(herdr: string, createdTabs: string[], run: CommandRunner): Promise<void> {
-  for (const tabId of [...createdTabs].reverse()) await run(herdr, ["tab", "close", tabId]);
-  createdTabs.length = 0;
+async function rollbackCreatedTabs(herdr: string, createdTabs: string[], run: CommandRunner, wait: Delay): Promise<void> {
+  for (const tabId of [...createdTabs].reverse()) await closeCreatedTab(herdr, tabId, createdTabs, run, wait);
 }
 
-async function closeCreatedTab(herdr: string, tabId: string, createdTabs: string[], run: CommandRunner): Promise<void> {
-  await run(herdr, ["tab", "close", tabId]);
+async function closeCreatedTab(herdr: string, tabId: string, createdTabs: string[], run: CommandRunner, wait: Delay): Promise<void> {
+  let closed = await run(herdr, ["tab", "close", tabId]);
+  for (let attempt = 0; closed.code !== 0 && attempt < 3; attempt += 1) {
+    await wait(100);
+    closed = await run(herdr, ["tab", "close", tabId]);
+  }
+  if (closed.code !== 0)
+    throw new HerdrHandoffError("workspace", herdrCliErrorCode(closed) ?? "tab_cleanup_failed");
   const index = createdTabs.indexOf(tabId);
   if (index >= 0) createdTabs.splice(index, 1);
 }
@@ -415,7 +421,7 @@ function shellWord(value: string): string {
 }
 
 export function herdrLauncherCommand(herdr: string, launcher: string, tuiLauncher: string): HerdrCommand {
-  const launchCommand = `${shellWord(tuiLauncher)} --app-id=org.omarchy.herdr ${shellWord(herdr)}`;
+  const launchCommand = `${shellWord(tuiLauncher)} --app-id=org.omarchy.herdr --title=herdr ${shellWord(herdr)}`;
   return { executable: launcher, args: [HERDR_WINDOW_PATTERN, launchCommand] };
 }
 
