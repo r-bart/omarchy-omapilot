@@ -55,7 +55,7 @@ a dedicated Herdr Quickchat workspace.
 - [x] Reproduce and fix the owner-reported **Continue in Herdr** failure on the
   installed Quattro plugin. Do not accept command-construction tests or a
   single successful development probe as completion.
-- [ ] Prove the complete handoff matrix in the live desktop: launch Herdr when
+- [x] Prove the complete handoff matrix in the live desktop: launch Herdr when
   closed; raise its existing window; create or reuse the Quickchat workspace;
   create and focus the intended tab; focus the intended agent pane; resume a
   native Codex, Claude, and OpenCode session where supported; repeat a handoff
@@ -66,9 +66,11 @@ a dedicated Herdr Quickchat workspace.
 
 ## Open checkpoints
 
-- Continue in Herdr's installed Codex/OpenCode cold, warm, exact-window focus,
-  and repeated-chat paths are verified. Native Claude and installed transcript
-  fallback remain release-blocking live matrix entries.
+- Continue in Herdr's installed Codex, Claude, and OpenCode native paths plus
+  transcript fallback are verified cold, warm, repeated, and with exact window,
+  workspace, tab, and agent-pane focus. The final installed OpenCode check used
+  the actual panel button and left Herdr foregrounded on the reused focused
+  agent (`focused: true`).
 - Codex must remain `on-request` while Quickchat rejects every ACP permission
   request; a live tool-denial probe is required before release.
 - Release asset publication follows final local runtime and UI verification.
