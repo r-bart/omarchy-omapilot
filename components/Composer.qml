@@ -83,7 +83,10 @@ Item {
       horizontalPadding: Style.spacing.md
       verticalPadding: Style.spacing.xxs
       Accessible.name: "Quickchat question"
-      onTextEdited: root.draftText = text
+      onTextEdited: {
+        if (root.backend) root.backend.prepareDraft()
+        root.draftText = text
+      }
       onAccepted: root.submit()
       Keys.onEscapePressed: function(event) {
         if (root.backend && root.backend.busy) root.backend.cancel()
@@ -173,7 +176,7 @@ Item {
         background: root.background
         onChanged: function(value) {
           if (value === "web" && !root.backend.webSupported) return
-          root.backend.capability = value
+          root.backend.selectCapability(value)
         }
       }
     }
@@ -203,7 +206,10 @@ Item {
         wrapMode: TextEdit.Wrap
         background: null
         Accessible.name: "Quickchat question"
-        onTextChanged: root.draftText = text
+        onTextEdited: {
+          if (root.backend) root.backend.prepareDraft()
+          root.draftText = text
+        }
 
         Keys.onPressed: function(event) {
           if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
@@ -233,6 +239,18 @@ Item {
         elide: Text.ElideRight
         Accessible.role: Accessible.StaticText
         Accessible.name: text
+      }
+
+      Button {
+        visible: root.backend && root.backend.canRetry
+        text: "Retry"
+        tooltipText: "Restart the Quickchat broker"
+        foreground: root.foreground
+        background: root.background
+        bordered: true
+        focusable: true
+        Accessible.name: tooltipText
+        onClicked: root.backend.retryBroker()
       }
 
       Button {

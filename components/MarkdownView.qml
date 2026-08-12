@@ -45,8 +45,10 @@ Item {
         id: imageCard
         required property var modelData
         readonly property var normalized: Protocol.normalizedImage(modelData)
+        readonly property bool localImageFailed: normalized.state === "ready" && responseImage.status === Image.Error
+        readonly property bool displayReady: normalized.state === "ready" && !localImageFailed
         width: content.width
-        height: normalized.state === "ready" ? Math.min(Style.space(320), Math.max(Style.space(140), responseImage.implicitHeight)) : Style.space(82)
+        height: displayReady ? Math.min(Style.space(320), Math.max(Style.space(140), responseImage.implicitHeight)) : Style.space(82)
         color: Style.normalFillFor(root.foreground, root.accent)
         borderSpec: Border.controlSpec(imageHover.hovered ? "hover-cursor" : "normal", root.foreground, root.accent)
         radius: Style.cornerRadius
@@ -55,9 +57,10 @@ Item {
         HoverHandler { id: imageHover; cursorShape: Qt.PointingHandCursor }
         TapHandler {
           onTapped: {
-            if (imageCard.normalized.state === "ready")
+            if (imageCard.displayReady)
               root.imagePreviewRequested(imageCard.normalized.source, imageCard.normalized.alt)
-            else if (imageCard.normalized.state === "placeholder" || imageCard.normalized.state === "error")
+            else if (imageCard.normalized.remoteUrl !== ""
+                && (imageCard.normalized.state === "placeholder" || imageCard.normalized.state === "error" || imageCard.localImageFailed))
               root.imageLoadRequested(imageCard.normalized)
           }
         }
@@ -75,7 +78,7 @@ Item {
         }
 
         Column {
-          visible: imageCard.normalized.state !== "ready"
+          visible: !imageCard.displayReady
           anchors.centerIn: parent
           width: parent.width - Style.spacing.xxl * 2
           spacing: Style.spacing.xs
@@ -83,7 +86,9 @@ Item {
           Text {
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
-            text: imageCard.normalized.state === "loading" ? "Loading image…"
+            text: imageCard.localImageFailed && imageCard.normalized.remoteUrl !== "" ? "Image expired — click to reload"
+              : imageCard.localImageFailed ? "Image expired"
+              : imageCard.normalized.state === "loading" ? "Loading image…"
               : imageCard.normalized.state === "expired" ? "Image expired"
               : imageCard.normalized.state === "error" ? "Image could not be loaded — retry"
               : "Remote image — click to load"

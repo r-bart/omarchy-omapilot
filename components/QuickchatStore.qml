@@ -34,6 +34,7 @@ Scope {
   property string provider: "codex"
   property string model: ""
   property string capability: "answer"
+  property bool capabilityChosenForNextQuestion: false
   property string transcript: ""
   property string dictationPhase: ""
   property bool initialized: false
@@ -43,6 +44,7 @@ Scope {
 
   readonly property bool busy: state === "preparing" || state === "dictating" || state === "streaming" || state === "stopping"
   readonly property bool canSubmit: initialized && providers.length > 0 && !busy
+  readonly property bool canRetry: !processStarted && !broker.running && state === "unavailable"
   readonly property var modelOptions: Protocol.modelOptions(providers, provider)
   readonly property bool webSupported: Protocol.providerSupportsWeb(providers, provider)
 
@@ -116,6 +118,7 @@ Scope {
     state = "preparing"
     statusMessage = "Preparing " + Protocol.providerLabel(provider) + "…"
     sendCommand(Protocol.submitCommand(currentId, prompt, provider, model, capability))
+    capabilityChosenForNextQuestion = false
     answerChanged()
     return true
   }
@@ -137,6 +140,7 @@ Scope {
     images = []
     transcript = ""
     capability = "answer"
+    capabilityChosenForNextQuestion = false
     state = initialized ? "composing" : "preparing"
     statusMessage = initialized ? "" : "Starting Quickchat…"
     focusComposerRequested()
@@ -157,6 +161,25 @@ Scope {
   function deleteHistory(chatId) { sendCommand(Protocol.command("history_delete", { chatId: String(chatId) })) }
   function clearHistory() { sendCommand(Protocol.command("history_clear")) }
   function copyText(text) { sendCommand(Protocol.command("copy", { text: String(text || "") })) }
+
+  function selectCapability(value) {
+    var desired = value === "web" ? "web" : "answer"
+    if (desired === "web" && !webSupported) return
+    capability = desired
+    capabilityChosenForNextQuestion = state === "complete"
+  }
+
+  function prepareDraft() {
+    if (state === "complete" && !capabilityChosenForNextQuestion) capability = "answer"
+  }
+
+  function retryBroker() {
+    if (!canRetry) return
+    state = "preparing"
+    statusMessage = "Restarting Quickchat…"
+    stderrTail = ""
+    broker.running = true
+  }
 
   function activateLink(url) {
     var value = String(url || "")
@@ -191,6 +214,7 @@ Scope {
     provider = Protocol.normalizedProvider(chat.provider) || provider
     model = String(chat.model || "")
     capability = chat.capability === "web" ? "web" : "answer"
+    capabilityChosenForNextQuestion = false
     state = "complete"
     statusMessage = ""
     answerChanged()
@@ -220,6 +244,12 @@ Scope {
     if (!event || !event.type) return
     var type = String(event.type)
     if (type === "ready") {
+      if (!Protocol.isCompatibleEvent(event)) {
+        initialized = false
+        state = "unavailable"
+        statusMessage = "Quickchat protocol mismatch. Update the plugin and try again."
+        return
+      }
       initialized = true
       applyProviders(event.providers || [])
       history = Protocol.normalizedHistory(event.history || [])

@@ -38,6 +38,10 @@ function parseLine(line) {
   }
 }
 
+function isCompatibleEvent(event) {
+  return event && Number(event.protocolVersion) === protocolVersion
+}
+
 function normalizedState(value, fallback) {
   var state = String(value || "")
   return validStates.indexOf(state) >= 0 ? state : (fallback || "idle")
@@ -153,6 +157,14 @@ function sanitizeMarkdown(markdown) {
   // Text.MarkdownText does not execute script, but stripping active/embed
   // HTML keeps the rendered subset explicit and deterministic.
   value = value.replace(/<\/?(?:script|iframe|object|embed|style|link|meta)[^>]*>/gi, "")
+  // CommonMark has several image forms (inline, full/collapsed/shortcut
+  // references, nested labels, and escaped label text). After converting the
+  // forms we understand into broker-owned quickchat-image links, remove the
+  // image opener itself from every remaining form. Encoding the exclamation
+  // mark is deliberately structural: Markdown parses the entity as display
+  // text only, so Text.MarkdownText never receives an image token or URL to
+  // resolve on its own.
+  value = value.replace(/!\[/g, "&#33;[")
   return value
 }
 

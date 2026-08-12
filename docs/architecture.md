@@ -19,7 +19,7 @@ Quickchat does not edit `shell.json`, Omarchy sources, Hyprland configuration, V
 
 The UI starts a separate Quickchat broker and communicates using newline-delimited JSON on stdin/stdout. The broker owns provider discovery and authentication readiness, ACP lifecycle, permission handling, streaming, cancellation, validation, history, and optional integration commands. Provider stderr is diagnostic input and must never be forwarded to persisted history without redaction.
 
-Release builds package the broker and exact production dependencies into a deterministic, checksum-addressed `linux-x86_64` archive. Omarchy itself still performs no install hook. Before marketplace publication, the reviewed plugin revision must include a prebuilt runtime layout usable immediately after a plain clone. A source checkout uses `npm ci && npm run build`; missing or incompatible runtimes fail closed.
+The reviewed plugin revision contains self-contained broker and adapter bundles usable immediately after a plain clone. Release builds package those tracked bundles into a deterministic, checksum-addressed `linux-x86_64` archive with lockfile-derived SBOM and provenance. Omarchy itself still performs no install hook. Contributors use `npm ci && npm run build` to reproduce checked-in bundles; missing or incompatible runtimes fail closed.
 
 ## Runtime command/event contract
 

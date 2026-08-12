@@ -11,6 +11,12 @@ TestCase {
     compare(Protocol.parseLine('{"type":"ready"}').type, "ready")
   }
 
+  function test_protocolCompatibilityFailsClosed() {
+    verify(Protocol.isCompatibleEvent({ protocolVersion: 1 }))
+    verify(!Protocol.isCompatibleEvent({ protocolVersion: 2 }))
+    verify(!Protocol.isCompatibleEvent({}))
+  }
+
   function test_providerContractUsesCapabilitiesAndNamedModels() {
     var providers = Protocol.normalizeProviders([{
       id: "codex",
@@ -71,6 +77,20 @@ TestCase {
     verify(output.indexOf("tracker.example") < 0)
     verify(output.indexOf("https://example.com/plot.png") < 0)
     verify(output.indexOf("![") < 0)
+  }
+
+  function test_allCommonMarkImageOpenersAreNeutralized() {
+    var cases = [
+      "![logo][]\n\n[logo]: https://example.com/logo.png",
+      "![logo]\n\n[logo]: https://example.com/logo.png",
+      "![nested [label]](https://example.com/nested.png)",
+      "![escaped \\] label](https://example.com/escaped.png)",
+      "prefix ![unterminated https://127.0.0.1/private"
+    ]
+    for (var i = 0; i < cases.length; i++) {
+      var output = Protocol.sanitizeMarkdown(cases[i])
+      verify(output.indexOf("![") < 0, "unsafe image opener survived: " + output)
+    }
   }
 
   function test_herdrOutcomesAreNotPrematurelySuccessful() {

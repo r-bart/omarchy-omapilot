@@ -96,17 +96,6 @@ Panel {
     else Qt.callLater(function() { composer.forceInputFocus() })
   }
 
-  IpcHandler {
-    target: root.ipcTarget
-    function open() { root.openFromHotkey() }
-    function close() { root.close() }
-    function show() { root.openFromHotkey() }
-    function hide() { root.close() }
-    function toggle() { root.toggle() }
-    function history() { root.openHistory() }
-    function newChat() { Quickchat.QuickchatStore.newChat(); root.openFromHotkey() }
-  }
-
   Shortcut {
     enabled: root.opened
     sequence: "Escape"

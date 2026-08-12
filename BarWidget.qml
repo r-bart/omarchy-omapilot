@@ -109,6 +109,9 @@ BarWidget {
     function hide() { root.close() }
     function toggle() { root.togglePanel() }
     function newChat() { Quickchat.QuickchatStore.newChat(); root.open() }
+    function history() {
+      if (panelLoader.item && panelLoader.item.openHistory) panelLoader.item.openHistory()
+    }
   }
 
   BarIconButton {

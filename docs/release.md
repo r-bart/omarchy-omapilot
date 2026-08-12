@@ -9,8 +9,8 @@ Quickchat is submitted only from a public GitHub repository whose default branch
 3. Run `npm ci`, the broker check suite, QML checks, and `./scripts/validate.sh`.
 4. Build with `npm run build`, then run `./scripts/package-runtime.sh --output-dir dist/release` twice and compare archive hashes.
 5. Inspect archive contents, `sbom.cdx.json`, `provenance.json`, and `SHA256SUMS`. Test extraction and broker startup on a clean x86-64 Omarchy Quattro environment.
-6. Upload the archive, checksum file, SBOM, and provenance to a GitHub draft release. Update the repository runtime release lock with the final immutable asset URL and SHA-256, then rebuild/retest that commit.
-7. Place the prebuilt runtime in the release revision, install from the public repository with the commands in the README, and verify startup, missing/corrupt-runtime failure, update, and removal.
+6. Confirm the checked-in bundles reproduce from source without a diff. Upload the archive, checksum file, SBOM, and provenance to a GitHub draft release.
+7. Install the exact public release revision with the commands in the README and verify startup, missing/corrupt-runtime failure, update, and removal.
 
 The packaging workflow builds artifacts for review; it does not create or publish a GitHub Release.
 
@@ -20,6 +20,7 @@ The packaging workflow builds artifacts for review; it does not create or publis
 - Verify open, compose, provider/model selection, Answer/Web enforcement, stream/stop, Markdown, safe links, images, history/clear, dictation, Herdr continuation, keyboard navigation, narrow geometry, theme reload, shell reload, and all missing/error states.
 - Record the exact Omarchy Quattro commit used for validation.
 - Complete independent security, implementation, and design review with no unresolved actionable findings.
+- Run `bash tests/check-ui-contract.sh` on a workstation with the pinned Quattro QML imports, Qt 6 tools, Quickshell, and a Wayland compositor. Hosted CI cannot substitute for this required environment gate.
 
 ## Marketplace submission
 
@@ -29,8 +30,8 @@ Submission metadata:
 
 - Repository: `https://github.com/spencerbull/omarchy-quickchat`
 - Plugin ID: `io.github.spencerbull.quickchat`
-- Category: AI
-- Suggested tags: `ai`, `bar-widget`, `acp`, `codex`, `claude`, `opencode`, `dictation`
+- Category: Widgets
+- Tags: `ai`, `bar`, `quickshell`
 - Preview: verified implementation screenshot
 
-Do not submit while `TODO.md` has an incomplete public-release or live-verification gate.
+Do not submit while `TODO.md` has an incomplete public-release or live-verification gate. The marketplace's agent instructions also require showing the exact issue title/body to the owner and receiving explicit approval before creating the issue.

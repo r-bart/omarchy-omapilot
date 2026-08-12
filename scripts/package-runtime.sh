@@ -41,7 +41,13 @@ required=(
   package.json
   package-lock.json
   runtime/dist/quickchat-broker.js
+  runtime/dist/adapters/codex-acp.js
+  runtime/dist/adapters/claude-agent-acp.js
+  runtime/dist/adapters/claude-agent-acp.js.LEGAL.txt
+  runtime/dist/adapters/Apache-2.0.txt
   runtime/bin/quickchat-broker
+  runtime/bin/codex-acp
+  runtime/bin/claude-agent-acp
   runtime/adapters.release.json
   THIRD_PARTY_NOTICES.md
   LICENSE
@@ -59,7 +65,7 @@ if ((dry_run)); then
       printf '    pending  %s\n' "$relative"
     fi
   done
-  printf '  actions: npm ci --omit=dev --ignore-scripts; npm sbom; normalized tar; SHA-256\n'
+  printf '  actions: lockfile SBOM; normalized tar; SHA-256\n'
   exit 0
 fi
 
@@ -96,19 +102,28 @@ stage_parent=$(mktemp -d "${TMPDIR:-/tmp}/quickchat-package.XXXXXX")
 trap 'rm -rf -- "$stage_parent"' EXIT
 bundle_name="omarchy-quickchat-runtime-${version}-${platform}"
 stage="$stage_parent/$bundle_name"
-mkdir -p "$stage/runtime/dist" "$stage/runtime/bin"
+mkdir -p "$stage/runtime/dist/adapters" "$stage/runtime/bin"
 
 cp "$repo_root/package.json" "$repo_root/package-lock.json" "$stage/"
 cp "$repo_root/runtime/dist/quickchat-broker.js" "$stage/runtime/dist/"
-cp "$repo_root/runtime/bin/quickchat-broker" "$stage/runtime/bin/"
+cp "$repo_root/runtime/dist/adapters/codex-acp.js" "$stage/runtime/dist/adapters/"
+cp "$repo_root/runtime/dist/adapters/claude-agent-acp.js" "$stage/runtime/dist/adapters/"
+cp "$repo_root/runtime/dist/adapters/claude-agent-acp.js.LEGAL.txt" "$stage/runtime/dist/adapters/"
+cp "$repo_root/runtime/dist/adapters/Apache-2.0.txt" "$stage/runtime/dist/adapters/"
+cp "$repo_root/runtime/bin/quickchat-broker" "$repo_root/runtime/bin/codex-acp" \
+  "$repo_root/runtime/bin/claude-agent-acp" "$stage/runtime/bin/"
 cp "$repo_root/runtime/adapters.release.json" "$stage/runtime/"
 cp "$repo_root/THIRD_PARTY_NOTICES.md" "$repo_root/LICENSE" "$stage/"
-chmod 0755 "$stage/runtime/bin/quickchat-broker"
+chmod 0755 "$stage/runtime/bin/quickchat-broker" "$stage/runtime/bin/codex-acp" \
+  "$stage/runtime/bin/claude-agent-acp"
 
 (
   cd "$stage"
-  npm ci --omit=dev --ignore-scripts --no-audit --no-fund
-  npm sbom --omit=dev --sbom-format cyclonedx \
+  # The three executables are already self-contained bundles. The lockfile is
+  # retained for exact source provenance and SBOM generation; including a
+  # second node_modules copy would add hundreds of megabytes without changing
+  # runtime behavior.
+  npm sbom --package-lock-only --omit=dev --sbom-format cyclonedx \
     | jq 'del(.serialNumber, .metadata.timestamp)' > sbom.cdx.json
 )
 

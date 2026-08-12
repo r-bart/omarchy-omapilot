@@ -29,7 +29,7 @@ omarchy plugin validate ~/.config/omarchy/plugins/io.github.spencerbull.quickcha
 omarchy plugin enable io.github.spencerbull.quickchat right
 ```
 
-The Omarchy installer only clones, validates, and enables the plugin. It runs no install hook, `sudo`, package manager, or host-configuration mutation. A source checkout currently needs `npm ci && npm run build` before the broker is available. A marketplace release must include the prebuilt, checksum-verified runtime in the reviewed plugin revision so the documented clone/validate/enable flow is complete. Quickchat never invokes `npx` at runtime or silently downloads executable code.
+The Omarchy installer only clones, validates, and enables the plugin. It runs no install hook, `sudo`, package manager, or host-configuration mutation. The reviewed repository revision includes self-contained broker and ACP adapter bundles, so a normal install does not run `npm`, `npx`, or silently download executable code. Git history anchors those checked-in bundles to their TypeScript source and pinned lockfile; release archives add an SBOM, provenance record, and SHA-256 checksum.
 
 Update or remove it with the standard plugin commands:
 
@@ -53,7 +53,7 @@ Quickchat broker
         └── OpenCode ACP ─ authenticated OpenCode CLI
 ```
 
-Codex and Claude use exact, release-pinned official ACP adapter packages. OpenCode uses its native `opencode acp` command. The broker normalizes provider discovery, streamed text/images, cancellation, permissions, errors, and session identities; QML does not parse provider-specific output.
+Codex and Claude use exact, source-pinned official ACP adapter packages bundled in the repository. OpenCode uses its native `opencode acp` command. The broker normalizes provider discovery, streamed text/images, cancellation, permissions, errors, and session identities; QML does not parse provider-specific output.
 
 Two capability profiles are exposed:
 
@@ -69,7 +69,7 @@ Quickchat persists only completed chats, capped at the newest 30. A chat contain
 | Path | Purpose |
 | --- | --- |
 | `${XDG_STATE_HOME:-~/.local/state}/quickchat/` | Atomic local history and resumable session metadata |
-| `${XDG_CACHE_HOME:-~/.cache}/quickchat/` | Verified runtime bundle and bounded image cache |
+| `${XDG_CACHE_HOME:-~/.cache}/quickchat/` | Bounded, validated image cache |
 | `${XDG_RUNTIME_DIR}/quickchat/` | Per-login sockets, temporary dictation, and in-flight data |
 
 Remote Markdown images are not fetched automatically. Quickchat shows the origin and requires a click before loading a validated HTTPS image. Links are scheme-checked and never interpolated into a shell command. See [`SECURITY.md`](SECURITY.md) for the threat model and reporting process.
@@ -96,7 +96,7 @@ npm run build
 ./scripts/package-runtime.sh --output-dir dist/release
 ```
 
-The package helper stages production dependencies, emits a CycloneDX SBOM, normalizes timestamps and ownership, creates a deterministic archive, and writes `SHA256SUMS`. Release details and marketplace gates are in [`docs/release.md`](docs/release.md).
+The package helper stages the self-contained checked-in runtime, emits a lockfile-derived CycloneDX SBOM, normalizes timestamps and ownership, creates a deterministic archive, and writes `SHA256SUMS`. Release details and marketplace gates are in [`docs/release.md`](docs/release.md).
 
 ## License and attribution
 

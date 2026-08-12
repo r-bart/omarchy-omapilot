@@ -12,8 +12,8 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
 - Web mode permits only a provider capability positively identified as web search or fetch.
 - Filesystem, shell, editing, arbitrary MCP, and unclassified permissions are denied in both modes.
 - Provider authentication remains in the installed harness. Quickchat must not log, copy, or persist credential output.
-- Adapter bundles are pinned per Quickchat release and accepted only after SHA-256 verification.
-- Remote images require a user action and are subject to scheme, redirect, address, MIME, byte-size, and decoded-dimension checks.
+- Adapter bundles are generated from exact package-lock versions and reviewed as tracked files in the same Git commit as their source. Published release archives add SHA-256 verification, provenance, and an SBOM; the runtime does not download or replace adapters.
+- Remote images require a user action and are subject to scheme, redirect, address, MIME, byte-size, complete decode, pixel-area, and cache-quota checks before Quickshell sees them.
 - External links are allowlisted by scheme and are never passed through shell interpolation.
 
 This boundary reduces accidental authority; it is not an OS sandbox. A compromised plugin repository or verified runtime release would execute with the current user's permissions.
