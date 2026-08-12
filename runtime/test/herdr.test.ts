@@ -4,7 +4,7 @@ import type { ChatRecord } from "../src/types.js";
 
 describe("Herdr handoff", () => {
   it("constructs native resume arguments for all harnesses", () => {
-    expect(nativeResumeArgs("codex", "abc")).toEqual(["resume", "abc", "-s", "read-only", "-a", "never"]);
+    expect(nativeResumeArgs("codex", "abc")).toEqual(["resume", "abc", "-s", "read-only", "-a", "on-request"]);
     expect(nativeResumeArgs("claude", "abc")).toEqual(["--resume", "abc"]);
     expect(nativeResumeArgs("opencode", "abc")).toEqual(["--pure", "--session", "abc"]);
   });

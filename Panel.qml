@@ -314,7 +314,7 @@ Panel {
               Button {
                 iconText: "󰆍"
                 text: "Continue in Herdr"
-                tooltipText: "Create a durable Herdr tab from this chat"
+                tooltipText: "Continue in Herdr with the native harness permissions"
                 visible: Quickchat.QuickchatStore.currentChatId !== ""
                 foreground: root.foreground
                 background: root.surface

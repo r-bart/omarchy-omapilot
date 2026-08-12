@@ -16,7 +16,8 @@ The packaging workflow builds artifacts for review; it does not create or publis
 
 ## Required product evidence
 
-- Add verified light/dark screenshots from the live Quattro shell and update the README preview section.
+- Add a verified screenshot from the live Quattro shell using the active
+  Omarchy theme and update the README preview section.
 - Verify open, compose, provider/model selection, Answer/Web enforcement, stream/stop, Markdown, safe links, images, history/clear, dictation, Herdr continuation, keyboard navigation, narrow geometry, theme reload, shell reload, and all missing/error states.
 - Record the exact Omarchy Quattro commit used for validation.
 - Complete independent security, implementation, and design review with no unresolved actionable findings.

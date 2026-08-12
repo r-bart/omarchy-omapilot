@@ -60,7 +60,10 @@ Two capability profiles are exposed:
 - **Answer** denies tools, shell, filesystem, MCP, and network capabilities.
 - **Web** allows only a harness capability that can be proven to be web search/fetch. It continues to deny shell, filesystem, edits, MCP, and unrelated tools. If the harness cannot enforce that boundary, Web is unavailable.
 
-Every permission request is denied unless it matches the selected profile. Quickchat never bypasses a harness permission system.
+ACP permission requests are denied in both profiles. Web access is enabled only
+through a provider-specific search/fetch capability that was positively
+identified during discovery; it does not turn on shell or filesystem access.
+Quickchat never bypasses a harness permission system.
 
 ## Storage and privacy
 
@@ -77,7 +80,7 @@ Remote Markdown images are not fetched automatically. Quickchat shows the origin
 ## Optional integrations
 
 - **Voxtype:** when `voxtype` is installed and ready, the microphone records directly to a file under `$XDG_RUNTIME_DIR/quickchat`; Quickchat reads that transcript after recording stops. It never simulates keyboard input or modifies Voxtype configuration.
-- **Herdr:** when `herdr` is installed, Continue in Herdr creates or reuses a dedicated `Quickchat` workspace and creates a labeled tab. It resumes the native harness session when possible, otherwise starts the matching agent with a compact transcript and labels the fallback.
+- **Herdr:** when `herdr` is installed, Continue in Herdr creates or reuses a dedicated `Quickchat` workspace and creates a labeled tab. It resumes the native harness session when possible, otherwise starts the matching agent with a compact transcript and labels the fallback. This is an explicit handoff from Quickchat's tool-free one-shot surface to Herdr's normal native-agent permission model; Codex resumes read-only and asks before commands.
 
 Both integrations disappear or show a clear unavailable state when their command or capability is missing.
 

@@ -16,6 +16,10 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
 - Remote images require a user action and are subject to scheme, redirect, address, MIME, byte-size, complete decode, pixel-area, and cache-quota checks before Quickshell sees them.
 - External links are allowlisted by scheme and are never passed through shell interpolation.
 
+The Quickchat boundary ends when the user selects **Continue in Herdr**. Herdr
+then owns the native harness session and its normal interactive permission
+model. Quickchat does not claim that a continued session remains tool-free.
+
 This boundary reduces accidental authority; it is not an OS sandbox. A compromised plugin repository or verified runtime release would execute with the current user's permissions.
 
 ## Reporting a vulnerability

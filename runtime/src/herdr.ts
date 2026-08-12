@@ -25,7 +25,10 @@ function nestedObject(value: unknown, key: string): unknown {
 }
 
 export function nativeResumeArgs(provider: ProviderId, sessionId: string): string[] | undefined {
-  if (provider === "codex") return ["resume", sessionId, "-s", "read-only", "-a", "never"];
+  // Continue in Herdr deliberately hands authority back to the native harness.
+  // Keep Codex interactive so any command outside its read-only sandbox still
+  // requires the user's approval in Herdr.
+  if (provider === "codex") return ["resume", sessionId, "-s", "read-only", "-a", "on-request"];
   if (provider === "claude") return ["--resume", sessionId];
   return ["--pure", "--session", sessionId];
 }

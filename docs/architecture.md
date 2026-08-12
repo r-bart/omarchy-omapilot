@@ -29,6 +29,13 @@ The UI sends commands whose `type` is one of `initialize`, `submit`, `cancel`, `
 
 The broker emits events whose `type` is one of `ready`, `providers`, `state`, `content`, `image`, `complete`, `error`, `dictation`, `history`, `herdr`, `link`, or `copied`. The broker's protocol tests are authoritative for exact fields and version negotiation.
 
+ACP is the broker's normalization boundary, not the policy boundary. Each
+harness receives its own fail-closed configuration, and the broker rejects ACP
+permission requests and unexpected tool events before content reaches QML or
+history. Continue in Herdr intentionally leaves that one-shot boundary and
+hands the resumable session or transcript to Herdr, which becomes the authority
+for native-agent permissions and lifecycle.
+
 ## Compatibility rule
 
 The protocol and release metadata are versioned independently of the manifest schema. The plugin must show an actionable incompatibility error when the cached runtime cannot negotiate its supported protocol; it must not guess at provider output or silently broaden permissions.

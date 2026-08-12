@@ -18543,7 +18543,7 @@ function nestedObject(value, key) {
   return Object.entries(value).find(([entryKey]) => entryKey === key)?.[1];
 }
 function nativeResumeArgs(provider, sessionId) {
-  if (provider === "codex") return ["resume", sessionId, "-s", "read-only", "-a", "never"];
+  if (provider === "codex") return ["resume", sessionId, "-s", "read-only", "-a", "on-request"];
   if (provider === "claude") return ["--resume", sessionId];
   return ["--pure", "--session", sessionId];
 }
