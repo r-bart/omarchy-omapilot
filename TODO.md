@@ -59,3 +59,17 @@ a dedicated Herdr Quickchat workspace.
 - Add a verified live themed capture to the README.
 - The checked-in runtime layout works after a plain Omarchy clone without hooks;
   rerun the deterministic packaging proof at the final commit.
+
+## Post-v0.1: OmaAsk rebrand
+
+- [ ] Approve the final `OmaAsk` capitalization, repository name, and public
+  product copy before changing stable identifiers.
+- [ ] Rebrand the visible shell surface, documentation, screenshots, package
+  metadata, release assets, security contacts, and marketplace submission.
+- [ ] Choose the replacement reverse-DNS plugin ID and provide an explicit
+  migration for the existing Quickchat layout entry and per-provider settings.
+- [ ] Migrate or compatibly discover Quickchat history, image cache, runtime
+  paths, Herdr workspace labels, IPC targets, environment overrides, and broker
+  client/protocol identifiers without abandoning user data.
+- [ ] Validate update, rollback, clean install, removal, and marketplace
+  behavior across both the old and new identities before retiring aliases.

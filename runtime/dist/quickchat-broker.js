@@ -18542,8 +18542,8 @@ function nestedObject(value, key) {
   if (typeof value !== "object" || value === null) return void 0;
   return Object.entries(value).find(([entryKey]) => entryKey === key)?.[1];
 }
-function nativeResumeArgs(provider, sessionId) {
-  if (provider === "codex") return ["resume", sessionId, "-s", "read-only", "-a", "on-request"];
+function nativeResumeArgs(provider, sessionId, cwd = process.cwd()) {
+  if (provider === "codex") return ["resume", sessionId, "-C", cwd, "-s", "read-only", "-a", "on-request"];
   if (provider === "claude") return ["--resume", sessionId];
   return ["--pure", "--session", sessionId];
 }
@@ -18564,26 +18564,40 @@ async function continueInHerdr(chat, env = process.env, runner) {
   const herdr = await resolveExecutable("herdr", env);
   if (herdr === void 0) throw new Error("Herdr is not installed");
   const run = runner ?? (async (executable, args) => runCommand(executable, args, { env, timeoutMs: 35e3, maxOutput: 256e3 }));
-  const listed = await run(herdr, ["workspace", "list"]);
+  const launcher = await resolveExecutable("omarchy-launch-or-focus-tui", env);
+  if (launcher === void 0) throw new Error("The Omarchy Herdr launcher is not installed");
+  const focusedWindow = await run(launcher, ["--app-id=org.omarchy.herdr", herdr]);
+  if (focusedWindow.code !== 0) throw new Error("Herdr could not be opened or focused");
+  let listed = await run(herdr, ["workspace", "list"]);
+  for (let attempt = 0; listed.code !== 0 && attempt < 19; attempt += 1) {
+    await delay(250);
+    listed = await run(herdr, ["workspace", "list"]);
+  }
   if (listed.code !== 0) throw new Error("Herdr is not available");
   const listResult = parseResult(listed.stdout);
-  const workspaceId = findQuickchatWorkspace(listResult);
+  let workspaceId = findQuickchatWorkspace(listResult);
+  let tabId;
   let paneId;
   if (workspaceId === void 0) {
     const created = await run(herdr, ["workspace", "create", "--cwd", process.cwd(), "--label", "Quickchat", "--no-focus"]);
     if (created.code !== 0) throw new Error("Herdr could not create the Quickchat workspace");
     const createdResult = parseResult(created.stdout);
     paneId = objectString(nestedObject(createdResult, "root_pane"), "pane_id");
-    const createdTab = objectString(nestedObject(createdResult, "tab"), "tab_id");
-    if (createdTab !== void 0) await run(herdr, ["tab", "rename", createdTab, chat.title.slice(0, 60)]);
+    tabId = objectString(nestedObject(createdResult, "tab"), "tab_id") ?? objectString(createdResult, "tab_id");
+    workspaceId = objectString(nestedObject(createdResult, "workspace"), "workspace_id") ?? objectString(createdResult, "workspace_id") ?? workspaceFromTab(tabId);
+    if (tabId !== void 0) await run(herdr, ["tab", "rename", tabId, chat.title.slice(0, 60)]);
   } else {
     const created = await run(herdr, ["tab", "create", "--workspace", workspaceId, "--cwd", process.cwd(), "--label", chat.title.slice(0, 60), "--no-focus"]);
     if (created.code !== 0) throw new Error("Herdr could not create a Quickchat tab");
-    paneId = objectString(nestedObject(parseResult(created.stdout), "root_pane"), "pane_id");
+    const createdResult = parseResult(created.stdout);
+    paneId = objectString(nestedObject(createdResult, "root_pane"), "pane_id");
+    tabId = objectString(nestedObject(createdResult, "tab"), "tab_id") ?? objectString(createdResult, "tab_id");
   }
-  if (paneId === void 0) throw new Error("Herdr did not return a target pane");
+  if (workspaceId === void 0 || tabId === void 0 || paneId === void 0)
+    throw new Error("Herdr did not return a complete workspace target");
   const agentName = `quickchat-${chat.id.slice(0, 8)}`;
-  const resume = !chat.session.resumable || chat.session.acpId === void 0 ? void 0 : nativeResumeArgs(chat.provider, chat.session.acpId);
+  await delay(250);
+  const resume = !chat.session.resumable || chat.session.acpId === void 0 ? void 0 : nativeResumeArgs(chat.provider, chat.session.acpId, process.cwd());
   const startArgs = ["agent", "start", agentName, "--kind", chat.provider, "--pane", paneId, "--timeout", "30000"];
   if (resume !== void 0) startArgs.push("--", ...resume);
   let started = await run(herdr, startArgs);
@@ -18597,10 +18611,19 @@ async function continueInHerdr(chat, env = process.env, runner) {
     const prompted = await run(herdr, ["agent", "prompt", agentName, transcriptPrompt(chat), "--wait", "--until", "idle", "--until", "done", "--timeout", "30000"]);
     if (prompted.code !== 0) throw new Error("Herdr started, but the transcript handoff failed");
   }
-  await run(herdr, ["agent", "focus", agentName]);
-  const launcher = await resolveExecutable("omarchy-launch-or-focus-tui", env);
-  if (launcher !== void 0) await run(launcher, ["--app-id=org.omarchy.herdr", herdr]);
+  for (const command of herdrSessionFocusCommands(herdr, workspaceId, tabId, agentName)) {
+    const focused = await run(command.executable, command.args);
+    if (focused.code !== 0) throw new Error("Herdr could not focus the continued session");
+  }
   return { mode };
+}
+function delay(milliseconds) {
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
+}
+function workspaceFromTab(tabId) {
+  if (tabId === void 0) return void 0;
+  const separator = tabId.indexOf(":");
+  return separator > 0 ? tabId.slice(0, separator) : void 0;
 }
 function findQuickchatWorkspace(result) {
   const workspaces = nestedObject(result, "workspaces");
@@ -18609,6 +18632,13 @@ function findQuickchatWorkspace(result) {
     if (objectString(workspace, "label")?.toLowerCase() === "quickchat") return objectString(workspace, "workspace_id");
   }
   return void 0;
+}
+function herdrSessionFocusCommands(herdr, workspaceId, tabId, agentName) {
+  return [
+    { executable: herdr, args: ["workspace", "focus", workspaceId] },
+    { executable: herdr, args: ["tab", "focus", tabId] },
+    { executable: herdr, args: ["agent", "focus", agentName] }
+  ];
 }
 
 // runtime/src/providers.ts
@@ -18848,6 +18878,11 @@ var QuickchatBroker = class {
     try {
       const result = await run.result;
       const selectedModel = result.defaultModel ?? command.model;
+      if (result.models.length > 0) {
+        provider.models = result.models;
+        if (result.defaultModel !== void 0) provider.defaultModel = result.defaultModel;
+        this.#emit({ type: "providers", providers: [...this.#providers.values()].map(publicProvider) });
+      }
       const chat = {
         schemaVersion: 1,
         id: randomUUID2(),

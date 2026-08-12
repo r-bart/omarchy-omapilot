@@ -191,6 +191,18 @@ Item {
       }
     }
 
+    Text {
+      Layout.fillWidth: true
+      visible: root.backend && root.backend.modelOptions.length === 0
+      text: "Using the harness default. Available models load after the first answer."
+      color: Qt.darker(root.foreground, 1.45)
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      elide: Text.ElideRight
+      Accessible.role: Accessible.StaticText
+      Accessible.name: text
+    }
+
     BorderSurface {
       Layout.fillWidth: true
       Layout.preferredHeight: Style.space(108)

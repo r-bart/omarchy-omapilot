@@ -87,6 +87,31 @@ describe("NDJSON protocol", () => {
     await new Promise((resolveExit) => child.once("close", resolveExit));
   }, 25_000);
 
+  it("refreshes provider models from the real answer session", async () => {
+    const state = await mkdtemp(join(tmpdir(), "quickchat-late-models-")); roots.push(state);
+    const child = spawn(resolve("runtime/bin/quickchat-broker"), [], {
+      env: {
+        ...process.env,
+        XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
+        QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+        PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+      },
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    const events: Record<string, unknown>[] = [];
+    createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
+    child.stdin.write('{"type":"initialize","protocolVersion":1}\n');
+    await until(() => events.some((event) => event.type === "ready"));
+    const ready = readySchema.parse(events.find((event) => event.type === "ready"));
+    expect(ready.providers.find((provider) => provider.id === "codex")?.models).toContainEqual({ id: "test/default", name: "Default" });
+    child.stdin.write('{"type":"submit","id":"late-models","question":"hello","provider":"codex","capability":"answer"}\n');
+    await until(() => events.some((event) => event.type === "providers"));
+    const update = readySchema.shape.providers.parse(events.find((event) => event.type === "providers")?.providers);
+    expect(update.find((provider) => provider.id === "codex")?.models).toContainEqual({ id: "test/default", name: "Default" });
+    child.stdin.end('{"type":"shutdown"}\n');
+    await new Promise((resolveExit) => child.once("close", resolveExit));
+  }, 20_000);
+
   it("fails a denied tool request without completing or persisting the answer", async () => {
     const events = await forbiddenAttempt("codex", { FAKE_ACP_PERMISSION_ATTEMPT: "1" });
     expect(events.find((event) => event.type === "error")).toMatchObject({

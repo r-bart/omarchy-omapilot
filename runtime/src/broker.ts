@@ -95,6 +95,11 @@ export class QuickchatBroker {
     try {
       const result = await run.result;
       const selectedModel = result.defaultModel ?? command.model;
+      if (result.models.length > 0) {
+        provider.models = result.models;
+        if (result.defaultModel !== undefined) provider.defaultModel = result.defaultModel;
+        this.#emit({ type: "providers", providers: [...this.#providers.values()].map(publicProvider) });
+      }
       const chat: ChatRecord = {
         schemaVersion: 1,
         id: randomUUID(),
