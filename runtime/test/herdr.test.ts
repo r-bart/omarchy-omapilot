@@ -46,7 +46,7 @@ describe("Herdr handoff", () => {
         { executable: paths.herdr, args: ["workspace", "focus", "w11"] },
         { executable: paths.herdr, args: ["tab", "focus", "w11:t2"] },
         { executable: paths.herdr, args: ["agent", "focus", "quickchat-1234"] },
-        { executable: paths.hyprctl, args: ["dispatch", "focuswindow", "address:0xabc"] },
+        { executable: paths.hyprctl, args: ["dispatch", "hl.dsp.focus({ window = \"address:0xabc\" })"] },
         { executable: paths.herdr, args: ["workspace", "focus", "w11"] },
         { executable: paths.herdr, args: ["tab", "focus", "w11:t2"] },
         { executable: paths.herdr, args: ["agent", "focus", "quickchat-1234"] }

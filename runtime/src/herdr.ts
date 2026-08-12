@@ -332,7 +332,7 @@ async function focusSessionAndWindow(
   wait: Delay
 ): Promise<void> {
   await runFocusCommands(commands.herdr, target.workspaceId, target.tabId, agentName, run);
-  const raised = await run(commands.hyprctl, ["dispatch", "focuswindow", `address:${windowAddress}`]);
+  const raised = await run(commands.hyprctl, ["dispatch", `hl.dsp.focus({ window = "address:${windowAddress}" })`]);
   if (raised.code !== 0) throw new HerdrHandoffError("focus", "window_raise_failed");
   if (!await waitForActiveHerdrWindow(commands.hyprctl, windowAddress, run, wait))
     throw new HerdrHandoffError("focus", "window_not_focused");
@@ -430,7 +430,7 @@ export function herdrFocusCommands(
 ): HerdrCommand[] {
   return [
     ...herdrSessionFocusCommands(herdr, workspaceId, tabId, agentName),
-    { executable: hyprctl, args: ["dispatch", "focuswindow", `address:${windowAddress}`] },
+    { executable: hyprctl, args: ["dispatch", `hl.dsp.focus({ window = "address:${windowAddress}" })`] },
     ...herdrSessionFocusCommands(herdr, workspaceId, tabId, agentName)
   ];
 }

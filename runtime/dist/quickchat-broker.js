@@ -18882,7 +18882,7 @@ async function startAgent(herdr, provider, agentName, paneId, resume, run, wait)
 }
 async function focusSessionAndWindow(commands, target, agentName, windowAddress, run, wait) {
   await runFocusCommands(commands.herdr, target.workspaceId, target.tabId, agentName, run);
-  const raised = await run(commands.hyprctl, ["dispatch", "focuswindow", `address:${windowAddress}`]);
+  const raised = await run(commands.hyprctl, ["dispatch", `hl.dsp.focus({ window = "address:${windowAddress}" })`]);
   if (raised.code !== 0) throw new HerdrHandoffError("focus", "window_raise_failed");
   if (!await waitForActiveHerdrWindow(commands.hyprctl, windowAddress, run, wait))
     throw new HerdrHandoffError("focus", "window_not_focused");
