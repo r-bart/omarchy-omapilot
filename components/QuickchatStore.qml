@@ -58,7 +58,8 @@ Scope {
     if (providers.length === 0 || providerAvailable(desiredProvider)) provider = desiredProvider
     var modelKey = desiredProvider + "Model"
     var desiredModel = String(source[modelKey] || "")
-    if (desiredModel !== "") model = desiredModel
+    model = desiredModel
+    if (providers.length > 0) selectProvider(provider)
   }
 
   function providerAvailable(value) {

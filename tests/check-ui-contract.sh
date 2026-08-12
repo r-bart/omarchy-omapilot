@@ -20,6 +20,9 @@ grep -Fq 'Qt.resolvedUrl("../runtime/bin/quickchat-broker")' \
   "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'Quickshell.env("QUICKCHAT_BROKER_PATH") || bundledBrokerPath' \
   "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'model = desiredModel' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'if (providers.length > 0) selectProvider(provider)' \
+  "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'signal escapeRequested()' "$repo_dir/components/Composer.qml"
 grep -Fq 'readonly property bool popupOpen:' "$repo_dir/components/Composer.qml"
 grep -Fq 'if (composer.popupOpen) composer.closePopups()' "$repo_dir/Panel.qml"
