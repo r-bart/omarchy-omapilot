@@ -114,7 +114,10 @@ Panel {
     open: root.opened
     focusTarget: panelFocus
     contentWidth: popup.fittedContentWidth(Style.space(560))
-    contentHeight: popup.fittedContentHeight(Style.space(620))
+    // Keep the popout compact enough to feel like a quick answer surface, not
+    // a second chat application. Long answers and history already scroll
+    // inside their own views.
+    contentHeight: popup.fittedContentHeight(Style.space(420))
 
     Item {
       id: panelFocus

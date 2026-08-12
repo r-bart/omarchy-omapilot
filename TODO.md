@@ -23,9 +23,9 @@ a dedicated Herdr Quickchat workspace.
 
 | Stream | Branch/worktree | Owns | Status |
 | --- | --- | --- | --- |
-| QML surface | `quattro-ui` / `/home/sbull/worktrees/omarchy-quickchat-ui` | Bar widget, panel, components, QML tests | Pending |
-| ACP runtime | `broker-runtime` / `/home/sbull/worktrees/omarchy-quickchat-broker` | Broker, provider adapters, history, Herdr/Voxtype helpers, unit tests | Pending |
-| Plugin/release | `plugin-compliance` / `/home/sbull/worktrees/omarchy-quickchat-compliance` | Manifest, docs, validation, CI/release packaging | Implemented; merge/review pending |
+| QML surface | `quattro-ui` / `/home/sbull/worktrees/omarchy-quickchat-ui` | Bar widget, panel, components, QML tests | Implemented and integrated on `main` |
+| ACP runtime | `broker-runtime` / `/home/sbull/worktrees/omarchy-quickchat-broker` | Broker, provider adapters, history, Herdr/Voxtype helpers, unit tests | Integrated; final permission hardening in review |
+| Plugin/release | `plugin-compliance` / `/home/sbull/worktrees/omarchy-quickchat-compliance` | Manifest, docs, validation, CI/release packaging | Implemented and integrated on `main` |
 
 ## Allowed actions
 
@@ -42,9 +42,9 @@ a dedicated Herdr Quickchat workspace.
 
 ## Gates
 
-- [ ] Inspect and merge all three stream diffs deliberately.
-- [ ] Static checks and focused tests pass.
-- [ ] `omarchy plugin validate .` passes.
+- [x] Inspect and merge all three stream diffs deliberately.
+- [ ] Static checks and focused tests pass at the final release commit.
+- [x] `omarchy plugin validate .` passes from a clean staged archive.
 - [ ] Independent review has no unresolved actionable findings.
 - [ ] Live shell: open, submit, stream/stop, history, dismissal/reopen, error, keyboard, theme, and narrow layout verified.
 - [ ] `design-qa.md` says `final result: passed`.
@@ -52,7 +52,10 @@ a dedicated Herdr Quickchat workspace.
 
 ## Open checkpoints
 
-- Release asset publication follows local runtime and UI verification.
-- Marketplace submission follows validation from the public repository.
-- Add verified live light/dark captures to the README.
-- Decide and verify the release layout that makes the broker available after a plain Omarchy clone without hooks.
+- Codex must remain `on-request` while Quickchat rejects every ACP permission
+  request; a live tool-denial probe is required before release.
+- Release asset publication follows final local runtime and UI verification.
+- Marketplace submission requires the owner's approval of the exact issue body.
+- Add a verified live themed capture to the README.
+- The checked-in runtime layout works after a plain Omarchy clone without hooks;
+  rerun the deterministic packaging proof at the final commit.

@@ -154,7 +154,9 @@ Item {
         id: modelPicker
         Layout.fillWidth: true
         showLabel: false
-        options: root.backend ? root.backend.modelOptions : []
+        options: root.backend && root.backend.modelOptions.length > 0
+          ? root.backend.modelOptions
+          : [{ value: "", label: "Harness default" }]
         value: root.backend ? root.backend.model : ""
         foreground: root.foreground
         background: root.background
