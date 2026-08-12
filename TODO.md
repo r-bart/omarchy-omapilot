@@ -25,7 +25,7 @@ a dedicated Herdr Quickchat workspace.
 | --- | --- | --- | --- |
 | QML surface | `quattro-ui` / `/home/sbull/worktrees/omarchy-quickchat-ui` | Bar widget, panel, components, QML tests | Pending |
 | ACP runtime | `broker-runtime` / `/home/sbull/worktrees/omarchy-quickchat-broker` | Broker, provider adapters, history, Herdr/Voxtype helpers, unit tests | Pending |
-| Plugin/release | `plugin-compliance` / `/home/sbull/worktrees/omarchy-quickchat-compliance` | Manifest, docs, validation, CI/release packaging | Pending |
+| Plugin/release | `plugin-compliance` / `/home/sbull/worktrees/omarchy-quickchat-compliance` | Manifest, docs, validation, CI/release packaging | Implemented; merge/review pending |
 
 ## Allowed actions
 
@@ -54,4 +54,5 @@ a dedicated Herdr Quickchat workspace.
 
 - Release asset publication follows local runtime and UI verification.
 - Marketplace submission follows validation from the public repository.
-
+- Add verified live light/dark captures to the README.
+- Decide and verify the release layout that makes the broker available after a plain Omarchy clone without hooks.

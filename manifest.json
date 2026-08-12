@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.spencerbull.quickchat",
+  "name": "Quickchat",
+  "version": "0.1.0",
+  "author": "Spencer Bull",
+  "license": "MIT",
+  "description": "Fast, disposable AI answers from Codex, Claude, or OpenCode in the Omarchy bar.",
+  "kinds": ["bar-widget"],
+  "activation": "on-demand",
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Quickchat",
+    "description": "Ask an authenticated local AI harness a question without leaving the Omarchy bar.",
+    "category": "AI",
+    "aliases": ["ai", "ask", "chat", "codex", "claude", "opencode"],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "provider": "codex",
+      "codexModel": "",
+      "claudeModel": "",
+      "opencodeModel": ""
+    },
+    "schema": [
+      {
+        "key": "provider",
+        "type": "enum",
+        "label": "Default harness",
+        "options": ["codex", "claude", "opencode"],
+        "defaultValue": "codex",
+        "description": "Quickchat shows only installed, authenticated harnesses at runtime."
+      },
+      {
+        "key": "codexModel",
+        "type": "string",
+        "label": "Last Codex model",
+        "defaultValue": "",
+        "description": "Empty uses the Codex default; discovered models are selected in Quickchat."
+      },
+      {
+        "key": "claudeModel",
+        "type": "string",
+        "label": "Last Claude model",
+        "defaultValue": "",
+        "description": "Empty uses the Claude default; discovered models are selected in Quickchat."
+      },
+      {
+        "key": "opencodeModel",
+        "type": "string",
+        "label": "Last OpenCode model",
+        "defaultValue": "",
+        "description": "Empty uses the OpenCode default; discovered models are selected in Quickchat."
+      }
+    ]
+  }
+}

@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Check manifest contract
+        run: ./scripts/check-manifest.sh
+      - name: Validate with pinned Omarchy Quattro
+        env:
+          OMARCHY_QUATTRO_COMMIT: 4727bad5ebd37cf2344416ae937b02a931113ec3
+        run: |
+          git clone --filter=blob:none https://github.com/basecamp/omarchy.git /tmp/omarchy
+          git -C /tmp/omarchy checkout "$OMARCHY_QUATTRO_COMMIT"
+          /tmp/omarchy/bin/omarchy-plugin-validate .
+      - name: Run shell lint
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
+        with:
+          scandir: scripts
+      - name: Install development dependencies
+        run: npm ci --ignore-scripts
+      - name: Check release metadata locks
+        run: ./scripts/check-release-metadata.sh
+      - name: Run broker checks
+        run: npm run check
+      - name: Broker protocol smoke test
+        run: npm test
+
+  package:
+    runs-on: ubuntu-24.04
+    needs: validate
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: ./scripts/package-runtime.sh --output-dir dist/release
+      - name: Verify checksums
+        run: cd dist/release && sha256sum --check SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: quickchat-runtime-linux-x86_64
+          path: dist/release/
+          if-no-files-found: error
