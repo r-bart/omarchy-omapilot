@@ -114,7 +114,8 @@ export async function continueInHerdr(
   const wait = dependencies.delay ?? delay;
 
   await openOrFocusHerdr(commands, env, launch, "launch_spawn_failed");
-  if (!await waitForHerdrWindow(commands.hyprctl, run, wait))
+  const windowAddress = await waitForHerdrWindow(commands.hyprctl, run, wait);
+  if (windowAddress === undefined)
     throw new HerdrHandoffError("launch", "window_not_mapped");
 
   const listed = await waitForHerdr(run, commands.herdr, wait);
@@ -127,7 +128,7 @@ export async function continueInHerdr(
     throw new HerdrHandoffError("session", herdrCliErrorCode(existingAgents) ?? "agent_list_failed");
   const existing = findExistingAgent(parseResult(existingAgents.stdout), [agentName, transcriptAgentName]);
   if (existing !== undefined) {
-    await focusSessionAndWindow(commands, existing, existing.name, env, run, launch, wait);
+    await focusSessionAndWindow(commands, existing, existing.name, windowAddress, run, wait);
     return { mode: existing.name === transcriptAgentName ? "transcript" : nativeMode(chat), reused: true };
   }
 
@@ -153,7 +154,7 @@ export async function continueInHerdr(
       if (raced !== undefined) {
         handoffStarted = true;
         await rollbackCreatedTabs(commands.herdr, createdTabs, run);
-        await focusSessionAndWindow(commands, raced, agentName, env, run, launch, wait);
+        await focusSessionAndWindow(commands, raced, agentName, windowAddress, run, wait);
         return { mode: nativeMode(chat), reused: true };
       }
       if (resume === undefined)
@@ -180,7 +181,7 @@ export async function continueInHerdr(
       }
     }
     const focusedAgentName = mode === "transcript" ? transcriptAgentName : agentName;
-    await focusSessionAndWindow(commands, target, focusedAgentName, env, run, launch, wait);
+    await focusSessionAndWindow(commands, target, focusedAgentName, windowAddress, run, wait);
     return { mode, reused: false };
   } catch (error) {
     if (!handoffStarted) await rollbackCreatedTabs(commands.herdr, createdTabs, run);
@@ -226,33 +227,32 @@ async function waitForHerdr(run: CommandRunner, herdr: string, wait: Delay): Pro
   return result;
 }
 
-async function waitForHerdrWindow(hyprctl: string, run: CommandRunner, wait: Delay): Promise<boolean> {
+async function waitForHerdrWindow(hyprctl: string, run: CommandRunner, wait: Delay): Promise<string | undefined> {
   for (let attempt = 0; attempt < 24; attempt += 1) {
-    const clients = await run(hyprctl, ["clients", "-j"]);
-    if (clients.code === 0 && herdrWindowIn(clients.stdout)) return true;
+    const active = await run(hyprctl, ["activewindow", "-j"]);
+    const address = active.code === 0 ? herdrWindowAddress(parseJson(active.stdout)) : undefined;
+    if (address !== undefined) return address;
     if (attempt < 23) await wait(250);
   }
-  return false;
+  return undefined;
 }
 
-async function waitForActiveHerdrWindow(hyprctl: string, run: CommandRunner, wait: Delay): Promise<boolean> {
+async function waitForActiveHerdrWindow(hyprctl: string, address: string, run: CommandRunner, wait: Delay): Promise<boolean> {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const active = await run(hyprctl, ["activewindow", "-j"]);
-    if (active.code === 0 && isHerdrWindow(parseJson(active.stdout))) return true;
+    if (active.code === 0 && objectString(parseJson(active.stdout), "address") === address) return true;
     if (attempt < 19) await wait(100);
   }
   return false;
 }
 
-function herdrWindowIn(output: string): boolean {
-  const clients = parseJson(output);
-  return Array.isArray(clients) && clients.some((client) => isHerdrWindow(client));
-}
-
-function isHerdrWindow(window: unknown): boolean {
+function herdrWindowAddress(window: unknown): string | undefined {
   const windowClass = objectString(window, "class")?.toLowerCase();
   const title = objectString(window, "title")?.toLowerCase();
-  return windowClass === "org.omarchy.herdr" || title === "herdr";
+  const address = objectString(window, "address");
+  if ((windowClass === "org.omarchy.herdr" || title === "herdr") && address !== undefined && /^0x[0-9a-f]+$/i.test(address))
+    return address;
+  return undefined;
 }
 
 async function createHandoffTarget(
@@ -327,19 +327,19 @@ async function focusSessionAndWindow(
   commands: ResolvedHerdr,
   target: Pick<HerdrTarget, "workspaceId" | "tabId">,
   agentName: string,
-  env: NodeJS.ProcessEnv,
+  windowAddress: string,
   run: CommandRunner,
-  launch: WindowLauncher,
   wait: Delay
 ): Promise<void> {
   await runFocusCommands(commands.herdr, target.workspaceId, target.tabId, agentName, run);
-  await openOrFocusHerdr(commands, env, launch, "focus_spawn_failed");
-  if (!await waitForActiveHerdrWindow(commands.hyprctl, run, wait))
+  const raised = await run(commands.hyprctl, ["dispatch", "focuswindow", `address:${windowAddress}`]);
+  if (raised.code !== 0) throw new HerdrHandoffError("focus", "window_raise_failed");
+  if (!await waitForActiveHerdrWindow(commands.hyprctl, windowAddress, run, wait))
     throw new HerdrHandoffError("focus", "window_not_focused");
   // Raising a previously attached client can restore that client's last target.
   // Reapply the API focus after the OS-level raise, then leave the Herdr window active.
   await runFocusCommands(commands.herdr, target.workspaceId, target.tabId, agentName, run);
-  if (!await waitForActiveHerdrWindow(commands.hyprctl, run, wait))
+  if (!await waitForActiveHerdrWindow(commands.hyprctl, windowAddress, run, wait))
     throw new HerdrHandoffError("focus", "window_focus_lost");
 }
 
@@ -422,15 +422,15 @@ export function herdrLauncherCommand(herdr: string, launcher: string, tuiLaunche
 
 export function herdrFocusCommands(
   herdr: string,
-  launcher: string,
-  tuiLauncher: string,
+  hyprctl: string,
+  windowAddress: string,
   workspaceId: string,
   tabId: string,
   agentName: string
 ): HerdrCommand[] {
   return [
     ...herdrSessionFocusCommands(herdr, workspaceId, tabId, agentName),
-    herdrLauncherCommand(herdr, launcher, tuiLauncher),
+    { executable: hyprctl, args: ["dispatch", "focuswindow", `address:${windowAddress}`] },
     ...herdrSessionFocusCommands(herdr, workspaceId, tabId, agentName)
   ];
 }

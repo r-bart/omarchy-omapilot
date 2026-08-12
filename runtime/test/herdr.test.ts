@@ -40,13 +40,13 @@ describe("Herdr handoff", () => {
     });
   });
 
-  it("focuses the session, raises Herdr last, then reapplies session focus", () => {
-    expect(herdrFocusCommands(paths.herdr, paths.launcher, paths.tuiLauncher, "w11", "w11:t2", "quickchat-1234"))
+  it("focuses the session, raises the exact Herdr window last, then reapplies session focus", () => {
+    expect(herdrFocusCommands(paths.herdr, paths.hyprctl, "0xabc", "w11", "w11:t2", "quickchat-1234"))
       .toEqual([
         { executable: paths.herdr, args: ["workspace", "focus", "w11"] },
         { executable: paths.herdr, args: ["tab", "focus", "w11:t2"] },
         { executable: paths.herdr, args: ["agent", "focus", "quickchat-1234"] },
-        { executable: paths.launcher, args: ["herdr", "'/test/omarchy-launch-tui' --app-id=org.omarchy.herdr '/test/herdr'"] },
+        { executable: paths.hyprctl, args: ["dispatch", "focuswindow", "address:0xabc"] },
         { executable: paths.herdr, args: ["workspace", "focus", "w11"] },
         { executable: paths.herdr, args: ["tab", "focus", "w11:t2"] },
         { executable: paths.herdr, args: ["agent", "focus", "quickchat-1234"] }
@@ -63,15 +63,14 @@ describe("Herdr handoff", () => {
     await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
     expect(await Promise.race([promise.then(() => "finished"), Promise.resolve("running")])).toBe("running");
     releaseLaunch?.();
-    await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(2));
-    releaseLaunch?.();
     await expect(promise).resolves.toMatchObject({ mode: "native", reused: true });
+    expect(launch).toHaveBeenCalledTimes(1);
   });
 
   it.each(["org.omarchy.herdr", "kitty"])("continues against a mapped %s Herdr window", async (windowClass) => {
     const fixture = harness({ agents: [existingAgent("quickchat-11111111")], windowClass });
     await expect(continueInHerdr(chat({ resumable: true }), env, fixture)).resolves.toEqual({ mode: "native", reused: true });
-    expect(fixture.launch).toHaveBeenCalledTimes(2);
+    expect(fixture.launch).toHaveBeenCalledTimes(1);
   });
 
   it("reuses an existing same-chat agent without creating another tab", async () => {
@@ -90,7 +89,7 @@ describe("Herdr handoff", () => {
     const start = callsContaining(fixture.calls, ["agent", "start"])[0]?.args ?? [];
     expect(start).toContain("--");
     expect(start.slice(start.indexOf("--") + 1)).toEqual(nativeResumeArgs(provider, "session-1", "/home/test"));
-    expect(fixture.launch).toHaveBeenCalledTimes(2);
+    expect(fixture.launch).toHaveBeenCalledTimes(1);
   });
 
   it("uses a fresh tab/name for transcript fallback, accepts blocked, and cleans the failed native tab", async () => {
@@ -174,8 +173,8 @@ function harness(options: {
   const run = vi.fn(async (executable: string, args: string[]): Promise<Result> => {
     calls.push({ executable, args });
     if (executable === paths.hyprctl) {
-      if (args[0] === "clients") return Promise.resolve({ code: 0, stdout: JSON.stringify([{ class: options.windowClass ?? "org.omarchy.herdr", title: "herdr" }]), stderr: "" });
-      return Promise.resolve({ code: 0, stdout: JSON.stringify({ class: options.windowClass ?? "org.omarchy.herdr", title: "herdr" }), stderr: "" });
+      if (args[0] === "activewindow") return Promise.resolve({ code: 0, stdout: JSON.stringify({ address: "0xabc", class: options.windowClass ?? "org.omarchy.herdr", title: "herdr" }), stderr: "" });
+      return ok();
     }
     if (args[0] === "workspace" && args[1] === "list") return ok({ workspaces: [{ workspace_id: "w11", label: "Quickchat" }] });
     if (args[0] === "agent" && args[1] === "list") return ok({ agents: options.agents ?? [] });
