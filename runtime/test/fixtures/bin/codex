@@ -2,5 +2,55 @@
 case "${1:-}" in
   login) exit 0 ;;
   --version) echo "codex-cli 1.0.0" ;;
+  features)
+    cat <<'EOF'
+apps stable false
+apply_patch_freeform removed false
+apply_patch_streaming_events under-development false
+artifact under-development false
+browser_use stable false
+browser_use_external stable false
+browser_use_full_cdp_access stable false
+code_mode under-development false
+code_mode_buffered_exec under-development false
+code_mode_host stable false
+code_mode_only under-development false
+computer_use stable false
+deferred_executor under-development false
+deferred_tool_world_state under-development false
+default_mode_request_user_input under-development false
+enable_mcp_apps under-development false
+executor_capability_discovery under-development false
+goals stable false
+hooks stable false
+image_generation stable false
+in_app_browser stable false
+js_repl removed false
+js_repl_tools_only removed false
+multi_agent stable false
+multi_agent_v2 stable false
+plugin_sharing stable false
+plugins stable false
+recommended_plugins stable false
+realtime_conversation under-development false
+remote_plugin stable false
+request_permissions_tool under-development false
+shell_tool stable false
+skill_mcp_dependency_install stable false
+skill_env_var_dependency_prompt removed false
+search_tool removed false
+standalone_web_search under-development false
+tool_call_mcp_elicitation stable false
+tool_search removed false
+tool_search_always_defer_mcp_tools removed false
+tool_suggest stable false
+unified_exec stable false
+unified_exec_zsh_fork under-development false
+unavailable_dummy_tools removed false
+view_image stable false
+future_tool_feature stable false
+EOF
+    ;;
+  app-server) exit 0 ;;
   *) exit 1 ;;
 esac

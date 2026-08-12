@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import type { AcpRun } from "./acp.js";
-import { BrokerAcpError, probeAcpModels, runAcpQuestion } from "./acp.js";
+import { BrokerAcpError, deleteAcpSession, probeAcpModels, runAcpQuestion } from "./acp.js";
 import { DictationService } from "./dictation.js";
 import { HistoryStore, presentChat, presentImage } from "./history.js";
 import { continueInHerdr } from "./herdr.js";
@@ -10,34 +10,50 @@ import { discoverProviders, fallbackModels, type DiscoveredProvider } from "./pr
 import { resolveExecutable, runCommand } from "./process.js";
 import type { BrokerCommand, BrokerEvent, ChatRecord, ProviderInfo } from "./types.js";
 
+type DictationClient = Pick<DictationService, "start" | "stop" | "cancel">;
+type SessionCleaner = (provider: DiscoveredProvider, sessionId: string) => Promise<boolean>;
+
 export class QuickchatBroker {
   readonly #emit: (event: BrokerEvent) => void;
   readonly #history: HistoryStore;
   readonly #images: ImageStore;
-  readonly #dictation: DictationService;
+  readonly #dictation: DictationClient;
+  readonly #sessionCleaner: SessionCleaner;
   readonly #env: NodeJS.ProcessEnv;
   #providers = new Map<string, DiscoveredProvider>();
   #runs = new Map<string, AcpRun>();
+  #dictationGeneration = 0;
 
   constructor(
     emit: (event: BrokerEvent) => void,
-    options: { history?: HistoryStore; images?: ImageStore; dictation?: DictationService; env?: NodeJS.ProcessEnv } = {}
+    options: { history?: HistoryStore; images?: ImageStore; dictation?: DictationClient; sessionCleaner?: SessionCleaner; env?: NodeJS.ProcessEnv } = {}
   ) {
     this.#emit = emit;
     this.#history = options.history ?? new HistoryStore();
     this.#images = options.images ?? new ImageStore();
     this.#dictation = options.dictation ?? new DictationService();
+    this.#sessionCleaner = options.sessionCleaner ?? deleteAcpSession;
     this.#env = options.env ?? process.env;
   }
 
   async handle(command: BrokerCommand): Promise<boolean> {
     switch (command.type) {
-      case "initialize": await this.#initialize(); break;
+      case "initialize": await this.#initialize(command); break;
       case "submit": await this.#submit(command); break;
       case "cancel": await this.#cancel(command.id); break;
       case "history_list": await this.#emitHistory(); break;
-      case "history_delete": await this.#history.delete(command.chatId); await this.#emitHistory(); break;
-      case "history_clear": await this.#history.clear(); await this.#emitHistory(); break;
+      case "history_delete": {
+        const deleted = await this.#history.delete(command.chatId);
+        await this.#emitHistory();
+        if (deleted !== undefined) await this.#cleanupSessions([deleted]);
+        break;
+      }
+      case "history_clear": {
+        const deleted = await this.#history.clear();
+        await this.#emitHistory();
+        await this.#cleanupSessions(deleted);
+        break;
+      }
       case "dictation_start": await this.#dictationStart(); break;
       case "dictation_stop": await this.#dictationStop(); break;
       case "dictation_cancel": await this.#dictationCancel(); break;
@@ -50,7 +66,11 @@ export class QuickchatBroker {
     return true;
   }
 
-  async #initialize(): Promise<void> {
+  async #initialize(command: Extract<BrokerCommand, { type: "initialize" }>): Promise<void> {
+    if (command.protocolVersion !== 1) {
+      this.#error("unsupported_protocol", "Quickchat supports broker protocol version 1", false);
+      return;
+    }
     const discovered = await discoverProviders(this.#env);
     await Promise.all(discovered.map(async (provider) => {
       const acpModels = await probeAcpModels(provider);
@@ -88,7 +108,8 @@ export class QuickchatBroker {
         images: result.images,
         session: { acpId: result.sessionId, resumable: result.resumable, resumeKind: result.resumable ? "native" : "transcript" }
       };
-      await this.#history.save(chat);
+      const evicted = await this.#history.save(chat);
+      await this.#cleanupSessions(evicted);
       this.#emit({ type: "complete", chat: presentChat(chat) });
       this.#emit({ type: "state", id: command.id, state: "idle" });
     } catch (error) {
@@ -111,17 +132,28 @@ export class QuickchatBroker {
   }
 
   async #dictationStart(): Promise<void> {
-    try { await this.#dictation.start(); this.#emit({ type: "dictation", state: "recording" }); }
-    catch { this.#emit({ type: "dictation", state: "unavailable", message: "Voxtype is unavailable or not ready" }); }
+    const generation = ++this.#dictationGeneration;
+    try {
+      await this.#dictation.start();
+      if (generation === this.#dictationGeneration) this.#emit({ type: "dictation", state: "recording" });
+    } catch {
+      if (generation === this.#dictationGeneration) this.#emit({ type: "dictation", state: "unavailable", message: "Voxtype is unavailable or not ready" });
+    }
   }
 
   async #dictationStop(): Promise<void> {
+    const generation = this.#dictationGeneration;
     this.#emit({ type: "dictation", state: "transcribing" });
-    try { this.#emit({ type: "dictation", state: "idle", text: await this.#dictation.stop() }); }
-    catch { this.#emit({ type: "dictation", state: "unavailable", message: "Voxtype could not finish transcription" }); }
+    try {
+      const text = await this.#dictation.stop();
+      if (generation === this.#dictationGeneration) this.#emit({ type: "dictation", state: "idle", text });
+    } catch {
+      if (generation === this.#dictationGeneration) this.#emit({ type: "dictation", state: "unavailable", message: "Voxtype could not finish transcription" });
+    }
   }
 
   async #dictationCancel(): Promise<void> {
+    this.#dictationGeneration += 1;
     await this.#dictation.cancel();
     this.#emit({ type: "dictation", state: "idle" });
   }
@@ -166,6 +198,14 @@ export class QuickchatBroker {
 
   #error(code: string, message: string, retryable: boolean, id?: string): void {
     this.#emit({ type: "error", code, message, retryable, ...(id === undefined ? {} : { id }) });
+  }
+
+  async #cleanupSessions(chats: ChatRecord[]): Promise<void> {
+    await Promise.allSettled(chats.map(async (chat) => {
+      const sessionId = chat.session.acpId;
+      const provider = this.#providers.get(chat.provider);
+      if (sessionId !== undefined && provider !== undefined) await this.#sessionCleaner(provider, sessionId);
+    }));
   }
 }
 

@@ -1,0 +1,38 @@
+#!/usr/bin/env node
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { inflateSync } from "node:zlib";
+
+const inputArgument = process.argv.find((argument) => argument.endsWith("[0]"));
+const outputArgument = process.argv.at(-1);
+if (inputArgument === undefined || outputArgument === undefined) process.exit(2);
+
+const input = inputArgument.slice(0, -3);
+const separator = outputArgument.indexOf(":");
+if (separator < 1) process.exit(2);
+const format = outputArgument.slice(0, separator);
+const output = outputArgument.slice(separator + 1);
+const bytes = readFileSync(input);
+
+if (format === "PNG32") {
+  const chunks = [];
+  let offset = 8;
+  while (offset + 12 <= bytes.length) {
+    const length = bytes.readUInt32BE(offset);
+    const type = bytes.subarray(offset + 4, offset + 8).toString("ascii");
+    if (offset + 12 + length > bytes.length) process.exit(3);
+    if (type === "IDAT") chunks.push(bytes.subarray(offset + 8, offset + 8 + length));
+    offset += 12 + length;
+  }
+  try {
+    inflateSync(Buffer.concat(chunks));
+  } catch {
+    process.exit(3);
+  }
+} else if (format === "JPEG") {
+  if (bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes.at(-2) !== 0xff || bytes.at(-1) !== 0xd9) process.exit(3);
+} else if (format !== "WEBP") {
+  process.exit(2);
+}
+
+writeFileSync(output, bytes);
+if (process.env.FAKE_MAGICK_AUDIT !== undefined) appendFileSync(process.env.FAKE_MAGICK_AUDIT, `${format}\n`);

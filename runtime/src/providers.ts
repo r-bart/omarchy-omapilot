@@ -7,7 +7,7 @@ import { quickchatPaths } from "./paths.js";
 import { resolveExecutable, runCommand, stripAnsi } from "./process.js";
 
 export type AgentCommand = { executable: string; args: string[]; env: NodeJS.ProcessEnv };
-export type DiscoveredProvider = ProviderInfo & { harnessPath: string; agent: AgentCommand };
+export type DiscoveredProvider = ProviderInfo & { harnessPath: string; agent: AgentCommand; lockdownFeatures?: string[] };
 
 const providerNames: Record<ProviderId, string> = {
   codex: "Codex",
@@ -93,6 +93,8 @@ export async function discoverProviders(env: NodeJS.ProcessEnv = process.env): P
       args = [];
     }
     if (executable === undefined) continue;
+    const lockdownFeatures = id === "codex" ? await codexToolLockdownFeatures(harnessPath, env) : undefined;
+    if (id === "codex" && lockdownFeatures === undefined) continue;
     const capabilities: Capability[] = ["answer", "web"];
     const providerVersion = await version(harnessPath, env);
     found.push({
@@ -102,10 +104,30 @@ export async function discoverProviders(env: NodeJS.ProcessEnv = process.env): P
       models: [],
       capabilities,
       harnessPath,
-      agent: { executable, args, env: agentEnvironment(id, harnessPath, env) }
+      agent: { executable, args, env: agentEnvironment(id, harnessPath, env) },
+      ...(lockdownFeatures === undefined ? {} : { lockdownFeatures })
     });
   }
   return found;
+}
+
+export async function codexToolLockdownFeatures(path: string, env: NodeJS.ProcessEnv): Promise<string[] | undefined> {
+  const listed = await runCommand(path, ["features", "list"], {
+    env,
+    timeoutMs: 10_000,
+    maxOutput: 256_000
+  });
+  if (listed.code !== 0) return undefined;
+  const output = stripAnsi(listed.stdout);
+  const features = [...new Set(output.split("\n").map((line) => /^([a-z][a-z0-9_]*)\s/u.exec(line)?.[1]).filter((feature): feature is string => feature !== undefined))];
+  if (features.length === 0) return undefined;
+  const featureArguments = features.flatMap((feature) => ["-c", `features.${feature}=false`]);
+  const validated = await runCommand(path, ["app-server", "--strict-config", ...featureArguments, "--listen", "stdio://"], {
+    env,
+    timeoutMs: 10_000,
+    maxOutput: 64_000
+  });
+  return validated.code === 0 ? features : undefined;
 }
 
 export async function fallbackModels(provider: DiscoveredProvider): Promise<Array<{ id: string; name: string }>> {

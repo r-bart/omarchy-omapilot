@@ -14,7 +14,7 @@ import { spawn as spawn3 } from "node:child_process";
 
 // runtime/src/acp.ts
 import { spawn as spawn2 } from "node:child_process";
-import { mkdir as mkdir3, mkdtemp, rm as rm2 } from "node:fs/promises";
+import { mkdir as mkdir3, mkdtemp as mkdtemp2, rm as rm3 } from "node:fs/promises";
 import { join as join4 } from "node:path";
 
 // node_modules/@agentclientprotocol/sdk/dist/schema/index.js
@@ -17483,7 +17483,7 @@ var legacyClientNotificationMethods = /* @__PURE__ */ new Set([
 
 // runtime/src/images.ts
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { get } from "node:https";
 import { isIP } from "node:net";
 import { lookup } from "node:dns/promises";
@@ -17511,9 +17511,88 @@ function quickchatPaths(env = process.env) {
   };
 }
 
+// runtime/src/process.ts
+import { spawn } from "node:child_process";
+import { access } from "node:fs/promises";
+import { constants } from "node:fs";
+import { delimiter, isAbsolute } from "node:path";
+async function runCommand(executable, args, options = {}) {
+  const maxOutput = options.maxOutput ?? 1e6;
+  return new Promise((resolve2, reject) => {
+    const child = spawn(executable, args, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32"
+    });
+    let stdout = "";
+    let stderr = "";
+    const append = (current, chunk) => (current + chunk.toString("utf8")).slice(-maxOutput);
+    child.stdout.on("data", (chunk) => {
+      stdout = append(stdout, chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr = append(stderr, chunk);
+    });
+    child.once("error", reject);
+    const timer = setTimeout(() => {
+      terminateProcessGroup(child.pid);
+    }, options.timeoutMs ?? 1e4);
+    timer.unref();
+    child.once("close", (code) => {
+      clearTimeout(timer);
+      resolve2({ code: code ?? 1, stdout, stderr });
+    });
+  });
+}
+function terminateProcessGroup(pid) {
+  if (pid === void 0) return;
+  try {
+    process.kill(process.platform === "win32" ? pid : -pid, "SIGTERM");
+  } catch {
+  }
+  const timer = setTimeout(() => {
+    try {
+      process.kill(process.platform === "win32" ? pid : -pid, "SIGKILL");
+    } catch {
+    }
+  }, 2e3);
+  timer.unref();
+}
+async function executableFile(candidate) {
+  try {
+    await access(candidate, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function resolveExecutable(name, env = process.env) {
+  const mise = await resolveFromPath("mise", env);
+  if (mise !== void 0) {
+    const result = await runCommand(mise, ["which", name], { env, timeoutMs: 5e3, maxOutput: 16384 });
+    const candidate = result.stdout.trim().split("\n")[0];
+    if (result.code === 0 && candidate !== void 0 && isAbsolute(candidate) && await executableFile(candidate)) return candidate;
+  }
+  return resolveFromPath(name, env);
+}
+async function resolveFromPath(name, env) {
+  for (const directory of (env.PATH ?? "").split(delimiter)) {
+    if (directory.length === 0) continue;
+    const candidate = `${directory}/${name}`;
+    if (await executableFile(candidate)) return candidate;
+  }
+  return void 0;
+}
+function stripAnsi(value) {
+  return value.replaceAll(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
+}
+
 // runtime/src/images.ts
 var MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 var MAX_IMAGE_DIMENSION = 12e3;
+var MAX_IMAGE_PIXELS = 16e6;
+var MAX_CACHE_BYTES = 50 * 1024 * 1024;
 var MIME_EXTENSIONS = /* @__PURE__ */ new Map([
   ["image/png", ".png"],
   ["image/jpeg", ".jpg"],
@@ -17521,10 +17600,16 @@ var MIME_EXTENSIONS = /* @__PURE__ */ new Map([
 ]);
 var ImageStore = class {
   #paths;
-  constructor(paths = quickchatPaths()) {
+  #env;
+  constructor(paths = quickchatPaths(), env = process.env) {
     this.#paths = paths;
+    this.#env = env;
   }
   async saveBase64(data, claimedMime, sourceUrl) {
+    const maxEncodedBytes = Math.ceil(MAX_IMAGE_BYTES / 3) * 4;
+    if (data.length === 0 || data.length > maxEncodedBytes || !/^(?:[a-zA-Z0-9+/]{4})*(?:[a-zA-Z0-9+/]{2}==|[a-zA-Z0-9+/]{3}=)?$/u.test(data)) {
+      throw new ImagePolicyError("image_size", "Image encoding is invalid or exceeds the 5 MiB limit");
+    }
     const bytes = Buffer.from(data, "base64");
     if (bytes.byteLength === 0 || bytes.byteLength > MAX_IMAGE_BYTES) throw new ImagePolicyError("image_size", "Image exceeds the 5 MiB limit");
     return this.save(bytes, claimedMime, sourceUrl);
@@ -17534,28 +17619,80 @@ var ImageStore = class {
     return this.save(response.body, response.mime, response.finalUrl);
   }
   async save(bytes, claimedMime, sourceUrl) {
-    const detected = inspectImage(bytes);
-    if (detected.mime !== claimedMime.toLowerCase().split(";")[0]) throw new ImagePolicyError("image_mime", "Image content does not match its MIME type");
-    if (detected.width < 1 || detected.height < 1 || detected.width > MAX_IMAGE_DIMENSION || detected.height > MAX_IMAGE_DIMENSION) {
-      throw new ImagePolicyError("image_dimensions", "Image dimensions are not supported");
-    }
+    const claimed = claimedMime.toLowerCase().split(";")[0] ?? "";
+    if (!MIME_EXTENSIONS.has(claimed)) throw new ImagePolicyError("image_mime", "Unsupported image type");
+    const source = inspectImage(bytes);
+    if (source.mime !== claimed) throw new ImagePolicyError("image_mime", "Image content does not match its MIME type");
+    const normalized = await normalizeImage(bytes, claimed, this.#paths, this.#env);
+    const detected = inspectImage(normalized);
+    if (detected.mime !== claimed) throw new ImagePolicyError("image_decode", "Image normalization changed the media type unexpectedly");
     await mkdir(this.#paths.images, { recursive: true, mode: 448 });
     const id = randomUUID();
     const extension = MIME_EXTENSIONS.get(detected.mime);
-    if (extension === void 0) throw new ImagePolicyError("image_mime", "Unsupported image type");
+    if (extension === void 0) throw new ImagePolicyError("image_mime", "Unsupported normalized image type");
     const filename = `${id}${extension}`;
-    await writeFile(join2(this.#paths.images, filename), bytes, { flag: "wx", mode: 384 });
-    return {
+    await writeFile(join2(this.#paths.images, filename), normalized, { flag: "wx", mode: 384 });
+    const image = {
       id,
       mimeType: detected.mime,
       path: basename(filename),
-      bytes: bytes.byteLength,
+      bytes: normalized.byteLength,
       width: detected.width,
       height: detected.height,
       ...sourceUrl === void 0 ? {} : { sourceUrl }
     };
+    await pruneImageCache(this.#paths);
+    return image;
   }
 };
+async function normalizeImage(bytes, mime, paths, env) {
+  const magick = await resolveExecutable("magick", env);
+  if (magick === void 0) throw new ImagePolicyError("image_decoder_unavailable", "Secure image decoding is unavailable");
+  await mkdir(paths.runtime, { recursive: true, mode: 448 });
+  const temporary = await mkdtemp(join2(paths.runtime, "image-"));
+  try {
+    const extension = MIME_EXTENSIONS.get(mime);
+    if (extension === void 0) throw new ImagePolicyError("image_mime", "Unsupported image type");
+    const input2 = join2(temporary, `source${extension}`);
+    const output = join2(temporary, `normalized${extension}`);
+    const outputTarget = mime === "image/png" ? `PNG32:${output}` : mime === "image/jpeg" ? `JPEG:${output}` : `WEBP:${output}`;
+    await writeFile(input2, bytes, { flag: "wx", mode: 384 });
+    const result = await runCommand(magick, [
+      "-limit",
+      "memory",
+      "128MiB",
+      "-limit",
+      "map",
+      "256MiB",
+      "-limit",
+      "disk",
+      "512MiB",
+      "-limit",
+      "area",
+      "16MP",
+      "-limit",
+      "width",
+      String(MAX_IMAGE_DIMENSION),
+      "-limit",
+      "height",
+      String(MAX_IMAGE_DIMENSION),
+      `${input2}[0]`,
+      "-auto-orient",
+      "-strip",
+      ...mime === "image/png" ? ["-define", "png:exclude-chunks=date,time"] : ["-quality", "90"],
+      outputTarget
+    ], { env, timeoutMs: 15e3, maxOutput: 32768 });
+    if (result.code !== 0) throw new ImagePolicyError("image_decode", "Image decoder rejected the payload");
+    const normalized = await readFile(output);
+    if (normalized.byteLength === 0 || normalized.byteLength > MAX_IMAGE_BYTES) throw new ImagePolicyError("image_size", "Normalized image exceeds the 5 MiB limit");
+    return normalized;
+  } catch (error48) {
+    if (error48 instanceof ImagePolicyError) throw error48;
+    throw new ImagePolicyError("image_decode", "Image decoder could not normalize the payload");
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
+}
 var ImagePolicyError = class extends Error {
   constructor(code, message) {
     super(message);
@@ -17564,41 +17701,124 @@ var ImagePolicyError = class extends Error {
   }
 };
 function inspectImage(bytes) {
-  if (bytes.byteLength >= 24 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
-    return { mime: "image/png", width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
-  }
-  if (bytes.byteLength >= 30 && bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") {
-    const kind = bytes.subarray(12, 16).toString("ascii");
-    if (kind === "VP8X") return { mime: "image/webp", width: 1 + bytes.readUIntLE(24, 3), height: 1 + bytes.readUIntLE(27, 3) };
-    if (kind === "VP8 " && bytes.subarray(23, 26).equals(Buffer.from([157, 1, 42]))) {
-      return { mime: "image/webp", width: bytes.readUInt16LE(26) & 16383, height: bytes.readUInt16LE(28) & 16383 };
-    }
-    if (kind === "VP8L" && bytes[20] === 47) {
-      const bits = bytes.readUInt32LE(21);
-      return { mime: "image/webp", width: (bits & 16383) + 1, height: (bits >>> 14 & 16383) + 1 };
-    }
-  }
-  if (bytes.byteLength >= 4 && bytes[0] === 255 && bytes[1] === 216) {
-    let offset = 2;
-    while (offset + 8 < bytes.byteLength) {
-      if (bytes[offset] !== 255) {
-        offset += 1;
-        continue;
-      }
-      const marker = bytes[offset + 1];
-      if (marker === void 0 || marker === 216 || marker === 217) {
-        offset += 2;
-        continue;
-      }
-      const length = bytes.readUInt16BE(offset + 2);
-      if (length < 2 || offset + 2 + length > bytes.byteLength) break;
-      if (marker >= 192 && marker <= 195 || marker >= 197 && marker <= 199 || marker >= 201 && marker <= 203 || marker >= 205 && marker <= 207) {
-        return { mime: "image/jpeg", height: bytes.readUInt16BE(offset + 5), width: bytes.readUInt16BE(offset + 7) };
-      }
-      offset += 2 + length;
-    }
-  }
+  if (bytes.byteLength > MAX_IMAGE_BYTES) throw new ImagePolicyError("image_size", "Image exceeds the 5 MiB limit");
+  const dimensions = inspectPng(bytes) ?? inspectWebp(bytes) ?? inspectJpeg(bytes);
+  if (dimensions !== void 0) return validateDimensions(dimensions);
   throw new ImagePolicyError("image_mime", "Only valid PNG, JPEG, and WebP images are supported");
+}
+function inspectPng(bytes) {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  if (!bytes.subarray(0, 8).equals(signature)) return void 0;
+  if (bytes.byteLength < 45) throw new ImagePolicyError("image_structure", "PNG image is truncated");
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let chunkIndex = 0;
+  let ended = false;
+  let hasImageData = false;
+  while (offset < bytes.byteLength) {
+    if (offset + 12 > bytes.byteLength) throw new ImagePolicyError("image_structure", "PNG chunk is truncated");
+    const length = bytes.readUInt32BE(offset);
+    const type = bytes.subarray(offset + 4, offset + 8).toString("ascii");
+    const end = offset + 12 + length;
+    if (end > bytes.byteLength) throw new ImagePolicyError("image_structure", "PNG chunk length exceeds the file");
+    if (chunkIndex === 0) {
+      if (type !== "IHDR" || length !== 13) throw new ImagePolicyError("image_structure", "PNG must begin with a complete IHDR chunk");
+      width = bytes.readUInt32BE(offset + 8);
+      height = bytes.readUInt32BE(offset + 12);
+    }
+    if (type === "IEND") {
+      if (length !== 0 || end !== bytes.byteLength) throw new ImagePolicyError("image_structure", "PNG must end with one empty IEND chunk");
+      ended = true;
+    }
+    if (type === "IDAT") hasImageData = true;
+    offset = end;
+    chunkIndex += 1;
+  }
+  if (!ended || !hasImageData) throw new ImagePolicyError("image_structure", "PNG is missing image data or its IEND chunk");
+  return { mime: "image/png", width, height };
+}
+function inspectWebp(bytes) {
+  if (bytes.byteLength < 12 || bytes.subarray(0, 4).toString("ascii") !== "RIFF" || bytes.subarray(8, 12).toString("ascii") !== "WEBP") return void 0;
+  if (bytes.readUInt32LE(4) + 8 !== bytes.byteLength) throw new ImagePolicyError("image_structure", "WebP RIFF size does not match the file");
+  let offset = 12;
+  let dimensions;
+  let hasImagePayload = false;
+  while (offset < bytes.byteLength) {
+    if (offset + 8 > bytes.byteLength) throw new ImagePolicyError("image_structure", "WebP chunk is truncated");
+    const kind = bytes.subarray(offset, offset + 4).toString("ascii");
+    const length = bytes.readUInt32LE(offset + 4);
+    const data = offset + 8;
+    const end = data + length;
+    const paddedEnd = end + length % 2;
+    if (end > bytes.byteLength || paddedEnd > bytes.byteLength) throw new ImagePolicyError("image_structure", "WebP chunk length exceeds the file");
+    if (dimensions === void 0 && kind === "VP8X" && length >= 10) {
+      dimensions = { mime: "image/webp", width: 1 + bytes.readUIntLE(data + 4, 3), height: 1 + bytes.readUIntLE(data + 7, 3) };
+    } else if (kind === "VP8 " && length >= 10 && bytes.subarray(data + 3, data + 6).equals(Buffer.from([157, 1, 42]))) {
+      hasImagePayload = true;
+      dimensions ??= { mime: "image/webp", width: bytes.readUInt16LE(data + 6) & 16383, height: bytes.readUInt16LE(data + 8) & 16383 };
+    } else if (kind === "VP8L" && length >= 5 && bytes[data] === 47) {
+      hasImagePayload = true;
+      const bits = bytes.readUInt32LE(data + 1);
+      dimensions ??= { mime: "image/webp", width: (bits & 16383) + 1, height: (bits >>> 14 & 16383) + 1 };
+    } else if (kind === "ANMF" && length >= 16) {
+      hasImagePayload = true;
+    }
+    offset = paddedEnd;
+  }
+  if (offset !== bytes.byteLength || dimensions === void 0 || !hasImagePayload) throw new ImagePolicyError("image_structure", "WebP image has no complete image payload");
+  return dimensions;
+}
+function inspectJpeg(bytes) {
+  if (bytes.byteLength < 4 || bytes[0] !== 255 || bytes[1] !== 216) return void 0;
+  if (bytes.at(-2) !== 255 || bytes.at(-1) !== 217) throw new ImagePolicyError("image_structure", "JPEG is missing its end marker");
+  let offset = 2;
+  let dimensions;
+  let hasScan = false;
+  while (offset < bytes.byteLength - 2) {
+    while (offset < bytes.byteLength - 2 && bytes[offset] === 255) offset += 1;
+    const marker = bytes[offset];
+    if (marker === void 0) break;
+    offset += 1;
+    if (marker === 0 || marker === 216 || marker >= 208 && marker <= 215) continue;
+    if (offset + 2 > bytes.byteLength - 2) throw new ImagePolicyError("image_structure", "JPEG segment is truncated");
+    const length = bytes.readUInt16BE(offset);
+    if (length < 2 || offset + length > bytes.byteLength - 2) throw new ImagePolicyError("image_structure", "JPEG segment length exceeds the file");
+    if (marker === 218) {
+      hasScan = true;
+      break;
+    }
+    if (marker >= 192 && marker <= 195 || marker >= 197 && marker <= 199 || marker >= 201 && marker <= 203 || marker >= 205 && marker <= 207) {
+      if (length < 7) throw new ImagePolicyError("image_structure", "JPEG frame header is truncated");
+      dimensions = { mime: "image/jpeg", height: bytes.readUInt16BE(offset + 3), width: bytes.readUInt16BE(offset + 5) };
+    }
+    offset += length;
+  }
+  if (dimensions === void 0 || !hasScan) throw new ImagePolicyError("image_structure", "JPEG is missing a supported frame header or scan");
+  return dimensions;
+}
+function validateDimensions(dimensions) {
+  if (dimensions.width < 1 || dimensions.height < 1 || dimensions.width > MAX_IMAGE_DIMENSION || dimensions.height > MAX_IMAGE_DIMENSION || dimensions.width * dimensions.height > MAX_IMAGE_PIXELS) {
+    throw new ImagePolicyError("image_dimensions", "Image dimensions are not supported");
+  }
+  return dimensions;
+}
+async function pruneImageCache(paths = quickchatPaths()) {
+  await mkdir(paths.images, { recursive: true, mode: 448 });
+  const files = (await Promise.all((await readdir(paths.images)).map(async (name) => {
+    try {
+      const info = await stat(join2(paths.images, name));
+      return info.isFile() ? { name, bytes: info.size, modified: info.mtimeMs } : void 0;
+    } catch {
+      return void 0;
+    }
+  }))).filter((item) => item !== void 0).sort((a, b) => a.modified - b.modified);
+  let total = files.reduce((sum, file2) => sum + file2.bytes, 0);
+  for (const file2 of files) {
+    if (total <= MAX_CACHE_BYTES) break;
+    await rm(join2(paths.images, file2.name), { force: true });
+    total -= file2.bytes;
+  }
 }
 function isPublicAddress(address) {
   const version3 = isIP(address);
@@ -17690,7 +17910,7 @@ function isAllowedExternalLink(rawUrl) {
 }
 
 // runtime/src/history.ts
-import { mkdir as mkdir2, open, readdir, readFile, rename, rm, stat, unlink, writeFile as writeFile2 } from "node:fs/promises";
+import { mkdir as mkdir2, open, readdir as readdir2, readFile as readFile2, rename, rm as rm2, stat as stat2, unlink, writeFile as writeFile2 } from "node:fs/promises";
 import { basename as basename2, join as join3 } from "node:path";
 import { pathToFileURL } from "node:url";
 var MAX_CHATS = 30;
@@ -17702,11 +17922,11 @@ var HistoryStore = class {
   }
   async list() {
     await mkdir2(this.#paths.records, { recursive: true, mode: 448 });
-    const names = await readdir(this.#paths.records);
+    const names = await readdir2(this.#paths.records);
     const records = [];
     for (const name of names.filter((value) => /^[0-9a-f-]{36}\.json$/u.test(value))) {
       try {
-        const parsed = JSON.parse(await readFile(join3(this.#paths.records, name), "utf8"));
+        const parsed = JSON.parse(await readFile2(join3(this.#paths.records, name), "utf8"));
         if (isChatRecord(parsed)) records.push(parsed);
       } catch {
       }
@@ -17716,7 +17936,7 @@ var HistoryStore = class {
   async get(id) {
     if (!isUuid(id)) return void 0;
     try {
-      const parsed = JSON.parse(await readFile(join3(this.#paths.records, `${id}.json`), "utf8"));
+      const parsed = JSON.parse(await readFile2(join3(this.#paths.records, `${id}.json`), "utf8"));
       return isChatRecord(parsed) ? parsed : void 0;
     } catch {
       return void 0;
@@ -17732,38 +17952,43 @@ var HistoryStore = class {
     await handle.sync();
     await handle.close();
     await rename(temporary, destination);
-    await this.#evictRecords();
+    const evicted = await this.#evictRecords();
     await this.#evictImages();
+    return evicted;
   }
   async delete(id) {
-    if (!isUuid(id)) return false;
+    if (!isUuid(id)) return void 0;
     const chat = await this.get(id);
     try {
       await unlink(join3(this.#paths.records, `${id}.json`));
     } catch {
-      return false;
+      return void 0;
     }
     if (chat !== void 0) {
       await Promise.all(chat.images.map(async (image) => {
-        if (basename2(image.path) === image.path) await rm(join3(this.#paths.images, image.path), { force: true });
+        if (basename2(image.path) === image.path) await rm2(join3(this.#paths.images, image.path), { force: true });
       }));
     }
-    return true;
+    return chat;
   }
   async clear() {
-    await rm(this.#paths.records, { recursive: true, force: true });
-    await rm(this.#paths.images, { recursive: true, force: true });
+    const chats = await this.listAll();
+    await rm2(this.#paths.records, { recursive: true, force: true });
+    await rm2(this.#paths.images, { recursive: true, force: true });
+    return chats;
   }
   async #evictRecords() {
     const records = await this.listAll();
-    await Promise.all(records.slice(MAX_CHATS).map((chat) => this.delete(chat.id)));
+    const evicted = records.slice(MAX_CHATS);
+    const deleted = await Promise.all(evicted.map((chat) => this.delete(chat.id)));
+    return deleted.filter((chat) => chat !== void 0);
   }
   async listAll() {
     await mkdir2(this.#paths.records, { recursive: true, mode: 448 });
-    const names = await readdir(this.#paths.records);
+    const names = await readdir2(this.#paths.records);
     const records = await Promise.all(names.filter((name) => name.endsWith(".json")).map(async (name) => {
       try {
-        const parsed = JSON.parse(await readFile(join3(this.#paths.records, name), "utf8"));
+        const parsed = JSON.parse(await readFile2(join3(this.#paths.records, name), "utf8"));
         return isChatRecord(parsed) ? parsed : void 0;
       } catch {
         return void 0;
@@ -17773,10 +17998,10 @@ var HistoryStore = class {
   }
   async #evictImages() {
     await mkdir2(this.#paths.images, { recursive: true, mode: 448 });
-    const names = await readdir(this.#paths.images);
+    const names = await readdir2(this.#paths.images);
     const files = (await Promise.all(names.map(async (name) => {
       try {
-        const info = await stat(join3(this.#paths.images, name));
+        const info = await stat2(join3(this.#paths.images, name));
         return info.isFile() ? { name, bytes: info.size, modified: info.mtimeMs } : void 0;
       } catch {
         return void 0;
@@ -17785,7 +18010,7 @@ var HistoryStore = class {
     let total = files.reduce((sum, file2) => sum + file2.bytes, 0);
     for (const file2 of files) {
       if (total <= MAX_IMAGE_BYTES2) break;
-      await rm(join3(this.#paths.images, file2.name), { force: true });
+      await rm2(join3(this.#paths.images, file2.name), { force: true });
       total -= file2.bytes;
     }
   }
@@ -17804,83 +18029,6 @@ function isChatRecord(value) {
   return "schemaVersion" in value && value.schemaVersion === 1 && "id" in value && typeof value.id === "string" && isUuid(value.id) && "createdAt" in value && typeof value.createdAt === "string" && "provider" in value && ["codex", "claude", "opencode"].includes(String(value.provider)) && "question" in value && typeof value.question === "string" && "answer" in value && typeof value.answer === "string" && "images" in value && Array.isArray(value.images);
 }
 
-// runtime/src/process.ts
-import { spawn } from "node:child_process";
-import { access } from "node:fs/promises";
-import { constants } from "node:fs";
-import { delimiter, isAbsolute } from "node:path";
-async function runCommand(executable, args, options = {}) {
-  const maxOutput = options.maxOutput ?? 1e6;
-  return new Promise((resolve2, reject) => {
-    const child = spawn(executable, args, {
-      cwd: options.cwd,
-      env: options.env,
-      stdio: ["ignore", "pipe", "pipe"],
-      detached: process.platform !== "win32"
-    });
-    let stdout = "";
-    let stderr = "";
-    const append = (current, chunk) => (current + chunk.toString("utf8")).slice(-maxOutput);
-    child.stdout.on("data", (chunk) => {
-      stdout = append(stdout, chunk);
-    });
-    child.stderr.on("data", (chunk) => {
-      stderr = append(stderr, chunk);
-    });
-    child.once("error", reject);
-    const timer = setTimeout(() => {
-      terminateProcessGroup(child.pid);
-    }, options.timeoutMs ?? 1e4);
-    timer.unref();
-    child.once("close", (code) => {
-      clearTimeout(timer);
-      resolve2({ code: code ?? 1, stdout, stderr });
-    });
-  });
-}
-function terminateProcessGroup(pid) {
-  if (pid === void 0) return;
-  try {
-    process.kill(process.platform === "win32" ? pid : -pid, "SIGTERM");
-  } catch {
-  }
-  const timer = setTimeout(() => {
-    try {
-      process.kill(process.platform === "win32" ? pid : -pid, "SIGKILL");
-    } catch {
-    }
-  }, 2e3);
-  timer.unref();
-}
-async function executableFile(candidate) {
-  try {
-    await access(candidate, constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-async function resolveExecutable(name, env = process.env) {
-  const mise = await resolveFromPath("mise", env);
-  if (mise !== void 0) {
-    const result = await runCommand(mise, ["which", name], { env, timeoutMs: 5e3, maxOutput: 16384 });
-    const candidate = result.stdout.trim().split("\n")[0];
-    if (result.code === 0 && candidate !== void 0 && isAbsolute(candidate) && await executableFile(candidate)) return candidate;
-  }
-  return resolveFromPath(name, env);
-}
-async function resolveFromPath(name, env) {
-  for (const directory of (env.PATH ?? "").split(delimiter)) {
-    if (directory.length === 0) continue;
-    const candidate = `${directory}/${name}`;
-    if (await executableFile(candidate)) return candidate;
-  }
-  return void 0;
-}
-function stripAnsi(value) {
-  return value.replaceAll(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
-}
-
 // runtime/src/acp.ts
 async function probeAcpModels(provider, timeoutMs = 15e3) {
   const child = spawn2(provider.agent.executable, provider.agent.args, {
@@ -17890,7 +18038,7 @@ async function probeAcpModels(provider, timeoutMs = 15e3) {
   });
   const paths = quickchatPaths(provider.agent.env);
   await mkdir3(paths.runtime, { recursive: true, mode: 448 });
-  const cwd = await mkdtemp(join4(paths.runtime, "probe-"));
+  const cwd = await mkdtemp2(join4(paths.runtime, "probe-"));
   const timeout = setTimeout(() => terminateProcessGroup(child.pid), timeoutMs);
   timeout.unref();
   try {
@@ -17900,14 +18048,16 @@ async function probeAcpModels(provider, timeoutMs = 15e3) {
       webReadable(child)
     );
     return await client({ name: "omarchy-quickchat-probe" }).onRequest(methods.client.session.requestPermission, () => ({ outcome: { outcome: "cancelled" } })).connectWith(stream, async (ctx) => {
-      await ctx.request(methods.agent.initialize, {
+      const initialized = await ctx.request(methods.agent.initialize, {
         protocolVersion: PROTOCOL_VERSION,
         clientCapabilities: { session: { configOptions: { boolean: {} } } },
         clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }
       });
+      if (!canRemoveSession(initialized.agentCapabilities)) return { models: [] };
       const session = await ctx.buildSession(sessionRequest(provider.id, cwd, "answer")).start();
       const config2 = modelConfiguration(session.newSessionResponse.configOptions ?? []);
       session.dispose();
+      await removeSession(ctx, initialized.agentCapabilities, session.sessionId);
       return { models: config2.models, ...config2.current === void 0 ? {} : { defaultModel: config2.current } };
     });
   } catch {
@@ -17915,7 +18065,42 @@ async function probeAcpModels(provider, timeoutMs = 15e3) {
   } finally {
     clearTimeout(timeout);
     terminateProcessGroup(child.pid);
-    await rm2(cwd, { recursive: true, force: true });
+    await rm3(cwd, { recursive: true, force: true });
+  }
+}
+async function deleteAcpSession(provider, sessionId, timeoutMs = 15e3) {
+  const child = spawn2(provider.agent.executable, provider.agent.args, {
+    env: secureEnvironment(provider, "answer"),
+    stdio: ["pipe", "pipe", "ignore"],
+    detached: process.platform !== "win32"
+  });
+  const timeout = setTimeout(() => terminateProcessGroup(child.pid), timeoutMs);
+  timeout.unref();
+  try {
+    if (child.stdin === null || child.stdout === null) return false;
+    const deleted = await client({ name: "omarchy-quickchat-cleanup" }).onRequest(methods.client.session.requestPermission, () => ({ outcome: { outcome: "cancelled" } })).connectWith(ndJsonStream2(webWritable(child), webReadable(child)), async (ctx) => {
+      const initialized = await ctx.request(methods.agent.initialize, {
+        protocolVersion: PROTOCOL_VERSION,
+        clientCapabilities: {},
+        clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }
+      });
+      return removeSession(ctx, initialized.agentCapabilities, sessionId);
+    });
+    if (deleted) return true;
+    if (provider.id === "opencode") {
+      const fallback = await runCommand(provider.harnessPath, ["--pure", "session", "delete", sessionId], {
+        env: provider.agent.env,
+        timeoutMs,
+        maxOutput: 32768
+      });
+      return fallback.code === 0;
+    }
+    return false;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+    terminateProcessGroup(child.pid);
   }
 }
 function runAcpQuestion(provider, requestId, question, model, capability, emit2, timeoutMs = 9e4, imageStore = new ImageStore()) {
@@ -17926,10 +18111,7 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
   });
   let cancelSession;
   let cancelled = false;
-  let stderr = "";
-  child.stderr?.on("data", (chunk) => {
-    stderr = (stderr + chunk.toString("utf8")).slice(-32768);
-  });
+  child.stderr?.resume();
   const cancel = async () => {
     cancelled = true;
     if (cancelSession !== void 0) await cancelSession().catch(() => void 0);
@@ -17939,7 +18121,7 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
   const result = (async () => {
     const paths = quickchatPaths(provider.agent.env);
     await mkdir3(paths.runtime, { recursive: true, mode: 448 });
-    const cwd = await mkdtemp(join4(paths.runtime, "chat-"));
+    const cwd = await mkdtemp2(join4(paths.runtime, "chat-"));
     const timeout = setTimeout(() => {
       void cancel();
     }, timeoutMs);
@@ -18020,19 +18202,29 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
       };
     } catch (error48) {
       if (error48 instanceof BrokerAcpError) throw error48;
-      const safeStderr = redactAgentError(stderr);
-      throw new BrokerAcpError(cancelled ? "cancelled" : "agent_failed", safeStderr ?? safeError(error48), !cancelled);
+      throw new BrokerAcpError(
+        cancelled ? "cancelled" : "agent_failed",
+        cancelled ? "Question was cancelled" : "The selected harness failed to answer",
+        !cancelled
+      );
     } finally {
       clearTimeout(timeout);
       terminateProcessGroup(child.pid);
-      await rm2(cwd, { recursive: true, force: true });
+      await rm3(cwd, { recursive: true, force: true });
     }
   })();
   return { result, cancel };
 }
 function secureEnvironment(provider, capability) {
   if (provider.id === "codex") {
-    const config2 = { approval_policy: "never", sandbox_mode: "read-only", web_search: capability === "web" ? "live" : "disabled", mcp_servers: {} };
+    const features = Object.fromEntries((provider.lockdownFeatures ?? []).map((feature) => [feature, false]));
+    const config2 = {
+      approval_policy: "never",
+      sandbox_mode: "read-only",
+      web_search: capability === "web" ? "live" : "disabled",
+      mcp_servers: {},
+      features
+    };
     return { ...provider.agent.env, CODEX_CONFIG: JSON.stringify(config2), INITIAL_AGENT_MODE: "read-only" };
   }
   if (provider.id === "opencode") {
@@ -18040,6 +18232,16 @@ function secureEnvironment(provider, capability) {
     return { ...provider.agent.env, OPENCODE_PERMISSION: JSON.stringify(permission) };
   }
   return provider.agent.env;
+}
+function canRemoveSession(capabilities) {
+  return capabilities?.sessionCapabilities?.delete !== void 0 && capabilities.sessionCapabilities.delete !== null;
+}
+async function removeSession(ctx, capabilities, sessionId) {
+  if (capabilities?.sessionCapabilities?.delete !== void 0 && capabilities.sessionCapabilities.delete !== null) {
+    await ctx.request(methods.agent.session.delete, { sessionId });
+    return true;
+  }
+  return false;
 }
 function sessionRequest(provider, cwd, capability) {
   const base = { cwd, mcpServers: [] };
@@ -18093,15 +18295,6 @@ async function handleContent(content, requestId, emit2, imageStore, imageCount) 
 function escapeMarkdown(value) {
   return value.replaceAll(/[\\[\]]/g, "\\$&");
 }
-function redactAgentError(value) {
-  const line = value.split("\n").map((item) => item.trim()).filter((item) => item !== "").at(-1);
-  if (line === void 0) return void 0;
-  return line.replaceAll(/(?:sk-|key-|token[:=]\s*)[a-zA-Z0-9._-]+/giu, "[redacted]").replaceAll(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu, "[redacted]").slice(0, 500);
-}
-function safeError(error48) {
-  if (error48 instanceof Error) return error48.message.replaceAll(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu, "[redacted]").slice(0, 500);
-  return "ACP agent failed";
-}
 var BrokerAcpError = class extends Error {
   constructor(code, message, retryable) {
     super(message);
@@ -18126,26 +18319,55 @@ function webWritable(child) {
   });
 }
 function webReadable(child) {
+  const maxFrameBytes = 8 * 1024 * 1024;
+  let currentFrameBytes = 0;
+  let settled = false;
   return new ReadableStream({
     start(controller) {
-      child.stdout?.on("data", (chunk) => controller.enqueue(chunk));
-      child.stdout?.once("end", () => controller.close());
-      child.stdout?.once("error", (error48) => controller.error(error48));
+      child.stdout?.on("data", (chunk) => {
+        if (settled) return;
+        for (const byte of chunk) {
+          currentFrameBytes = byte === 10 ? 0 : currentFrameBytes + 1;
+          if (currentFrameBytes > maxFrameBytes) {
+            settled = true;
+            controller.error(new Error("ACP frame exceeds the Quickchat limit"));
+            child.stdout?.destroy();
+            terminateProcessGroup(child.pid);
+            return;
+          }
+        }
+        controller.enqueue(chunk);
+      });
+      child.stdout?.once("end", () => {
+        if (!settled) {
+          settled = true;
+          controller.close();
+        }
+      });
+      child.stdout?.once("error", (error48) => {
+        if (!settled) {
+          settled = true;
+          controller.error(error48);
+        }
+      });
     },
     cancel() {
+      settled = true;
       child.stdout?.destroy();
     }
   });
 }
 
 // runtime/src/dictation.ts
-import { mkdir as mkdir4, readFile as readFile2, rm as rm3 } from "node:fs/promises";
+import { mkdir as mkdir4, readFile as readFile3, rm as rm4 } from "node:fs/promises";
 import { join as join5 } from "node:path";
 var DictationService = class {
   #paths;
   #env;
   #voxtype;
   #transcript;
+  #generation = 0;
+  #operation = Promise.resolve();
   constructor(paths = quickchatPaths(), env = process.env) {
     this.#paths = paths;
     this.#env = env;
@@ -18157,23 +18379,37 @@ var DictationService = class {
     const result = await runCommand(this.#voxtype, ["status", "--format", "json"], { env: this.#env, timeoutMs: 3e3, maxOutput: 16384 });
     return result.code === 0;
   }
-  async start() {
+  start() {
+    return this.#serialize(() => this.#start());
+  }
+  async #start() {
+    const generation = ++this.#generation;
     if (!await this.available() || this.#voxtype === void 0) throw new Error("Voxtype is not ready");
+    if (generation !== this.#generation) throw new DictationCancelledError();
     await mkdir4(this.#paths.runtime, { recursive: true, mode: 448 });
-    await rm3(this.#transcript, { force: true });
+    await rm4(this.#transcript, { force: true });
     const result = await runCommand(this.#voxtype, dictationStartArgs(this.#transcript), { env: this.#env, timeoutMs: 5e3, maxOutput: 16384 });
     if (result.code !== 0) throw new Error("Voxtype could not start recording");
+    if (generation !== this.#generation) {
+      await runCommand(this.#voxtype, ["record", "cancel"], { env: this.#env, timeoutMs: 5e3, maxOutput: 16384 });
+      throw new DictationCancelledError();
+    }
   }
-  async stop(timeoutMs = 6e4) {
+  stop(timeoutMs = 6e4) {
+    return this.#serialize(() => this.#stop(timeoutMs));
+  }
+  async #stop(timeoutMs) {
+    const generation = this.#generation;
     if (this.#voxtype === void 0) throw new Error("Voxtype is not recording");
     const result = await runCommand(this.#voxtype, ["record", "stop"], { env: this.#env, timeoutMs: 5e3, maxOutput: 16384 });
     if (result.code !== 0) throw new Error("Voxtype could not stop recording");
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
+      if (generation !== this.#generation) throw new DictationCancelledError();
       try {
-        const text = (await readFile2(this.#transcript, "utf8")).trim();
+        const text = (await readFile3(this.#transcript, "utf8")).trim();
         if (text !== "") {
-          await rm3(this.#transcript, { force: true });
+          await rm4(this.#transcript, { force: true });
           return text;
         }
       } catch {
@@ -18182,9 +18418,24 @@ var DictationService = class {
     }
     throw new Error("Voxtype transcription timed out");
   }
-  async cancel() {
+  cancel() {
+    this.#generation += 1;
+    return this.#serialize(() => this.#cancel());
+  }
+  async #cancel() {
     if (this.#voxtype !== void 0) await runCommand(this.#voxtype, ["record", "cancel"], { env: this.#env, timeoutMs: 5e3, maxOutput: 16384 });
-    await rm3(this.#transcript, { force: true });
+    await rm4(this.#transcript, { force: true });
+  }
+  #serialize(operation) {
+    const result = this.#operation.then(operation, operation);
+    this.#operation = result.then(() => void 0, () => void 0);
+    return result;
+  }
+};
+var DictationCancelledError = class extends Error {
+  constructor() {
+    super("Dictation was cancelled");
+    this.name = "DictationCancelledError";
   }
 };
 function dictationStartArgs(transcript) {
@@ -18360,6 +18611,8 @@ async function discoverProviders(env = process.env) {
       args = [];
     }
     if (executable === void 0) continue;
+    const lockdownFeatures = id === "codex" ? await codexToolLockdownFeatures(harnessPath, env) : void 0;
+    if (id === "codex" && lockdownFeatures === void 0) continue;
     const capabilities = ["answer", "web"];
     const providerVersion = await version2(harnessPath, env);
     found.push({
@@ -18369,10 +18622,29 @@ async function discoverProviders(env = process.env) {
       models: [],
       capabilities,
       harnessPath,
-      agent: { executable, args, env: agentEnvironment(id, harnessPath, env) }
+      agent: { executable, args, env: agentEnvironment(id, harnessPath, env) },
+      ...lockdownFeatures === void 0 ? {} : { lockdownFeatures }
     });
   }
   return found;
+}
+async function codexToolLockdownFeatures(path, env) {
+  const listed = await runCommand(path, ["features", "list"], {
+    env,
+    timeoutMs: 1e4,
+    maxOutput: 256e3
+  });
+  if (listed.code !== 0) return void 0;
+  const output = stripAnsi(listed.stdout);
+  const features = [...new Set(output.split("\n").map((line) => /^([a-z][a-z0-9_]*)\s/u.exec(line)?.[1]).filter((feature) => feature !== void 0))];
+  if (features.length === 0) return void 0;
+  const featureArguments = features.flatMap((feature) => ["-c", `features.${feature}=false`]);
+  const validated = await runCommand(path, ["app-server", "--strict-config", ...featureArguments, "--listen", "stdio://"], {
+    env,
+    timeoutMs: 1e4,
+    maxOutput: 64e3
+  });
+  return validated.code === 0 ? features : void 0;
 }
 async function fallbackModels(provider) {
   if (provider.id !== "opencode") return [];
@@ -18391,20 +18663,23 @@ var QuickchatBroker = class {
   #history;
   #images;
   #dictation;
+  #sessionCleaner;
   #env;
   #providers = /* @__PURE__ */ new Map();
   #runs = /* @__PURE__ */ new Map();
+  #dictationGeneration = 0;
   constructor(emit2, options = {}) {
     this.#emit = emit2;
     this.#history = options.history ?? new HistoryStore();
     this.#images = options.images ?? new ImageStore();
     this.#dictation = options.dictation ?? new DictationService();
+    this.#sessionCleaner = options.sessionCleaner ?? deleteAcpSession;
     this.#env = options.env ?? process.env;
   }
   async handle(command) {
     switch (command.type) {
       case "initialize":
-        await this.#initialize();
+        await this.#initialize(command);
         break;
       case "submit":
         await this.#submit(command);
@@ -18415,14 +18690,18 @@ var QuickchatBroker = class {
       case "history_list":
         await this.#emitHistory();
         break;
-      case "history_delete":
-        await this.#history.delete(command.chatId);
+      case "history_delete": {
+        const deleted = await this.#history.delete(command.chatId);
         await this.#emitHistory();
+        if (deleted !== void 0) await this.#cleanupSessions([deleted]);
         break;
-      case "history_clear":
-        await this.#history.clear();
+      }
+      case "history_clear": {
+        const deleted = await this.#history.clear();
         await this.#emitHistory();
+        await this.#cleanupSessions(deleted);
         break;
+      }
       case "dictation_start":
         await this.#dictationStart();
         break;
@@ -18450,7 +18729,11 @@ var QuickchatBroker = class {
     }
     return true;
   }
-  async #initialize() {
+  async #initialize(command) {
+    if (command.protocolVersion !== 1) {
+      this.#error("unsupported_protocol", "Quickchat supports broker protocol version 1", false);
+      return;
+    }
     const discovered = await discoverProviders(this.#env);
     await Promise.all(discovered.map(async (provider) => {
       const acpModels = await probeAcpModels(provider);
@@ -18496,7 +18779,8 @@ var QuickchatBroker = class {
         images: result.images,
         session: { acpId: result.sessionId, resumable: result.resumable, resumeKind: result.resumable ? "native" : "transcript" }
       };
-      await this.#history.save(chat);
+      const evicted = await this.#history.save(chat);
+      await this.#cleanupSessions(evicted);
       this.#emit({ type: "complete", chat: presentChat(chat) });
       this.#emit({ type: "state", id: command.id, state: "idle" });
     } catch (error48) {
@@ -18516,22 +18800,26 @@ var QuickchatBroker = class {
     this.#emit({ type: "history", history: (await this.#history.list()).map((chat) => presentChat(chat)) });
   }
   async #dictationStart() {
+    const generation = ++this.#dictationGeneration;
     try {
       await this.#dictation.start();
-      this.#emit({ type: "dictation", state: "recording" });
+      if (generation === this.#dictationGeneration) this.#emit({ type: "dictation", state: "recording" });
     } catch {
-      this.#emit({ type: "dictation", state: "unavailable", message: "Voxtype is unavailable or not ready" });
+      if (generation === this.#dictationGeneration) this.#emit({ type: "dictation", state: "unavailable", message: "Voxtype is unavailable or not ready" });
     }
   }
   async #dictationStop() {
+    const generation = this.#dictationGeneration;
     this.#emit({ type: "dictation", state: "transcribing" });
     try {
-      this.#emit({ type: "dictation", state: "idle", text: await this.#dictation.stop() });
+      const text = await this.#dictation.stop();
+      if (generation === this.#dictationGeneration) this.#emit({ type: "dictation", state: "idle", text });
     } catch {
-      this.#emit({ type: "dictation", state: "unavailable", message: "Voxtype could not finish transcription" });
+      if (generation === this.#dictationGeneration) this.#emit({ type: "dictation", state: "unavailable", message: "Voxtype could not finish transcription" });
     }
   }
   async #dictationCancel() {
+    this.#dictationGeneration += 1;
     await this.#dictation.cancel();
     this.#emit({ type: "dictation", state: "idle" });
   }
@@ -18588,6 +18876,13 @@ var QuickchatBroker = class {
   #error(code, message, retryable, id) {
     this.#emit({ type: "error", code, message, retryable, ...id === void 0 ? {} : { id } });
   }
+  async #cleanupSessions(chats) {
+    await Promise.allSettled(chats.map(async (chat) => {
+      const sessionId = chat.session.acpId;
+      const provider = this.#providers.get(chat.provider);
+      if (sessionId !== void 0 && provider !== void 0) await this.#sessionCleaner(provider, sessionId);
+    }));
+  }
 };
 function publicProvider(provider) {
   return {
@@ -18605,7 +18900,7 @@ var providerIdSchema = external_exports.enum(["codex", "claude", "opencode"]);
 var capabilitySchema = external_exports.enum(["answer", "web"]);
 var initializeCommand = external_exports.object({
   type: external_exports.literal("initialize"),
-  protocolVersion: external_exports.number().int().positive().optional(),
+  protocolVersion: external_exports.number().int().positive(),
   client: external_exports.string().max(120).optional()
 });
 var submitCommand = external_exports.object({

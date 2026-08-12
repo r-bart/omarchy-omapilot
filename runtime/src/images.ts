@@ -1,14 +1,17 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { get } from "node:https";
 import { isIP } from "node:net";
 import { lookup } from "node:dns/promises";
 import { basename, extname, join } from "node:path";
 import type { StoredImage } from "./types.js";
 import { quickchatPaths, type QuickchatPaths } from "./paths.js";
+import { resolveExecutable, runCommand } from "./process.js";
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const MAX_IMAGE_DIMENSION = 12_000;
+export const MAX_IMAGE_PIXELS = 16_000_000;
+const MAX_CACHE_BYTES = 50 * 1024 * 1024;
 const MIME_EXTENSIONS = new Map([
   ["image/png", ".png"],
   ["image/jpeg", ".jpg"],
@@ -17,12 +20,18 @@ const MIME_EXTENSIONS = new Map([
 
 export class ImageStore {
   readonly #paths: QuickchatPaths;
+  readonly #env: NodeJS.ProcessEnv;
 
-  constructor(paths: QuickchatPaths = quickchatPaths()) {
+  constructor(paths: QuickchatPaths = quickchatPaths(), env: NodeJS.ProcessEnv = process.env) {
     this.#paths = paths;
+    this.#env = env;
   }
 
   async saveBase64(data: string, claimedMime: string, sourceUrl?: string): Promise<StoredImage> {
+    const maxEncodedBytes = Math.ceil(MAX_IMAGE_BYTES / 3) * 4;
+    if (data.length === 0 || data.length > maxEncodedBytes || !/^(?:[a-zA-Z0-9+/]{4})*(?:[a-zA-Z0-9+/]{2}==|[a-zA-Z0-9+/]{3}=)?$/u.test(data)) {
+      throw new ImagePolicyError("image_size", "Image encoding is invalid or exceeds the 5 MiB limit");
+    }
     const bytes = Buffer.from(data, "base64");
     if (bytes.byteLength === 0 || bytes.byteLength > MAX_IMAGE_BYTES) throw new ImagePolicyError("image_size", "Image exceeds the 5 MiB limit");
     return this.save(bytes, claimedMime, sourceUrl);
@@ -34,26 +43,67 @@ export class ImageStore {
   }
 
   async save(bytes: Buffer, claimedMime: string, sourceUrl?: string): Promise<StoredImage> {
-    const detected = inspectImage(bytes);
-    if (detected.mime !== claimedMime.toLowerCase().split(";")[0]) throw new ImagePolicyError("image_mime", "Image content does not match its MIME type");
-    if (detected.width < 1 || detected.height < 1 || detected.width > MAX_IMAGE_DIMENSION || detected.height > MAX_IMAGE_DIMENSION) {
-      throw new ImagePolicyError("image_dimensions", "Image dimensions are not supported");
-    }
+    const claimed = claimedMime.toLowerCase().split(";")[0] ?? "";
+    if (!MIME_EXTENSIONS.has(claimed)) throw new ImagePolicyError("image_mime", "Unsupported image type");
+    const source = inspectImage(bytes);
+    if (source.mime !== claimed) throw new ImagePolicyError("image_mime", "Image content does not match its MIME type");
+    const normalized = await normalizeImage(bytes, claimed, this.#paths, this.#env);
+    const detected = inspectImage(normalized);
+    if (detected.mime !== claimed) throw new ImagePolicyError("image_decode", "Image normalization changed the media type unexpectedly");
     await mkdir(this.#paths.images, { recursive: true, mode: 0o700 });
     const id = randomUUID();
     const extension = MIME_EXTENSIONS.get(detected.mime);
-    if (extension === undefined) throw new ImagePolicyError("image_mime", "Unsupported image type");
+    if (extension === undefined) throw new ImagePolicyError("image_mime", "Unsupported normalized image type");
     const filename = `${id}${extension}`;
-    await writeFile(join(this.#paths.images, filename), bytes, { flag: "wx", mode: 0o600 });
-    return {
+    await writeFile(join(this.#paths.images, filename), normalized, { flag: "wx", mode: 0o600 });
+    const image = {
       id,
       mimeType: detected.mime,
       path: basename(filename),
-      bytes: bytes.byteLength,
+      bytes: normalized.byteLength,
       width: detected.width,
       height: detected.height,
       ...(sourceUrl === undefined ? {} : { sourceUrl })
     };
+    await pruneImageCache(this.#paths);
+    return image;
+  }
+}
+
+async function normalizeImage(bytes: Buffer, mime: string, paths: QuickchatPaths, env: NodeJS.ProcessEnv): Promise<Buffer> {
+  const magick = await resolveExecutable("magick", env);
+  if (magick === undefined) throw new ImagePolicyError("image_decoder_unavailable", "Secure image decoding is unavailable");
+  await mkdir(paths.runtime, { recursive: true, mode: 0o700 });
+  const temporary = await mkdtemp(join(paths.runtime, "image-"));
+  try {
+    const extension = MIME_EXTENSIONS.get(mime);
+    if (extension === undefined) throw new ImagePolicyError("image_mime", "Unsupported image type");
+    const input = join(temporary, `source${extension}`);
+    const output = join(temporary, `normalized${extension}`);
+    const outputTarget = mime === "image/png" ? `PNG32:${output}` : mime === "image/jpeg" ? `JPEG:${output}` : `WEBP:${output}`;
+    await writeFile(input, bytes, { flag: "wx", mode: 0o600 });
+    const result = await runCommand(magick, [
+      "-limit", "memory", "128MiB",
+      "-limit", "map", "256MiB",
+      "-limit", "disk", "512MiB",
+      "-limit", "area", "16MP",
+      "-limit", "width", String(MAX_IMAGE_DIMENSION),
+      "-limit", "height", String(MAX_IMAGE_DIMENSION),
+      `${input}[0]`,
+      "-auto-orient",
+      "-strip",
+      ...(mime === "image/png" ? ["-define", "png:exclude-chunks=date,time"] : ["-quality", "90"]),
+      outputTarget
+    ], { env, timeoutMs: 15_000, maxOutput: 32_768 });
+    if (result.code !== 0) throw new ImagePolicyError("image_decode", "Image decoder rejected the payload");
+    const normalized = await readFile(output);
+    if (normalized.byteLength === 0 || normalized.byteLength > MAX_IMAGE_BYTES) throw new ImagePolicyError("image_size", "Normalized image exceeds the 5 MiB limit");
+    return normalized;
+  } catch (error) {
+    if (error instanceof ImagePolicyError) throw error;
+    throw new ImagePolicyError("image_decode", "Image decoder could not normalize the payload");
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
   }
 }
 
@@ -65,35 +115,127 @@ export class ImagePolicyError extends Error {
 }
 
 export function inspectImage(bytes: Buffer): { mime: string; width: number; height: number } {
-  if (bytes.byteLength >= 24 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
-    return { mime: "image/png", width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
-  }
-  if (bytes.byteLength >= 30 && bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") {
-    const kind = bytes.subarray(12, 16).toString("ascii");
-    if (kind === "VP8X") return { mime: "image/webp", width: 1 + bytes.readUIntLE(24, 3), height: 1 + bytes.readUIntLE(27, 3) };
-    if (kind === "VP8 " && bytes.subarray(23, 26).equals(Buffer.from([0x9d, 0x01, 0x2a]))) {
-      return { mime: "image/webp", width: bytes.readUInt16LE(26) & 0x3fff, height: bytes.readUInt16LE(28) & 0x3fff };
-    }
-    if (kind === "VP8L" && bytes[20] === 0x2f) {
-      const bits = bytes.readUInt32LE(21);
-      return { mime: "image/webp", width: (bits & 0x3fff) + 1, height: ((bits >>> 14) & 0x3fff) + 1 };
-    }
-  }
-  if (bytes.byteLength >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8) {
-    let offset = 2;
-    while (offset + 8 < bytes.byteLength) {
-      if (bytes[offset] !== 0xff) { offset += 1; continue; }
-      const marker = bytes[offset + 1];
-      if (marker === undefined || marker === 0xd8 || marker === 0xd9) { offset += 2; continue; }
-      const length = bytes.readUInt16BE(offset + 2);
-      if (length < 2 || offset + 2 + length > bytes.byteLength) break;
-      if ((marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xc7) || (marker >= 0xc9 && marker <= 0xcb) || (marker >= 0xcd && marker <= 0xcf)) {
-        return { mime: "image/jpeg", height: bytes.readUInt16BE(offset + 5), width: bytes.readUInt16BE(offset + 7) };
-      }
-      offset += 2 + length;
-    }
-  }
+  if (bytes.byteLength > MAX_IMAGE_BYTES) throw new ImagePolicyError("image_size", "Image exceeds the 5 MiB limit");
+  const dimensions = inspectPng(bytes) ?? inspectWebp(bytes) ?? inspectJpeg(bytes);
+  if (dimensions !== undefined) return validateDimensions(dimensions);
   throw new ImagePolicyError("image_mime", "Only valid PNG, JPEG, and WebP images are supported");
+}
+
+function inspectPng(bytes: Buffer): { mime: string; width: number; height: number } | undefined {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  if (!bytes.subarray(0, 8).equals(signature)) return undefined;
+  if (bytes.byteLength < 45) throw new ImagePolicyError("image_structure", "PNG image is truncated");
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let chunkIndex = 0;
+  let ended = false;
+  let hasImageData = false;
+  while (offset < bytes.byteLength) {
+    if (offset + 12 > bytes.byteLength) throw new ImagePolicyError("image_structure", "PNG chunk is truncated");
+    const length = bytes.readUInt32BE(offset);
+    const type = bytes.subarray(offset + 4, offset + 8).toString("ascii");
+    const end = offset + 12 + length;
+    if (end > bytes.byteLength) throw new ImagePolicyError("image_structure", "PNG chunk length exceeds the file");
+    if (chunkIndex === 0) {
+      if (type !== "IHDR" || length !== 13) throw new ImagePolicyError("image_structure", "PNG must begin with a complete IHDR chunk");
+      width = bytes.readUInt32BE(offset + 8);
+      height = bytes.readUInt32BE(offset + 12);
+    }
+    if (type === "IEND") {
+      if (length !== 0 || end !== bytes.byteLength) throw new ImagePolicyError("image_structure", "PNG must end with one empty IEND chunk");
+      ended = true;
+    }
+    if (type === "IDAT") hasImageData = true;
+    offset = end;
+    chunkIndex += 1;
+  }
+  if (!ended || !hasImageData) throw new ImagePolicyError("image_structure", "PNG is missing image data or its IEND chunk");
+  return { mime: "image/png", width, height };
+}
+
+function inspectWebp(bytes: Buffer): { mime: string; width: number; height: number } | undefined {
+  if (bytes.byteLength < 12 || bytes.subarray(0, 4).toString("ascii") !== "RIFF" || bytes.subarray(8, 12).toString("ascii") !== "WEBP") return undefined;
+  if (bytes.readUInt32LE(4) + 8 !== bytes.byteLength) throw new ImagePolicyError("image_structure", "WebP RIFF size does not match the file");
+  let offset = 12;
+  let dimensions: { mime: string; width: number; height: number } | undefined;
+  let hasImagePayload = false;
+  while (offset < bytes.byteLength) {
+    if (offset + 8 > bytes.byteLength) throw new ImagePolicyError("image_structure", "WebP chunk is truncated");
+    const kind = bytes.subarray(offset, offset + 4).toString("ascii");
+    const length = bytes.readUInt32LE(offset + 4);
+    const data = offset + 8;
+    const end = data + length;
+    const paddedEnd = end + (length % 2);
+    if (end > bytes.byteLength || paddedEnd > bytes.byteLength) throw new ImagePolicyError("image_structure", "WebP chunk length exceeds the file");
+    if (dimensions === undefined && kind === "VP8X" && length >= 10) {
+      dimensions = { mime: "image/webp", width: 1 + bytes.readUIntLE(data + 4, 3), height: 1 + bytes.readUIntLE(data + 7, 3) };
+    } else if (kind === "VP8 " && length >= 10 && bytes.subarray(data + 3, data + 6).equals(Buffer.from([0x9d, 0x01, 0x2a]))) {
+      hasImagePayload = true;
+      dimensions ??= { mime: "image/webp", width: bytes.readUInt16LE(data + 6) & 0x3fff, height: bytes.readUInt16LE(data + 8) & 0x3fff };
+    } else if (kind === "VP8L" && length >= 5 && bytes[data] === 0x2f) {
+      hasImagePayload = true;
+      const bits = bytes.readUInt32LE(data + 1);
+      dimensions ??= { mime: "image/webp", width: (bits & 0x3fff) + 1, height: ((bits >>> 14) & 0x3fff) + 1 };
+    } else if (kind === "ANMF" && length >= 16) {
+      hasImagePayload = true;
+    }
+    offset = paddedEnd;
+  }
+  if (offset !== bytes.byteLength || dimensions === undefined || !hasImagePayload) throw new ImagePolicyError("image_structure", "WebP image has no complete image payload");
+  return dimensions;
+}
+
+function inspectJpeg(bytes: Buffer): { mime: string; width: number; height: number } | undefined {
+  if (bytes.byteLength < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return undefined;
+  if (bytes.at(-2) !== 0xff || bytes.at(-1) !== 0xd9) throw new ImagePolicyError("image_structure", "JPEG is missing its end marker");
+  let offset = 2;
+  let dimensions: { mime: string; width: number; height: number } | undefined;
+  let hasScan = false;
+  while (offset < bytes.byteLength - 2) {
+    while (offset < bytes.byteLength - 2 && bytes[offset] === 0xff) offset += 1;
+    const marker = bytes[offset];
+    if (marker === undefined) break;
+    offset += 1;
+    if (marker === 0x00 || marker === 0xd8 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (offset + 2 > bytes.byteLength - 2) throw new ImagePolicyError("image_structure", "JPEG segment is truncated");
+    const length = bytes.readUInt16BE(offset);
+    if (length < 2 || offset + length > bytes.byteLength - 2) throw new ImagePolicyError("image_structure", "JPEG segment length exceeds the file");
+    if (marker === 0xda) { hasScan = true; break; }
+    if ((marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xc7) || (marker >= 0xc9 && marker <= 0xcb) || (marker >= 0xcd && marker <= 0xcf)) {
+      if (length < 7) throw new ImagePolicyError("image_structure", "JPEG frame header is truncated");
+      dimensions = { mime: "image/jpeg", height: bytes.readUInt16BE(offset + 3), width: bytes.readUInt16BE(offset + 5) };
+    }
+    offset += length;
+  }
+  if (dimensions === undefined || !hasScan) throw new ImagePolicyError("image_structure", "JPEG is missing a supported frame header or scan");
+  return dimensions;
+}
+
+function validateDimensions(dimensions: { mime: string; width: number; height: number }): { mime: string; width: number; height: number } {
+  if (dimensions.width < 1 || dimensions.height < 1 || dimensions.width > MAX_IMAGE_DIMENSION || dimensions.height > MAX_IMAGE_DIMENSION || dimensions.width * dimensions.height > MAX_IMAGE_PIXELS) {
+    throw new ImagePolicyError("image_dimensions", "Image dimensions are not supported");
+  }
+  return dimensions;
+}
+
+export async function pruneImageCache(paths: QuickchatPaths = quickchatPaths()): Promise<void> {
+  await mkdir(paths.images, { recursive: true, mode: 0o700 });
+  const files = (await Promise.all((await readdir(paths.images)).map(async (name) => {
+    try {
+      const info = await stat(join(paths.images, name));
+      return info.isFile() ? { name, bytes: info.size, modified: info.mtimeMs } : undefined;
+    } catch {
+      return undefined;
+    }
+  }))).filter((item): item is { name: string; bytes: number; modified: number } => item !== undefined)
+    .sort((a, b) => a.modified - b.modified);
+  let total = files.reduce((sum, file) => sum + file.bytes, 0);
+  for (const file of files) {
+    if (total <= MAX_CACHE_BYTES) break;
+    await rm(join(paths.images, file.name), { force: true });
+    total -= file.bytes;
+  }
 }
 
 export function isPublicAddress(address: string): boolean {

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as acp from "@agentclientprotocol/sdk";
 import { Readable, Writable } from "node:stream";
+import { appendFile } from "node:fs/promises";
 
 let sessionCounter = 0;
 let pending;
@@ -8,7 +9,10 @@ const stream = acp.ndJsonStream(Writable.toWeb(process.stdout), Readable.toWeb(p
 const server = acp.agent({ name: "quickchat-fake" })
   .onRequest(acp.methods.agent.initialize, () => ({
     protocolVersion: acp.PROTOCOL_VERSION,
-    agentCapabilities: { loadSession: true }
+    agentCapabilities: {
+      loadSession: true,
+      sessionCapabilities: process.env.FAKE_ACP_NO_DELETE === "1" ? { close: {} } : { delete: {}, close: {} }
+    }
   }))
   .onRequest(acp.methods.agent.session.new, () => ({
     sessionId: `fake-${++sessionCounter}`,
@@ -22,7 +26,19 @@ const server = acp.agent({ name: "quickchat-fake" })
   .onRequest(acp.methods.agent.session.setConfigOption, ({ params }) => ({ configOptions: [{
     type: "select", id: "model", name: "Model", category: "model", currentValue: String(params.value), options: []
   }] }))
+  .onRequest(acp.methods.agent.session.delete, async ({ params }) => {
+    if (process.env.FAKE_ACP_AUDIT_FILE) await appendFile(process.env.FAKE_ACP_AUDIT_FILE, `delete:${params.sessionId}\n`);
+    return {};
+  })
+  .onRequest(acp.methods.agent.session.close, async ({ params }) => {
+    if (process.env.FAKE_ACP_AUDIT_FILE) await appendFile(process.env.FAKE_ACP_AUDIT_FILE, `close:${params.sessionId}\n`);
+    return {};
+  })
   .onRequest(acp.methods.agent.session.prompt, async ({ params, client }) => {
+    if (process.env.FAKE_ACP_FAIL_SECRET === "1") {
+      process.stderr.write("provider failed for person@example.com token=top-secret sk-secret-value\n");
+      throw new Error("provider failed for person@example.com token=top-secret sk-secret-value");
+    }
     const controller = new AbortController();
     pending = controller;
     const decision = await client.request(acp.methods.client.session.requestPermission, {

@@ -7,7 +7,7 @@ export type Capability = z.infer<typeof capabilitySchema>;
 
 const initializeCommand = z.object({
   type: z.literal("initialize"),
-  protocolVersion: z.number().int().positive().optional(),
+  protocolVersion: z.number().int().positive(),
   client: z.string().max(120).optional()
 });
 const submitCommand = z.object({

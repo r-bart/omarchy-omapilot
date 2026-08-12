@@ -9,7 +9,7 @@ import type { BrokerEvent, Capability, ModelOption, StoredImage } from "./types.
 import { ImageStore } from "./images.js";
 import { presentImage } from "./history.js";
 import { quickchatPaths } from "./paths.js";
-import { terminateProcessGroup } from "./process.js";
+import { runCommand, terminateProcessGroup } from "./process.js";
 
 export type AcpResult = {
   answer: string;
@@ -44,14 +44,16 @@ export async function probeAcpModels(provider: DiscoveredProvider, timeoutMs = 1
     return await acp.client({ name: "omarchy-quickchat-probe" })
       .onRequest(acp.methods.client.session.requestPermission, () => ({ outcome: { outcome: "cancelled" } }))
       .connectWith(stream, async (ctx) => {
-        await ctx.request(acp.methods.agent.initialize, {
+        const initialized = await ctx.request(acp.methods.agent.initialize, {
           protocolVersion: acp.PROTOCOL_VERSION,
           clientCapabilities: { session: { configOptions: { boolean: {} } } },
           clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }
         });
+        if (!canRemoveSession(initialized.agentCapabilities)) return { models: [] };
         const session = await ctx.buildSession(sessionRequest(provider.id, cwd, "answer")).start();
         const config = modelConfiguration(session.newSessionResponse.configOptions ?? []);
         session.dispose();
+        await removeSession(ctx, initialized.agentCapabilities, session.sessionId);
         return { models: config.models, ...(config.current === undefined ? {} : { defaultModel: config.current }) };
       });
   } catch {
@@ -60,6 +62,42 @@ export async function probeAcpModels(provider: DiscoveredProvider, timeoutMs = 1
     clearTimeout(timeout);
     terminateProcessGroup(child.pid);
     await rm(cwd, { recursive: true, force: true });
+  }
+}
+
+export async function deleteAcpSession(provider: DiscoveredProvider, sessionId: string, timeoutMs = 15_000): Promise<boolean> {
+  const child = spawn(provider.agent.executable, provider.agent.args, {
+    env: secureEnvironment(provider, "answer"), stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32"
+  });
+  const timeout = setTimeout(() => terminateProcessGroup(child.pid), timeoutMs);
+  timeout.unref();
+  try {
+    if (child.stdin === null || child.stdout === null) return false;
+    const deleted = await acp.client({ name: "omarchy-quickchat-cleanup" })
+      .onRequest(acp.methods.client.session.requestPermission, () => ({ outcome: { outcome: "cancelled" } }))
+      .connectWith(acp.ndJsonStream(webWritable(child), webReadable(child)), async (ctx) => {
+        const initialized = await ctx.request(acp.methods.agent.initialize, {
+          protocolVersion: acp.PROTOCOL_VERSION,
+          clientCapabilities: {},
+          clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }
+        });
+        return removeSession(ctx, initialized.agentCapabilities, sessionId);
+      });
+    if (deleted) return true;
+    if (provider.id === "opencode") {
+      const fallback = await runCommand(provider.harnessPath, ["--pure", "session", "delete", sessionId], {
+        env: provider.agent.env,
+        timeoutMs,
+        maxOutput: 32_768
+      });
+      return fallback.code === 0;
+    }
+    return false;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+    terminateProcessGroup(child.pid);
   }
 }
 
@@ -80,8 +118,7 @@ export function runAcpQuestion(
   });
   let cancelSession: (() => Promise<void>) | undefined;
   let cancelled = false;
-  let stderr = "";
-  child.stderr?.on("data", (chunk: Buffer) => { stderr = (stderr + chunk.toString("utf8")).slice(-32_768); });
+  child.stderr?.resume();
 
   const cancel = async (): Promise<void> => {
     cancelled = true;
@@ -169,8 +206,11 @@ export function runAcpQuestion(
       };
     } catch (error) {
       if (error instanceof BrokerAcpError) throw error;
-      const safeStderr = redactAgentError(stderr);
-      throw new BrokerAcpError(cancelled ? "cancelled" : "agent_failed", safeStderr ?? safeError(error), !cancelled);
+      throw new BrokerAcpError(
+        cancelled ? "cancelled" : "agent_failed",
+        cancelled ? "Question was cancelled" : "The selected harness failed to answer",
+        !cancelled
+      );
     } finally {
       clearTimeout(timeout);
       terminateProcessGroup(child.pid);
@@ -182,7 +222,14 @@ export function runAcpQuestion(
 
 function secureEnvironment(provider: DiscoveredProvider, capability: Capability): NodeJS.ProcessEnv {
   if (provider.id === "codex") {
-    const config = { approval_policy: "never", sandbox_mode: "read-only", web_search: capability === "web" ? "live" : "disabled", mcp_servers: {} };
+    const features = Object.fromEntries((provider.lockdownFeatures ?? []).map((feature) => [feature, false]));
+    const config = {
+      approval_policy: "never",
+      sandbox_mode: "read-only",
+      web_search: capability === "web" ? "live" : "disabled",
+      mcp_servers: {},
+      features
+    };
     return { ...provider.agent.env, CODEX_CONFIG: JSON.stringify(config), INITIAL_AGENT_MODE: "read-only" };
   }
   if (provider.id === "opencode") {
@@ -190,6 +237,22 @@ function secureEnvironment(provider: DiscoveredProvider, capability: Capability)
     return { ...provider.agent.env, OPENCODE_PERMISSION: JSON.stringify(permission) };
   }
   return provider.agent.env;
+}
+
+function canRemoveSession(capabilities: acp.AgentCapabilities | null | undefined): boolean {
+  return capabilities?.sessionCapabilities?.delete !== undefined && capabilities.sessionCapabilities.delete !== null;
+}
+
+async function removeSession(
+  ctx: acp.ClientContext,
+  capabilities: acp.AgentCapabilities | null | undefined,
+  sessionId: string
+): Promise<boolean> {
+  if (capabilities?.sessionCapabilities?.delete !== undefined && capabilities.sessionCapabilities.delete !== null) {
+    await ctx.request(acp.methods.agent.session.delete, { sessionId });
+    return true;
+  }
+  return false;
 }
 
 function sessionRequest(provider: DiscoveredProvider["id"], cwd: string, capability: Capability): NewSessionRequest {
@@ -254,19 +317,6 @@ function escapeMarkdown(value: string): string {
   return value.replaceAll(/[\\[\]]/g, "\\$&");
 }
 
-export function redactAgentError(value: string): string | undefined {
-  const line = value.split("\n").map((item) => item.trim()).filter((item) => item !== "").at(-1);
-  if (line === undefined) return undefined;
-  return line.replaceAll(/(?:sk-|key-|token[:=]\s*)[a-zA-Z0-9._-]+/giu, "[redacted]")
-    .replaceAll(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu, "[redacted]")
-    .slice(0, 500);
-}
-
-function safeError(error: unknown): string {
-  if (error instanceof Error) return error.message.replaceAll(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu, "[redacted]").slice(0, 500);
-  return "ACP agent failed";
-}
-
 export class BrokerAcpError extends Error {
   constructor(readonly code: string, message: string, readonly retryable: boolean) {
     super(message);
@@ -295,12 +345,32 @@ function webWritable(child: ChildProcess): WritableStream<Uint8Array> {
 }
 
 function webReadable(child: ChildProcess): ReadableStream<Uint8Array> {
+  const maxFrameBytes = 8 * 1024 * 1024;
+  let currentFrameBytes = 0;
+  let settled = false;
   return new ReadableStream<Uint8Array>({
     start(controller) {
-      child.stdout?.on("data", (chunk: Buffer) => controller.enqueue(chunk));
-      child.stdout?.once("end", () => controller.close());
-      child.stdout?.once("error", (error) => controller.error(error));
+      child.stdout?.on("data", (chunk: Buffer) => {
+        if (settled) return;
+        for (const byte of chunk) {
+          currentFrameBytes = byte === 0x0a ? 0 : currentFrameBytes + 1;
+          if (currentFrameBytes > maxFrameBytes) {
+            settled = true;
+            controller.error(new Error("ACP frame exceeds the Quickchat limit"));
+            child.stdout?.destroy();
+            terminateProcessGroup(child.pid);
+            return;
+          }
+        }
+        controller.enqueue(chunk);
+      });
+      child.stdout?.once("end", () => {
+        if (!settled) { settled = true; controller.close(); }
+      });
+      child.stdout?.once("error", (error) => {
+        if (!settled) { settled = true; controller.error(error); }
+      });
     },
-    cancel() { child.stdout?.destroy(); }
+    cancel() { settled = true; child.stdout?.destroy(); }
   });
 }

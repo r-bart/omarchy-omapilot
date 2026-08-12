@@ -39,7 +39,7 @@ export class HistoryStore {
     }
   }
 
-  async save(chat: ChatRecord): Promise<void> {
+  async save(chat: ChatRecord): Promise<ChatRecord[]> {
     await mkdir(this.#paths.records, { recursive: true, mode: 0o700 });
     const destination = join(this.#paths.records, `${chat.id}.json`);
     const temporary = `${destination}.${process.pid}.tmp`;
@@ -48,34 +48,39 @@ export class HistoryStore {
     await handle.sync();
     await handle.close();
     await rename(temporary, destination);
-    await this.#evictRecords();
+    const evicted = await this.#evictRecords();
     await this.#evictImages();
+    return evicted;
   }
 
-  async delete(id: string): Promise<boolean> {
-    if (!isUuid(id)) return false;
+  async delete(id: string): Promise<ChatRecord | undefined> {
+    if (!isUuid(id)) return undefined;
     const chat = await this.get(id);
     try {
       await unlink(join(this.#paths.records, `${id}.json`));
     } catch {
-      return false;
+      return undefined;
     }
     if (chat !== undefined) {
       await Promise.all(chat.images.map(async (image) => {
         if (basename(image.path) === image.path) await rm(join(this.#paths.images, image.path), { force: true });
       }));
     }
-    return true;
+    return chat;
   }
 
-  async clear(): Promise<void> {
+  async clear(): Promise<ChatRecord[]> {
+    const chats = await this.listAll();
     await rm(this.#paths.records, { recursive: true, force: true });
     await rm(this.#paths.images, { recursive: true, force: true });
+    return chats;
   }
 
-  async #evictRecords(): Promise<void> {
+  async #evictRecords(): Promise<ChatRecord[]> {
     const records = await this.listAll();
-    await Promise.all(records.slice(MAX_CHATS).map((chat) => this.delete(chat.id)));
+    const evicted = records.slice(MAX_CHATS);
+    const deleted = await Promise.all(evicted.map((chat) => this.delete(chat.id)));
+    return deleted.filter((chat): chat is ChatRecord => chat !== undefined);
   }
 
   async listAll(): Promise<ChatRecord[]> {

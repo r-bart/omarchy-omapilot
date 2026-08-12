@@ -14,12 +14,14 @@ describe("history store", () => {
     const root = await mkdtemp(join(tmpdir(), "quickchat-history-")); roots.push(root);
     const paths = quickchatPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
     const store = new HistoryStore(paths);
-    for (let index = 0; index < 35; index += 1) await store.save(record(index));
+    const evicted: ChatRecord[] = [];
+    for (let index = 0; index < 35; index += 1) evicted.push(...await store.save(record(index)));
     const records = await store.list();
     expect(records).toHaveLength(30);
     expect(records[0]?.title).toBe("Chat 34");
     expect(records.at(-1)?.title).toBe("Chat 5");
     expect((await readdir(paths.records)).some((name) => name.endsWith(".tmp"))).toBe(false);
+    expect(evicted.map((chat) => chat.title)).toEqual(["Chat 0", "Chat 1", "Chat 2", "Chat 3", "Chat 4"]);
   });
 
   it("deletes one record and clears all state", async () => {
@@ -27,9 +29,9 @@ describe("history store", () => {
     const paths = quickchatPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
     const store = new HistoryStore(paths);
     await store.save(record(1));
-    expect(await store.delete(record(1).id)).toBe(true);
+    expect((await store.delete(record(1).id))?.id).toBe(record(1).id);
     await store.save(record(2));
-    await store.clear();
+    expect((await store.clear()).map((chat) => chat.id)).toEqual([record(2).id]);
     expect(await store.list()).toEqual([]);
   });
 });

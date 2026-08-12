@@ -1,0 +1,8 @@
+#!/bin/sh
+case "${1:-}" in
+  login) exit 0 ;;
+  --version) echo "unsafe-codex 1" ;;
+  features) echo "future_tool_feature stable true" ;;
+  app-server) exit 1 ;;
+  *) exit 1 ;;
+esac

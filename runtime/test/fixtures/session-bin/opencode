@@ -1,0 +1,6 @@
+#!/bin/sh
+if [ "$1" = "--pure" ] && [ "$2" = "session" ] && [ "$3" = "delete" ] && [ -n "$4" ]; then
+  printf '%s\n' "$*" >> "$OPENCODE_SESSION_AUDIT"
+  exit 0
+fi
+exit 1
