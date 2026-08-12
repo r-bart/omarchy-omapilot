@@ -18703,11 +18703,11 @@ async function continueInHerdr(chat, env = process.env, dependencies = {}) {
   const launch = dependencies.launch ?? launchDetached;
   const wait = dependencies.delay ?? delay;
   await openOrFocusHerdr(commands, env, launch, "launch_spawn_failed");
+  const listed = await waitForHerdr(run, commands.herdr, wait);
+  if (listed.code !== 0) throw new HerdrHandoffError("launch", herdrCliErrorCode(listed) ?? "api_unavailable");
   const windowAddress = await waitForHerdrWindow(commands.hyprctl, run, wait);
   if (windowAddress === void 0)
     throw new HerdrHandoffError("launch", "window_not_mapped");
-  const listed = await waitForHerdr(run, commands.herdr, wait);
-  if (listed.code !== 0) throw new HerdrHandoffError("launch", herdrCliErrorCode(listed) ?? "api_unavailable");
   const agentName = `quickchat-${chat.id.slice(0, 8)}`;
   const transcriptAgentName = `${agentName}-context`;
   const existingAgents = await run(commands.herdr, ["agent", "list"]);
@@ -18808,11 +18808,11 @@ async function waitForHerdr(run, herdr, wait) {
   return result;
 }
 async function waitForHerdrWindow(hyprctl, run, wait) {
-  for (let attempt = 0; attempt < 24; attempt += 1) {
+  for (let attempt = 0; attempt < 48; attempt += 1) {
     const active = await run(hyprctl, ["activewindow", "-j"]);
     const address = active.code === 0 ? herdrWindowAddress(parseJson(active.stdout)) : void 0;
     if (address !== void 0) return address;
-    if (attempt < 23) await wait(250);
+    if (attempt < 47) await wait(250);
   }
   return void 0;
 }

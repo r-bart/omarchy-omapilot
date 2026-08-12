@@ -73,6 +73,14 @@ describe("Herdr handoff", () => {
     expect(fixture.launch).toHaveBeenCalledTimes(1);
   });
 
+  it("waits for the cold-launched Herdr client before requiring a mapped window", async () => {
+    const fixture = harness({ activeWindowMisses: 7, workspaceMisses: 3, agents: [existingAgent("quickchat-11111111")] });
+    await expect(continueInHerdr(chat({ resumable: true }), env, fixture)).resolves.toEqual({ mode: "native", reused: true });
+    expect(callsContaining(fixture.calls, ["workspace", "list"])).toHaveLength(4);
+    // Eight discovery polls, followed by the two post-focus assertions.
+    expect(callsContaining(fixture.calls, ["activewindow", "-j"])).toHaveLength(10);
+  });
+
   it("reuses an existing same-chat agent without creating another tab", async () => {
     const fixture = harness({ agents: [existingAgent("quickchat-11111111")] });
     await expect(continueInHerdr(chat({ resumable: true }), env, fixture)).resolves.toEqual({ mode: "native", reused: true });
@@ -165,18 +173,28 @@ function harness(options: {
   failNative?: boolean;
   failTranscript?: boolean;
   busyStarts?: number;
+  activeWindowMisses?: number;
+  workspaceMisses?: number;
 } = {}): HerdrDependencies & { calls: Call[]; launch: ReturnType<typeof vi.fn> } {
   const calls: Call[] = [];
   let tab = 3;
   let busyStarts = options.busyStarts ?? 0;
+  let activeWindowMisses = options.activeWindowMisses ?? 0;
+  let workspaceMisses = options.workspaceMisses ?? 0;
   const launch = options.launch === undefined ? vi.fn(() => Promise.resolve()) : vi.fn(options.launch);
   const run = vi.fn(async (executable: string, args: string[]): Promise<Result> => {
     calls.push({ executable, args });
     if (executable === paths.hyprctl) {
-      if (args[0] === "activewindow") return Promise.resolve({ code: 0, stdout: JSON.stringify({ address: "0xabc", class: options.windowClass ?? "org.omarchy.herdr", title: "herdr" }), stderr: "" });
+      if (args[0] === "activewindow") {
+        if (activeWindowMisses > 0) { activeWindowMisses -= 1; return { code: 0, stdout: JSON.stringify({ address: "0xother", class: "kitty", title: "~" }), stderr: "" }; }
+        return Promise.resolve({ code: 0, stdout: JSON.stringify({ address: "0xabc", class: options.windowClass ?? "org.omarchy.herdr", title: "herdr" }), stderr: "" });
+      }
       return ok();
     }
-    if (args[0] === "workspace" && args[1] === "list") return ok({ workspaces: [{ workspace_id: "w11", label: "Quickchat" }] });
+    if (args[0] === "workspace" && args[1] === "list") {
+      if (workspaceMisses > 0) { workspaceMisses -= 1; return error("api_unavailable"); }
+      return ok({ workspaces: [{ workspace_id: "w11", label: "Quickchat" }] });
+    }
     if (args[0] === "agent" && args[1] === "list") return ok({ agents: options.agents ?? [] });
     if (args[0] === "tab" && args[1] === "create") {
       tab += 1;
