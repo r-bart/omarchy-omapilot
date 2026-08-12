@@ -1,10 +1,10 @@
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, truncate, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { HistoryStore } from "../src/history.js";
 import { quickchatPaths } from "../src/paths.js";
-import type { ChatRecord } from "../src/types.js";
+import type { ChatRecord, StoredImage } from "../src/types.js";
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
@@ -34,7 +34,34 @@ describe("history store", () => {
     expect((await store.clear()).map((chat) => chat.id)).toEqual([record(2).id]);
     expect(await store.list()).toEqual([]);
   });
+
+  it("removes evicted cache images from retained chat records", async () => {
+    const root = await mkdtemp(join(tmpdir(), "quickchat-history-images-")); roots.push(root);
+    const paths = quickchatPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
+    const store = new HistoryStore(paths);
+    await mkdir(paths.images, { recursive: true });
+    const oldest = image("oldest.png");
+    const newest = image("newest.png");
+    await sparseImage(paths.images, oldest.path, 1_600_000_000);
+    await store.save({ ...record(1), images: [oldest] });
+    await sparseImage(paths.images, newest.path, 1_700_000_000);
+    await store.save({ ...record(2), images: [newest] });
+    expect((await store.get(record(1).id))?.images).toEqual([]);
+    expect((await store.get(record(2).id))?.images).toEqual([newest]);
+    expect(await readdir(paths.images)).toEqual(["newest.png"]);
+  });
 });
+
+function image(path: string): StoredImage {
+  return { id: `11111111-1111-4111-8111-${path === "oldest.png" ? "111111111111" : "222222222222"}`, mimeType: "image/png", path, bytes: 30 * 1024 * 1024, width: 1, height: 1 };
+}
+
+async function sparseImage(directory: string, name: string, timestamp: number): Promise<void> {
+  const path = join(directory, name);
+  await writeFile(path, "");
+  await truncate(path, 30 * 1024 * 1024);
+  await utimes(path, timestamp, timestamp);
+}
 
 function record(index: number): ChatRecord {
   const suffix = index.toString(16).padStart(12, "0");

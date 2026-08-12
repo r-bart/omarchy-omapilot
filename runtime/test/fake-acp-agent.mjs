@@ -41,16 +41,26 @@ const server = acp.agent({ name: "quickchat-fake" })
     }
     const controller = new AbortController();
     pending = controller;
-    const decision = await client.request(acp.methods.client.session.requestPermission, {
-      sessionId: params.sessionId,
-      toolCall: { toolCallId: "forbidden", title: "Forbidden shell", kind: "execute" },
-      options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }]
-    });
-    if (decision.outcome.outcome !== "cancelled") throw new Error("permission was not denied");
-    await client.notify(acp.methods.client.session.update, {
-      sessionId: params.sessionId,
-      update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "# Answer\n\nHello [link](https://example.com)." } }
-    });
+    if (process.env.FAKE_ACP_PERMISSION_ATTEMPT === "1") {
+      const decision = await client.request(acp.methods.client.session.requestPermission, {
+        sessionId: params.sessionId,
+        toolCall: { toolCallId: "forbidden", title: "Forbidden shell", kind: "execute" },
+        options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }]
+      });
+      if (decision.outcome.outcome !== "cancelled") throw new Error("permission was not denied");
+    }
+    const answer = process.env.FAKE_ACP_RAW_TOOL_MARKUP === "1"
+      ? '<｜｜DSML｜｜tool_calls>\n<｜｜DSML｜｜invoke name="Bash">\n<｜｜DSML｜｜parameter name="command" string="true">cat /etc/hostname</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n</｜｜DSML｜｜tool_calls>'
+      : "# Answer\n\nHello [link](https://example.com).";
+    const chunks = process.env.FAKE_ACP_RAW_TOOL_MARKUP === "1"
+      ? [answer.slice(0, 5), answer.slice(5, 14), answer.slice(14)]
+      : [answer];
+    for (const text of chunks) {
+      await client.notify(acp.methods.client.session.update, {
+        sessionId: params.sessionId,
+        update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text } }
+      });
+    }
     if (process.env.FAKE_ACP_WAIT === "1") {
       await new Promise((resolve) => {
         const timer = setTimeout(resolve, 30_000);

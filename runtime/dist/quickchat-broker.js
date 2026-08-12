@@ -17483,7 +17483,7 @@ var legacyClientNotificationMethods = /* @__PURE__ */ new Set([
 
 // runtime/src/images.ts
 import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { get } from "node:https";
 import { isIP } from "node:net";
 import { lookup } from "node:dns/promises";
@@ -17814,11 +17814,49 @@ async function pruneImageCache(paths = quickchatPaths()) {
     }
   }))).filter((item) => item !== void 0).sort((a, b) => a.modified - b.modified);
   let total = files.reduce((sum, file2) => sum + file2.bytes, 0);
+  const evicted = [];
   for (const file2 of files) {
     if (total <= MAX_CACHE_BYTES) break;
-    await rm(join2(paths.images, file2.name), { force: true });
+    evicted.push(file2.name);
     total -= file2.bytes;
   }
+  if (evicted.length === 0) return;
+  await removeEvictedImageReferences(paths, new Set(evicted));
+  await Promise.all(evicted.map((name) => rm(join2(paths.images, name), { force: true })));
+}
+async function removeEvictedImageReferences(paths, evicted) {
+  await mkdir(paths.records, { recursive: true, mode: 448 });
+  for (const name of (await readdir(paths.records)).filter((value) => /^[0-9a-f-]{36}\.json$/iu.test(value))) {
+    const destination = join2(paths.records, name);
+    let value;
+    try {
+      value = JSON.parse(await readFile(destination, "utf8"));
+    } catch {
+      continue;
+    }
+    if (!isRecordWithImages(value)) continue;
+    const images = value.images.filter((image) => !referencesEvictedImage(image, evicted));
+    if (images.length === value.images.length) continue;
+    const temporary = `${destination}.${process.pid}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporary, `${JSON.stringify({ ...value, images })}
+`, { encoding: "utf8", mode: 384, flag: "wx" });
+      const handle = await open(temporary, "r");
+      await handle.sync();
+      await handle.close();
+      await rename(temporary, destination);
+    } catch (error48) {
+      await rm(temporary, { force: true });
+      throw error48;
+    }
+  }
+}
+function isRecordWithImages(value) {
+  return typeof value === "object" && value !== null && "images" in value && Array.isArray(value.images);
+}
+function referencesEvictedImage(value, evicted) {
+  if (typeof value !== "object" || value === null || !("path" in value) || typeof value.path !== "string") return false;
+  return basename(value.path) === value.path && evicted.has(value.path);
 }
 function isPublicAddress(address) {
   const version3 = isIP(address);
@@ -17910,11 +17948,10 @@ function isAllowedExternalLink(rawUrl) {
 }
 
 // runtime/src/history.ts
-import { mkdir as mkdir2, open, readdir as readdir2, readFile as readFile2, rename, rm as rm2, stat as stat2, unlink, writeFile as writeFile2 } from "node:fs/promises";
+import { mkdir as mkdir2, open as open2, readdir as readdir2, readFile as readFile2, rename as rename2, rm as rm2, unlink, writeFile as writeFile2 } from "node:fs/promises";
 import { basename as basename2, join as join3 } from "node:path";
 import { pathToFileURL } from "node:url";
 var MAX_CHATS = 30;
-var MAX_IMAGE_BYTES2 = 50 * 1024 * 1024;
 var HistoryStore = class {
   #paths;
   constructor(paths = quickchatPaths()) {
@@ -17948,12 +17985,12 @@ var HistoryStore = class {
     const temporary = `${destination}.${process.pid}.tmp`;
     await writeFile2(temporary, `${JSON.stringify(chat)}
 `, { encoding: "utf8", mode: 384, flag: "wx" });
-    const handle = await open(temporary, "r");
+    const handle = await open2(temporary, "r");
     await handle.sync();
     await handle.close();
-    await rename(temporary, destination);
+    await rename2(temporary, destination);
     const evicted = await this.#evictRecords();
-    await this.#evictImages();
+    await pruneImageCache(this.#paths);
     return evicted;
   }
   async delete(id) {
@@ -17995,24 +18032,6 @@ var HistoryStore = class {
       }
     }));
     return records.filter((record2) => record2 !== void 0).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }
-  async #evictImages() {
-    await mkdir2(this.#paths.images, { recursive: true, mode: 448 });
-    const names = await readdir2(this.#paths.images);
-    const files = (await Promise.all(names.map(async (name) => {
-      try {
-        const info = await stat2(join3(this.#paths.images, name));
-        return info.isFile() ? { name, bytes: info.size, modified: info.mtimeMs } : void 0;
-      } catch {
-        return void 0;
-      }
-    }))).filter((item) => item !== void 0).sort((a, b) => a.modified - b.modified);
-    let total = files.reduce((sum, file2) => sum + file2.bytes, 0);
-    for (const file2 of files) {
-      if (total <= MAX_IMAGE_BYTES2) break;
-      await rm2(join3(this.#paths.images, file2.name), { force: true });
-      total -= file2.bytes;
-    }
   }
 };
 function presentImage(image, paths = quickchatPaths()) {
@@ -18111,6 +18130,7 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
   });
   let cancelSession;
   let cancelled = false;
+  let forbiddenToolAttempt = false;
   child.stderr?.resume();
   const cancel = async () => {
     cancelled = true;
@@ -18135,7 +18155,11 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
       let modelOptions = [];
       let defaultModel;
       let resumable = false;
-      const app = client({ name: "omarchy-quickchat" }).onRequest(methods.client.session.requestPermission, () => ({ outcome: { outcome: "cancelled" } })).onRequest(methods.client.fs.readTextFile, () => {
+      const text = new GuardedTextEmitter(requestId, emit2);
+      const app = client({ name: "omarchy-quickchat" }).onRequest(methods.client.session.requestPermission, () => {
+        forbiddenToolAttempt = true;
+        return { outcome: { outcome: "cancelled" } };
+      }).onRequest(methods.client.fs.readTextFile, () => {
         throw new Error("Quickchat does not expose filesystem reads");
       }).onRequest(methods.client.fs.writeTextFile, () => {
         throw new Error("Quickchat does not expose filesystem writes");
@@ -18179,19 +18203,37 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
           defaultModel = model;
         }
         const promptPromise = session.prompt(question);
-        for (; ; ) {
-          const update = await session.nextUpdate();
-          if (update.kind === "stop") break;
-          const content = update.update.sessionUpdate === "agent_message_chunk" ? update.update.content : void 0;
-          if (content === void 0) continue;
-          const handled = await handleContent(content, requestId, emit2, imageStore, images.length);
-          if (handled.text !== void 0) answer += handled.text;
-          if (handled.image !== void 0) images.push(handled.image);
+        try {
+          for (; ; ) {
+            const update = await session.nextUpdate();
+            if (forbiddenToolAttempt) {
+              await ctx.notify(methods.agent.session.cancel, { sessionId: session.sessionId });
+              break;
+            }
+            if (update.kind === "stop") break;
+            if (capability === "answer" && isToolUpdate(update.update.sessionUpdate)) {
+              forbiddenToolAttempt = true;
+              await ctx.notify(methods.agent.session.cancel, { sessionId: session.sessionId });
+              break;
+            }
+            const content = update.update.sessionUpdate === "agent_message_chunk" ? update.update.content : void 0;
+            if (content === void 0) continue;
+            const handled = await handleContent(content, requestId, text, emit2, imageStore, images.length);
+            if (handled.text !== void 0) answer += handled.text;
+            if (handled.image !== void 0) images.push(handled.image);
+          }
+          await promptPromise;
+          if (forbiddenToolAttempt) throw forbiddenToolError();
+          text.finish();
+        } catch (error48) {
+          await ctx.notify(methods.agent.session.cancel, { sessionId: session.sessionId }).catch(() => void 0);
+          await promptPromise.catch(() => void 0);
+          throw error48;
         }
-        await promptPromise;
         session.dispose();
       });
       if (cancelled) throw new BrokerAcpError("cancelled", "Question was cancelled", false);
+      if (forbiddenToolAttempt) throw forbiddenToolError();
       return {
         answer,
         images,
@@ -18202,6 +18244,7 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
       };
     } catch (error48) {
       if (error48 instanceof BrokerAcpError) throw error48;
+      if (error48 instanceof ForbiddenToolMarkupError || forbiddenToolAttempt) throw forbiddenToolError();
       throw new BrokerAcpError(
         cancelled ? "cancelled" : "agent_failed",
         cancelled ? "Question was cancelled" : "The selected harness failed to answer",
@@ -18219,7 +18262,8 @@ function secureEnvironment(provider, capability) {
   if (provider.id === "codex") {
     const features = Object.fromEntries((provider.lockdownFeatures ?? []).map((feature) => [feature, false]));
     const config2 = {
-      approval_policy: "never",
+      // Codex read-only still permits reads; on-request is what routes command attempts to our deny-all ACP handler.
+      approval_policy: "on-request",
       sandbox_mode: "read-only",
       web_search: capability === "web" ? "live" : "disabled",
       mcp_servers: {},
@@ -18271,27 +18315,65 @@ function modelConfiguration(options) {
     models: flat.map((item) => ({ id: item.value, name: item.name, ...item.description === void 0 || item.description === null ? {} : { description: item.description } }))
   };
 }
-async function handleContent(content, requestId, emit2, imageStore, imageCount) {
+async function handleContent(content, requestId, text, emit2, imageStore, imageCount) {
   if (content.type === "text") {
-    emit2({ type: "content", id: requestId, delta: content.text });
+    text.write(content.text);
     return { text: content.text };
   }
   if (content.type === "image" && imageCount < 4) {
+    text.finish();
     const image = await imageStore.saveBase64(content.data, content.mimeType, content.uri ?? void 0);
     emit2({ type: "image", id: requestId, image: presentImage(image) });
     return { image };
   }
   if (content.type === "resource_link") {
+    text.finish();
     const markdown = `[${escapeMarkdown(content.title ?? content.name)}](${content.uri})`;
     emit2({ type: "content", id: requestId, delta: markdown });
     return { text: markdown };
   }
   if (content.type === "resource" && "text" in content.resource) {
-    emit2({ type: "content", id: requestId, delta: content.resource.text });
+    text.write(content.resource.text);
     return { text: content.resource.text };
   }
   return {};
 }
+var TEXT_GUARD_TAIL = 64;
+var GuardedTextEmitter = class {
+  constructor(requestId, emit2) {
+    this.requestId = requestId;
+    this.emit = emit2;
+  }
+  #pending = "";
+  write(delta) {
+    this.#pending += delta;
+    if (containsToolMarkup(this.#pending)) throw new ForbiddenToolMarkupError();
+    if (this.#pending.length <= TEXT_GUARD_TAIL) return;
+    const boundary = this.#pending.length - TEXT_GUARD_TAIL;
+    this.emit({ type: "content", id: this.requestId, delta: this.#pending.slice(0, boundary) });
+    this.#pending = this.#pending.slice(boundary);
+  }
+  finish() {
+    if (containsToolMarkup(this.#pending)) throw new ForbiddenToolMarkupError();
+    if (this.#pending !== "") this.emit({ type: "content", id: this.requestId, delta: this.#pending });
+    this.#pending = "";
+  }
+};
+function containsToolMarkup(value) {
+  return /<\/?(?:[|｜]{1,2}\s*DSML\s*[|｜]{1,2}\s*)?(?:tool[_ -]?calls?|function[_ -]?calls?|invoke|parameter)\b/iu.test(value);
+}
+function isToolUpdate(kind) {
+  return kind === "tool_call" || kind === "tool_call_update";
+}
+function forbiddenToolError() {
+  return new BrokerAcpError("forbidden_tool_attempt", "The harness attempted a tool that Quickchat does not permit", false);
+}
+var ForbiddenToolMarkupError = class extends Error {
+  constructor() {
+    super("Provider returned raw tool-call markup");
+    this.name = "ForbiddenToolMarkupError";
+  }
+};
 function escapeMarkdown(value) {
   return value.replaceAll(/[\\[\]]/g, "\\$&");
 }

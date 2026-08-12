@@ -1,2 +1,17 @@
 #!/bin/sh
+if [ "$1" = "--pure" ] && [ "$2" = "auth" ] && [ "$3" = "list" ]; then
+  printf 'Credentials\n● fixture oauth\n'
+  exit 0
+fi
+if [ "$1" = "--version" ]; then
+  printf 'opencode 1.0.0\n'
+  exit 0
+fi
+if [ "$1" = "--pure" ] && [ "$2" = "models" ]; then
+  printf 'fixture/default\n'
+  exit 0
+fi
+if [ "$1" = "--pure" ] && [ "$2" = "acp" ]; then
+  exec node "$(dirname "$0")/../../fake-acp-agent.mjs"
+fi
 exit 1

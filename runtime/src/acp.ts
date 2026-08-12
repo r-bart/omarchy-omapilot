@@ -118,6 +118,7 @@ export function runAcpQuestion(
   });
   let cancelSession: (() => Promise<void>) | undefined;
   let cancelled = false;
+  let forbiddenToolAttempt = false;
   child.stderr?.resume();
 
   const cancel = async (): Promise<void> => {
@@ -143,8 +144,12 @@ export function runAcpQuestion(
       let defaultModel: string | undefined;
       let resumable = false;
 
+      const text = new GuardedTextEmitter(requestId, emit);
       const app = acp.client({ name: "omarchy-quickchat" })
-        .onRequest(acp.methods.client.session.requestPermission, () => ({ outcome: { outcome: "cancelled" } }))
+        .onRequest(acp.methods.client.session.requestPermission, () => {
+          forbiddenToolAttempt = true;
+          return { outcome: { outcome: "cancelled" } };
+        })
         .onRequest(acp.methods.client.fs.readTextFile, () => { throw new Error("Quickchat does not expose filesystem reads"); })
         .onRequest(acp.methods.client.fs.writeTextFile, () => { throw new Error("Quickchat does not expose filesystem writes"); })
         .onRequest(acp.methods.client.terminal.create, () => { throw new Error("Quickchat does not expose a terminal"); })
@@ -182,20 +187,38 @@ export function runAcpQuestion(
           defaultModel = model;
         }
         const promptPromise = session.prompt(question);
-        for (;;) {
-          const update = await session.nextUpdate();
-          if (update.kind === "stop") break;
-          const content = update.update.sessionUpdate === "agent_message_chunk" ? update.update.content : undefined;
-          if (content === undefined) continue;
-          const handled = await handleContent(content, requestId, emit, imageStore, images.length);
-          if (handled.text !== undefined) answer += handled.text;
-          if (handled.image !== undefined) images.push(handled.image);
+        try {
+          for (;;) {
+            const update = await session.nextUpdate();
+            if (forbiddenToolAttempt) {
+              await ctx.notify(acp.methods.agent.session.cancel, { sessionId: session.sessionId });
+              break;
+            }
+            if (update.kind === "stop") break;
+            if (capability === "answer" && isToolUpdate(update.update.sessionUpdate)) {
+              forbiddenToolAttempt = true;
+              await ctx.notify(acp.methods.agent.session.cancel, { sessionId: session.sessionId });
+              break;
+            }
+            const content = update.update.sessionUpdate === "agent_message_chunk" ? update.update.content : undefined;
+            if (content === undefined) continue;
+            const handled = await handleContent(content, requestId, text, emit, imageStore, images.length);
+            if (handled.text !== undefined) answer += handled.text;
+            if (handled.image !== undefined) images.push(handled.image);
+          }
+          await promptPromise;
+          if (forbiddenToolAttempt) throw forbiddenToolError();
+          text.finish();
+        } catch (error) {
+          await ctx.notify(acp.methods.agent.session.cancel, { sessionId: session.sessionId }).catch(() => undefined);
+          await promptPromise.catch(() => undefined);
+          throw error;
         }
-        await promptPromise;
         session.dispose();
       });
 
       if (cancelled) throw new BrokerAcpError("cancelled", "Question was cancelled", false);
+      if (forbiddenToolAttempt) throw forbiddenToolError();
       return {
         answer,
         images,
@@ -206,6 +229,7 @@ export function runAcpQuestion(
       };
     } catch (error) {
       if (error instanceof BrokerAcpError) throw error;
+      if (error instanceof ForbiddenToolMarkupError || forbiddenToolAttempt) throw forbiddenToolError();
       throw new BrokerAcpError(
         cancelled ? "cancelled" : "agent_failed",
         cancelled ? "Question was cancelled" : "The selected harness failed to answer",
@@ -224,7 +248,8 @@ function secureEnvironment(provider: DiscoveredProvider, capability: Capability)
   if (provider.id === "codex") {
     const features = Object.fromEntries((provider.lockdownFeatures ?? []).map((feature) => [feature, false]));
     const config = {
-      approval_policy: "never",
+      // Codex read-only still permits reads; on-request is what routes command attempts to our deny-all ACP handler.
+      approval_policy: "on-request",
       sandbox_mode: "read-only",
       web_search: capability === "web" ? "live" : "disabled",
       mcp_servers: {},
@@ -288,29 +313,74 @@ export function modelConfiguration(options: SessionConfigOption[]): { configId?:
 async function handleContent(
   content: ContentBlock,
   requestId: string,
+  text: GuardedTextEmitter,
   emit: (event: BrokerEvent) => void,
   imageStore: ImageStore,
   imageCount: number
 ): Promise<{ text?: string; image?: StoredImage }> {
   if (content.type === "text") {
-    emit({ type: "content", id: requestId, delta: content.text });
+    text.write(content.text);
     return { text: content.text };
   }
   if (content.type === "image" && imageCount < 4) {
+    text.finish();
     const image = await imageStore.saveBase64(content.data, content.mimeType, content.uri ?? undefined);
     emit({ type: "image", id: requestId, image: presentImage(image) });
     return { image };
   }
   if (content.type === "resource_link") {
+    text.finish();
     const markdown = `[${escapeMarkdown(content.title ?? content.name)}](${content.uri})`;
     emit({ type: "content", id: requestId, delta: markdown });
     return { text: markdown };
   }
   if (content.type === "resource" && "text" in content.resource) {
-    emit({ type: "content", id: requestId, delta: content.resource.text });
+    text.write(content.resource.text);
     return { text: content.resource.text };
   }
   return {};
+}
+
+const TEXT_GUARD_TAIL = 64;
+
+class GuardedTextEmitter {
+  #pending = "";
+
+  constructor(readonly requestId: string, readonly emit: (event: BrokerEvent) => void) {}
+
+  write(delta: string): void {
+    this.#pending += delta;
+    if (containsToolMarkup(this.#pending)) throw new ForbiddenToolMarkupError();
+    if (this.#pending.length <= TEXT_GUARD_TAIL) return;
+    const boundary = this.#pending.length - TEXT_GUARD_TAIL;
+    this.emit({ type: "content", id: this.requestId, delta: this.#pending.slice(0, boundary) });
+    this.#pending = this.#pending.slice(boundary);
+  }
+
+  finish(): void {
+    if (containsToolMarkup(this.#pending)) throw new ForbiddenToolMarkupError();
+    if (this.#pending !== "") this.emit({ type: "content", id: this.requestId, delta: this.#pending });
+    this.#pending = "";
+  }
+}
+
+function containsToolMarkup(value: string): boolean {
+  return /<\/?(?:[|｜]{1,2}\s*DSML\s*[|｜]{1,2}\s*)?(?:tool[_ -]?calls?|function[_ -]?calls?|invoke|parameter)\b/iu.test(value);
+}
+
+function isToolUpdate(kind: string): boolean {
+  return kind === "tool_call" || kind === "tool_call_update";
+}
+
+function forbiddenToolError(): BrokerAcpError {
+  return new BrokerAcpError("forbidden_tool_attempt", "The harness attempted a tool that Quickchat does not permit", false);
+}
+
+class ForbiddenToolMarkupError extends Error {
+  constructor() {
+    super("Provider returned raw tool-call markup");
+    this.name = "ForbiddenToolMarkupError";
+  }
 }
 
 function escapeMarkdown(value: string): string {

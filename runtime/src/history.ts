@@ -1,11 +1,11 @@
-import { mkdir, open, readdir, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, open, readdir, readFile, rename, rm, unlink, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { ChatRecord, ChatView, StoredImage } from "./types.js";
+import { pruneImageCache } from "./images.js";
 import { quickchatPaths, type QuickchatPaths } from "./paths.js";
 
 const MAX_CHATS = 30;
-const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
 
 export class HistoryStore {
   readonly #paths: QuickchatPaths;
@@ -49,7 +49,7 @@ export class HistoryStore {
     await handle.close();
     await rename(temporary, destination);
     const evicted = await this.#evictRecords();
-    await this.#evictImages();
+    await pruneImageCache(this.#paths);
     return evicted;
   }
 
@@ -98,25 +98,6 @@ export class HistoryStore {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  async #evictImages(): Promise<void> {
-    await mkdir(this.#paths.images, { recursive: true, mode: 0o700 });
-    const names = await readdir(this.#paths.images);
-    const files = (await Promise.all(names.map(async (name) => {
-      try {
-        const info = await stat(join(this.#paths.images, name));
-        return info.isFile() ? { name, bytes: info.size, modified: info.mtimeMs } : undefined;
-      } catch {
-        return undefined;
-      }
-    }))).filter((item): item is { name: string; bytes: number; modified: number } => item !== undefined)
-      .sort((a, b) => a.modified - b.modified);
-    let total = files.reduce((sum, file) => sum + file.bytes, 0);
-    for (const file of files) {
-      if (total <= MAX_IMAGE_BYTES) break;
-      await rm(join(this.#paths.images, file.name), { force: true });
-      total -= file.bytes;
-    }
-  }
 }
 
 export function presentImage(image: StoredImage, paths: QuickchatPaths = quickchatPaths()): StoredImage & { localUrl: string } {

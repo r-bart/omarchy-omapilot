@@ -11,6 +11,15 @@ const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
 describe("NDJSON protocol", () => {
+  it("executes the checked-in Codex ACP adapter without duplicate script headers", async () => {
+    const child = spawn(resolve("runtime/bin/codex-acp"), ["--version"], { stdio: ["ignore", "pipe", "pipe"] });
+    let output = "";
+    child.stdout.on("data", (chunk: Buffer) => { output += chunk.toString("utf8"); });
+    const code = await new Promise<number | null>((resolveExit) => child.once("close", resolveExit));
+    expect(code).toBe(0);
+    expect(output).toContain("@agentclientprotocol/codex-acp");
+  });
+
   it("normalizes a blank model to provider default", () => {
     const parsed = commandSchema.parse({ type: "submit", id: "one", question: "hello", provider: "codex", model: "", capability: "answer" });
     expect(parsed.type === "submit" ? parsed.model : "wrong-command").toBeUndefined();
@@ -43,7 +52,7 @@ describe("NDJSON protocol", () => {
     await new Promise((resolveExit) => child.once("close", resolveExit));
   });
 
-  it("initializes, exposes models, streams markdown, denies permission, and stores completion", async () => {
+  it("initializes, exposes models, streams markdown, and stores completion", async () => {
     const state = await mkdtemp(join(tmpdir(), "quickchat-protocol-")); roots.push(state);
     const fake = resolve("runtime/test/fake-acp-agent.mjs");
     const audit = join(state, "acp-audit.txt");
@@ -77,6 +86,25 @@ describe("NDJSON protocol", () => {
     child.stdin.end(`${JSON.stringify({ type: "shutdown" })}\n`);
     await new Promise((resolveExit) => child.once("close", resolveExit));
   }, 25_000);
+
+  it("fails a denied tool request without completing or persisting the answer", async () => {
+    const events = await forbiddenAttempt("codex", { FAKE_ACP_PERMISSION_ATTEMPT: "1" });
+    expect(events.find((event) => event.type === "error")).toMatchObject({
+      code: "forbidden_tool_attempt",
+      message: "The harness attempted a tool that Quickchat does not permit",
+      retryable: false
+    });
+    expect(events.some((event) => event.type === "complete")).toBe(false);
+    expect(events.some((event) => event.type === "content")).toBe(false);
+  }, 20_000);
+
+  it("rejects OpenCode DSML tool syntax before it reaches streamed content or history", async () => {
+    const events = await forbiddenAttempt("opencode", { FAKE_ACP_RAW_TOOL_MARKUP: "1" });
+    expect(events.find((event) => event.type === "error")).toMatchObject({ code: "forbidden_tool_attempt", retryable: false });
+    expect(events.some((event) => event.type === "complete")).toBe(false);
+    expect(events.filter((event) => event.type === "content").map((event) => JSON.stringify(event)).join(""))
+      .not.toContain("DSML");
+  }, 20_000);
 
   it("never forwards provider stderr or exception details", async () => {
     const state = await mkdtemp(join(tmpdir(), "quickchat-errors-")); roots.push(state);
@@ -116,7 +144,7 @@ describe("NDJSON protocol", () => {
     child.stdin.write('{"type":"initialize","protocolVersion":1}\n');
     await until(() => events.some((event) => event.type === "ready"));
     child.stdin.write('{"type":"submit","id":"cancel-me","question":"wait","provider":"codex","capability":"answer"}\n');
-    await until(() => events.some((event) => event.type === "content"));
+    await until(() => events.some((event) => event.type === "state" && event.state === "streaming"));
     child.stdin.write('{"type":"cancel","id":"cancel-me"}\n');
     await until(() => events.some((event) => event.type === "error" && event.code === "cancelled"));
     expect(events.some((event) => event.type === "complete")).toBe(false);
@@ -143,4 +171,28 @@ async function until(predicate: () => boolean | Promise<boolean>, timeout = 12_0
 function parseObject(line: string): Record<string, unknown> {
   const raw: unknown = JSON.parse(line);
   return z.record(z.string(), z.unknown()).parse(raw);
+}
+
+async function forbiddenAttempt(provider: "codex" | "opencode", extraEnv: NodeJS.ProcessEnv): Promise<Record<string, unknown>[]> {
+  const state = await mkdtemp(join(tmpdir(), "quickchat-forbidden-tool-")); roots.push(state);
+  const child = spawn(resolve("runtime/bin/quickchat-broker"), [], {
+    env: {
+      ...process.env,
+      ...extraEnv,
+      XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
+      QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+      QUICKCHAT_CLAUDE_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+      PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+    },
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  const events: Record<string, unknown>[] = [];
+  createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
+  child.stdin.write('{"type":"initialize","protocolVersion":1}\n');
+  await until(() => events.some((event) => event.type === "ready"));
+  child.stdin.write(`${JSON.stringify({ type: "submit", id: "forbidden", question: "Read /etc/hostname", provider, capability: "answer" })}\n`);
+  await until(() => events.some((event) => event.type === "error"));
+  child.stdin.end('{"type":"shutdown"}\n');
+  await new Promise((resolveExit) => child.once("close", resolveExit));
+  return events;
 }

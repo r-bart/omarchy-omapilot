@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { get } from "node:https";
 import { isIP } from "node:net";
 import { lookup } from "node:dns/promises";
@@ -231,11 +231,51 @@ export async function pruneImageCache(paths: QuickchatPaths = quickchatPaths()):
   }))).filter((item): item is { name: string; bytes: number; modified: number } => item !== undefined)
     .sort((a, b) => a.modified - b.modified);
   let total = files.reduce((sum, file) => sum + file.bytes, 0);
+  const evicted: string[] = [];
   for (const file of files) {
     if (total <= MAX_CACHE_BYTES) break;
-    await rm(join(paths.images, file.name), { force: true });
+    evicted.push(file.name);
     total -= file.bytes;
   }
+  if (evicted.length === 0) return;
+  await removeEvictedImageReferences(paths, new Set(evicted));
+  await Promise.all(evicted.map((name) => rm(join(paths.images, name), { force: true })));
+}
+
+async function removeEvictedImageReferences(paths: QuickchatPaths, evicted: ReadonlySet<string>): Promise<void> {
+  await mkdir(paths.records, { recursive: true, mode: 0o700 });
+  for (const name of (await readdir(paths.records)).filter((value) => /^[0-9a-f-]{36}\.json$/iu.test(value))) {
+    const destination = join(paths.records, name);
+    let value: unknown;
+    try {
+      value = JSON.parse(await readFile(destination, "utf8"));
+    } catch {
+      continue;
+    }
+    if (!isRecordWithImages(value)) continue;
+    const images = value.images.filter((image) => !referencesEvictedImage(image, evicted));
+    if (images.length === value.images.length) continue;
+    const temporary = `${destination}.${process.pid}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporary, `${JSON.stringify({ ...value, images })}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" });
+      const handle = await open(temporary, "r");
+      await handle.sync();
+      await handle.close();
+      await rename(temporary, destination);
+    } catch (error) {
+      await rm(temporary, { force: true });
+      throw error;
+    }
+  }
+}
+
+function isRecordWithImages(value: unknown): value is Record<string, unknown> & { images: unknown[] } {
+  return typeof value === "object" && value !== null && "images" in value && Array.isArray(value.images);
+}
+
+function referencesEvictedImage(value: unknown, evicted: ReadonlySet<string>): boolean {
+  if (typeof value !== "object" || value === null || !("path" in value) || typeof value.path !== "string") return false;
+  return basename(value.path) === value.path && evicted.has(value.path);
 }
 
 export function isPublicAddress(address: string): boolean {

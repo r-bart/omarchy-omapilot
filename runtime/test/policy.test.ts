@@ -8,8 +8,8 @@ describe("provider security profiles", () => {
   it("keeps Codex read-only and tool-free in both modes while gating web", () => {
     const answer: unknown = JSON.parse(providerPolicyEnvironment(provider("codex"), "answer").CODEX_CONFIG ?? "{}");
     const web: unknown = JSON.parse(providerPolicyEnvironment(provider("codex"), "web").CODEX_CONFIG ?? "{}");
-    expect(answer).toMatchObject({ approval_policy: "never", sandbox_mode: "read-only", web_search: "disabled", mcp_servers: {} });
-    expect(web).toMatchObject({ approval_policy: "never", sandbox_mode: "read-only", web_search: "live", mcp_servers: {} });
+    expect(answer).toMatchObject({ approval_policy: "on-request", sandbox_mode: "read-only", web_search: "disabled", mcp_servers: {} });
+    expect(web).toMatchObject({ approval_policy: "on-request", sandbox_mode: "read-only", web_search: "live", mcp_servers: {} });
     const answerFeatures = featureRecord(answer);
     const webFeatures = featureRecord(web);
     for (const feature of provider("codex").lockdownFeatures ?? []) {
