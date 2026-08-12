@@ -20,6 +20,9 @@ grep -Fq 'Qt.resolvedUrl("../runtime/bin/quickchat-broker")' \
   "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'Quickshell.env("QUICKCHAT_BROKER_PATH") || bundledBrokerPath' \
   "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'property string configuredProvider: "codex"' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'if (!changed) return' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'model = desiredModel' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'if (providers.length > 0) selectProvider(provider)' \
   "$repo_dir/components/QuickchatStore.qml"

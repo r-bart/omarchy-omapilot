@@ -41,6 +41,10 @@ Scope {
   property bool processStarted: false
   property var queuedCommands: []
   property string stderrTail: ""
+  property string configuredProvider: "codex"
+  property string configuredCodexModel: ""
+  property string configuredClaudeModel: ""
+  property string configuredOpencodeModel: ""
 
   readonly property bool busy: state === "preparing" || state === "dictating" || state === "streaming" || state === "stopping"
   readonly property bool canSubmit: initialized && providers.length > 0 && !busy
@@ -55,9 +59,21 @@ Scope {
   function configure(settings) {
     var source = settings || {}
     var desiredProvider = Protocol.normalizedProvider(source.provider) || "codex"
+    var desiredCodexModel = String(source.codexModel || "")
+    var desiredClaudeModel = String(source.claudeModel || "")
+    var desiredOpencodeModel = String(source.opencodeModel || "")
+    var changed = desiredProvider !== configuredProvider
+      || desiredCodexModel !== configuredCodexModel
+      || desiredClaudeModel !== configuredClaudeModel
+      || desiredOpencodeModel !== configuredOpencodeModel
+    if (!changed) return
+    configuredProvider = desiredProvider
+    configuredCodexModel = desiredCodexModel
+    configuredClaudeModel = desiredClaudeModel
+    configuredOpencodeModel = desiredOpencodeModel
     if (providers.length === 0 || providerAvailable(desiredProvider)) provider = desiredProvider
-    var modelKey = desiredProvider + "Model"
-    var desiredModel = String(source[modelKey] || "")
+    var desiredModel = desiredProvider === "claude" ? desiredClaudeModel
+      : desiredProvider === "opencode" ? desiredOpencodeModel : desiredCodexModel
     model = desiredModel
     if (providers.length > 0) selectProvider(provider)
   }
