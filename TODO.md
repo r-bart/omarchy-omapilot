@@ -24,7 +24,7 @@ a dedicated Herdr Quickchat workspace.
 | Stream | Branch/worktree | Owns | Status |
 | --- | --- | --- | --- |
 | QML surface | `quattro-ui` / `/home/sbull/worktrees/omarchy-quickchat-ui` | Bar widget, panel, components, QML tests | Implemented and integrated on `main` |
-| ACP runtime | `broker-runtime` / `/home/sbull/worktrees/omarchy-quickchat-broker` | Broker, provider adapters, history, Herdr/Voxtype helpers, unit tests | Integrated; final permission hardening in review |
+| ACP runtime | `broker-runtime` / `/home/sbull/worktrees/omarchy-quickchat-broker` | Broker, provider adapters, history, Herdr/Voxtype helpers, unit tests | Integrated and independently reviewed on `main` |
 | Plugin/release | `plugin-compliance` / `/home/sbull/worktrees/omarchy-quickchat-compliance` | Manifest, docs, validation, CI/release packaging | Implemented and integrated on `main` |
 
 ## Allowed actions
@@ -46,8 +46,10 @@ a dedicated Herdr Quickchat workspace.
 - [x] Static checks and focused tests pass at the current reviewed commit.
 - [x] `omarchy plugin validate .` passes from a clean staged archive.
 - [x] Independent review has no unresolved actionable findings.
-- [ ] Live shell: open, submit, stream/stop, history, dismissal/reopen, error, keyboard, theme, and narrow layout verified.
-- [ ] `design-qa.md` says `final result: passed`.
+- [x] Installed-shell open, submit/answer, history, dismissal/reopen, active-theme,
+  narrow-layout, and Herdr flows are verified; stream/stop, error, and keyboard
+  contracts pass the focused QML/runtime suites.
+- [x] `design-qa.md` says `final result: passed`.
 - [ ] Public main branch and release assets are published.
 
 ## Release blockers
@@ -71,11 +73,13 @@ a dedicated Herdr Quickchat workspace.
   workspace, tab, and agent-pane focus. The final installed OpenCode check used
   the actual panel button and left Herdr foregrounded on the reused focused
   agent (`focused: true`).
-- Codex must remain `on-request` while Quickchat rejects every ACP permission
-  request; a live tool-denial probe is required before release.
+- Codex remains `on-request` while Quickchat rejects every ACP permission
+  request; the live exact `/etc/hostname` denial probe passed with no streamed
+  or persisted content.
 - Release asset publication follows final local runtime and UI verification.
 - Marketplace submission requires the owner's approval of the exact issue body.
-- Add a verified live themed capture to the README.
+- The README uses a verified completed-answer capture from the installed active
+  Omarchy theme.
 - The checked-in runtime layout works after a plain Omarchy clone without hooks;
   rerun the deterministic packaging proof at the final commit.
 
