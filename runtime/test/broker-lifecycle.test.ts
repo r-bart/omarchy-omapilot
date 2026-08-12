@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { deleteAcpSession } from "../src/acp.js";
 import { QuickchatBroker } from "../src/broker.js";
+import { HerdrHandoffError } from "../src/herdr.js";
 import { HistoryStore } from "../src/history.js";
 import { ImageStore } from "../src/images.js";
 import { quickchatPaths } from "../src/paths.js";
@@ -89,6 +90,60 @@ describe("dictation generation guard", () => {
       { type: "dictation", state: "transcribing" },
       { type: "dictation", state: "idle" }
     ]);
+  });
+});
+
+describe("Herdr handoff serialization", () => {
+  it("coalesces concurrent clicks for the same chat into one handoff and one result", async () => {
+    const fixture = await setup();
+    const saved = record(7);
+    await fixture.history.save(saved);
+    const events: BrokerEvent[] = [];
+    let finish: (value: { mode: "native"; reused: boolean }) => void = () => undefined;
+    const result = new Promise<{ mode: "native"; reused: boolean }>((resolveResult) => { finish = resolveResult; });
+    let handoffCount = 0;
+    const broker = new QuickchatBroker(events.push.bind(events), {
+      history: fixture.history,
+      images: new ImageStore(fixture.paths),
+      env: fixture.env,
+      herdrContinue: () => { handoffCount += 1; return result; }
+    });
+    const first = broker.handle({ type: "continue_in_herdr", chatId: saved.id });
+    const second = broker.handle({ type: "continue_in_herdr", chatId: saved.id });
+    await new Promise((resolveTurn) => setTimeout(resolveTurn, 0));
+    expect(handoffCount).toBe(1);
+    finish({ mode: "native", reused: false });
+    await Promise.all([first, second]);
+    expect(events.filter((event) => event.type === "herdr" && event.state === "opening")).toHaveLength(1);
+    expect(events.filter((event) => event.type === "herdr" && event.state === "continued")).toHaveLength(1);
+  });
+
+  it("coalesces failures and exposes only safe stage/error-code diagnostics", async () => {
+    const fixture = await setup();
+    const saved = record(8);
+    await fixture.history.save(saved);
+    const events: BrokerEvent[] = [];
+    let fail: (error: Error) => void = () => undefined;
+    const result = new Promise<{ mode: "native"; reused: boolean }>((_resolveResult, rejectResult) => { fail = rejectResult; });
+    const broker = new QuickchatBroker(events.push.bind(events), {
+      history: fixture.history,
+      images: new ImageStore(fixture.paths),
+      env: fixture.env,
+      herdrContinue: () => result
+    });
+    const first = broker.handle({ type: "continue_in_herdr", chatId: saved.id });
+    const second = broker.handle({ type: "continue_in_herdr", chatId: saved.id });
+    await new Promise((resolveTurn) => setTimeout(resolveTurn, 0));
+    fail(new HerdrHandoffError("focus", "window_not_focused"));
+    await Promise.all([first, second]);
+    expect(events.filter((event) => event.type === "herdr" && event.state === "failed")).toEqual([{
+      type: "herdr",
+      chatId: saved.id,
+      state: "failed",
+      stage: "focus",
+      errorCode: "window_not_focused",
+      message: "The session opened in Herdr, but Quickchat could not focus it"
+    }]);
   });
 });
 

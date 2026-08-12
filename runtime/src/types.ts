@@ -71,6 +71,7 @@ export type ChatRecord = {
   images: StoredImage[];
   session: {
     acpId?: string;
+    cwd?: string;
     resumable: boolean;
     resumeKind: "native" | "transcript";
   };
@@ -88,6 +89,6 @@ export type BrokerEvent =
   | { type: "error"; id?: string; code: string; message: string; retryable: boolean }
   | { type: "dictation"; state: "recording" | "transcribing" | "idle" | "unavailable"; text?: string; message?: string }
   | { type: "history"; history: ChatView[] }
-  | { type: "herdr"; chatId: string; state: "opening" | "continued" | "unavailable" | "failed"; mode?: "native" | "transcript"; message?: string }
+  | { type: "herdr"; chatId: string; state: "opening" | "continued" | "unavailable" | "failed"; mode?: "native" | "transcript"; message?: string; stage?: "availability" | "launch" | "workspace" | "session" | "transcript" | "focus"; errorCode?: string }
   | { type: "link"; url: string; opened: boolean }
   | { type: "copied"; copied: boolean };

@@ -1,6 +1,24 @@
-import { describe, expect, it } from "vitest";
-import { herdrFocusCommands, nativeResumeArgs, transcriptPrompt } from "../src/herdr.js";
-import type { ChatRecord } from "../src/types.js";
+import { describe, expect, it, vi } from "vitest";
+import {
+  continueInHerdr,
+  describeHerdrError,
+  herdrFocusCommands,
+  herdrLauncherCommand,
+  nativeResumeArgs,
+  transcriptPrompt,
+  type HerdrDependencies
+} from "../src/herdr.js";
+import type { ChatRecord, ProviderId } from "../src/types.js";
+
+type Result = { code: number; stdout: string; stderr: string };
+type Call = { executable: string; args: string[] };
+
+const paths = {
+  herdr: "/test/herdr",
+  launcher: "/test/omarchy-launch-or-focus",
+  tuiLauncher: "/test/omarchy-launch-tui",
+  hyprctl: "/test/hyprctl"
+};
 
 describe("Herdr handoff", () => {
   it("constructs native resume arguments for all harnesses", () => {
@@ -10,24 +28,183 @@ describe("Herdr handoff", () => {
   });
 
   it("labels transcript fallback honestly", () => {
-    expect(transcriptPrompt(chat)).toContain("could not be attached natively");
-    expect(transcriptPrompt(chat)).toContain("## Question\nQuestion");
-    expect(transcriptPrompt(chat)).toContain("## Answer\nAnswer");
+    expect(transcriptPrompt(chat())).toContain("could not be attached natively");
+    expect(transcriptPrompt(chat())).toContain("## Question\nQuestion");
+    expect(transcriptPrompt(chat())).toContain("## Answer\nAnswer");
   });
 
-  it("focuses the Herdr window, workspace, tab, and agent in that order", () => {
-    expect(herdrFocusCommands("/usr/bin/herdr", "/usr/bin/omarchy-launch-or-focus-tui", "w11", "w11:t2", "quickchat-1234"))
+  it("matches official and legacy Herdr windows through the Omarchy helper", () => {
+    expect(herdrLauncherCommand(paths.herdr, paths.launcher, paths.tuiLauncher)).toEqual({
+      executable: paths.launcher,
+      args: ["herdr", "'/test/omarchy-launch-tui' --app-id=org.omarchy.herdr '/test/herdr'"]
+    });
+  });
+
+  it("focuses the session, raises Herdr last, then reapplies session focus", () => {
+    expect(herdrFocusCommands(paths.herdr, paths.launcher, paths.tuiLauncher, "w11", "w11:t2", "quickchat-1234"))
       .toEqual([
-        { executable: "/usr/bin/omarchy-launch-or-focus-tui", args: ["--app-id=org.omarchy.herdr", "/usr/bin/herdr"] },
-        { executable: "/usr/bin/herdr", args: ["workspace", "focus", "w11"] },
-        { executable: "/usr/bin/herdr", args: ["tab", "focus", "w11:t2"] },
-        { executable: "/usr/bin/herdr", args: ["agent", "focus", "quickchat-1234"] }
+        { executable: paths.herdr, args: ["workspace", "focus", "w11"] },
+        { executable: paths.herdr, args: ["tab", "focus", "w11:t2"] },
+        { executable: paths.herdr, args: ["agent", "focus", "quickchat-1234"] },
+        { executable: paths.launcher, args: ["herdr", "'/test/omarchy-launch-tui' --app-id=org.omarchy.herdr '/test/herdr'"] },
+        { executable: paths.herdr, args: ["workspace", "focus", "w11"] },
+        { executable: paths.herdr, args: ["tab", "focus", "w11:t2"] },
+        { executable: paths.herdr, args: ["agent", "focus", "quickchat-1234"] }
       ]);
+  });
+
+  it("does not wait for the launched window process to close", async () => {
+    let releaseLaunch: (() => void) | undefined;
+    const launch = vi.fn(() => new Promise<void>((resolve) => { releaseLaunch = resolve; }));
+    const promise = continueInHerdr(chat({ provider: "opencode", resumable: true }), env, harness({
+      launch,
+      agents: [existingAgent("quickchat-11111111")]
+    }));
+    await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
+    expect(await Promise.race([promise.then(() => "finished"), Promise.resolve("running")])).toBe("running");
+    releaseLaunch?.();
+    await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(2));
+    releaseLaunch?.();
+    await expect(promise).resolves.toMatchObject({ mode: "native", reused: true });
+  });
+
+  it.each(["org.omarchy.herdr", "kitty"])("continues against a mapped %s Herdr window", async (windowClass) => {
+    const fixture = harness({ agents: [existingAgent("quickchat-11111111")], windowClass });
+    await expect(continueInHerdr(chat({ resumable: true }), env, fixture)).resolves.toEqual({ mode: "native", reused: true });
+    expect(fixture.launch).toHaveBeenCalledTimes(2);
+  });
+
+  it("reuses an existing same-chat agent without creating another tab", async () => {
+    const fixture = harness({ agents: [existingAgent("quickchat-11111111")] });
+    await expect(continueInHerdr(chat({ resumable: true }), env, fixture)).resolves.toEqual({ mode: "native", reused: true });
+    expect(callsContaining(fixture.calls, ["tab", "create"])).toHaveLength(0);
+    expect(callsContaining(fixture.calls, ["agent", "start"])).toHaveLength(0);
+    expect(callArgs(fixture.calls)).toEqual(expect.arrayContaining([
+      ["workspace", "focus", "w11"], ["tab", "focus", "w11:t4"], ["agent", "focus", "quickchat-11111111"]
+    ]));
+  });
+
+  it.each<ProviderId>(["codex", "claude", "opencode"])("starts a native %s resume and leaves Herdr focused", async (provider) => {
+    const fixture = harness();
+    await expect(continueInHerdr(chat({ provider, resumable: true }), env, fixture)).resolves.toEqual({ mode: "native", reused: false });
+    const start = callsContaining(fixture.calls, ["agent", "start"])[0]?.args ?? [];
+    expect(start).toContain("--");
+    expect(start.slice(start.indexOf("--") + 1)).toEqual(nativeResumeArgs(provider, "session-1", "/home/test"));
+    expect(fixture.launch).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses a fresh tab/name for transcript fallback, accepts blocked, and cleans the failed native tab", async () => {
+    const fixture = harness({ failNative: true });
+    await expect(continueInHerdr(chat({ provider: "claude", resumable: true }), env, fixture))
+      .resolves.toEqual({ mode: "transcript", reused: false });
+    const starts = callsContaining(fixture.calls, ["agent", "start"]);
+    expect(starts).toHaveLength(2);
+    expect(starts[0]?.args[2]).toBe("quickchat-11111111");
+    expect(starts[1]?.args[2]).toBe("quickchat-11111111-context");
+    expect(callsContaining(fixture.calls, ["agent", "prompt"])[0]?.args).toEqual(expect.arrayContaining(["--until", "blocked"]));
+    expect(callsContaining(fixture.calls, ["tab", "close"])[0]?.args).toEqual(["tab", "close", "w11:t4"]);
+  });
+
+  it("retries only the structured pane-busy failure", async () => {
+    const fixture = harness({ busyStarts: 2 });
+    await expect(continueInHerdr(chat({ resumable: true }), env, fixture)).resolves.toMatchObject({ mode: "native" });
+    expect(callsContaining(fixture.calls, ["agent", "start"])).toHaveLength(3);
+  });
+
+  it("removes its new tab when a start fails", async () => {
+    const fixture = harness({ failTranscript: true });
+    await expect(continueInHerdr(chat({ resumable: false }), env, fixture)).rejects.toMatchObject({
+      stage: "session", errorCode: "agent_start_failed"
+    });
+    expect(callsContaining(fixture.calls, ["tab", "close"])[0]?.args).toEqual(["tab", "close", "w11:t4"]);
+  });
+
+  it("returns safe structured stage diagnostics", () => {
+    expect(describeHerdrError(Object.assign(new Error(), { stage: "session" }))).toEqual({
+      state: "failed", message: "Could not continue this chat in Herdr"
+    });
   });
 });
 
-const chat: ChatRecord = {
-  schemaVersion: 1, id: "11111111-1111-4111-8111-111111111111", createdAt: "2026-08-11T00:00:00.000Z", title: "Test",
-  provider: "claude", capability: "answer", question: "Question", answer: "Answer", images: [],
-  session: { resumable: false, resumeKind: "transcript" }
-};
+function chat(options: { provider?: ProviderId; resumable?: boolean } = {}): ChatRecord {
+  return {
+    schemaVersion: 1,
+    id: "11111111-1111-4111-8111-111111111111",
+    createdAt: "2026-08-11T00:00:00.000Z",
+    title: "Test",
+    provider: options.provider ?? "claude",
+    capability: "answer",
+    question: "Question",
+    answer: "Answer",
+    images: [],
+    session: options.resumable === false
+      ? { resumable: false, resumeKind: "transcript", cwd: "/home/test" }
+      : { resumable: true, resumeKind: "native", acpId: "session-1", cwd: "/home/test" }
+  };
+}
+
+function existingAgent(name: string): Record<string, unknown> {
+  return { name, workspace_id: "w11", tab_id: "w11:t4", pane_id: "w11:p4", interactive_ready: true };
+}
+
+function envelope(result: unknown): string {
+  return JSON.stringify({ id: "test", result });
+}
+
+function error(code: string): Result {
+  return { code: 1, stdout: JSON.stringify({ error: { code } }), stderr: "sensitive details are never forwarded" };
+}
+
+function ok(result: unknown = {}): Result {
+  return { code: 0, stdout: envelope(result), stderr: "" };
+}
+
+function harness(options: {
+  agents?: Record<string, unknown>[];
+  windowClass?: string;
+  launch?: HerdrDependencies["launch"];
+  failNative?: boolean;
+  failTranscript?: boolean;
+  busyStarts?: number;
+} = {}): HerdrDependencies & { calls: Call[]; launch: ReturnType<typeof vi.fn> } {
+  const calls: Call[] = [];
+  let tab = 3;
+  let busyStarts = options.busyStarts ?? 0;
+  const launch = options.launch === undefined ? vi.fn(() => Promise.resolve()) : vi.fn(options.launch);
+  const run = vi.fn(async (executable: string, args: string[]): Promise<Result> => {
+    calls.push({ executable, args });
+    if (executable === paths.hyprctl) {
+      if (args[0] === "clients") return Promise.resolve({ code: 0, stdout: JSON.stringify([{ class: options.windowClass ?? "org.omarchy.herdr", title: "herdr" }]), stderr: "" });
+      return Promise.resolve({ code: 0, stdout: JSON.stringify({ class: options.windowClass ?? "org.omarchy.herdr", title: "herdr" }), stderr: "" });
+    }
+    if (args[0] === "workspace" && args[1] === "list") return ok({ workspaces: [{ workspace_id: "w11", label: "Quickchat" }] });
+    if (args[0] === "agent" && args[1] === "list") return ok({ agents: options.agents ?? [] });
+    if (args[0] === "tab" && args[1] === "create") {
+      tab += 1;
+      return ok({ tab: { tab_id: `w11:t${tab}` }, root_pane: { pane_id: `w11:p${tab}` } });
+    }
+    if (args[0] === "agent" && args[1] === "start") {
+      if (busyStarts > 0) { busyStarts -= 1; return error("agent_pane_busy"); }
+      if (options.failNative && args.includes("--")) return error("native_resume_failed");
+      if (options.failTranscript && !args.includes("--")) return error("agent_start_failed");
+    }
+    return ok();
+  });
+  return {
+    calls,
+    launch,
+    run,
+    resolve: (name) => Promise.resolve(Object.values(paths).find((value) => value.endsWith(name))),
+    delay: () => Promise.resolve()
+  };
+}
+
+function callsContaining(calls: Call[], prefix: string[]): Call[] {
+  return calls.filter((call) => prefix.every((value, index) => call.args[index] === value));
+}
+
+function callArgs(calls: Call[]): string[][] {
+  return calls.map((call) => call.args);
+}
+
+const env: NodeJS.ProcessEnv = { HOME: "/home/test", PATH: "/test" };

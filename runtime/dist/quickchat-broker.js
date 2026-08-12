@@ -10,7 +10,7 @@ import { createInterface as createInterface2 } from "node:readline";
 
 // runtime/src/broker.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
-import { spawn as spawn3 } from "node:child_process";
+import { spawn as spawn4 } from "node:child_process";
 
 // runtime/src/acp.ts
 import { spawn as spawn2 } from "node:child_process";
@@ -18,7 +18,7 @@ import { mkdir as mkdir3, mkdtemp as mkdtemp2, rm as rm3 } from "node:fs/promise
 import { join as join4 } from "node:path";
 import { createInterface } from "node:readline";
 
-// node_modules/@agentclientprotocol/sdk/dist/schema/index.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/@agentclientprotocol/sdk/dist/schema/index.js
 var AGENT_METHODS = {
   initialize: "initialize",
   authenticate: "authenticate",
@@ -70,7 +70,7 @@ var PROTOCOL_METHODS = {
 };
 var PROTOCOL_VERSION = 1;
 
-// node_modules/zod/v4/classic/external.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/classic/external.js
 var external_exports = {};
 __export(external_exports, {
   $brand: () => $brand,
@@ -311,7 +311,7 @@ __export(external_exports, {
   xor: () => xor
 });
 
-// node_modules/zod/v4/core/index.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/index.js
 var core_exports2 = {};
 __export(core_exports2, {
   $ZodAny: () => $ZodAny,
@@ -589,7 +589,7 @@ __export(core_exports2, {
   version: () => version
 });
 
-// node_modules/zod/v4/core/core.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/core.js
 var NEVER = Object.freeze({
   status: "aborted"
 });
@@ -664,7 +664,7 @@ function config(newConfig) {
   return globalConfig;
 }
 
-// node_modules/zod/v4/core/util.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -1343,7 +1343,7 @@ var Class = class {
   }
 };
 
-// node_modules/zod/v4/core/errors.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/errors.js
 var initializer = (inst, def) => {
   inst.name = "$ZodError";
   Object.defineProperty(inst, "_zod", {
@@ -1479,7 +1479,7 @@ function prettifyError(error48) {
   return lines.join("\n");
 }
 
-// node_modules/zod/v4/core/parse.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/parse.js
 var _parse = (_Err) => (schema, value, _ctx, _params) => {
   const ctx = _ctx ? Object.assign(_ctx, { async: false }) : { async: false };
   const result = schema._zod.run({ value, issues: [] }, ctx);
@@ -1567,7 +1567,7 @@ var _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
 };
 var safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
 
-// node_modules/zod/v4/core/regexes.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/regexes.js
 var regexes_exports = {};
 __export(regexes_exports, {
   base64: () => base64,
@@ -1724,7 +1724,7 @@ var sha512_hex = /^[0-9a-fA-F]{128}$/;
 var sha512_base64 = /* @__PURE__ */ fixedBase64(86, "==");
 var sha512_base64url = /* @__PURE__ */ fixedBase64url(86);
 
-// node_modules/zod/v4/core/checks.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a2;
   inst._zod ?? (inst._zod = {});
@@ -2272,7 +2272,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// node_modules/zod/v4/core/doc.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/doc.js
 var Doc = class {
   constructor(args = []) {
     this.content = [];
@@ -2308,14 +2308,14 @@ var Doc = class {
   }
 };
 
-// node_modules/zod/v4/core/versions.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 3,
   patch: 6
 };
 
-// node_modules/zod/v4/core/schemas.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a2;
   inst ?? (inst = {});
@@ -4286,7 +4286,7 @@ function handleRefineResult(result, payload, input2, inst) {
   }
 }
 
-// node_modules/zod/v4/locales/index.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/index.js
 var locales_exports = {};
 __export(locales_exports, {
   ar: () => ar_default,
@@ -4340,7 +4340,7 @@ __export(locales_exports, {
   zhTW: () => zh_TW_default
 });
 
-// node_modules/zod/v4/locales/ar.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/ar.js
 var error = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0641", verb: "\u0623\u0646 \u064A\u062D\u0648\u064A" },
@@ -4447,7 +4447,7 @@ function ar_default() {
   };
 }
 
-// node_modules/zod/v4/locales/az.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/az.js
 var error2 = () => {
   const Sizable = {
     string: { unit: "simvol", verb: "olmal\u0131d\u0131r" },
@@ -4553,7 +4553,7 @@ function az_default() {
   };
 }
 
-// node_modules/zod/v4/locales/be.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -4710,7 +4710,7 @@ function be_default() {
   };
 }
 
-// node_modules/zod/v4/locales/bg.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/bg.js
 var error4 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0430", verb: "\u0434\u0430 \u0441\u044A\u0434\u044A\u0440\u0436\u0430" },
@@ -4831,7 +4831,7 @@ function bg_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ca.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/ca.js
 var error5 = () => {
   const Sizable = {
     string: { unit: "car\xE0cters", verb: "contenir" },
@@ -4940,7 +4940,7 @@ function ca_default() {
   };
 }
 
-// node_modules/zod/v4/locales/cs.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/cs.js
 var error6 = () => {
   const Sizable = {
     string: { unit: "znak\u016F", verb: "m\xEDt" },
@@ -5052,7 +5052,7 @@ function cs_default() {
   };
 }
 
-// node_modules/zod/v4/locales/da.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/da.js
 var error7 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "havde" },
@@ -5168,7 +5168,7 @@ function da_default() {
   };
 }
 
-// node_modules/zod/v4/locales/de.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/de.js
 var error8 = () => {
   const Sizable = {
     string: { unit: "Zeichen", verb: "zu haben" },
@@ -5277,7 +5277,7 @@ function de_default() {
   };
 }
 
-// node_modules/zod/v4/locales/en.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/en.js
 var error9 = () => {
   const Sizable = {
     string: { unit: "characters", verb: "to have" },
@@ -5386,7 +5386,7 @@ function en_default() {
   };
 }
 
-// node_modules/zod/v4/locales/eo.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/eo.js
 var error10 = () => {
   const Sizable = {
     string: { unit: "karaktrojn", verb: "havi" },
@@ -5496,7 +5496,7 @@ function eo_default() {
   };
 }
 
-// node_modules/zod/v4/locales/es.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/es.js
 var error11 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "tener" },
@@ -5629,7 +5629,7 @@ function es_default() {
   };
 }
 
-// node_modules/zod/v4/locales/fa.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/fa.js
 var error12 = () => {
   const Sizable = {
     string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -5744,7 +5744,7 @@ function fa_default() {
   };
 }
 
-// node_modules/zod/v4/locales/fi.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/fi.js
 var error13 = () => {
   const Sizable = {
     string: { unit: "merkki\xE4", subject: "merkkijonon" },
@@ -5857,7 +5857,7 @@ function fi_default() {
   };
 }
 
-// node_modules/zod/v4/locales/fr.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/fr.js
 var error14 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -5966,7 +5966,7 @@ function fr_default() {
   };
 }
 
-// node_modules/zod/v4/locales/fr-CA.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/fr-CA.js
 var error15 = () => {
   const Sizable = {
     string: { unit: "caract\xE8res", verb: "avoir" },
@@ -6074,7 +6074,7 @@ function fr_CA_default() {
   };
 }
 
-// node_modules/zod/v4/locales/he.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/he.js
 var error16 = () => {
   const TypeNames = {
     string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
@@ -6269,7 +6269,7 @@ function he_default() {
   };
 }
 
-// node_modules/zod/v4/locales/hu.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/hu.js
 var error17 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "legyen" },
@@ -6378,7 +6378,7 @@ function hu_default() {
   };
 }
 
-// node_modules/zod/v4/locales/hy.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -6526,7 +6526,7 @@ function hy_default() {
   };
 }
 
-// node_modules/zod/v4/locales/id.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/id.js
 var error19 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "memiliki" },
@@ -6633,7 +6633,7 @@ function id_default() {
   };
 }
 
-// node_modules/zod/v4/locales/is.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/is.js
 var error20 = () => {
   const Sizable = {
     string: { unit: "stafi", verb: "a\xF0 hafa" },
@@ -6743,7 +6743,7 @@ function is_default() {
   };
 }
 
-// node_modules/zod/v4/locales/it.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/it.js
 var error21 = () => {
   const Sizable = {
     string: { unit: "caratteri", verb: "avere" },
@@ -6852,7 +6852,7 @@ function it_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ja.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/ja.js
 var error22 = () => {
   const Sizable = {
     string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
@@ -6960,7 +6960,7 @@ function ja_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ka.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/ka.js
 var error23 = () => {
   const Sizable = {
     string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -7073,7 +7073,7 @@ function ka_default() {
   };
 }
 
-// node_modules/zod/v4/locales/km.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/km.js
 var error24 = () => {
   const Sizable = {
     string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -7184,12 +7184,12 @@ function km_default() {
   };
 }
 
-// node_modules/zod/v4/locales/kh.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
 
-// node_modules/zod/v4/locales/ko.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/ko.js
 var error25 = () => {
   const Sizable = {
     string: { unit: "\uBB38\uC790", verb: "to have" },
@@ -7301,7 +7301,7 @@ function ko_default() {
   };
 }
 
-// node_modules/zod/v4/locales/lt.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/lt.js
 var capitalizeFirstCharacter = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
@@ -7505,7 +7505,7 @@ function lt_default() {
   };
 }
 
-// node_modules/zod/v4/locales/mk.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/mk.js
 var error27 = () => {
   const Sizable = {
     string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -7615,7 +7615,7 @@ function mk_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ms.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/ms.js
 var error28 = () => {
   const Sizable = {
     string: { unit: "aksara", verb: "mempunyai" },
@@ -7723,7 +7723,7 @@ function ms_default() {
   };
 }
 
-// node_modules/zod/v4/locales/nl.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/nl.js
 var error29 = () => {
   const Sizable = {
     string: { unit: "tekens", verb: "heeft" },
@@ -7834,7 +7834,7 @@ function nl_default() {
   };
 }
 
-// node_modules/zod/v4/locales/no.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/no.js
 var error30 = () => {
   const Sizable = {
     string: { unit: "tegn", verb: "\xE5 ha" },
@@ -7943,7 +7943,7 @@ function no_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ota.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/ota.js
 var error31 = () => {
   const Sizable = {
     string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
@@ -8053,7 +8053,7 @@ function ota_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ps.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/ps.js
 var error32 = () => {
   const Sizable = {
     string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
@@ -8168,7 +8168,7 @@ function ps_default() {
   };
 }
 
-// node_modules/zod/v4/locales/pl.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/pl.js
 var error33 = () => {
   const Sizable = {
     string: { unit: "znak\xF3w", verb: "mie\u0107" },
@@ -8278,7 +8278,7 @@ function pl_default() {
   };
 }
 
-// node_modules/zod/v4/locales/pt.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/pt.js
 var error34 = () => {
   const Sizable = {
     string: { unit: "caracteres", verb: "ter" },
@@ -8387,7 +8387,7 @@ function pt_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ru.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -8544,7 +8544,7 @@ function ru_default() {
   };
 }
 
-// node_modules/zod/v4/locales/sl.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/sl.js
 var error36 = () => {
   const Sizable = {
     string: { unit: "znakov", verb: "imeti" },
@@ -8654,7 +8654,7 @@ function sl_default() {
   };
 }
 
-// node_modules/zod/v4/locales/sv.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/sv.js
 var error37 = () => {
   const Sizable = {
     string: { unit: "tecken", verb: "att ha" },
@@ -8765,7 +8765,7 @@ function sv_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ta.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/ta.js
 var error38 = () => {
   const Sizable = {
     string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -8876,7 +8876,7 @@ function ta_default() {
   };
 }
 
-// node_modules/zod/v4/locales/th.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/th.js
 var error39 = () => {
   const Sizable = {
     string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -8987,7 +8987,7 @@ function th_default() {
   };
 }
 
-// node_modules/zod/v4/locales/tr.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/tr.js
 var error40 = () => {
   const Sizable = {
     string: { unit: "karakter", verb: "olmal\u0131" },
@@ -9093,7 +9093,7 @@ function tr_default() {
   };
 }
 
-// node_modules/zod/v4/locales/uk.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/uk.js
 var error41 = () => {
   const Sizable = {
     string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -9202,12 +9202,12 @@ function uk_default() {
   };
 }
 
-// node_modules/zod/v4/locales/ua.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
 
-// node_modules/zod/v4/locales/ur.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/ur.js
 var error42 = () => {
   const Sizable = {
     string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
@@ -9318,7 +9318,7 @@ function ur_default() {
   };
 }
 
-// node_modules/zod/v4/locales/uz.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/uz.js
 var error43 = () => {
   const Sizable = {
     string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
@@ -9428,7 +9428,7 @@ function uz_default() {
   };
 }
 
-// node_modules/zod/v4/locales/vi.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/vi.js
 var error44 = () => {
   const Sizable = {
     string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
@@ -9537,7 +9537,7 @@ function vi_default() {
   };
 }
 
-// node_modules/zod/v4/locales/zh-CN.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/zh-CN.js
 var error45 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
@@ -9647,7 +9647,7 @@ function zh_CN_default() {
   };
 }
 
-// node_modules/zod/v4/locales/zh-TW.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/zh-TW.js
 var error46 = () => {
   const Sizable = {
     string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
@@ -9755,7 +9755,7 @@ function zh_TW_default() {
   };
 }
 
-// node_modules/zod/v4/locales/yo.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/locales/yo.js
 var error47 = () => {
   const Sizable = {
     string: { unit: "\xE0mi", verb: "n\xED" },
@@ -9863,7 +9863,7 @@ function yo_default() {
   };
 }
 
-// node_modules/zod/v4/core/registries.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/registries.js
 var _a;
 var $output = /* @__PURE__ */ Symbol("ZodOutput");
 var $input = /* @__PURE__ */ Symbol("ZodInput");
@@ -9913,7 +9913,7 @@ function registry() {
 (_a = globalThis).__zod_globalRegistry ?? (_a.__zod_globalRegistry = registry());
 var globalRegistry = globalThis.__zod_globalRegistry;
 
-// node_modules/zod/v4/core/api.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/api.js
 // @__NO_SIDE_EFFECTS__
 function _string(Class2, params) {
   return new Class2({
@@ -10952,7 +10952,7 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   return inst;
 }
 
-// node_modules/zod/v4/core/to-json-schema.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/to-json-schema.js
 function initializeContext(params) {
   let target = params?.target ?? "draft-2020-12";
   if (target === "draft-4")
@@ -11304,7 +11304,7 @@ var createStandardJSONSchemaMethod = (schema, io, processors = {}) => (params) =
   return finalize(ctx, schema);
 };
 
-// node_modules/zod/v4/core/json-schema-processors.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/json-schema-processors.js
 var formatMap = {
   guid: "uuid",
   url: "uri",
@@ -11855,7 +11855,7 @@ function toJSONSchema(input2, params) {
   return finalize(ctx, input2);
 }
 
-// node_modules/zod/v4/core/json-schema-generator.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/json-schema-generator.js
 var JSONSchemaGenerator = class {
   /** @deprecated Access via ctx instead */
   get metadataRegistry() {
@@ -11930,10 +11930,10 @@ var JSONSchemaGenerator = class {
   }
 };
 
-// node_modules/zod/v4/core/json-schema.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/core/json-schema.js
 var json_schema_exports = {};
 
-// node_modules/zod/v4/classic/schemas.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/classic/schemas.js
 var schemas_exports2 = {};
 __export(schemas_exports2, {
   ZodAny: () => ZodAny,
@@ -12102,7 +12102,7 @@ __export(schemas_exports2, {
   xor: () => xor
 });
 
-// node_modules/zod/v4/classic/checks.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/classic/checks.js
 var checks_exports2 = {};
 __export(checks_exports2, {
   endsWith: () => _endsWith,
@@ -12136,7 +12136,7 @@ __export(checks_exports2, {
   uppercase: () => _uppercase
 });
 
-// node_modules/zod/v4/classic/iso.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/classic/iso.js
 var iso_exports = {};
 __export(iso_exports, {
   ZodISODate: () => ZodISODate,
@@ -12177,7 +12177,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// node_modules/zod/v4/classic/errors.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/classic/errors.js
 var initializer2 = (inst, issues) => {
   $ZodError.init(inst, issues);
   inst.name = "ZodError";
@@ -12217,7 +12217,7 @@ var ZodRealError = $constructor("ZodError", initializer2, {
   Parent: Error
 });
 
-// node_modules/zod/v4/classic/parse.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse2 = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -12231,7 +12231,7 @@ var safeDecode2 = /* @__PURE__ */ _safeDecode(ZodRealError);
 var safeEncodeAsync2 = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 var safeDecodeAsync2 = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 
-// node_modules/zod/v4/classic/schemas.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/classic/schemas.js
 var ZodType = /* @__PURE__ */ $constructor("ZodType", (inst, def) => {
   $ZodType.init(inst, def);
   Object.assign(inst["~standard"], {
@@ -13310,7 +13310,7 @@ function preprocess(fn, schema) {
   return pipe(transform(fn), schema);
 }
 
-// node_modules/zod/v4/classic/compat.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/classic/compat.js
 var ZodIssueCode = {
   invalid_type: "invalid_type",
   too_big: "too_big",
@@ -13336,7 +13336,7 @@ var ZodFirstPartyTypeKind;
 /* @__PURE__ */ (function(ZodFirstPartyTypeKind2) {
 })(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
 
-// node_modules/zod/v4/classic/from-json-schema.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/classic/from-json-schema.js
 var z = {
   ...schemas_exports2,
   ...checks_exports2,
@@ -13810,7 +13810,7 @@ function fromJSONSchema(schema, params) {
   return convertSchema(schema, ctx);
 }
 
-// node_modules/zod/v4/classic/coerce.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/classic/coerce.js
 var coerce_exports = {};
 __export(coerce_exports, {
   bigint: () => bigint3,
@@ -13835,10 +13835,10 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 
-// node_modules/zod/v4/classic/external.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/zod/v4/classic/external.js
 config(en_default());
 
-// node_modules/@agentclientprotocol/sdk/dist/schema-deserialize.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/@agentclientprotocol/sdk/dist/schema-deserialize.js
 var skippedItem = /* @__PURE__ */ Symbol("skippedItem");
 function defaultOnError(schema, fallback) {
   return schema.catch(fallback);
@@ -13901,7 +13901,7 @@ function vecSkipError(itemSchema) {
   return external_exports.array(itemSchema.catch(skippedItem)).transform((items) => items.filter((item) => item !== skippedItem));
 }
 
-// node_modules/@agentclientprotocol/sdk/dist/schema/zod.gen.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/@agentclientprotocol/sdk/dist/schema/zod.gen.js
 var zRequestId = union([number2(), string2()]).nullable();
 var zSessionId = string2();
 var zWriteTextFileRequest = object({
@@ -15499,7 +15499,7 @@ var zCancelRequestNotification = object({
   _meta: defaultOnError(record(string2(), unknown()).nullish(), () => void 0)
 });
 
-// node_modules/@agentclientprotocol/sdk/dist/jsonrpc.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/@agentclientprotocol/sdk/dist/jsonrpc.js
 var CANCEL_REQUEST_METHOD = "$/cancel_request";
 function isRequestMessage(value) {
   return isJsonRpcEnvelope(value) && "id" in value && typeof value["method"] === "string" && isJsonRpcId(value["id"]);
@@ -16419,7 +16419,7 @@ var RequestError = class _RequestError extends Error {
   }
 };
 
-// node_modules/@agentclientprotocol/sdk/dist/line-buffer.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/@agentclientprotocol/sdk/dist/line-buffer.js
 var newline = 10;
 var LineBuffer = class {
   /** Bytes of the current (incomplete) line, carried across chunks. */
@@ -16472,7 +16472,7 @@ var LineBuffer = class {
   }
 };
 
-// node_modules/@agentclientprotocol/sdk/dist/stream.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/@agentclientprotocol/sdk/dist/stream.js
 function ndJsonStream(output, input2) {
   const textEncoder = new TextEncoder();
   const textDecoder = new TextDecoder();
@@ -16560,7 +16560,7 @@ function ndJsonStream(output, input2) {
   return { readable, writable };
 }
 
-// node_modules/@agentclientprotocol/sdk/dist/schema/guards.gen.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/@agentclientprotocol/sdk/dist/schema/guards.gen.js
 var zGuardCreateElicitationRequestForm = zElicitationFormMode.and(object({ mode: literal("form") })).and(object({ message: string2() }));
 var zGuardCreateElicitationRequestUrl = zElicitationUrlMode.and(object({ mode: literal("url") })).and(object({ message: string2() }));
 var zGuardCreateElicitationRequestCustom = union([zElicitationSessionScope, zElicitationRequestScope]).and(object({ message: string2() }));
@@ -16578,7 +16578,7 @@ var zGuardCreateElicitationResponseCancel = object({
   action: literal("cancel")
 });
 
-// node_modules/@agentclientprotocol/sdk/dist/acp.js
+// ../../../src/github.com/spencerbull/omarchy-quickchat/node_modules/@agentclientprotocol/sdk/dist/acp.js
 function ndJsonStream2(output, input2) {
   return ndJsonStream(output, input2);
 }
@@ -18627,22 +18627,43 @@ function dictationStartArgs(transcript) {
 }
 
 // runtime/src/herdr.ts
-function parseResult(output) {
+import { spawn as spawn3 } from "node:child_process";
+var HerdrHandoffError = class extends Error {
+  stage;
+  errorCode;
+  constructor(stage, errorCode) {
+    super(herdrErrorMessage(stage, errorCode));
+    this.name = "HerdrHandoffError";
+    this.stage = stage;
+    this.errorCode = errorCode;
+  }
+};
+var HERDR_WINDOW_PATTERN = "herdr";
+function parseJson(output) {
   try {
-    const envelope = JSON.parse(output);
-    return typeof envelope === "object" && envelope !== null && "result" in envelope ? envelope.result : void 0;
+    return JSON.parse(output);
   } catch {
     return void 0;
   }
 }
-function objectString(value, key) {
+function parseResult(output) {
+  const envelope = parseJson(output);
+  return typeof envelope === "object" && envelope !== null && "result" in envelope ? envelope.result : void 0;
+}
+function objectValue(value, key) {
   if (typeof value !== "object" || value === null) return void 0;
-  const entry = Object.entries(value).find(([entryKey]) => entryKey === key)?.[1];
+  return Object.entries(value).find(([entryKey]) => entryKey === key)?.[1];
+}
+function objectString(value, key) {
+  const entry = objectValue(value, key);
   return typeof entry === "string" ? entry : void 0;
 }
 function nestedObject(value, key) {
-  if (typeof value !== "object" || value === null) return void 0;
-  return Object.entries(value).find(([entryKey]) => entryKey === key)?.[1];
+  return objectValue(value, key);
+}
+function nestedArray(value, key) {
+  const entry = objectValue(value, key);
+  return Array.isArray(entry) ? entry : void 0;
 }
 function nativeResumeArgs(provider, sessionId, cwd = process.cwd()) {
   if (provider === "codex") return ["resume", sessionId, "-C", cwd, "-s", "read-only", "-a", "on-request"];
@@ -18662,65 +18683,226 @@ function transcriptPrompt(chat) {
     "Continue from this context and wait for my next instruction."
   ].join("\n");
 }
-async function continueInHerdr(chat, env = process.env, runner) {
-  const herdr = await resolveExecutable("herdr", env);
-  if (herdr === void 0) throw new Error("Herdr is not installed");
-  const run = runner ?? (async (executable, args) => runCommand(executable, args, { env, timeoutMs: 35e3, maxOutput: 256e3 }));
-  const launcher = await resolveExecutable("omarchy-launch-or-focus-tui", env);
-  if (launcher === void 0) throw new Error("The Omarchy Herdr launcher is not installed");
-  const focusedWindow = await run(launcher, ["--app-id=org.omarchy.herdr", herdr]);
-  if (focusedWindow.code !== 0) throw new Error("Herdr could not be opened or focused");
-  let listed = await run(herdr, ["workspace", "list"]);
-  for (let attempt = 0; listed.code !== 0 && attempt < 19; attempt += 1) {
-    await delay(250);
-    listed = await run(herdr, ["workspace", "list"]);
-  }
-  if (listed.code !== 0) throw new Error("Herdr is not available");
-  const listResult = parseResult(listed.stdout);
-  let workspaceId = findQuickchatWorkspace(listResult);
-  let tabId;
-  let paneId;
-  if (workspaceId === void 0) {
-    const created = await run(herdr, ["workspace", "create", "--cwd", process.cwd(), "--label", "Quickchat", "--no-focus"]);
-    if (created.code !== 0) throw new Error("Herdr could not create the Quickchat workspace");
-    const createdResult = parseResult(created.stdout);
-    paneId = objectString(nestedObject(createdResult, "root_pane"), "pane_id");
-    tabId = objectString(nestedObject(createdResult, "tab"), "tab_id") ?? objectString(createdResult, "tab_id");
-    workspaceId = objectString(nestedObject(createdResult, "workspace"), "workspace_id") ?? objectString(createdResult, "workspace_id") ?? workspaceFromTab(tabId);
-    if (tabId !== void 0) await run(herdr, ["tab", "rename", tabId, chat.title.slice(0, 60)]);
-  } else {
-    const created = await run(herdr, ["tab", "create", "--workspace", workspaceId, "--cwd", process.cwd(), "--label", chat.title.slice(0, 60), "--no-focus"]);
-    if (created.code !== 0) throw new Error("Herdr could not create a Quickchat tab");
-    const createdResult = parseResult(created.stdout);
-    paneId = objectString(nestedObject(createdResult, "root_pane"), "pane_id");
-    tabId = objectString(nestedObject(createdResult, "tab"), "tab_id") ?? objectString(createdResult, "tab_id");
-  }
-  if (workspaceId === void 0 || tabId === void 0 || paneId === void 0)
-    throw new Error("Herdr did not return a complete workspace target");
+async function continueInHerdr(chat, env = process.env, dependencies = {}) {
+  const resolve2 = dependencies.resolve ?? resolveExecutable;
+  const [herdr, launcher, tuiLauncher, hyprctl] = await Promise.all([
+    resolve2("herdr", env),
+    resolve2("omarchy-launch-or-focus", env),
+    resolve2("omarchy-launch-tui", env),
+    resolve2("hyprctl", env)
+  ]);
+  if (herdr === void 0) throw new HerdrHandoffError("availability", "herdr_missing");
+  if (launcher === void 0 || tuiLauncher === void 0 || hyprctl === void 0)
+    throw new HerdrHandoffError("availability", "omarchy_launcher_missing");
+  const commands = { herdr, launcher, tuiLauncher, hyprctl };
+  const run = dependencies.run ?? (async (executable, args) => runCommand(executable, args, {
+    env,
+    timeoutMs: 35e3,
+    maxOutput: 256e3
+  }));
+  const launch = dependencies.launch ?? launchDetached;
+  const wait = dependencies.delay ?? delay;
+  await openOrFocusHerdr(commands, env, launch, "launch_spawn_failed");
+  if (!await waitForHerdrWindow(commands.hyprctl, run, wait))
+    throw new HerdrHandoffError("launch", "window_not_mapped");
+  const listed = await waitForHerdr(run, commands.herdr, wait);
+  if (listed.code !== 0) throw new HerdrHandoffError("launch", herdrCliErrorCode(listed) ?? "api_unavailable");
   const agentName = `quickchat-${chat.id.slice(0, 8)}`;
-  await delay(250);
-  const resume = !chat.session.resumable || chat.session.acpId === void 0 ? void 0 : nativeResumeArgs(chat.provider, chat.session.acpId, process.cwd());
-  const startArgs = ["agent", "start", agentName, "--kind", chat.provider, "--pane", paneId, "--timeout", "30000"];
-  if (resume !== void 0) startArgs.push("--", ...resume);
-  let started = await run(herdr, startArgs);
-  let mode = resume === void 0 ? "transcript" : "native";
-  if (started.code !== 0 && resume !== void 0) {
-    mode = "transcript";
-    started = await run(herdr, ["agent", "start", agentName, "--kind", chat.provider, "--pane", paneId, "--timeout", "30000"]);
+  const transcriptAgentName = `${agentName}-context`;
+  const existingAgents = await run(commands.herdr, ["agent", "list"]);
+  if (existingAgents.code !== 0)
+    throw new HerdrHandoffError("session", herdrCliErrorCode(existingAgents) ?? "agent_list_failed");
+  const existing = findExistingAgent(parseResult(existingAgents.stdout), [agentName, transcriptAgentName]);
+  if (existing !== void 0) {
+    await focusSessionAndWindow(commands, existing, existing.name, env, run, launch, wait);
+    return { mode: existing.name === transcriptAgentName ? "transcript" : nativeMode(chat), reused: true };
   }
-  if (started.code !== 0) throw new Error("Herdr could not start the selected harness");
-  if (mode === "transcript") {
-    const prompted = await run(herdr, ["agent", "prompt", agentName, transcriptPrompt(chat), "--wait", "--until", "idle", "--until", "done", "--timeout", "30000"]);
-    if (prompted.code !== 0) throw new Error("Herdr started, but the transcript handoff failed");
+  const savedCwd = chat.session.cwd?.trim();
+  const homeCwd = env.HOME?.trim();
+  const cwd = savedCwd !== void 0 && savedCwd.length > 0 ? savedCwd : homeCwd !== void 0 && homeCwd.length > 0 ? homeCwd : process.cwd();
+  const createdTabs = [];
+  let handoffStarted = false;
+  try {
+    let target = await createHandoffTarget(parseResult(listed.stdout), commands.herdr, cwd, chat.title, run, createdTabs);
+    const workspaceId = target.workspaceId;
+    const resume = !chat.session.resumable || chat.session.acpId === void 0 ? void 0 : nativeResumeArgs(chat.provider, chat.session.acpId, cwd);
+    let mode = resume === void 0 ? "transcript" : "native";
+    let started = await startAgent(commands.herdr, chat.provider, agentName, target.paneId, resume, run, wait);
+    if (started.code !== 0) {
+      const racedAgents = await run(commands.herdr, ["agent", "list"]);
+      const raced = racedAgents.code === 0 ? findExistingAgent(parseResult(racedAgents.stdout), [agentName]) : void 0;
+      if (raced !== void 0) {
+        handoffStarted = true;
+        await rollbackCreatedTabs(commands.herdr, createdTabs, run);
+        await focusSessionAndWindow(commands, raced, agentName, env, run, launch, wait);
+        return { mode: nativeMode(chat), reused: true };
+      }
+      if (resume === void 0)
+        throw new HerdrHandoffError("session", herdrCliErrorCode(started) ?? "agent_start_failed");
+      mode = "transcript";
+      const nativeTabId = target.tabId;
+      target = await createTabTarget(commands.herdr, workspaceId, cwd, chat.title, run, createdTabs);
+      started = await startAgent(commands.herdr, chat.provider, transcriptAgentName, target.paneId, void 0, run, wait);
+      if (started.code !== 0)
+        throw new HerdrHandoffError("session", herdrCliErrorCode(started) ?? "agent_start_failed");
+      await closeCreatedTab(commands.herdr, nativeTabId, createdTabs, run);
+    }
+    handoffStarted = true;
+    if (mode === "transcript") {
+      const prompted = await run(commands.herdr, [
+        "agent",
+        "prompt",
+        transcriptAgentName,
+        transcriptPrompt(chat),
+        "--wait",
+        "--until",
+        "idle",
+        "--until",
+        "done",
+        "--until",
+        "blocked",
+        "--timeout",
+        "30000"
+      ]);
+      if (prompted.code !== 0) {
+        await rollbackCreatedTabs(commands.herdr, createdTabs, run);
+        throw new HerdrHandoffError("transcript", herdrCliErrorCode(prompted) ?? "prompt_failed");
+      }
+    }
+    const focusedAgentName = mode === "transcript" ? transcriptAgentName : agentName;
+    await focusSessionAndWindow(commands, target, focusedAgentName, env, run, launch, wait);
+    return { mode, reused: false };
+  } catch (error48) {
+    if (!handoffStarted) await rollbackCreatedTabs(commands.herdr, createdTabs, run);
+    throw error48;
   }
-  for (const command of herdrSessionFocusCommands(herdr, workspaceId, tabId, agentName)) {
-    const focused = await run(command.executable, command.args);
-    if (focused.code !== 0) throw new Error("Herdr could not focus the continued session");
-  }
-  return { mode };
+}
+async function launchDetached(executable, args, env) {
+  await new Promise((resolveLaunch, rejectLaunch) => {
+    const child = spawn3(executable, args, { env, stdio: "ignore", detached: true });
+    child.once("error", rejectLaunch);
+    child.once("spawn", () => {
+      child.unref();
+      resolveLaunch();
+    });
+  });
 }
 function delay(milliseconds) {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
+}
+async function openOrFocusHerdr(commands, env, launch, errorCode) {
+  const command = herdrLauncherCommand(commands.herdr, commands.launcher, commands.tuiLauncher);
+  try {
+    await launch(command.executable, command.args, env);
+  } catch {
+    throw new HerdrHandoffError("launch", errorCode);
+  }
+}
+async function waitForHerdr(run, herdr, wait) {
+  let result = await run(herdr, ["workspace", "list"]);
+  for (let attempt = 0; result.code !== 0 && attempt < 23; attempt += 1) {
+    await wait(250);
+    result = await run(herdr, ["workspace", "list"]);
+  }
+  return result;
+}
+async function waitForHerdrWindow(hyprctl, run, wait) {
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const clients = await run(hyprctl, ["clients", "-j"]);
+    if (clients.code === 0 && herdrWindowIn(clients.stdout)) return true;
+    if (attempt < 23) await wait(250);
+  }
+  return false;
+}
+async function waitForActiveHerdrWindow(hyprctl, run, wait) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const active = await run(hyprctl, ["activewindow", "-j"]);
+    if (active.code === 0 && isHerdrWindow(parseJson(active.stdout))) return true;
+    if (attempt < 19) await wait(100);
+  }
+  return false;
+}
+function herdrWindowIn(output) {
+  const clients = parseJson(output);
+  return Array.isArray(clients) && clients.some((client2) => isHerdrWindow(client2));
+}
+function isHerdrWindow(window) {
+  const windowClass = objectString(window, "class")?.toLowerCase();
+  const title = objectString(window, "title")?.toLowerCase();
+  return windowClass === "org.omarchy.herdr" || title === "herdr";
+}
+async function createHandoffTarget(listResult, herdr, cwd, title, run, createdTabs) {
+  const existing = findQuickchatWorkspace(listResult);
+  if (existing !== void 0) return createTabTarget(herdr, existing, cwd, title, run, createdTabs);
+  const created = await run(herdr, ["workspace", "create", "--cwd", cwd, "--label", "Quickchat", "--no-focus"]);
+  if (created.code !== 0)
+    throw new HerdrHandoffError("workspace", herdrCliErrorCode(created) ?? "workspace_create_failed");
+  const createdResult = parseResult(created.stdout);
+  const tabId = objectString(nestedObject(createdResult, "tab"), "tab_id") ?? objectString(createdResult, "tab_id");
+  const paneId = objectString(nestedObject(createdResult, "root_pane"), "pane_id");
+  const workspaceId = objectString(nestedObject(createdResult, "workspace"), "workspace_id") ?? objectString(createdResult, "workspace_id") ?? workspaceFromTab(tabId);
+  if (workspaceId === void 0 || tabId === void 0 || paneId === void 0)
+    throw new HerdrHandoffError("workspace", "incomplete_workspace_target");
+  createdTabs.push(tabId);
+  await run(herdr, ["tab", "rename", tabId, title.slice(0, 60)]);
+  return { workspaceId, tabId, paneId };
+}
+async function createTabTarget(herdr, workspaceId, cwd, title, run, createdTabs) {
+  const created = await run(herdr, [
+    "tab",
+    "create",
+    "--workspace",
+    workspaceId,
+    "--cwd",
+    cwd,
+    "--label",
+    title.slice(0, 60),
+    "--no-focus"
+  ]);
+  if (created.code !== 0)
+    throw new HerdrHandoffError("workspace", herdrCliErrorCode(created) ?? "tab_create_failed");
+  const result = parseResult(created.stdout);
+  const tabId = objectString(nestedObject(result, "tab"), "tab_id") ?? objectString(result, "tab_id");
+  const paneId = objectString(nestedObject(result, "root_pane"), "pane_id");
+  if (tabId === void 0 || paneId === void 0)
+    throw new HerdrHandoffError("workspace", "incomplete_tab_target");
+  createdTabs.push(tabId);
+  return { workspaceId, tabId, paneId };
+}
+async function startAgent(herdr, provider, agentName, paneId, resume, run, wait) {
+  const args = ["agent", "start", agentName, "--kind", provider, "--pane", paneId, "--timeout", "30000"];
+  if (resume !== void 0) args.push("--", ...resume);
+  let result = await run(herdr, args);
+  for (let attempt = 0; herdrCliErrorCode(result) === "agent_pane_busy" && attempt < 19; attempt += 1) {
+    await wait(250);
+    result = await run(herdr, args);
+  }
+  return result;
+}
+async function focusSessionAndWindow(commands, target, agentName, env, run, launch, wait) {
+  await runFocusCommands(commands.herdr, target.workspaceId, target.tabId, agentName, run);
+  await openOrFocusHerdr(commands, env, launch, "focus_spawn_failed");
+  if (!await waitForActiveHerdrWindow(commands.hyprctl, run, wait))
+    throw new HerdrHandoffError("focus", "window_not_focused");
+  await runFocusCommands(commands.herdr, target.workspaceId, target.tabId, agentName, run);
+  if (!await waitForActiveHerdrWindow(commands.hyprctl, run, wait))
+    throw new HerdrHandoffError("focus", "window_focus_lost");
+}
+async function runFocusCommands(herdr, workspaceId, tabId, agentName, run) {
+  for (const command of herdrSessionFocusCommands(herdr, workspaceId, tabId, agentName)) {
+    const focused = await run(command.executable, command.args);
+    if (focused.code !== 0)
+      throw new HerdrHandoffError("focus", herdrCliErrorCode(focused) ?? `${command.args[0]}_focus_failed`);
+  }
+}
+async function rollbackCreatedTabs(herdr, createdTabs, run) {
+  for (const tabId of [...createdTabs].reverse()) await run(herdr, ["tab", "close", tabId]);
+  createdTabs.length = 0;
+}
+async function closeCreatedTab(herdr, tabId, createdTabs, run) {
+  await run(herdr, ["tab", "close", tabId]);
+  const index = createdTabs.indexOf(tabId);
+  if (index >= 0) createdTabs.splice(index, 1);
 }
 function workspaceFromTab(tabId) {
   if (tabId === void 0) return void 0;
@@ -18728,12 +18910,44 @@ function workspaceFromTab(tabId) {
   return separator > 0 ? tabId.slice(0, separator) : void 0;
 }
 function findQuickchatWorkspace(result) {
-  const workspaces = nestedObject(result, "workspaces");
-  if (!Array.isArray(workspaces)) return void 0;
+  const workspaces = nestedArray(result, "workspaces");
+  if (workspaces === void 0) return void 0;
   for (const workspace of workspaces) {
     if (objectString(workspace, "label")?.toLowerCase() === "quickchat") return objectString(workspace, "workspace_id");
   }
   return void 0;
+}
+function findExistingAgent(result, names) {
+  const agents = nestedArray(result, "agents");
+  if (agents === void 0) return void 0;
+  for (const agent of agents) {
+    const name = objectString(agent, "name");
+    if (name === void 0 || !names.includes(name) || objectValue(agent, "interactive_ready") !== true) continue;
+    const workspaceId = objectString(agent, "workspace_id");
+    const tabId = objectString(agent, "tab_id");
+    const paneId = objectString(agent, "pane_id");
+    if (workspaceId !== void 0 && tabId !== void 0 && paneId !== void 0)
+      return { name, workspaceId, tabId, paneId };
+  }
+  return void 0;
+}
+function nativeMode(chat) {
+  return chat.session.resumable && chat.session.acpId !== void 0 ? "native" : "transcript";
+}
+function herdrCliErrorCode(result) {
+  for (const output of [result.stdout, result.stderr]) {
+    const envelope = parseJson(output);
+    const code = objectString(nestedObject(envelope, "error"), "code");
+    if (code !== void 0 && /^[a-z][a-z0-9_]{0,63}$/.test(code)) return code;
+  }
+  return void 0;
+}
+function shellWord(value) {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+function herdrLauncherCommand(herdr, launcher, tuiLauncher) {
+  const launchCommand = `${shellWord(tuiLauncher)} --app-id=org.omarchy.herdr ${shellWord(herdr)}`;
+  return { executable: launcher, args: [HERDR_WINDOW_PATTERN, launchCommand] };
 }
 function herdrSessionFocusCommands(herdr, workspaceId, tabId, agentName) {
   return [
@@ -18741,6 +18955,25 @@ function herdrSessionFocusCommands(herdr, workspaceId, tabId, agentName) {
     { executable: herdr, args: ["tab", "focus", tabId] },
     { executable: herdr, args: ["agent", "focus", agentName] }
   ];
+}
+function describeHerdrError(error48) {
+  if (!(error48 instanceof HerdrHandoffError))
+    return { state: "failed", message: "Could not continue this chat in Herdr" };
+  return {
+    state: error48.stage === "availability" ? "unavailable" : "failed",
+    message: error48.message,
+    stage: error48.stage,
+    errorCode: error48.errorCode
+  };
+}
+function herdrErrorMessage(stage, errorCode) {
+  if (stage === "availability")
+    return errorCode === "herdr_missing" ? "Herdr is not installed" : "Omarchy's Herdr launcher is unavailable";
+  if (stage === "launch") return "Herdr could not be opened";
+  if (stage === "workspace") return "Herdr opened, but Quickchat could not prepare its workspace";
+  if (stage === "session") return "Herdr opened, but the selected harness session could not be continued";
+  if (stage === "transcript") return "Herdr opened, but the transcript handoff could not be sent";
+  return "The session opened in Herdr, but Quickchat could not focus it";
 }
 
 // runtime/src/providers.ts
@@ -18878,9 +19111,11 @@ var QuickchatBroker = class {
   #images;
   #dictation;
   #sessionCleaner;
+  #herdrContinue;
   #env;
   #providers = /* @__PURE__ */ new Map();
   #runs = /* @__PURE__ */ new Map();
+  #handoffs = /* @__PURE__ */ new Map();
   #dictationGeneration = 0;
   constructor(emit2, options = {}) {
     this.#emit = emit2;
@@ -18888,6 +19123,7 @@ var QuickchatBroker = class {
     this.#images = options.images ?? new ImageStore();
     this.#dictation = options.dictation ?? new DictationService();
     this.#sessionCleaner = options.sessionCleaner ?? deleteAcpSession;
+    this.#herdrContinue = options.herdrContinue ?? continueInHerdr;
     this.#env = options.env ?? process.env;
   }
   async handle(command) {
@@ -18996,7 +19232,12 @@ var QuickchatBroker = class {
         question: command.question,
         answer: result.answer,
         images: result.images,
-        session: { acpId: result.sessionId, resumable: result.resumable, resumeKind: result.resumable ? "native" : "transcript" }
+        session: {
+          acpId: result.sessionId,
+          ...this.#env.HOME === void 0 ? {} : { cwd: this.#env.HOME },
+          resumable: result.resumable,
+          resumeKind: result.resumable ? "native" : "transcript"
+        }
       };
       const evicted = await this.#history.save(chat);
       await this.#cleanupSessions(evicted);
@@ -19048,13 +19289,27 @@ var QuickchatBroker = class {
       this.#emit({ type: "herdr", chatId, state: "failed", message: "Saved chat was not found" });
       return;
     }
-    this.#emit({ type: "herdr", chatId, state: "opening" });
+    let flight = this.#handoffs.get(chatId);
+    if (flight === void 0) {
+      const promise2 = this.#herdrContinue(chat, this.#env);
+      flight = { promise: promise2, listeners: 1 };
+      this.#handoffs.set(chatId, flight);
+      this.#emit({ type: "herdr", chatId, state: "opening" });
+      void promise2.finally(() => this.#handoffs.delete(chatId)).catch(() => void 0);
+    } else {
+      flight.listeners += 1;
+    }
     try {
-      const result = await continueInHerdr(chat, this.#env);
-      this.#emit({ type: "herdr", chatId, state: "continued", mode: result.mode });
+      const result = await flight.promise;
+      if (flight.listeners > 0) {
+        flight.listeners = 0;
+        this.#emit({ type: "herdr", chatId, state: "continued", mode: result.mode });
+      }
     } catch (error48) {
-      const unavailable = error48 instanceof Error && error48.message.includes("not installed");
-      this.#emit({ type: "herdr", chatId, state: unavailable ? "unavailable" : "failed", message: unavailable ? "Herdr is not installed" : "Could not continue this chat in Herdr" });
+      if (flight.listeners === 0) return;
+      flight.listeners = 0;
+      const failure = describeHerdrError(error48);
+      this.#emit({ type: "herdr", chatId, ...failure });
     }
   }
   async #loadImage(url2, id) {
@@ -19085,7 +19340,7 @@ var QuickchatBroker = class {
       return;
     }
     const copied = await new Promise((resolveCopy) => {
-      const child = spawn3(copy, [], { env: this.#env, stdio: ["pipe", "ignore", "ignore"] });
+      const child = spawn4(copy, [], { env: this.#env, stdio: ["pipe", "ignore", "ignore"] });
       child.stdin.end(text);
       child.once("error", () => resolveCopy(false));
       child.once("close", (code) => resolveCopy(code === 0));

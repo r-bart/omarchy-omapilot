@@ -4,7 +4,7 @@ import type { AcpRun } from "./acp.js";
 import { BrokerAcpError, deleteAcpSession, probeAcpModels, runAcpQuestion } from "./acp.js";
 import { DictationService } from "./dictation.js";
 import { HistoryStore, presentChat, presentImage } from "./history.js";
-import { continueInHerdr } from "./herdr.js";
+import { continueInHerdr, describeHerdrError } from "./herdr.js";
 import { ImagePolicyError, ImageStore, isAllowedExternalLink } from "./images.js";
 import { discoverProviders, fallbackModels, type DiscoveredProvider } from "./providers.js";
 import { resolveExecutable, runCommand } from "./process.js";
@@ -12,6 +12,8 @@ import type { BrokerCommand, BrokerEvent, ChatRecord, ProviderInfo } from "./typ
 
 type DictationClient = Pick<DictationService, "start" | "stop" | "cancel">;
 type SessionCleaner = (provider: DiscoveredProvider, sessionId: string) => Promise<boolean>;
+type HerdrContinue = typeof continueInHerdr;
+type HerdrResult = Awaited<ReturnType<HerdrContinue>>;
 
 export class QuickchatBroker {
   readonly #emit: (event: BrokerEvent) => void;
@@ -19,20 +21,23 @@ export class QuickchatBroker {
   readonly #images: ImageStore;
   readonly #dictation: DictationClient;
   readonly #sessionCleaner: SessionCleaner;
+  readonly #herdrContinue: HerdrContinue;
   readonly #env: NodeJS.ProcessEnv;
   #providers = new Map<string, DiscoveredProvider>();
   #runs = new Map<string, AcpRun>();
+  #handoffs = new Map<string, { promise: Promise<HerdrResult>; listeners: number }>();
   #dictationGeneration = 0;
 
   constructor(
     emit: (event: BrokerEvent) => void,
-    options: { history?: HistoryStore; images?: ImageStore; dictation?: DictationClient; sessionCleaner?: SessionCleaner; env?: NodeJS.ProcessEnv } = {}
+    options: { history?: HistoryStore; images?: ImageStore; dictation?: DictationClient; sessionCleaner?: SessionCleaner; herdrContinue?: HerdrContinue; env?: NodeJS.ProcessEnv } = {}
   ) {
     this.#emit = emit;
     this.#history = options.history ?? new HistoryStore();
     this.#images = options.images ?? new ImageStore();
     this.#dictation = options.dictation ?? new DictationService();
     this.#sessionCleaner = options.sessionCleaner ?? deleteAcpSession;
+    this.#herdrContinue = options.herdrContinue ?? continueInHerdr;
     this.#env = options.env ?? process.env;
   }
 
@@ -111,7 +116,12 @@ export class QuickchatBroker {
         question: command.question,
         answer: result.answer,
         images: result.images,
-        session: { acpId: result.sessionId, resumable: result.resumable, resumeKind: result.resumable ? "native" : "transcript" }
+        session: {
+          acpId: result.sessionId,
+          ...(this.#env.HOME === undefined ? {} : { cwd: this.#env.HOME }),
+          resumable: result.resumable,
+          resumeKind: result.resumable ? "native" : "transcript"
+        }
       };
       const evicted = await this.#history.save(chat);
       await this.#cleanupSessions(evicted);
@@ -166,13 +176,27 @@ export class QuickchatBroker {
   async #continue(chatId: string): Promise<void> {
     const chat = await this.#history.get(chatId);
     if (chat === undefined) { this.#emit({ type: "herdr", chatId, state: "failed", message: "Saved chat was not found" }); return; }
-    this.#emit({ type: "herdr", chatId, state: "opening" });
+    let flight = this.#handoffs.get(chatId);
+    if (flight === undefined) {
+      const promise = this.#herdrContinue(chat, this.#env);
+      flight = { promise, listeners: 1 };
+      this.#handoffs.set(chatId, flight);
+      this.#emit({ type: "herdr", chatId, state: "opening" });
+      void promise.finally(() => this.#handoffs.delete(chatId)).catch(() => undefined);
+    } else {
+      flight.listeners += 1;
+    }
     try {
-      const result = await continueInHerdr(chat, this.#env);
-      this.#emit({ type: "herdr", chatId, state: "continued", mode: result.mode });
+      const result = await flight.promise;
+      if (flight.listeners > 0) {
+        flight.listeners = 0;
+        this.#emit({ type: "herdr", chatId, state: "continued", mode: result.mode });
+      }
     } catch (error) {
-      const unavailable = error instanceof Error && error.message.includes("not installed");
-      this.#emit({ type: "herdr", chatId, state: unavailable ? "unavailable" : "failed", message: unavailable ? "Herdr is not installed" : "Could not continue this chat in Herdr" });
+      if (flight.listeners === 0) return;
+      flight.listeners = 0;
+      const failure = describeHerdrError(error);
+      this.#emit({ type: "herdr", chatId, ...failure });
     }
   }
 
