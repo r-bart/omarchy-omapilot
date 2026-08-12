@@ -21,6 +21,7 @@ Item {
   signal escapeRequested()
 
   readonly property bool inputActive: inlineMode ? inlineInput.activeFocus : promptInput.activeFocus
+  readonly property bool popupOpen: inlineProvider.popupOpen || providerPicker.popupOpen || modelPicker.popupOpen
 
   implicitWidth: inlineMode ? Style.space(360) : Style.space(520)
   implicitHeight: inlineMode ? Style.bar.sizeHorizontal : panelComposer.implicitHeight
@@ -33,6 +34,13 @@ Item {
   function forceInputFocus() {
     if (inlineMode) inlineInput.forceActiveFocus()
     else promptInput.forceActiveFocus()
+  }
+
+  function closePopups() {
+    inlineProvider.close()
+    providerPicker.close()
+    modelPicker.close()
+    forceInputFocus()
   }
 
   function acceptTranscript() {

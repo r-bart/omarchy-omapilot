@@ -100,7 +100,8 @@ Panel {
     enabled: root.opened
     sequence: "Escape"
     onActivated: {
-      if (root.previewSource !== "") root.previewSource = ""
+      if (composer.popupOpen) composer.closePopups()
+      else if (root.previewSource !== "") root.previewSource = ""
       else if (Quickchat.QuickchatStore.busy) Quickchat.QuickchatStore.cancel()
       else root.close()
     }

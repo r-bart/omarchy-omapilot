@@ -21,6 +21,8 @@ grep -Fq 'Qt.resolvedUrl("../runtime/bin/quickchat-broker")' \
 grep -Fq 'Quickshell.env("QUICKCHAT_BROKER_PATH") || bundledBrokerPath' \
   "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'signal escapeRequested()' "$repo_dir/components/Composer.qml"
+grep -Fq 'readonly property bool popupOpen:' "$repo_dir/components/Composer.qml"
+grep -Fq 'if (composer.popupOpen) composer.closePopups()' "$repo_dir/Panel.qml"
 grep -Fq 'readonly property bool opened:' "$repo_dir/BarWidget.qml"
 grep -Fq 'function closeForPopoutSwitch()' "$repo_dir/BarWidget.qml"
 if grep -Fq 'Accessible.name: plainText' "$repo_dir/components/MarkdownView.qml"; then
