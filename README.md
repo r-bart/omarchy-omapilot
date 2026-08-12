@@ -17,7 +17,7 @@ A verified live Quattro capture is pending. The compact composer expands from th
 - At least one installed and authenticated harness: `codex`, `claude`, or `opencode`.
 - Optional: Voxtype for dictation and Herdr for durable continuation.
 
-Quickchat does not install a harness, log you in, or read provider credentials. Authentication and model availability remain owned by the selected harness.
+Quickchat does not install a harness, log you in, or read provider credentials. Authentication and model availability remain owned by the selected harness. The model picker is populated at startup from Codex's read-only app-server catalog, a non-persisted Claude ACP discovery session, or OpenCode's native catalog; if discovery is unavailable, Quickchat safely falls back to the harness default.
 
 ## Install
 
@@ -80,7 +80,7 @@ Remote Markdown images are not fetched automatically. Quickchat shows the origin
 ## Optional integrations
 
 - **Voxtype:** when `voxtype` is installed and ready, the microphone records directly to a file under `$XDG_RUNTIME_DIR/quickchat`; Quickchat reads that transcript after recording stops. It never simulates keyboard input or modifies Voxtype configuration.
-- **Herdr:** when `herdr` is installed, Continue in Herdr creates or reuses a dedicated `Quickchat` workspace and creates a labeled tab. It resumes the native harness session when possible, otherwise starts the matching agent with a compact transcript and labels the fallback. This is an explicit handoff from Quickchat's tool-free one-shot surface to Herdr's normal native-agent permission model; Codex resumes read-only and asks before commands.
+- **Herdr:** when `herdr` is installed, Continue in Herdr launches it when needed or raises its existing window, creates or reuses a dedicated `Quickchat` workspace, creates a labeled tab, and focuses the resumed agent pane. It resumes the native harness session when possible, otherwise starts the matching agent with a compact transcript and labels the fallback. This is an explicit handoff from Quickchat's tool-free one-shot surface to Herdr's normal native-agent permission model; Codex resumes read-only and asks before commands.
 
 Both integrations disappear or show a clear unavailable state when their command or capability is missing.
 

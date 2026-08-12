@@ -51,6 +51,17 @@ view_image stable false
 future_tool_feature stable false
 EOF
     ;;
-  app-server) exit 0 ;;
+  app-server)
+    case " $* " in
+      *' approval_policy="on-request" '*)
+        IFS= read -r initialize
+        printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"userAgent":"fixture"}}'
+        IFS= read -r initialized
+        IFS= read -r model_list
+        printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"data":[{"id":"test/default","displayName":"Default","isDefault":true,"hidden":false}]}}'
+        ;;
+      *) exit 0 ;;
+    esac
+    ;;
   *) exit 1 ;;
 esac

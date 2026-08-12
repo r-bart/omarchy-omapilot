@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createInterface } from "node:readline";
 import * as acp from "@agentclientprotocol/sdk";
 import type { ContentBlock, NewSessionRequest, SessionConfigOption } from "@agentclientprotocol/sdk";
 import type { DiscoveredProvider } from "./providers.js";
@@ -27,6 +28,7 @@ export function providerPolicyEnvironment(provider: DiscoveredProvider, capabili
 }
 
 export async function probeAcpModels(provider: DiscoveredProvider, timeoutMs = 15_000): Promise<{ models: ModelOption[]; defaultModel?: string }> {
+  if (provider.id === "codex") return probeCodexModels(provider, timeoutMs);
   const child = spawn(provider.agent.executable, provider.agent.args, {
     env: secureEnvironment(provider, "answer"), stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32"
   });
@@ -49,11 +51,12 @@ export async function probeAcpModels(provider: DiscoveredProvider, timeoutMs = 1
           clientCapabilities: { session: { configOptions: { boolean: {} } } },
           clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }
         });
-        if (!canRemoveSession(initialized.agentCapabilities)) return { models: [] };
-        const session = await ctx.buildSession(sessionRequest(provider.id, cwd, "answer")).start();
+        const ephemeral = provider.id === "claude";
+        if (!ephemeral && !canRemoveSession(initialized.agentCapabilities)) return { models: [] };
+        const session = await ctx.buildSession(sessionRequest(provider.id, cwd, "answer", ephemeral)).start();
         const config = modelConfiguration(session.newSessionResponse.configOptions ?? []);
         session.dispose();
-        await removeSession(ctx, initialized.agentCapabilities, session.sessionId);
+        if (!ephemeral) await removeSession(ctx, initialized.agentCapabilities, session.sessionId);
         return { models: config.models, ...(config.current === undefined ? {} : { defaultModel: config.current }) };
       });
   } catch {
@@ -63,6 +66,86 @@ export async function probeAcpModels(provider: DiscoveredProvider, timeoutMs = 1
     terminateProcessGroup(child.pid);
     await rm(cwd, { recursive: true, force: true });
   }
+}
+
+async function probeCodexModels(provider: DiscoveredProvider, timeoutMs: number): Promise<{ models: ModelOption[]; defaultModel?: string }> {
+  const maximumResponseLineBytes = 4 * 1024 * 1024;
+  const featureArgs = (provider.lockdownFeatures ?? []).flatMap((feature) => ["-c", `features.${feature}=false`]);
+  const child = spawn(provider.harnessPath, [
+    "app-server", "--strict-config",
+    "-c", 'approval_policy="on-request"',
+    "-c", 'sandbox_mode="read-only"',
+    "-c", 'web_search="disabled"',
+    "-c", "mcp_servers={}",
+    ...featureArgs,
+    "--listen", "stdio://"
+  ], { env: provider.agent.env, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });
+  child.stderr?.resume();
+  try {
+    if (child.stdin === null || child.stdout === null) return { models: [] };
+    const catalog = await new Promise<unknown>((resolveCatalog, rejectCatalog) => {
+      let settled = false;
+      const timeout = setTimeout(() => finish(() => rejectCatalog(new Error("Codex model discovery timed out"))), timeoutMs);
+      timeout.unref();
+      const lines = createInterface({ input: child.stdout });
+      const finish = (callback: () => void): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        lines.close();
+        callback();
+      };
+      child.once("error", (error) => finish(() => rejectCatalog(error)));
+      child.once("close", () => finish(() => rejectCatalog(new Error("Codex app server stopped during model discovery"))));
+      lines.on("line", (line) => {
+        if (Buffer.byteLength(line, "utf8") > maximumResponseLineBytes) {
+          finish(() => rejectCatalog(new Error("Codex model response exceeded the size limit")));
+          return;
+        }
+        let message: unknown;
+        try { message = JSON.parse(line); } catch { return; }
+        if (!isObject(message) || typeof message.id !== "number") return;
+        if (message.id === 1) {
+          if ("error" in message) { finish(() => rejectCatalog(new Error("Codex initialization failed"))); return; }
+          child.stdin?.write(`${JSON.stringify({ jsonrpc: "2.0", method: "initialized", params: {} })}\n`);
+          child.stdin?.write(`${JSON.stringify({ jsonrpc: "2.0", id: 2, method: "model/list", params: {} })}\n`);
+        } else if (message.id === 2) {
+          if ("error" in message) { finish(() => rejectCatalog(new Error("Codex model discovery failed"))); return; }
+          finish(() => resolveCatalog(message.result));
+        }
+      });
+      child.stdin?.write(`${JSON.stringify({
+        jsonrpc: "2.0", id: 1, method: "initialize",
+        params: { clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }, capabilities: { experimentalApi: true, requestAttestation: false } }
+      })}\n`);
+    });
+    return parseCodexModelCatalog(catalog);
+  } catch {
+    return { models: [] };
+  } finally {
+    terminateProcessGroup(child.pid);
+  }
+}
+
+export function parseCodexModelCatalog(value: unknown): { models: ModelOption[]; defaultModel?: string } {
+  if (!isObject(value) || !Array.isArray(value.data)) return { models: [] };
+  const models: ModelOption[] = [];
+  const modelIds = new Set<string>();
+  let defaultModel: string | undefined;
+  for (const item of value.data) {
+    if (!isObject(item) || item.hidden === true || typeof item.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._:/+-]{0,127}$/u.test(item.id)) continue;
+    if (modelIds.has(item.id) || models.length >= 100) continue;
+    modelIds.add(item.id);
+    const name = typeof item.displayName === "string" && item.displayName.trim() !== "" ? item.displayName.trim() : item.id;
+    const description = typeof item.description === "string" && item.description.trim() !== "" ? item.description.trim().slice(0, 240) : undefined;
+    models.push({ id: item.id, name: name.slice(0, 120), ...(description === undefined ? {} : { description }) });
+    if (item.isDefault === true) defaultModel = item.id;
+  }
+  return { models, ...(defaultModel === undefined ? {} : { defaultModel }) };
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export async function deleteAcpSession(provider: DiscoveredProvider, sessionId: string, timeoutMs = 15_000): Promise<boolean> {
@@ -280,7 +363,7 @@ async function removeSession(
   return false;
 }
 
-function sessionRequest(provider: DiscoveredProvider["id"], cwd: string, capability: Capability): NewSessionRequest {
+function sessionRequest(provider: DiscoveredProvider["id"], cwd: string, capability: Capability, ephemeral = false): NewSessionRequest {
   const base: NewSessionRequest = { cwd, mcpServers: [] };
   if (provider !== "claude") return base;
   const tools = capability === "web" ? ["WebSearch", "WebFetch"] : [];
@@ -291,6 +374,7 @@ function sessionRequest(provider: DiscoveredProvider["id"], cwd: string, capabil
       claudeCode: {
         options: {
           tools,
+          ...(ephemeral ? { persistSession: false } : {}),
           disallowedTools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "NotebookEdit", "Task", "Agent", "WebSearch", "WebFetch"].filter((tool) => !tools.includes(tool)),
           settingSources: []
         }

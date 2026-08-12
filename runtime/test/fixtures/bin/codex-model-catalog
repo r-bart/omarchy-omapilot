@@ -1,0 +1,6 @@
+#!/bin/sh
+IFS= read -r initialize
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"userAgent":"fixture"}}'
+IFS= read -r initialized
+IFS= read -r model_list
+printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"data":[{"id":"gpt-fixture","displayName":"Fixture model","description":"Read from model/list","isDefault":true,"hidden":false}]}}'

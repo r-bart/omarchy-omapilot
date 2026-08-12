@@ -6,7 +6,7 @@ var __export = (target, all) => {
 };
 
 // runtime/src/index.ts
-import { createInterface } from "node:readline";
+import { createInterface as createInterface2 } from "node:readline";
 
 // runtime/src/broker.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
@@ -16,6 +16,7 @@ import { spawn as spawn3 } from "node:child_process";
 import { spawn as spawn2 } from "node:child_process";
 import { mkdir as mkdir3, mkdtemp as mkdtemp2, rm as rm3 } from "node:fs/promises";
 import { join as join4 } from "node:path";
+import { createInterface } from "node:readline";
 
 // node_modules/@agentclientprotocol/sdk/dist/schema/index.js
 var AGENT_METHODS = {
@@ -3050,13 +3051,13 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     }
     return propValues;
   });
-  const isObject2 = isObject;
+  const isObject3 = isObject;
   const catchall = def.catchall;
   let value;
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input2 = payload.value;
-    if (!isObject2(input2)) {
+    if (!isObject3(input2)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -3154,7 +3155,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
     return (payload, ctx) => fn(shape, payload, ctx);
   };
   let fastpass;
-  const isObject2 = isObject;
+  const isObject3 = isObject;
   const jit = !globalConfig.jitless;
   const allowsEval2 = allowsEval;
   const fastEnabled = jit && allowsEval2.value;
@@ -3163,7 +3164,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input2 = payload.value;
-    if (!isObject2(input2)) {
+    if (!isObject3(input2)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -18050,6 +18051,7 @@ function isChatRecord(value) {
 
 // runtime/src/acp.ts
 async function probeAcpModels(provider, timeoutMs = 15e3) {
+  if (provider.id === "codex") return probeCodexModels(provider, timeoutMs);
   const child = spawn2(provider.agent.executable, provider.agent.args, {
     env: secureEnvironment(provider, "answer"),
     stdio: ["pipe", "pipe", "ignore"],
@@ -18072,11 +18074,12 @@ async function probeAcpModels(provider, timeoutMs = 15e3) {
         clientCapabilities: { session: { configOptions: { boolean: {} } } },
         clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }
       });
-      if (!canRemoveSession(initialized.agentCapabilities)) return { models: [] };
-      const session = await ctx.buildSession(sessionRequest(provider.id, cwd, "answer")).start();
+      const ephemeral = provider.id === "claude";
+      if (!ephemeral && !canRemoveSession(initialized.agentCapabilities)) return { models: [] };
+      const session = await ctx.buildSession(sessionRequest(provider.id, cwd, "answer", ephemeral)).start();
       const config2 = modelConfiguration(session.newSessionResponse.configOptions ?? []);
       session.dispose();
-      await removeSession(ctx, initialized.agentCapabilities, session.sessionId);
+      if (!ephemeral) await removeSession(ctx, initialized.agentCapabilities, session.sessionId);
       return { models: config2.models, ...config2.current === void 0 ? {} : { defaultModel: config2.current } };
     });
   } catch {
@@ -18086,6 +18089,104 @@ async function probeAcpModels(provider, timeoutMs = 15e3) {
     terminateProcessGroup(child.pid);
     await rm3(cwd, { recursive: true, force: true });
   }
+}
+async function probeCodexModels(provider, timeoutMs) {
+  const maximumResponseLineBytes = 4 * 1024 * 1024;
+  const featureArgs = (provider.lockdownFeatures ?? []).flatMap((feature) => ["-c", `features.${feature}=false`]);
+  const child = spawn2(provider.harnessPath, [
+    "app-server",
+    "--strict-config",
+    "-c",
+    'approval_policy="on-request"',
+    "-c",
+    'sandbox_mode="read-only"',
+    "-c",
+    'web_search="disabled"',
+    "-c",
+    "mcp_servers={}",
+    ...featureArgs,
+    "--listen",
+    "stdio://"
+  ], { env: provider.agent.env, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });
+  child.stderr?.resume();
+  try {
+    if (child.stdin === null || child.stdout === null) return { models: [] };
+    const catalog = await new Promise((resolveCatalog, rejectCatalog) => {
+      let settled = false;
+      const timeout = setTimeout(() => finish(() => rejectCatalog(new Error("Codex model discovery timed out"))), timeoutMs);
+      timeout.unref();
+      const lines = createInterface({ input: child.stdout });
+      const finish = (callback) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        lines.close();
+        callback();
+      };
+      child.once("error", (error48) => finish(() => rejectCatalog(error48)));
+      child.once("close", () => finish(() => rejectCatalog(new Error("Codex app server stopped during model discovery"))));
+      lines.on("line", (line) => {
+        if (Buffer.byteLength(line, "utf8") > maximumResponseLineBytes) {
+          finish(() => rejectCatalog(new Error("Codex model response exceeded the size limit")));
+          return;
+        }
+        let message;
+        try {
+          message = JSON.parse(line);
+        } catch {
+          return;
+        }
+        if (!isObject2(message) || typeof message.id !== "number") return;
+        if (message.id === 1) {
+          if ("error" in message) {
+            finish(() => rejectCatalog(new Error("Codex initialization failed")));
+            return;
+          }
+          child.stdin?.write(`${JSON.stringify({ jsonrpc: "2.0", method: "initialized", params: {} })}
+`);
+          child.stdin?.write(`${JSON.stringify({ jsonrpc: "2.0", id: 2, method: "model/list", params: {} })}
+`);
+        } else if (message.id === 2) {
+          if ("error" in message) {
+            finish(() => rejectCatalog(new Error("Codex model discovery failed")));
+            return;
+          }
+          finish(() => resolveCatalog(message.result));
+        }
+      });
+      child.stdin?.write(`${JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }, capabilities: { experimentalApi: true, requestAttestation: false } }
+      })}
+`);
+    });
+    return parseCodexModelCatalog(catalog);
+  } catch {
+    return { models: [] };
+  } finally {
+    terminateProcessGroup(child.pid);
+  }
+}
+function parseCodexModelCatalog(value) {
+  if (!isObject2(value) || !Array.isArray(value.data)) return { models: [] };
+  const models = [];
+  const modelIds = /* @__PURE__ */ new Set();
+  let defaultModel;
+  for (const item of value.data) {
+    if (!isObject2(item) || item.hidden === true || typeof item.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._:/+-]{0,127}$/u.test(item.id)) continue;
+    if (modelIds.has(item.id) || models.length >= 100) continue;
+    modelIds.add(item.id);
+    const name = typeof item.displayName === "string" && item.displayName.trim() !== "" ? item.displayName.trim() : item.id;
+    const description = typeof item.description === "string" && item.description.trim() !== "" ? item.description.trim().slice(0, 240) : void 0;
+    models.push({ id: item.id, name: name.slice(0, 120), ...description === void 0 ? {} : { description } });
+    if (item.isDefault === true) defaultModel = item.id;
+  }
+  return { models, ...defaultModel === void 0 ? {} : { defaultModel } };
+}
+function isObject2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 async function deleteAcpSession(provider, sessionId, timeoutMs = 15e3) {
   const child = spawn2(provider.agent.executable, provider.agent.args, {
@@ -18287,7 +18388,7 @@ async function removeSession(ctx, capabilities, sessionId) {
   }
   return false;
 }
-function sessionRequest(provider, cwd, capability) {
+function sessionRequest(provider, cwd, capability, ephemeral = false) {
   const base = { cwd, mcpServers: [] };
   if (provider !== "claude") return base;
   const tools = capability === "web" ? ["WebSearch", "WebFetch"] : [];
@@ -18298,6 +18399,7 @@ function sessionRequest(provider, cwd, capability) {
       claudeCode: {
         options: {
           tools,
+          ...ephemeral ? { persistSession: false } : {},
           disallowedTools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "NotebookEdit", "Task", "Agent", "WebSearch", "WebFetch"].filter((tool) => !tools.includes(tool)),
           settingSources: []
         }
@@ -19050,7 +19152,7 @@ function emit(event) {
 `);
 }
 var broker = new QuickchatBroker(emit);
-var input = createInterface({ input: process.stdin, crlfDelay: Number.POSITIVE_INFINITY });
+var input = createInterface2({ input: process.stdin, crlfDelay: Number.POSITIVE_INFINITY });
 input.on("line", (line) => {
   if (Buffer.byteLength(line, "utf8") > 11e5) {
     emit({ type: "error", code: "command_too_large", message: "Command exceeds the input limit", retryable: false });

@@ -73,7 +73,6 @@ describe("NDJSON protocol", () => {
     const ready = readySchema.parse(events.find((event) => event.type === "ready"));
     expect(ready.protocolVersion).toBe(1);
     expect(ready.providers.find((provider) => provider.id === "codex")?.models).toContainEqual({ id: "test/default", name: "Default" });
-    expect(await readFile(audit, "utf8")).toContain("delete:fake-1");
     child.stdin.write(`${JSON.stringify({ type: "submit", id: "wire-1", question: "Say hello", provider: "codex", capability: "answer" })}\n`);
     await until(() => events.some((event) => event.type === "complete"));
     expect(events).toContainEqual({ type: "content", id: "wire-1", delta: "# Answer\n\nHello [link](https://example.com)." });
@@ -82,7 +81,7 @@ describe("NDJSON protocol", () => {
     const saved = await readFile(join(state, "state/quickchat/chats", `${complete.chat.id}.json`), "utf8");
     expect(saved).not.toContain("localUrl");
     child.stdin.write(`${JSON.stringify({ type: "history_delete", chatId: complete.chat.id })}\n`);
-    await until(async () => (await readFile(audit, "utf8")).trim().split("\n").length >= 2);
+    await until(async () => (await readFile(audit, "utf8")).trim() === "delete:fake-1");
     child.stdin.end(`${JSON.stringify({ type: "shutdown" })}\n`);
     await new Promise((resolveExit) => child.once("close", resolveExit));
   }, 25_000);

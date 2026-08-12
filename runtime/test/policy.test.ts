@@ -1,10 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { resolve } from "node:path";
 import { z } from "zod";
-import { providerPolicyEnvironment } from "../src/acp.js";
+import { parseCodexModelCatalog, probeAcpModels, providerPolicyEnvironment } from "../src/acp.js";
 import { codexToolLockdownFeatures, discoverProviders, type DiscoveredProvider } from "../src/providers.js";
 
 describe("provider security profiles", () => {
+  it("normalizes the Codex app-server model catalog without hidden or invalid rows", () => {
+    expect(parseCodexModelCatalog({ data: [
+      { id: "gpt-5.6-sol", displayName: "GPT-5.6 Sol", description: "Frontier", isDefault: true, hidden: false },
+      { id: "gpt-5.6-sol", displayName: "Duplicate", description: "Ignore", isDefault: false, hidden: false },
+      { id: "hidden", displayName: "Hidden", isDefault: false, hidden: true },
+      { id: "bad model", displayName: "Bad", isDefault: false, hidden: false }
+    ] })).toEqual({
+      models: [{ id: "gpt-5.6-sol", name: "GPT-5.6 Sol", description: "Frontier" }],
+      defaultModel: "gpt-5.6-sol"
+    });
+  });
+
+  it("discovers Codex models from app-server without creating an ACP session", async () => {
+    const codex = provider("codex");
+    codex.harnessPath = resolve("runtime/test/fixtures/bin/codex-model-catalog");
+    await expect(probeAcpModels(codex, 2_000)).resolves.toEqual({
+      models: [{ id: "gpt-fixture", name: "Fixture model", description: "Read from model/list" }],
+      defaultModel: "gpt-fixture"
+    });
+  });
+
   it("keeps Codex read-only and tool-free in both modes while gating web", () => {
     const answer: unknown = JSON.parse(providerPolicyEnvironment(provider("codex"), "answer").CODEX_CONFIG ?? "{}");
     const web: unknown = JSON.parse(providerPolicyEnvironment(provider("codex"), "web").CODEX_CONFIG ?? "{}");

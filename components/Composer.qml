@@ -194,7 +194,7 @@ Item {
     Text {
       Layout.fillWidth: true
       visible: root.backend && root.backend.modelOptions.length === 0
-      text: "Using the harness default. Available models load after the first answer."
+      text: "Using the harness default. This harness did not expose a model catalog."
       color: Qt.darker(root.foreground, 1.45)
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
