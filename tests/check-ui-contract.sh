@@ -42,7 +42,15 @@ grep -Fq 'readonly property bool popupOpen:' "$repo_dir/components/Composer.qml"
 grep -Fq 'if (composer.popupOpen) composer.closePopups()' "$repo_dir/Panel.qml"
 grep -Fq 'readonly property bool opened:' "$repo_dir/BarWidget.qml"
 grep -Fq 'function closeForPopoutSwitch()' "$repo_dir/BarWidget.qml"
-grep -Fq 'enabled: root.ipcOwner' "$repo_dir/BarWidget.qml"
+test "$(grep -Fc 'IpcHandler {' "$repo_dir/components/QuickchatStore.qml")" -eq 1
+if grep -Fq 'IpcHandler {' "$repo_dir/BarWidget.qml"; then
+  printf 'BarWidget must not register one IPC target per monitor\n' >&2
+  exit 1
+fi
+grep -Fq 'QuickchatStore.registerIpcRouter(root)' "$repo_dir/BarWidget.qml"
+grep -Fq 'QuickchatStore.unregisterIpcRouter(root)' "$repo_dir/BarWidget.qml"
+manifest_id="$(jq -r '.id' "$repo_dir/manifest.json")"
+grep -Fq "target: \"$manifest_id\"" "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'bar.findPanelWidget(moduleName)' "$repo_dir/BarWidget.qml"
 if grep -Fq 'Accessible.name: plainText' "$repo_dir/components/MarkdownView.qml"; then
   printf 'MarkdownView uses TextEdit.plainText, which is unavailable in Qt Quick\n' >&2

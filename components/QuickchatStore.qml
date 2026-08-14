@@ -47,6 +47,7 @@ Scope {
   property string configuredCodexModel: ""
   property string configuredClaudeModel: ""
   property string configuredOpencodeModel: ""
+  property var ipcRouters: []
 
   readonly property bool busy: state === "preparing" || state === "dictating" || state === "streaming" || state === "stopping"
   readonly property bool canSubmit: initialized && providers.length > 0 && !busy
@@ -59,6 +60,36 @@ Scope {
   signal focusComposerRequested()
   signal toastRequested(string message)
   signal herdrContinued()
+
+  function registerIpcRouter(widget) {
+    var next = []
+    for (var i = 0; i < ipcRouters.length; i++)
+      if (ipcRouters[i] && ipcRouters[i] !== widget) next.push(ipcRouters[i])
+    next.push(widget)
+    ipcRouters = next
+  }
+
+  function unregisterIpcRouter(widget) {
+    var next = []
+    for (var i = 0; i < ipcRouters.length; i++)
+      if (ipcRouters[i] && ipcRouters[i] !== widget) next.push(ipcRouters[i])
+    ipcRouters = next
+  }
+
+  function ipcRouter() {
+    for (var i = 0; i < ipcRouters.length; i++) if (ipcRouters[i]) return ipcRouters[i]
+    return null
+  }
+
+  function routeIpc(method) {
+    var router = ipcRouter()
+    if (!router) return
+    if (method === "open" || method === "show") router.routeOpen()
+    else if (method === "close" || method === "hide") router.routeClose()
+    else if (method === "toggle") router.routeToggle()
+    else if (method === "history") router.routeHistory()
+    else if (method === "newChat") { newChat(); router.routeOpen() }
+  }
 
   function configure(settings) {
     var source = settings || {}
@@ -440,6 +471,17 @@ Scope {
     if (type === "link" && event.opened === false) {
       toastRequested("Could not open that link")
     }
+  }
+
+  IpcHandler {
+    target: "io.github.spencerbull.quickchat"
+    function open() { root.routeIpc("open") }
+    function close() { root.routeIpc("close") }
+    function show() { root.routeIpc("show") }
+    function hide() { root.routeIpc("hide") }
+    function toggle() { root.routeIpc("toggle") }
+    function newChat() { root.routeIpc("newChat") }
+    function history() { root.routeIpc("history") }
   }
 
   Process {
