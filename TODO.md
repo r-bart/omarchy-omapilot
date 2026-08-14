@@ -145,8 +145,9 @@ a dedicated Herdr Quickchat workspace.
   one `allow_once`; focused broker permission/protocol coverage passed 39/39;
   full repository validation passed 100 tests with four explicit live skips.
   The final singleton-signal IPC design has an independent `CLEAN` verdict.
-  CUA is stopped; the owner's installed-panel usage check, push, CI, and v0.1.1
-  publication remain open.
+  CUA is stopped; the owner's installed-panel usage check remains open.
+  Commit `9c36dcf` passed GitHub CI, and annotated tag/release `v0.1.1` is public
+  with checksum, SBOM, and provenance assets.
 
 ## Current repair evidence (2026-08-13)
 
