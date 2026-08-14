@@ -125,6 +125,12 @@ a dedicated Herdr Quickchat workspace.
 - Forbidden: arbitrary shell approval, silent app launch, host-data access,
   changes outside this repository/installed plugin copy, credential changes,
   marketplace submission, or destructive user-data operations.
+- Current checkpoint: reviewed commit `eb3d2b4` is installed through the native
+  plugin CLI with the owner's prior Codex/model settings restored. CUA Driver's
+  Wayland session reached the desktop, but Hyprland is locked and reports that
+  the lockscreen app died. No Quickchat interaction or launch occurred. The
+  owner must unlock the session before the installed-panel CUA gate, push, tag,
+  release assets, and publication can proceed.
 
 ## Current repair evidence (2026-08-13)
 
