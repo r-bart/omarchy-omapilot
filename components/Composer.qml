@@ -177,7 +177,11 @@ Item {
 
       ButtonGroup {
         Layout.alignment: Qt.AlignVCenter
-        options: [
+        options: root.backend && root.backend.toolsSupported ? [
+          { value: "answer", label: "Answer", tooltip: "Answer without tools" },
+          { value: "web", label: "Web", tooltip: root.backend.webSupported ? "Allow web search only" : "Web is unavailable for this selection" },
+          { value: "tools", label: "Tools", tooltip: "Run isolated commands in a disposable Claude workspace" }
+        ] : [
           { value: "answer", label: "Answer", tooltip: "Answer without tools" },
           { value: "web", label: "Web", tooltip: root.backend && root.backend.webSupported ? "Allow web search only" : "Web is unavailable for this selection" }
         ]
@@ -186,6 +190,7 @@ Item {
         background: root.background
         onChanged: function(value) {
           if (value === "web" && !root.backend.webSupported) return
+          if (value === "tools" && !root.backend.toolsSupported) return
           root.backend.selectCapability(value)
         }
       }
@@ -193,8 +198,10 @@ Item {
 
     Text {
       Layout.fillWidth: true
-      visible: root.backend && root.backend.modelOptions.length === 0
-      text: "Using the harness default. This harness did not expose a model catalog."
+      visible: root.backend && (root.backend.modelOptions.length === 0 || root.backend.capability === "tools")
+      text: root.backend && root.backend.capability === "tools"
+        ? "Tools gives Claude a disposable scratch workspace; host data, credentials, network, and outside writes stay blocked."
+        : "Using the harness default. This harness did not expose a model catalog."
       color: Qt.darker(root.foreground, 1.45)
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption

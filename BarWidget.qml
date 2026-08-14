@@ -23,6 +23,12 @@ BarWidget {
   readonly property bool canInline: !vertical && hostInlineAllowance >= Style.space(390)
   property bool inlineExpanded: false
   readonly property bool inlineActive: canInline && inlineExpanded
+  // Quattro creates one instance per monitor, while an IPC target may have
+  // only one owner. moduleSlots is reassigned as monitors change, so this
+  // binding transfers ownership without duplicate registrations.
+  readonly property var peerWidgets: bar && bar.moduleSlots !== undefined
+    && typeof bar.moduleWidgets === "function" ? bar.moduleWidgets(moduleName) : []
+  readonly property bool ipcOwner: peerWidgets.length === 0 || peerWidgets[0] === root
 
   readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
   readonly property bool popoutSwitchClosing: panelLoader.item ? panelLoader.item.popoutSwitchClosing === true : false
@@ -60,6 +66,23 @@ BarWidget {
   function togglePanel() {
     if (panelLoader.item) panelLoader.item.toggle()
   }
+
+  function openHistory() {
+    if (panelLoader.item && panelLoader.item.openHistory) panelLoader.item.openHistory()
+  }
+
+  function routedWidget() {
+    if (bar && typeof bar.findPanelWidget === "function") {
+      var target = bar.findPanelWidget(moduleName)
+      if (target) return target
+    }
+    return root
+  }
+
+  function routeOpen() { routedWidget().open() }
+  function routeClose() { routedWidget().close() }
+  function routeToggle() { routedWidget().togglePanel() }
+  function routeHistory() { routedWidget().openHistory() }
 
   function closeForPopoutSwitch() {
     inlineExpanded = false
@@ -102,16 +125,15 @@ BarWidget {
   }
 
   IpcHandler {
+    enabled: root.ipcOwner
     target: root.moduleName
-    function open() { root.open() }
-    function close() { root.close() }
-    function show() { root.open() }
-    function hide() { root.close() }
-    function toggle() { root.togglePanel() }
-    function newChat() { Quickchat.QuickchatStore.newChat(); root.open() }
-    function history() {
-      if (panelLoader.item && panelLoader.item.openHistory) panelLoader.item.openHistory()
-    }
+    function open() { root.routeOpen() }
+    function close() { root.routeClose() }
+    function show() { root.routeOpen() }
+    function hide() { root.routeClose() }
+    function toggle() { root.routeToggle() }
+    function newChat() { Quickchat.QuickchatStore.newChat(); root.routeOpen() }
+    function history() { root.routeHistory() }
   }
 
   BarIconButton {

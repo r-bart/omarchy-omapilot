@@ -3,8 +3,8 @@
 Quickchat is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget for fast, disposable AI answers. It uses the Codex, Claude, or OpenCode harness already authenticated on your machine, renders Markdown in a themed panel, remembers the latest 30 completed chats, and can hand an answer to Herdr when you want to keep working.
 
 > [!IMPORTANT]
-> Quickchat 0.1.0 is published. The remaining marketplace-listing approval is
-> tracked in [`TODO.md`](TODO.md).
+> Quickchat 0.1.1 is the current release. The remaining marketplace-listing
+> approval is tracked in [`TODO.md`](TODO.md).
 
 ## Preview
 
@@ -60,15 +60,42 @@ Quickchat broker
 
 Codex and Claude use exact, source-pinned official ACP adapter packages bundled in the repository. OpenCode uses its native `opencode acp` command. The broker normalizes provider discovery, streamed text/images, cancellation, permissions, errors, and session identities; QML does not parse provider-specific output.
 
-Two capability profiles are exposed:
+Three capability profiles are exposed:
 
 - **Answer** denies tools, shell, filesystem, MCP, and network capabilities.
 - **Web** allows only a harness capability that can be proven to be web search/fetch. It continues to deny shell, filesystem, edits, MCP, and unrelated tools. If the harness cannot enforce that boundary, Web is unavailable.
+- **Tools** gives Claude a disposable, network-disabled scratch workspace.
+  Every existing top-level host path except system executable/library roots,
+  plus credential-bearing environment variables, is hidden; writes
+  are confined to that per-turn workspace. Commands that fit that boundary can
+  run automatically. Exact provider permission requests are paused behind a
+  card that shows the complete payload and offers only **Allow once** or
+  **Deny**; approval never relaxes the filesystem, credential, write, or network
+  sandbox. Oversized or visually ambiguous requests,
+  persistent grants, arbitrary MCP, browser/computer control, and uninspectable
+  requests remain blocked. Codex and OpenCode remain on Answer/Web because
+  their current ACP paths cannot prove the same local-read boundary.
 
-ACP permission requests are denied in both profiles. Web access is enabled only
+ACP permission requests are denied in Answer and Web. Web access is enabled only
 through a provider-specific search/fetch capability that was positively
 identified during discovery; it does not turn on shell or filesystem access.
-Quickchat never bypasses a harness permission system.
+Tools binds supported provider permission decisions to the exact in-flight
+request. Quickchat removes its per-turn working directory afterward. Raw tool
+requests, decisions, inputs, and outputs are not stored in chat history; the
+completed answer can contain tool-derived text and is retained like any other
+answer. Quickchat never bypasses a harness permission system.
+
+Exact prompts shaped as **open**, **launch**, or **start** followed by one
+installed application name take a separate broker-owned path before ACP. The
+broker resolves an exact visible desktop entry and presents its application
+name, desktop ID, and resolved path in a default-deny **Allow once** card.
+Approval follows Omarchy's own detached app-scope path,
+`uwsm-app -- gtk-launch <desktop-id>`; a bounded detached `gio launch` fallback
+is used only when that host path is unavailable. Prompt/model text and the
+desktop entry's `Exec` field are never interpreted as commands. Missing,
+ambiguous, hidden, compound, or malformed targets are not intercepted and stay
+inside the selected harness's capability boundary. Local actions are ephemeral:
+they do not enter history or offer Continue in Herdr.
 
 ## Storage and privacy
 
@@ -85,7 +112,7 @@ Remote Markdown images are not fetched automatically. Quickchat shows the origin
 ## Optional integrations
 
 - **Voxtype:** when `voxtype` is installed and ready, the microphone records directly to a file under `$XDG_RUNTIME_DIR/quickchat`; Quickchat reads that transcript after recording stops. It never simulates keyboard input or modifies Voxtype configuration.
-- **Herdr:** when `herdr` is installed, Continue in Herdr launches it when needed or raises its existing window, creates or reuses a dedicated `Quickchat` workspace, creates a labeled tab, and focuses the resumed agent pane. It resumes the native harness session when possible, otherwise starts the matching agent with a compact transcript and labels the fallback. This is an explicit handoff from Quickchat's tool-free one-shot surface to Herdr's normal native-agent permission model; Codex resumes read-only and asks before commands.
+- **Herdr:** when `herdr` is installed, Continue in Herdr launches it when needed or raises its existing window, creates or reuses a dedicated `Quickchat` workspace, creates a labeled tab, closes the Quickchat panel, and focuses the resumed agent pane. It resumes the native harness session when possible, otherwise starts the matching agent with a compact transcript and labels the fallback. This is an explicit handoff from Quickchat's one-shot permission boundary to Herdr's normal native-agent permission model; Codex resumes read-only and asks before commands.
 
 Both integrations disappear or show a clear unavailable state when their command or capability is missing.
 

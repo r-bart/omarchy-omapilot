@@ -10,6 +10,7 @@ qml_files=(
   "$repo_dir/components/Composer.qml"
   "$repo_dir/components/HistoryView.qml"
   "$repo_dir/components/MarkdownView.qml"
+  "$repo_dir/components/internal/PermissionFocusGuard.qml"
   "$repo_dir/components/QuickchatStore.qml"
   "$repo_dir/components/Protocol.js"
 )
@@ -26,11 +27,15 @@ grep -Fq 'if (!changed) return' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'model = desiredModel' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'if (providers.length > 0) selectProvider(provider)' \
   "$repo_dir/components/QuickchatStore.qml"
+test "$(grep -Fc 'root.pendingPermission = null' "$repo_dir/components/QuickchatStore.qml")" -ge 2
+test "$(grep -Fc 'root.permissionQueue = []' "$repo_dir/components/QuickchatStore.qml")" -ge 2
 grep -Fq 'signal escapeRequested()' "$repo_dir/components/Composer.qml"
 grep -Fq 'readonly property bool popupOpen:' "$repo_dir/components/Composer.qml"
 grep -Fq 'if (composer.popupOpen) composer.closePopups()' "$repo_dir/Panel.qml"
 grep -Fq 'readonly property bool opened:' "$repo_dir/BarWidget.qml"
 grep -Fq 'function closeForPopoutSwitch()' "$repo_dir/BarWidget.qml"
+grep -Fq 'enabled: root.ipcOwner' "$repo_dir/BarWidget.qml"
+grep -Fq 'bar.findPanelWidget(moduleName)' "$repo_dir/BarWidget.qml"
 if grep -Fq 'Accessible.name: plainText' "$repo_dir/components/MarkdownView.qml"; then
   printf 'MarkdownView uses TextEdit.plainText, which is unavailable in Qt Quick\n' >&2
   exit 1
@@ -38,6 +43,11 @@ fi
 
 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -input "$repo_dir/tests/tst_protocol.qml" \
+  -import "$repo_dir" \
+  -import "$omarchy_shell"
+
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
+  -input "$repo_dir/tests/tst_permission_focus.qml" \
   -import "$repo_dir" \
   -import "$omarchy_shell"
 

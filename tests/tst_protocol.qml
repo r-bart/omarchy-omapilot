@@ -25,13 +25,42 @@ TestCase {
       models: [{ id: "gpt-5", name: "GPT-5" }]
     }, {
       id: "claude",
-      ready: false,
-      capabilities: ["answer"]
+      ready: true,
+      capabilities: ["answer", "web", "tools"]
+    }, {
+      id: "opencode",
+      ready: true,
+      capabilities: ["answer", "web"]
     }])
-    compare(providers.length, 1)
+    compare(providers.length, 3)
     compare(providers[0].value, "codex")
     compare(providers[0].models[0].label, "GPT-5")
     verify(Protocol.providerSupportsWeb(providers, "codex"))
+    verify(!Protocol.providerSupportsTools(providers, "codex"))
+    verify(Protocol.providerSupportsTools(providers, "claude"))
+    verify(!Protocol.providerSupportsTools(providers, "opencode"))
+  }
+
+  function test_toolPermissionIsBoundToCurrentTurn() {
+    var permission = Protocol.normalizedPermission({
+      id: "permission-1", requestId: "turn-1", title: "Run uname",
+      kind: "execute", detail: "uname -s", allowOnce: true
+    }, "turn-1")
+    compare(permission.detail, "uname -s")
+    verify(permission.allowOnce)
+    compare(Protocol.normalizedPermission({ id: "permission-1", requestId: "other", kind: "execute" }, "turn-1"), null)
+    compare(Protocol.normalizedPermission({ id: "permission-1", requestId: "turn-1", kind: "edit" }, "turn-1"), null)
+  }
+
+  function test_localActionPermissionIsBoundToCurrentTurn() {
+    var permission = Protocol.normalizedPermission({
+      id: "permission-2", requestId: "turn-2", title: "Launch Zoom",
+      kind: "local_action", detail: "Zoom.desktop", allowOnce: true
+    }, "turn-2")
+    compare(permission.kind, "local_action")
+    compare(permission.title, "Launch Zoom")
+    compare(Protocol.normalizedPermission({ id: "permission-2", requestId: "other", kind: "local_action" }, "turn-2"), null)
+    compare(Protocol.normalizedPermission({ id: "permission-2", requestId: "turn-2", kind: "arbitrary_action" }, "turn-2"), null)
   }
 
   function test_defaultSubmitOmitsEmptyModel() {

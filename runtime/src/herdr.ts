@@ -232,6 +232,12 @@ async function waitForHerdrWindow(hyprctl: string, run: CommandRunner, wait: Del
     const active = await run(hyprctl, ["activewindow", "-j"]);
     const address = active.code === 0 ? herdrWindowAddress(parseJson(active.stdout)) : undefined;
     if (address !== undefined) return address;
+    // A Quickshell layer surface can retain keyboard focus while the Herdr
+    // client is already mapped. Discover the client list instead of treating
+    // "not active yet" as a launch failure.
+    const clients = await run(hyprctl, ["clients", "-j"]);
+    const mappedAddress = clients.code === 0 ? herdrClientAddress(parseJson(clients.stdout)) : undefined;
+    if (mappedAddress !== undefined) return mappedAddress;
     if (attempt < 47) await wait(250);
   }
   return undefined;
@@ -250,9 +256,17 @@ function herdrWindowAddress(window: unknown): string | undefined {
   const windowClass = objectString(window, "class")?.toLowerCase();
   const title = objectString(window, "title")?.toLowerCase();
   const address = objectString(window, "address");
-  if ((windowClass === "org.omarchy.herdr" || title === "herdr") && address !== undefined && /^0x[0-9a-f]+$/i.test(address))
+  if ((windowClass === "org.omarchy.herdr" || (windowClass === "kitty" && title === "herdr"))
+    && address !== undefined && /^0x[0-9a-f]+$/i.test(address))
     return address;
   return undefined;
+}
+
+function herdrClientAddress(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const mapped = value.filter((client) => objectValue(client, "mapped") !== false);
+  const official = mapped.find((client) => objectString(client, "class")?.toLowerCase() === "org.omarchy.herdr");
+  return herdrWindowAddress(official) ?? mapped.map(herdrWindowAddress).find((address) => address !== undefined);
 }
 
 async function createHandoffTarget(

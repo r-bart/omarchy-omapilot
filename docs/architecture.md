@@ -12,6 +12,9 @@ The widget follows the current Quattro host contract:
 - preferences are inline widget settings—there is no second configuration authority;
 - colors, type, borders, radii, and motion come from public `qs.Commons` and `qs.Ui` theme roles;
 - the widget coordinates one nested Omarchy `Panel` through the same open/close/anchor/popout behavior used by first-party bar widgets.
+- one monitor instance conditionally owns the direct Quickchat IPC target, then
+  routes panel actions through Quattro's focused-monitor bar-widget resolver;
+  ownership follows the host's reassigned module list across monitor changes.
 
 Quickchat does not edit `shell.json`, Omarchy sources, Hyprland configuration, Voxtype configuration, or Herdr configuration directly.
 
@@ -25,16 +28,34 @@ The reviewed plugin revision contains self-contained broker and adapter bundles 
 
 One compact JSON object is sent per line; embedded newlines remain JSON escapes. Each command has an `id`. Every correlated event repeats that `id`; asynchronous readiness events may omit it.
 
-The UI sends commands whose `type` is one of `initialize`, `submit`, `cancel`, `dictation_start`, `dictation_stop`, `dictation_cancel`, `copy`, `open_link`, `load_image`, `continue_in_herdr`, `history_list`, `history_delete`, `history_clear`, or `shutdown`.
+The UI sends commands whose `type` is one of `initialize`, `submit`, `cancel`, `permission_response`, `dictation_start`, `dictation_stop`, `dictation_cancel`, `copy`, `open_link`, `load_image`, `continue_in_herdr`, `history_list`, `history_delete`, `history_clear`, or `shutdown`.
 
-The broker emits events whose `type` is one of `ready`, `providers`, `state`, `content`, `image`, `complete`, `error`, `dictation`, `history`, `herdr`, `link`, or `copied`. The broker's protocol tests are authoritative for exact fields and version negotiation.
+The broker emits events whose `type` is one of `ready`, `providers`, `state`, `content`, `permission`, `permission_closed`, `image`, `complete`, `error`, `dictation`, `history`, `herdr`, `link`, or `copied`. The broker's protocol tests are authoritative for exact fields and version negotiation.
 
 ACP is the broker's normalization boundary, not the policy boundary. Each
-harness receives its own fail-closed configuration, and the broker rejects ACP
-permission requests and unexpected tool events before content reaches QML or
-history. Continue in Herdr intentionally leaves that one-shot boundary and
+harness receives its own fail-closed configuration. Answer and Web reject ACP
+permission requests. Tools is advertised only for Claude, whose disposable
+workspace dynamically denies every existing top-level host path except system
+executable/library roots, hides credential-bearing environment variables,
+blocks network, and confines writes to per-turn scratch space. Commands inside
+that boundary may run automatically. Exact,
+classifiable permission requests accept a broker-bound allow-once or reject-once
+decision without relaxing the hard sandbox; unclassified and mutating tool kinds fail closed. Raw tool requests,
+decisions, updates, and outputs remain ephemeral, while the completed answer may
+contain tool-derived text and is retained like any other answer. Continue in Herdr intentionally leaves that one-shot boundary and
 hands the resumable session or transcript to Herdr, which becomes the authority
 for native-agent permissions and lifecycle.
+
+Application launch is a broker-owned action, not an ACP capability. An anchored
+imperative prompt may resolve to one exact visible XDG desktop entry. The broker
+then pauses on a nonce-bound allow-once permission and, only after approval,
+uses Omarchy's detached `uwsm-app -- gtk-launch <desktop-id>` argv contract. A
+bounded detached `gio launch <desktop-file>` fallback exists only when the host
+path is unavailable. It never evaluates the entry's `Exec` field or passes
+prompt/model text to a shell. The acknowledgement is ephemeral and does not
+enter history or Herdr; denial, expiry, cancellation, and launch failure produce
+stable events. Unresolved phrases continue through the selected ACP capability
+profile instead of being misclassified as launch failures.
 
 ## Compatibility rule
 

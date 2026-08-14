@@ -1,10 +1,11 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { readdirSync } from "node:fs";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import * as acp from "@agentclientprotocol/sdk";
-import type { ContentBlock, NewSessionRequest, SessionConfigOption } from "@agentclientprotocol/sdk";
+import type { ContentBlock, NewSessionRequest, RequestPermissionRequest, SessionConfigOption } from "@agentclientprotocol/sdk";
 import type { DiscoveredProvider } from "./providers.js";
 import type { BrokerEvent, Capability, ModelOption, StoredImage } from "./types.js";
 import { ImageStore } from "./images.js";
@@ -22,6 +23,7 @@ export type AcpResult = {
 };
 
 export type AcpRun = { result: Promise<AcpResult>; cancel: () => Promise<void> };
+export type PermissionHandler = (request: RequestPermissionRequest) => Promise<string | undefined>;
 
 export function providerPolicyEnvironment(provider: DiscoveredProvider, capability: Capability): NodeJS.ProcessEnv {
   return secureEnvironment(provider, capability);
@@ -53,7 +55,7 @@ export async function probeAcpModels(provider: DiscoveredProvider, timeoutMs = 1
         });
         const ephemeral = provider.id === "claude";
         if (!ephemeral && !canRemoveSession(initialized.agentCapabilities)) return { models: [] };
-        const session = await ctx.buildSession(sessionRequest(provider.id, cwd, "answer", ephemeral)).start();
+        const session = await ctx.buildSession(providerSessionRequest(provider, cwd, "answer", ephemeral)).start();
         const config = modelConfiguration(session.newSessionResponse.configOptions ?? []);
         session.dispose();
         if (!ephemeral) await removeSession(ctx, initialized.agentCapabilities, session.sessionId);
@@ -192,7 +194,9 @@ export function runAcpQuestion(
   capability: Capability,
   emit: (event: BrokerEvent) => void,
   timeoutMs = 90_000,
-  imageStore = new ImageStore()
+  imageStore = new ImageStore(),
+  requestPermission?: PermissionHandler,
+  cancelPermissions?: () => void
 ): AcpRun {
   const child = spawn(provider.agent.executable, provider.agent.args, {
     env: secureEnvironment(provider, capability),
@@ -206,6 +210,7 @@ export function runAcpQuestion(
 
   const cancel = async (): Promise<void> => {
     cancelled = true;
+    cancelPermissions?.();
     if (cancelSession !== undefined) await cancelSession().catch(() => undefined);
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
     terminateProcessGroup(child.pid);
@@ -229,9 +234,15 @@ export function runAcpQuestion(
 
       const text = new GuardedTextEmitter(requestId, emit);
       const app = acp.client({ name: "omarchy-quickchat" })
-        .onRequest(acp.methods.client.session.requestPermission, () => {
-          forbiddenToolAttempt = true;
-          return { outcome: { outcome: "cancelled" } };
+        .onRequest(acp.methods.client.session.requestPermission, async ({ params }) => {
+          if (capability !== "tools" || requestPermission === undefined) {
+            forbiddenToolAttempt = true;
+            return { outcome: { outcome: "cancelled" } };
+          }
+          const optionId = await requestPermission(params);
+          return optionId === undefined
+            ? { outcome: { outcome: "cancelled" } }
+            : { outcome: { outcome: "selected", optionId } };
         })
         .onRequest(acp.methods.client.fs.readTextFile, () => { throw new Error("Quickchat does not expose filesystem reads"); })
         .onRequest(acp.methods.client.fs.writeTextFile, () => { throw new Error("Quickchat does not expose filesystem writes"); })
@@ -249,7 +260,7 @@ export function runAcpQuestion(
         });
         if (initialized.protocolVersion !== acp.PROTOCOL_VERSION) throw new Error("ACP protocol version is unsupported");
         resumable = initialized.agentCapabilities?.loadSession === true;
-        const newRequest = sessionRequest(provider.id, cwd, capability);
+        const newRequest = providerSessionRequest(provider, cwd, capability);
         const session = await ctx.buildSession(newRequest).start();
         sessionIdentifier = session.sessionId;
         cancelSession = async () => {
@@ -329,7 +340,8 @@ export function runAcpQuestion(
 
 function secureEnvironment(provider: DiscoveredProvider, capability: Capability): NodeJS.ProcessEnv {
   if (provider.id === "codex") {
-    const features = Object.fromEntries((provider.lockdownFeatures ?? []).map((feature) => [feature, false]));
+    const features = Object.fromEntries((provider.lockdownFeatures ?? [])
+      .map((feature) => [feature, false]));
     const config = {
       // Codex read-only still permits reads; on-request is what routes command attempts to our deny-all ACP handler.
       approval_policy: "on-request",
@@ -363,24 +375,74 @@ async function removeSession(
   return false;
 }
 
-function sessionRequest(provider: DiscoveredProvider["id"], cwd: string, capability: Capability, ephemeral = false): NewSessionRequest {
+export function providerSessionRequest(provider: DiscoveredProvider, cwd: string, capability: Capability, ephemeral = false): NewSessionRequest {
   const base: NewSessionRequest = { cwd, mcpServers: [] };
-  if (provider !== "claude") return base;
-  const tools = capability === "web" ? ["WebSearch", "WebFetch"] : [];
+  if (provider.id !== "claude") return base;
+  const tools = capability === "tools"
+    ? ["Bash"]
+    : capability === "web" ? ["WebSearch", "WebFetch"] : [];
+  const systemPrompt = capability === "tools"
+    ? "Answer the user's question directly and concisely. You may use Bash only inside the isolated disposable workspace. Host files, credentials, network, and writes outside that workspace are unavailable."
+    : "Answer the user's question directly and concisely. Do not access local files or execute commands.";
   return {
     ...base,
     _meta: {
-      systemPrompt: "Answer the user's question directly and concisely. Do not access local files or execute commands.",
+      systemPrompt,
       claudeCode: {
         options: {
           tools,
           ...(ephemeral ? { persistSession: false } : {}),
           disallowedTools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "NotebookEdit", "Task", "Agent", "WebSearch", "WebFetch"].filter((tool) => !tools.includes(tool)),
-          settingSources: []
+          settingSources: [],
+          ...(capability === "tools" ? {
+            settings: {
+              permissions: {
+                ask: ["Bash(*)"],
+                deny: ["Write(*)", "Edit(*)", "NotebookEdit(*)", "Task(*)", "Agent(*)"],
+                disableBypassPermissionsMode: "disable"
+              }
+            },
+            sandbox: {
+              enabled: true,
+              failIfUnavailable: true,
+              autoAllowBashIfSandboxed: false,
+              allowUnsandboxedCommands: false,
+              network: { allowedDomains: [], strictAllowlist: true, allowLocalBinding: false, allowUnixSockets: [] },
+              filesystem: {
+                denyRead: sandboxDeniedReadPaths(),
+                allowRead: [cwd, "/dev/null", "/etc/ld.so.cache"],
+                denyWrite: ["/"],
+                allowWrite: [cwd]
+              },
+              credentials: {
+                envVars: sandboxCredentialEnvironment(provider.agent.env)
+              }
+            }
+          } : {})
         }
       }
     }
   };
+}
+
+const SANDBOX_SYSTEM_ROOTS = new Set(["bin", "sbin", "lib", "lib64", "usr"]);
+
+function sandboxDeniedReadPaths(): string[] {
+  // Discover the actual root at turn creation rather than maintaining an
+  // incomplete list. Only executable/library roots remain generally readable;
+  // /usr/local is host-managed data and is denied separately.
+  return [
+    ...readdirSync("/").filter((name) => !SANDBOX_SYSTEM_ROOTS.has(name)).map((name) => `/${name}`),
+    "/usr/local"
+  ].sort();
+}
+
+function sandboxCredentialEnvironment(env: NodeJS.ProcessEnv): Array<{ name: string; mode: "deny" }> {
+  const safe = /^(?:PATH|LANG|LC_[A-Z0-9_]+|TERM|COLORTERM|SHELL)$/u;
+  return Object.keys(env)
+    .filter((name) => /^[A-Za-z_][A-Za-z0-9_]*$/u.test(name) && !safe.test(name))
+    .sort()
+    .map((name) => ({ name, mode: "deny" as const }));
 }
 
 export function modelConfiguration(options: SessionConfigOption[]): { configId?: string; current?: string; models: ModelOption[] } {

@@ -35,6 +35,7 @@ const server = acp.agent({ name: "quickchat-fake" })
     return {};
   })
   .onRequest(acp.methods.agent.session.prompt, async ({ params, client }) => {
+    if (process.env.FAKE_ACP_PROMPT_AUDIT) await appendFile(process.env.FAKE_ACP_PROMPT_AUDIT, "prompt\n");
     if (process.env.FAKE_ACP_FAIL_SECRET === "1") {
       process.stderr.write("provider failed for person@example.com token=top-secret sk-secret-value\n");
       throw new Error("provider failed for person@example.com token=top-secret sk-secret-value");
@@ -44,10 +45,14 @@ const server = acp.agent({ name: "quickchat-fake" })
     if (process.env.FAKE_ACP_PERMISSION_ATTEMPT === "1") {
       const decision = await client.request(acp.methods.client.session.requestPermission, {
         sessionId: params.sessionId,
-        toolCall: { toolCallId: "forbidden", title: "Forbidden shell", kind: "execute" },
-        options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }]
+        toolCall: { toolCallId: "permission-test", title: "Run a read-only command", kind: "execute", rawInput: { command: "uname -s" } },
+        options: [
+          { optionId: "allow", name: "Allow once", kind: "allow_once" },
+          { optionId: "deny", name: "Deny", kind: "reject_once" }
+        ]
       });
-      if (decision.outcome.outcome !== "cancelled") throw new Error("permission was not denied");
+      const allowed = decision.outcome.outcome === "selected" && decision.outcome.optionId === "allow";
+      if ((process.env.FAKE_ACP_EXPECT_ALLOW === "1") !== allowed) throw new Error("permission decision did not match the fixture");
     }
     const answer = process.env.FAKE_ACP_RAW_TOOL_MARKUP === "1"
       ? '<｜｜DSML｜｜tool_calls>\n<｜｜DSML｜｜invoke name="Bash">\n<｜｜DSML｜｜parameter name="command" string="true">cat /etc/hostname</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n</｜｜DSML｜｜tool_calls>'

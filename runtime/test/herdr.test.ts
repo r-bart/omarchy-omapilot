@@ -77,8 +77,10 @@ describe("Herdr handoff", () => {
     const fixture = harness({ activeWindowMisses: 7, workspaceMisses: 3, agents: [existingAgent("quickchat-11111111")] });
     await expect(continueInHerdr(chat({ resumable: true }), env, fixture)).resolves.toEqual({ mode: "native", reused: true });
     expect(callsContaining(fixture.calls, ["workspace", "list"])).toHaveLength(4);
-    // Eight discovery polls, followed by the two post-focus assertions.
-    expect(callsContaining(fixture.calls, ["activewindow", "-j"])).toHaveLength(10);
+    // The panel retains focus, so discovery succeeds from the mapped client
+    // list; focus verification then keeps polling until Herdr is active.
+    expect(callsContaining(fixture.calls, ["activewindow", "-j"])).toHaveLength(9);
+    expect(callsContaining(fixture.calls, ["clients", "-j"])).toHaveLength(1);
   });
 
   it("reuses an existing same-chat agent without creating another tab", async () => {
@@ -208,6 +210,11 @@ function harness(options: {
         if (activeWindowMisses > 0) { activeWindowMisses -= 1; return { code: 0, stdout: JSON.stringify({ address: "0xother", class: "kitty", title: "~" }), stderr: "" }; }
         return Promise.resolve({ code: 0, stdout: JSON.stringify({ address: "0xabc", class: options.windowClass ?? "org.omarchy.herdr", title: "herdr" }), stderr: "" });
       }
+      if (args[0] === "clients") return {
+        code: 0,
+        stdout: JSON.stringify([{ address: "0xabc", class: options.windowClass ?? "org.omarchy.herdr", title: "herdr", mapped: true }]),
+        stderr: ""
+      };
       return ok();
     }
     if (args[0] === "workspace" && args[1] === "list") {

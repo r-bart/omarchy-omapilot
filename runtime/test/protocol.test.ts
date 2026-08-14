@@ -27,6 +27,7 @@ describe("NDJSON protocol", () => {
 
   it("rejects malformed commands", () => {
     expect(commandSchema.safeParse({ type: "submit", id: "one", question: "", provider: "codex" }).success).toBe(false);
+    expect(commandSchema.safeParse({ type: "permission_response", id: "one", permissionId: "not-a-uuid", decision: "allow_always" }).success).toBe(false);
   });
 
   it("rejects incompatible protocol versions without becoming ready", async () => {
@@ -73,6 +74,11 @@ describe("NDJSON protocol", () => {
     const ready = readySchema.parse(events.find((event) => event.type === "ready"));
     expect(ready.protocolVersion).toBe(1);
     expect(ready.providers.find((provider) => provider.id === "codex")?.models).toContainEqual({ id: "test/default", name: "Default" });
+    const capabilities = z.object({ providers: z.array(z.object({ id: z.string(), capabilities: z.array(z.string()) })) })
+      .parse(events.find((event) => event.type === "ready")).providers;
+    expect(capabilities.find((provider) => provider.id === "codex")?.capabilities).not.toContain("tools");
+    expect(capabilities.find((provider) => provider.id === "claude")).toBeUndefined();
+    expect(capabilities.find((provider) => provider.id === "opencode")?.capabilities).not.toContain("tools");
     child.stdin.write(`${JSON.stringify({ type: "submit", id: "wire-1", question: "Say hello", provider: "codex", capability: "answer" })}\n`);
     await until(() => events.some((event) => event.type === "complete"));
     expect(events).toContainEqual({ type: "content", id: "wire-1", delta: "# Answer\n\nHello [link](https://example.com)." });
@@ -121,6 +127,79 @@ describe("NDJSON protocol", () => {
     expect(events.some((event) => event.type === "complete")).toBe(false);
     expect(events.some((event) => event.type === "content")).toBe(false);
   }, 20_000);
+
+  it("rejects Tools for Codex before starting an ACP turn", async () => {
+    const events = await unsupportedCapability("codex", "tools");
+    expect(events.find((event) => event.type === "error")).toMatchObject({
+      code: "capability_unavailable",
+      message: "This harness cannot safely enforce the selected capability",
+      retryable: false
+    });
+    expect(events.some((event) => event.type === "state")).toBe(false);
+  }, 20_000);
+
+  it("round-trips a bounded allow-once tool decision without exposing provider option IDs", async () => {
+    const state = await mkdtemp(join(tmpdir(), "quickchat-tool-permission-")); roots.push(state);
+    const child = spawn(resolve("runtime/bin/quickchat-broker"), [], {
+      env: {
+        ...process.env,
+        FAKE_ACP_PERMISSION_ATTEMPT: "1",
+        FAKE_ACP_EXPECT_ALLOW: "1",
+        XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
+        QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+        QUICKCHAT_CLAUDE_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+        PATH: `${resolve("runtime/test/fixtures/claude-auth")}:${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+      },
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    const events: Record<string, unknown>[] = [];
+    createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
+    child.stdin.write('{"type":"initialize","protocolVersion":1}\n');
+    await until(() => events.some((event) => event.type === "ready"));
+    child.stdin.write('{"type":"submit","id":"tool-turn","question":"Run uname","provider":"claude","capability":"tools"}\n');
+    await until(() => events.some((event) => event.type === "permission"));
+    const permission = z.object({
+      type: z.literal("permission"),
+      permission: z.object({ id: z.string().uuid(), requestId: z.literal("tool-turn"), kind: z.literal("execute"), detail: z.string(), allowOnce: z.literal(true) })
+    }).parse(events.find((event) => event.type === "permission"));
+    expect(permission.permission.detail).toBe('{\n  "command": "uname -s"\n}');
+    expect(JSON.stringify(permission)).not.toContain("provider-allow");
+    child.stdin.write(`${JSON.stringify({ type: "permission_response", id: "tool-turn", permissionId: permission.permission.id, decision: "allow_once" })}\n`);
+    await until(() => events.some((event) => event.type === "complete"));
+    expect(events).toContainEqual({ type: "permission_closed", id: "tool-turn", permissionId: permission.permission.id, reason: "decided" });
+    expect(events.some((event) => event.type === "error")).toBe(false);
+    child.stdin.end('{"type":"shutdown"}\n');
+    await new Promise((resolveExit) => child.once("close", resolveExit));
+  }, 25_000);
+
+  it("round-trips a deny decision and lets the harness answer without the tool", async () => {
+    const state = await mkdtemp(join(tmpdir(), "quickchat-tool-deny-")); roots.push(state);
+    const child = spawn(resolve("runtime/bin/quickchat-broker"), [], {
+      env: {
+        ...process.env,
+        FAKE_ACP_PERMISSION_ATTEMPT: "1",
+        XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
+        QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+        QUICKCHAT_CLAUDE_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+        PATH: `${resolve("runtime/test/fixtures/claude-auth")}:${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+      },
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    const events: Record<string, unknown>[] = [];
+    createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
+    child.stdin.write('{"type":"initialize","protocolVersion":1}\n');
+    await until(() => events.some((event) => event.type === "ready"));
+    child.stdin.write('{"type":"submit","id":"deny-turn","question":"Do not run it","provider":"claude","capability":"tools"}\n');
+    await until(() => events.some((event) => event.type === "permission"));
+    const permission = z.object({ type: z.literal("permission"), permission: z.object({ id: z.string().uuid() }) })
+      .parse(events.find((event) => event.type === "permission"));
+    child.stdin.write(`${JSON.stringify({ type: "permission_response", id: "deny-turn", permissionId: permission.permission.id, decision: "reject_once" })}\n`);
+    await until(() => events.some((event) => event.type === "complete"));
+    expect(events).toContainEqual({ type: "permission_closed", id: "deny-turn", permissionId: permission.permission.id, reason: "decided" });
+    expect(events.some((event) => event.type === "error")).toBe(false);
+    child.stdin.end('{"type":"shutdown"}\n');
+    await new Promise((resolveExit) => child.once("close", resolveExit));
+  }, 25_000);
 
   it("rejects OpenCode DSML tool syntax before it reaches streamed content or history", async () => {
     const events = await forbiddenAttempt("opencode", { FAKE_ACP_RAW_TOOL_MARKUP: "1" });
@@ -215,6 +294,28 @@ async function forbiddenAttempt(provider: "codex" | "opencode", extraEnv: NodeJS
   child.stdin.write('{"type":"initialize","protocolVersion":1}\n');
   await until(() => events.some((event) => event.type === "ready"));
   child.stdin.write(`${JSON.stringify({ type: "submit", id: "forbidden", question: "Read /etc/hostname", provider, capability: "answer" })}\n`);
+  await until(() => events.some((event) => event.type === "error"));
+  child.stdin.end('{"type":"shutdown"}\n');
+  await new Promise((resolveExit) => child.once("close", resolveExit));
+  return events;
+}
+
+async function unsupportedCapability(provider: "codex" | "opencode", capability: "tools"): Promise<Record<string, unknown>[]> {
+  const state = await mkdtemp(join(tmpdir(), "quickchat-unsupported-capability-")); roots.push(state);
+  const child = spawn(resolve("runtime/bin/quickchat-broker"), [], {
+    env: {
+      ...process.env,
+      XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
+      QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+      PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+    },
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  const events: Record<string, unknown>[] = [];
+  createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
+  child.stdin.write('{"type":"initialize","protocolVersion":1}\n');
+  await until(() => events.some((event) => event.type === "ready"));
+  child.stdin.write(`${JSON.stringify({ type: "submit", id: "unsupported", question: "Run uname", provider, capability })}\n`);
   await until(() => events.some((event) => event.type === "error"));
   child.stdin.end('{"type":"shutdown"}\n');
   await new Promise((resolveExit) => child.once("close", resolveExit));

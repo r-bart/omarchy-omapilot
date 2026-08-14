@@ -95,7 +95,10 @@ export async function discoverProviders(env: NodeJS.ProcessEnv = process.env): P
     if (executable === undefined) continue;
     const lockdownFeatures = id === "codex" ? await codexToolLockdownFeatures(harnessPath, env) : undefined;
     if (id === "codex" && lockdownFeatures === undefined) continue;
-    const capabilities: Capability[] = ["answer", "web"];
+    // Codex read-only still exposes the host filesystem to shell commands and
+    // OpenCode cannot prove an equivalent sandbox. Claude is the only current
+    // harness whose sandbox can hide host paths and credential-bearing env.
+    const capabilities: Capability[] = id === "claude" ? ["answer", "web", "tools"] : ["answer", "web"];
     const providerVersion = await version(harnessPath, env);
     found.push({
       id,

@@ -6,6 +6,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "components" as Quickchat
+import "components/internal" as QuickchatInternal
 
 Panel {
   id: root
@@ -75,6 +76,12 @@ Panel {
     })
   }
 
+  function closeForExternalHandoff() {
+    setCenterHoverRevealSuppressed(false)
+    previewSource = ""
+    root.controller.hide()
+  }
+
   function toggle() {
     if (opened) close()
     else openFromHotkey()
@@ -94,6 +101,11 @@ Panel {
     Quickchat.QuickchatStore.configure(settings)
     if (viewMode === "history") Quickchat.QuickchatStore.requestHistory()
     else Qt.callLater(function() { composer.forceInputFocus() })
+  }
+
+  Connections {
+    target: Quickchat.QuickchatStore
+    function onHerdrContinued() { root.closeForExternalHandoff() }
   }
 
   Shortcut {
@@ -250,6 +262,106 @@ Panel {
                 id: answerContent
                 width: answerScroll.width
                 spacing: Style.spacing.xl
+
+                BorderSurface {
+                  id: permissionCard
+                  width: parent.width
+                  height: permissionContent.implicitHeight + contentTopInset + contentBottomInset + Style.spacing.xl * 2
+                  visible: Quickchat.QuickchatStore.pendingPermission !== null
+                  color: Style.normalFillFor(root.foreground, root.accent)
+                  borderSpec: Border.controlSpec("focus", root.foreground, root.accent)
+                  radius: Style.cornerRadius
+
+                  QuickchatInternal.PermissionFocusGuard {
+                    permissionId: Quickchat.QuickchatStore.pendingPermission
+                      ? String(Quickchat.QuickchatStore.pendingPermission.id || "") : ""
+                    defaultTarget: denyPermission
+                  }
+
+                  ColumnLayout {
+                    id: permissionContent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Style.spacing.xl
+                    spacing: Style.spacing.md
+
+                    Text {
+                      Layout.fillWidth: true
+                      text: Quickchat.QuickchatStore.pendingPermission
+                        ? "Allow once: " + Quickchat.QuickchatStore.pendingPermission.title : ""
+                      color: root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      font.bold: true
+                      wrapMode: Text.Wrap
+                    }
+
+                    RowLayout {
+                      Layout.fillWidth: true
+                      spacing: Style.spacing.md
+
+                      Text {
+                        Layout.fillWidth: true
+                        text: Quickchat.QuickchatStore.pendingPermission
+                          && Quickchat.QuickchatStore.pendingPermission.kind === "local_action"
+                          ? "Quickchat will ask Omarchy to launch this installed application once."
+                          : "This approval applies only to this call; sandbox limits stay active."
+                        color: Qt.darker(root.foreground, 1.45)
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                      }
+
+                      Button {
+                        id: denyPermission
+                        text: "Deny"
+                        foreground: root.foreground
+                        background: root.surface
+                        bordered: true
+                        focusable: true
+                        onClicked: Quickchat.QuickchatStore.respondPermission("reject_once")
+                      }
+
+                      Button {
+                        text: "Allow once"
+                        foreground: root.foreground
+                        background: root.surface
+                        accent: root.accent
+                        active: true
+                        bordered: true
+                        focusable: true
+                        enabled: Quickchat.QuickchatStore.pendingPermission
+                          && Quickchat.QuickchatStore.pendingPermission.allowOnce
+                        onClicked: Quickchat.QuickchatStore.respondPermission("allow_once")
+                      }
+                    }
+
+                    Flickable {
+                      Layout.fillWidth: true
+                      Layout.preferredHeight: Math.min(permissionDetail.implicitHeight, Style.space(140))
+                      contentWidth: width
+                      contentHeight: permissionDetail.implicitHeight
+                      clip: true
+                      boundsBehavior: Flickable.StopAtBounds
+                      interactive: contentHeight > height
+
+                      TextEdit {
+                        id: permissionDetail
+                        width: parent.width
+                        text: Quickchat.QuickchatStore.pendingPermission
+                          ? Quickchat.QuickchatStore.pendingPermission.detail : ""
+                        color: Qt.darker(root.foreground, 1.25)
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.bodySmall
+                        wrapMode: Text.WrapAnywhere
+                        textFormat: Text.PlainText
+                        readOnly: true
+                        selectByMouse: true
+                      }
+                    }
+
+                  }
+                }
 
                 Text {
                   visible: Quickchat.QuickchatStore.answerMarkdown === ""

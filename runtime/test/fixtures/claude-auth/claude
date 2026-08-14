@@ -1,0 +1,6 @@
+#!/bin/sh
+case "${1:-}" in
+  auth) printf '{"loggedIn":true,"email":"fixture@example.invalid"}\n'; exit 0 ;;
+  --version) echo "claude 1.0.0" ;;
+  *) exit 1 ;;
+esac

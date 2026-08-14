@@ -34,6 +34,8 @@ Scope {
   property string provider: "codex"
   property string model: ""
   property string capability: "answer"
+  property var pendingPermission: null
+  property var permissionQueue: []
   property bool capabilityChosenForNextQuestion: false
   property string transcript: ""
   property string dictationPhase: ""
@@ -51,10 +53,12 @@ Scope {
   readonly property bool canRetry: !processStarted && !broker.running && state === "unavailable"
   readonly property var modelOptions: Protocol.modelOptions(providers, provider)
   readonly property bool webSupported: Protocol.providerSupportsWeb(providers, provider)
+  readonly property bool toolsSupported: Protocol.providerSupportsTools(providers, provider)
 
   signal answerChanged()
   signal focusComposerRequested()
   signal toastRequested(string message)
+  signal herdrContinued()
 
   function configure(settings) {
     var source = settings || {}
@@ -96,7 +100,7 @@ Scope {
         if (providers[p].value === provider) preferred = String(providers[p].defaultModel || "")
       model = preferred || (options.length > 0 ? options[0].value : "")
     }
-    if (!webSupported) capability = "answer"
+    if ((capability === "web" && !webSupported) || (capability === "tools" && !toolsSupported)) capability = "answer"
   }
 
   function sendCommand(payload) {
@@ -132,6 +136,8 @@ Scope {
     question = prompt
     answerMarkdown = ""
     images = []
+    pendingPermission = null
+    permissionQueue = []
     state = "preparing"
     statusMessage = "Preparing " + Protocol.providerLabel(provider) + "…"
     sendCommand(Protocol.submitCommand(currentId, prompt, provider, model, capability))
@@ -149,12 +155,34 @@ Scope {
     sendCommand(Protocol.command("cancel", { id: currentId }))
   }
 
+  function respondPermission(decision) {
+    if (!pendingPermission || !currentId) return
+    var selected = decision === "allow_once" ? "allow_once" : "reject_once"
+    sendCommand(Protocol.command("permission_response", {
+      id: currentId,
+      permissionId: String(pendingPermission.id || ""),
+      decision: selected
+    }))
+  }
+
+  function closePermission(permissionId) {
+    var id = String(permissionId || "")
+    var queued = []
+    for (var i = 0; i < permissionQueue.length; i++)
+      if (String(permissionQueue[i].id || "") !== id) queued.push(permissionQueue[i])
+    permissionQueue = queued
+    if (pendingPermission && String(pendingPermission.id || "") === id)
+      pendingPermission = queued.length > 0 ? queued[0] : null
+  }
+
   function newChat() {
     currentId = ""
     currentChatId = ""
     question = ""
     answerMarkdown = ""
     images = []
+    pendingPermission = null
+    permissionQueue = []
     transcript = ""
     capability = "answer"
     capabilityChosenForNextQuestion = false
@@ -180,8 +208,9 @@ Scope {
   function copyText(text) { sendCommand(Protocol.command("copy", { text: String(text || "") })) }
 
   function selectCapability(value) {
-    var desired = value === "web" ? "web" : "answer"
+    var desired = Protocol.normalizedCapability(value)
     if (desired === "web" && !webSupported) return
+    if (desired === "tools" && !toolsSupported) return
     capability = desired
     capabilityChosenForNextQuestion = state === "complete"
   }
@@ -230,7 +259,8 @@ Scope {
     images = Array.isArray(chat.images) ? chat.images : []
     provider = Protocol.normalizedProvider(chat.provider) || provider
     model = String(chat.model || "")
-    capability = chat.capability === "web" ? "web" : "answer"
+    capability = Protocol.normalizedCapability(chat.capability)
+    pendingPermission = null
     capabilityChosenForNextQuestion = false
     state = "complete"
     statusMessage = ""
@@ -299,6 +329,28 @@ Scope {
       answerChanged()
       return
     }
+    if (type === "permission") {
+      var permission = Protocol.normalizedPermission(event.permission, currentId)
+      if (!permission) return
+      var queued = permissionQueue.slice()
+      for (var permissionIndex = 0; permissionIndex < queued.length; permissionIndex++)
+        if (String(queued[permissionIndex].id || "") === permission.id) return
+      queued.push(permission)
+      permissionQueue = queued
+      if (!pendingPermission) pendingPermission = permission
+      state = "streaming"
+      statusMessage = permission.kind === "local_action" ? "Waiting for action approval…" : "Waiting for tool approval…"
+      return
+    }
+    if (type === "permission_closed") {
+      if (String(event.id || "") !== currentId) return
+      var closedKind = pendingPermission && String(pendingPermission.id || "") === String(event.permissionId || "")
+        ? String(pendingPermission.kind || "") : ""
+      closePermission(event.permissionId)
+      if (String(event.reason || "") === "expired")
+        toastRequested(closedKind === "local_action" ? "Action approval expired" : "Tool approval expired")
+      return
+    }
     if (type === "image") {
       var eventId = String(event.id || "")
       var sourceUrl = String(event.image && event.image.sourceUrl || "")
@@ -320,6 +372,8 @@ Scope {
       } else if (event.chatId) currentChatId = String(event.chatId)
       if (event.history) history = Protocol.normalizedHistory(event.history)
       state = "complete"
+      pendingPermission = null
+      permissionQueue = []
       statusMessage = ""
       answerChanged()
       return
@@ -332,11 +386,15 @@ Scope {
       }
       if (String(event.code || "").toLowerCase() === "cancelled") {
         state = "canceled"
+        pendingPermission = null
+        permissionQueue = []
         statusMessage = String(event.message || "Stopped")
         answerChanged()
         return
       }
       state = event.unavailable === true ? "unavailable" : "error"
+      pendingPermission = null
+      permissionQueue = []
       statusMessage = String(event.message || "Quickchat could not complete that request.")
       return
     }
@@ -372,6 +430,7 @@ Scope {
       state = outcome.state
       statusMessage = outcome.message
       if (outcome.toast) toastRequested(statusMessage)
+      if (String(event.state || "") === "continued") herdrContinued()
       return
     }
     if (type === "copied") {
@@ -392,6 +451,8 @@ Scope {
     onStarted: {
       root.processStarted = true
       root.stderrTail = ""
+      root.pendingPermission = null
+      root.permissionQueue = []
       root.initialize()
       root.flushQueue()
     }
@@ -399,6 +460,8 @@ Scope {
     onExited: function(exitCode, exitStatus) {
       root.processStarted = false
       root.initialized = false
+      root.pendingPermission = null
+      root.permissionQueue = []
       if (root.state !== "canceled") root.state = "unavailable"
       root.statusMessage = root.stderrTail || "Quickchat broker is unavailable."
     }

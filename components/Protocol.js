@@ -22,7 +22,7 @@ function submitCommand(id, question, provider, model, capability) {
     id: String(id || ""),
     question: String(question || ""),
     provider: normalizedProvider(provider) || "codex",
-    capability: capability === "web" ? "web" : "answer"
+    capability: normalizedCapability(capability)
   })
   var selectedModel = String(model || "").trim()
   if (selectedModel !== "") payload.model = selectedModel
@@ -50,6 +50,11 @@ function normalizedState(value, fallback) {
 function normalizedProvider(value) {
   var provider = String(value || "").toLowerCase()
   return ["codex", "claude", "opencode"].indexOf(provider) >= 0 ? provider : ""
+}
+
+function normalizedCapability(value) {
+  var capability = String(value || "").toLowerCase()
+  return ["answer", "web", "tools"].indexOf(capability) >= 0 ? capability : "answer"
 }
 
 function providerLabel(value) {
@@ -85,7 +90,10 @@ function normalizeProviders(input) {
       defaultModel: String(raw && typeof raw === "object" ? raw.defaultModel || "" : ""),
       web: raw && typeof raw === "object" && Array.isArray(raw.capabilities)
         ? raw.capabilities.indexOf("web") >= 0
-        : !(raw && typeof raw === "object" && raw.web === false)
+        : !(raw && typeof raw === "object" && raw.web === false),
+      tools: raw && typeof raw === "object" && Array.isArray(raw.capabilities)
+        ? raw.capabilities.indexOf("tools") >= 0
+        : false
     })
   }
   return result
@@ -105,6 +113,31 @@ function providerSupportsWeb(providers, provider) {
     if (rows[i].value === provider) return rows[i].web !== false
   }
   return false
+}
+
+function providerSupportsTools(providers, provider) {
+  var rows = Array.isArray(providers) ? providers : []
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].value === provider) return rows[i].tools === true
+  }
+  return false
+}
+
+function normalizedPermission(raw, currentRequestId) {
+  var value = raw && typeof raw === "object" ? raw : {}
+  var id = String(value.id || "")
+  var requestId = String(value.requestId || "")
+  var kind = String(value.kind || "")
+  if (!id || requestId !== String(currentRequestId || "")
+      || (kind !== "execute" && kind !== "local_action")) return null
+  return {
+    id: id,
+    requestId: requestId,
+    title: String(value.title || (kind === "local_action" ? "Local action" : "Tool request")).slice(0, 120),
+    kind: kind,
+    detail: String(value.detail || "").slice(0, 3000),
+    allowOnce: value.allowOnce === true
+  }
 }
 
 function isSafeExternalUrl(url) {
@@ -248,7 +281,7 @@ function normalizedHistory(input) {
       answer: String(row.answer || row.markdown || ""),
       provider: normalizedProvider(row.provider) || "codex",
       model: String(row.model || ""),
-      capability: row.capability === "web" ? "web" : "answer",
+      capability: normalizedCapability(row.capability),
       timestamp: String(row.createdAt || row.timestamp || ""),
       images: Array.isArray(row.images) ? row.images : [],
       resumable: row.resumable === true || (row.session && row.session.resumable === true)

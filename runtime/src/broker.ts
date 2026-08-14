@@ -1,19 +1,26 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import type { AcpRun } from "./acp.js";
+import { DesktopActionService, type LocalActionClient, type LocalLaunchAction } from "./actions.js";
 import { BrokerAcpError, deleteAcpSession, probeAcpModels, runAcpQuestion } from "./acp.js";
 import { DictationService } from "./dictation.js";
 import { HistoryStore, presentChat, presentImage } from "./history.js";
 import { continueInHerdr, describeHerdrError } from "./herdr.js";
 import { ImagePolicyError, ImageStore, isAllowedExternalLink } from "./images.js";
+import { normalizeToolPermission, type PendingToolPermission } from "./permissions.js";
 import { discoverProviders, fallbackModels, type DiscoveredProvider } from "./providers.js";
 import { resolveExecutable, runCommand } from "./process.js";
 import type { BrokerCommand, BrokerEvent, ChatRecord, ProviderInfo } from "./types.js";
+import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 
 type DictationClient = Pick<DictationService, "start" | "stop" | "cancel">;
 type SessionCleaner = (provider: DiscoveredProvider, sessionId: string) => Promise<boolean>;
 type HerdrContinue = typeof continueInHerdr;
 type HerdrResult = Awaited<ReturnType<HerdrContinue>>;
+type PermissionWaiter = PendingToolPermission & {
+  resolve: (optionId: string | undefined) => void;
+  timeout: NodeJS.Timeout;
+};
 
 export class QuickchatBroker {
   readonly #emit: (event: BrokerEvent) => void;
@@ -23,14 +30,19 @@ export class QuickchatBroker {
   readonly #sessionCleaner: SessionCleaner;
   readonly #herdrContinue: HerdrContinue;
   readonly #env: NodeJS.ProcessEnv;
+  readonly #permissionTimeoutMs: number;
+  readonly #localActions: LocalActionClient;
   #providers = new Map<string, DiscoveredProvider>();
   #runs = new Map<string, AcpRun>();
   #handoffs = new Map<string, Promise<void>>();
+  #permissions = new Map<string, PermissionWaiter>();
+  #pendingLocalActions = new Map<string, AbortController>();
+  #submissions = new Set<string>();
   #dictationGeneration = 0;
 
   constructor(
     emit: (event: BrokerEvent) => void,
-    options: { history?: HistoryStore; images?: ImageStore; dictation?: DictationClient; sessionCleaner?: SessionCleaner; herdrContinue?: HerdrContinue; env?: NodeJS.ProcessEnv } = {}
+    options: { history?: HistoryStore; images?: ImageStore; dictation?: DictationClient; sessionCleaner?: SessionCleaner; herdrContinue?: HerdrContinue; localActions?: LocalActionClient; env?: NodeJS.ProcessEnv; permissionTimeoutMs?: number } = {}
   ) {
     this.#emit = emit;
     this.#history = options.history ?? new HistoryStore();
@@ -39,6 +51,8 @@ export class QuickchatBroker {
     this.#sessionCleaner = options.sessionCleaner ?? deleteAcpSession;
     this.#herdrContinue = options.herdrContinue ?? continueInHerdr;
     this.#env = options.env ?? process.env;
+    this.#permissionTimeoutMs = options.permissionTimeoutMs ?? 60_000;
+    this.#localActions = options.localActions ?? new DesktopActionService(this.#env);
   }
 
   async handle(command: BrokerCommand): Promise<boolean> {
@@ -46,6 +60,7 @@ export class QuickchatBroker {
       case "initialize": await this.#initialize(command); break;
       case "submit": await this.#submit(command); break;
       case "cancel": await this.#cancel(command.id); break;
+      case "permission_response": this.#respondPermission(command); break;
       case "history_list": await this.#emitHistory(); break;
       case "history_delete": {
         const deleted = await this.#history.delete(command.chatId);
@@ -89,12 +104,31 @@ export class QuickchatBroker {
   }
 
   async #submit(command: Extract<BrokerCommand, { type: "submit" }>): Promise<void> {
-    if (this.#runs.has(command.id)) { this.#error("duplicate_id", "This request is already running", false, command.id); return; }
+    if (this.#submissions.has(command.id)) { this.#error("duplicate_id", "This request is already running", false, command.id); return; }
+    this.#submissions.add(command.id);
+    try {
+      await this.#submitOnce(command);
+    } finally {
+      this.#submissions.delete(command.id);
+    }
+  }
+
+  async #submitOnce(command: Extract<BrokerCommand, { type: "submit" }>): Promise<void> {
     const provider = this.#providers.get(command.provider);
     if (provider === undefined) { this.#error("provider_unavailable", "The selected harness is not installed and authenticated", false, command.id); return; }
     if (!provider.capabilities.includes(command.capability)) { this.#error("capability_unavailable", "This harness cannot safely enforce the selected capability", false, command.id); return; }
+    const action = await this.#localActions.resolve(command.question);
+    if (action.kind === "launch") {
+      await this.#submitLocalAction(command, action.action);
+      return;
+    }
     this.#emit({ type: "state", id: command.id, state: "preparing", message: `Preparing ${provider.name}…` });
-    const run = runAcpQuestion(provider, command.id, command.question, command.model, command.capability, this.#emit, 90_000, this.#images);
+    const run = runAcpQuestion(
+      provider, command.id, command.question, command.model, command.capability,
+      this.#emit, 90_000, this.#images,
+      (request) => this.#requestToolPermission(command.id, request),
+      () => this.#cancelPermissions(command.id)
+    );
     this.#runs.set(command.id, run);
     this.#emit({ type: "state", id: command.id, state: "streaming" });
     try {
@@ -131,15 +165,118 @@ export class QuickchatBroker {
       if (error instanceof BrokerAcpError) this.#error(error.code, error.message, error.retryable, command.id);
       else this.#error("agent_failed", "The selected harness stopped unexpectedly", true, command.id);
     } finally {
+      this.#cancelPermissions(command.id);
       this.#runs.delete(command.id);
+    }
+  }
+
+  async #submitLocalAction(
+    command: Extract<BrokerCommand, { type: "submit" }>,
+    action: LocalLaunchAction
+  ): Promise<void> {
+    const controller = new AbortController();
+    this.#pendingLocalActions.set(command.id, controller);
+    this.#emit({ type: "state", id: command.id, state: "streaming", message: "Waiting for action approval…" });
+    try {
+      const approved = await this.#requestLocalActionPermission(command.id, action);
+      if (!approved || controller.signal.aborted) {
+        this.#error("cancelled", "Launch canceled", false, command.id);
+        return;
+      }
+      this.#emit({ type: "state", id: command.id, state: "preparing", message: `Opening ${action.appName}…` });
+      if (!await this.#localActions.launch(action, controller.signal)) {
+        if (controller.signal.aborted) {
+          this.#error("cancelled", "Launch canceled", false, command.id);
+          return;
+        }
+        this.#error("app_launch_failed", `Quickchat could not open ${action.appName}`, true, command.id);
+        return;
+      }
+      const answer = `Opened ${action.appName}.`;
+      this.#emit({ type: "content", id: command.id, delta: answer });
+      this.#emit({ type: "complete", id: command.id, answer });
+      this.#emit({ type: "state", id: command.id, state: "idle" });
+    } finally {
+      this.#cancelPermissions(command.id);
+      if (this.#pendingLocalActions.get(command.id) === controller) this.#pendingLocalActions.delete(command.id);
+    }
+  }
+
+  async #requestLocalActionPermission(requestId: string, action: LocalLaunchAction): Promise<boolean> {
+    const permissionId = randomUUID();
+    const allowOptionId = "local-action-allow";
+    const view = {
+      id: permissionId,
+      requestId,
+      title: `Launch ${action.appName}`,
+      kind: "local_action" as const,
+      detail: JSON.stringify({ action: "launch_app", app: action.appName, desktopId: action.desktopId, desktopFile: action.desktopFile }, null, 2),
+      allowOnce: true
+    };
+    return new Promise<boolean>((resolvePermission) => {
+      const timeout = setTimeout(() => {
+        this.#permissions.delete(permissionId);
+        this.#emit({ type: "permission_closed", id: requestId, permissionId, reason: "expired" });
+        resolvePermission(false);
+      }, this.#permissionTimeoutMs);
+      timeout.unref();
+      this.#permissions.set(permissionId, {
+        view,
+        allowOptionId,
+        rejectOptionId: "local-action-reject",
+        resolve: (optionId) => resolvePermission(optionId === allowOptionId),
+        timeout
+      });
+      this.#emit({ type: "permission", permission: view });
+    });
+  }
+
+  async #requestToolPermission(requestId: string, request: RequestPermissionRequest): Promise<string | undefined> {
+    const permissionId = randomUUID();
+    const pending = normalizeToolPermission(requestId, permissionId, request);
+    if (pending === undefined) return undefined;
+    return new Promise<string | undefined>((resolvePermission) => {
+      const timeout = setTimeout(() => {
+        this.#permissions.delete(permissionId);
+        this.#emit({ type: "permission_closed", id: requestId, permissionId, reason: "expired" });
+        resolvePermission(undefined);
+      }, this.#permissionTimeoutMs);
+      timeout.unref();
+      this.#permissions.set(permissionId, { ...pending, resolve: resolvePermission, timeout });
+      this.#emit({ type: "permission", permission: pending.view });
+    });
+  }
+
+  #respondPermission(command: Extract<BrokerCommand, { type: "permission_response" }>): void {
+    const pending = this.#permissions.get(command.permissionId);
+    if (pending === undefined || pending.view.requestId !== command.id) return;
+    this.#permissions.delete(command.permissionId);
+    clearTimeout(pending.timeout);
+    this.#emit({ type: "permission_closed", id: command.id, permissionId: command.permissionId, reason: "decided" });
+    const optionId = command.decision === "allow_once" ? pending.allowOptionId : pending.rejectOptionId;
+    pending.resolve(optionId);
+  }
+
+  #cancelPermissions(requestId: string): void {
+    for (const [permissionId, pending] of this.#permissions) {
+      if (pending.view.requestId !== requestId) continue;
+      this.#permissions.delete(permissionId);
+      clearTimeout(pending.timeout);
+      this.#emit({ type: "permission_closed", id: requestId, permissionId, reason: "cancelled" });
+      pending.resolve(undefined);
     }
   }
 
   async #cancel(id: string): Promise<void> {
     const run = this.#runs.get(id);
-    if (run === undefined) return;
+    const localAction = this.#pendingLocalActions.get(id);
+    if (run === undefined && localAction === undefined) return;
     this.#emit({ type: "state", id, state: "stopping" });
-    await run.cancel();
+    if (run !== undefined) await run.cancel();
+    else {
+      localAction?.abort();
+      this.#cancelPermissions(id);
+    }
   }
 
   async #emitHistory(): Promise<void> {
