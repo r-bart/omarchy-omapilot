@@ -12,8 +12,9 @@ a dedicated Herdr Quickchat workspace.
 - Root manifest validates with `omarchy plugin validate .`.
 - Native bar widget and coordinated popout match the selected concept.
 - Authenticated provider and harness-owned model discovery work.
-- Answer and Web-only profiles fail closed; Tools is exposed only where host
-  reads, credentials, network, and writes outside per-turn scratch are blocked.
+- Answer and Web-only profiles fail closed; Tools is exposed only where the
+  provider's authority is stated truthfully and every broader command crosses
+  an inspectable, request-bound allow-once boundary.
 - Markdown, safe links, direct images, and click-to-load remote images render.
 - The newest 30 completed chats persist with bounded cached content.
 - Voxtype file-output dictation and Herdr native/transcript handoff work.
@@ -67,17 +68,19 @@ a dedicated Herdr Quickchat workspace.
 - [x] Capture the actual failing command/event and surface a truthful in-panel
   error when any Herdr launch, session, or focus stage fails.
 - [x] Replace the blanket tool-free Answer/Web policy with an explicit,
-  least-authority tool-call contract for harnesses that can prove the boundary;
-  withhold Tools from any provider, currently Codex and OpenCode, that cannot prove an
-  equivalent sandbox without exposing arbitrary local files, secrets, or
-  unapproved MCP servers.
+  least-authority tool-call contract for harnesses that can prove the boundary.
+  Codex Tools discloses its device-readable authority and requires exact
+  allow-once approval for commands; Claude remains scratch-sandboxed; OpenCode
+  remains withheld because it cannot prove an equivalent boundary.
 - [x] Add focused policy/protocol tests for allowed, denied, canceled, and
   malformed tool requests.
 - [x] Prove at least one real installed-shell Claude tool call succeeds while a
   forbidden host-data read still fails closed.
-- [ ] Re-run independent security review, full repository validation,
-  deterministic runtime rebuild checks, installed-plugin update, and live
-  computer-use validation before considering either regression closed.
+- [x] Re-run independent security review, full repository validation,
+  deterministic runtime rebuild checks, installed-plugin update, and real ACP
+  plus broker-protocol validation before considering either regression closed.
+- [ ] Complete the owner's installed-panel usage check; automated CUA validation
+  is intentionally paused at the owner's request.
 
 ## Active repair loop (2026-08-13)
 
@@ -120,9 +123,10 @@ a dedicated Herdr Quickchat workspace.
   `open`, `close`, `newChat`, and `history` remain callable after reload and
   shell restart without duplicate-handler warnings.
 - Source/install criterion: focused and full suites pass, deterministic builds
-  remain byte-identical, the installed tree matches the reviewed source, and
-  CUA Driver proves the real Codex command approval/denial flow, resulting
-  state, plus IPC open/close.
+  remain byte-identical, the installed tree matches the reviewed source, and a
+  real authenticated Codex ACP probe plus broker-protocol tests prove the
+  command approval/denial flow. Installed-panel interaction is an explicit
+  owner-run usage gate; automated CUA is paused.
 - Publication criterion: independent review is clean, the complete scoped diff
   is committed and pushed, CI is green, and the published revision is recorded.
 - Orchestrator: current Herdr pane `wK:p2`; owns implementation, integration,
@@ -133,14 +137,16 @@ a dedicated Herdr Quickchat workspace.
 - Forbidden: silent or persistent command approval, truncated/uninspectable
   commands, OpenCode tool enablement, credential changes, marketplace
   submission, or destructive user-data operations.
-- Current checkpoint: reviewed commit `eb3d2b4` is installed through the native
-  plugin CLI with the owner's prior Codex/model settings restored. The desktop
-  is unlocked. CUA Driver captured the exact theme-switch prompt in Codex Answer
-  and the resulting tool denial. Theme-specific dispatch was explicitly rejected
-  and fully reverted. The active stream advertises Codex Tools, shows every
-  command for Allow once/Deny, and adds actionable Answer-mode copy. Source,
-  live harness, installed-panel, independent-review, CI, and publication gates
-  remain open.
+- Current checkpoint: reviewed commit `f3daecd` is installed through the native
+  plugin CLI with the owner's prior Codex/model settings restored. Theme-specific
+  dispatch was explicitly rejected and fully reverted: the implementation is a
+  generic Codex command boundary. The authenticated headless Codex suite passed
+  both Answer-mode denial and a randomized temporary-file command after exactly
+  one `allow_once`; focused broker permission/protocol coverage passed 39/39;
+  full repository validation passed 100 tests with four explicit live skips.
+  The final singleton-signal IPC design has an independent `CLEAN` verdict.
+  CUA is stopped; the owner's installed-panel usage check, push, CI, and v0.1.1
+  publication remain open.
 
 ## Current repair evidence (2026-08-13)
 
@@ -156,8 +162,9 @@ a dedicated Herdr Quickchat workspace.
   its exact payload and approval controls above the detail, then failed without
   exposing or persisting the random secret.
 - The installed provider/model controls exposed live Codex, Claude, and
-  OpenCode catalogs. The final gate correctly withholds Tools from Codex and
-  OpenCode while Claude exposes Tools alongside its live model catalog.
+  OpenCode catalogs. Codex now exposes Tools with device-authority disclosure
+  and exact allow-once command approval; Claude exposes scratch-sandboxed Tools;
+  OpenCode remains withheld.
 - Continue in Herdr raised the existing official-class window, focused the
   exact resumed Codex agent, and repeated the same handoff without adding a tab,
   pane, or duplicate agent. The test-created tab was removed afterward.
