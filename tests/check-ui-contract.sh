@@ -32,6 +32,8 @@ test "$(grep -Fc 'root.permissionQueue = []' "$repo_dir/components/QuickchatStor
 grep -Fq 'signal escapeRequested()' "$repo_dir/components/Composer.qml"
 grep -Fq 'Codex Tools may read any user-readable file without asking' \
   "$repo_dir/components/Composer.qml"
+grep -Fq 'visible: !root.backend || root.backend.pendingPermission === null' \
+  "$repo_dir/components/Composer.qml"
 grep -Fq 'QuickchatStore.pendingPermission.authority === "sandboxed"' \
   "$repo_dir/Panel.qml"
 grep -Fq 'Allow once may read or change device data and access the network' \

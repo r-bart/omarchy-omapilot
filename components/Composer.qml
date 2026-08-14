@@ -220,6 +220,7 @@ Item {
     BorderSurface {
       Layout.fillWidth: true
       Layout.preferredHeight: Style.space(108)
+      visible: !root.backend || root.backend.pendingPermission === null
       color: Style.normalFillFor(root.foreground, root.accent)
       borderSpec: Border.controlSpec(promptInput.activeFocus ? "focus" : (promptHover.hovered ? "hover-cursor" : "normal"), root.foreground, root.accent)
       radius: Style.cornerRadius
