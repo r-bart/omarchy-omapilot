@@ -59,6 +59,18 @@ Scope {
   signal focusComposerRequested()
   signal toastRequested(string message)
   signal herdrContinued()
+  signal ipcOpenRequested()
+  signal ipcCloseRequested()
+  signal ipcToggleRequested()
+  signal ipcHistoryRequested()
+
+  function routeIpc(method) {
+    if (method === "open" || method === "show") ipcOpenRequested()
+    else if (method === "close" || method === "hide") ipcCloseRequested()
+    else if (method === "toggle") ipcToggleRequested()
+    else if (method === "history") ipcHistoryRequested()
+    else if (method === "newChat") { newChat(); ipcOpenRequested() }
+  }
 
   function configure(settings) {
     var source = settings || {}
@@ -440,6 +452,17 @@ Scope {
     if (type === "link" && event.opened === false) {
       toastRequested("Could not open that link")
     }
+  }
+
+  IpcHandler {
+    target: "io.github.spencerbull.quickchat"
+    function open() { root.routeIpc("open") }
+    function close() { root.routeIpc("close") }
+    function show() { root.routeIpc("show") }
+    function hide() { root.routeIpc("hide") }
+    function toggle() { root.routeIpc("toggle") }
+    function newChat() { root.routeIpc("newChat") }
+    function history() { root.routeIpc("history") }
   }
 
   Process {

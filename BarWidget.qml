@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "components" as Quickchat
@@ -23,13 +22,6 @@ BarWidget {
   readonly property bool canInline: !vertical && hostInlineAllowance >= Style.space(390)
   property bool inlineExpanded: false
   readonly property bool inlineActive: canInline && inlineExpanded
-  // Quattro creates one instance per monitor, while an IPC target may have
-  // only one owner. moduleSlots is reassigned as monitors change, so this
-  // binding transfers ownership without duplicate registrations.
-  readonly property var peerWidgets: bar && bar.moduleSlots !== undefined
-    && typeof bar.moduleWidgets === "function" ? bar.moduleWidgets(moduleName) : []
-  readonly property bool ipcOwner: peerWidgets.length === 0 || peerWidgets[0] === root
-
   readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
   readonly property bool popoutSwitchClosing: panelLoader.item ? panelLoader.item.popoutSwitchClosing === true : false
   readonly property real openPanelIndicatorWidth: inlineActive ? inlineComposer.width : button.width
@@ -113,6 +105,22 @@ BarWidget {
   onInlineActiveChanged: injectPanel()
   onCanInlineChanged: if (!canInline) inlineExpanded = false
 
+  Connections {
+    target: Quickchat.QuickchatStore
+    function onIpcOpenRequested() {
+      if (root.routedWidget() === root) root.open()
+    }
+    function onIpcCloseRequested() {
+      if (root.routedWidget() === root) root.close()
+    }
+    function onIpcToggleRequested() {
+      if (root.routedWidget() === root) root.togglePanel()
+    }
+    function onIpcHistoryRequested() {
+      if (root.routedWidget() === root) root.openHistory()
+    }
+  }
+
   Loader {
     id: panelLoader
     active: true
@@ -122,18 +130,6 @@ BarWidget {
       root.injectPanel()
       Qt.callLater(root.injectPanel)
     }
-  }
-
-  IpcHandler {
-    enabled: root.ipcOwner
-    target: root.moduleName
-    function open() { root.routeOpen() }
-    function close() { root.routeClose() }
-    function show() { root.routeOpen() }
-    function hide() { root.routeClose() }
-    function toggle() { root.routeToggle() }
-    function newChat() { Quickchat.QuickchatStore.newChat(); root.routeOpen() }
-    function history() { root.routeHistory() }
   }
 
   BarIconButton {
