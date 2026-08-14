@@ -149,6 +149,7 @@ Item {
         showLabel: false
         options: root.backend ? root.backend.providers : []
         value: root.backend ? root.backend.provider : ""
+        enabled: root.backend && !root.backend.busy
         foreground: root.foreground
         background: root.background
         Accessible.name: "AI harness"
@@ -166,6 +167,7 @@ Item {
           ? root.backend.modelOptions
           : [{ value: "", label: "Harness default" }]
         value: root.backend ? root.backend.model : ""
+        enabled: root.backend && !root.backend.busy
         foreground: root.foreground
         background: root.background
         Accessible.name: "AI model"
@@ -177,10 +179,13 @@ Item {
 
       ButtonGroup {
         Layout.alignment: Qt.AlignVCenter
+        enabled: root.backend && !root.backend.busy
         options: root.backend && root.backend.toolsSupported ? [
           { value: "answer", label: "Answer", tooltip: "Answer without tools" },
           { value: "web", label: "Web", tooltip: root.backend.webSupported ? "Allow web search only" : "Web is unavailable for this selection" },
-          { value: "tools", label: "Tools", tooltip: "Run isolated commands in a disposable Claude workspace" }
+          { value: "tools", label: "Tools", tooltip: root.backend.provider === "claude"
+            ? "Run isolated commands in a disposable Claude workspace"
+            : "Run commands with current-user device authority" }
         ] : [
           { value: "answer", label: "Answer", tooltip: "Answer without tools" },
           { value: "web", label: "Web", tooltip: root.backend && root.backend.webSupported ? "Allow web search only" : "Web is unavailable for this selection" }
@@ -200,12 +205,14 @@ Item {
       Layout.fillWidth: true
       visible: root.backend && (root.backend.modelOptions.length === 0 || root.backend.capability === "tools")
       text: root.backend && root.backend.capability === "tools"
-        ? "Tools gives Claude a disposable scratch workspace; host data, credentials, network, and outside writes stay blocked."
+        ? (root.backend.provider === "claude"
+          ? "Claude Tools uses disposable scratch; host data, credentials, network, and outside writes stay blocked."
+          : "Codex Tools may read any user-readable file without asking; output is sent to Codex and saved. Broader access needs Allow once.")
         : "Using the harness default. This harness did not expose a model catalog."
       color: Qt.darker(root.foreground, 1.45)
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
-      elide: Text.ElideRight
+      wrapMode: Text.Wrap
       Accessible.role: Accessible.StaticText
       Accessible.name: text
     }

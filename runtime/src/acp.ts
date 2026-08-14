@@ -301,7 +301,7 @@ export function runAcpQuestion(
             if (handled.image !== undefined) images.push(handled.image);
           }
           await promptPromise;
-          if (forbiddenToolAttempt) throw forbiddenToolError();
+          if (forbiddenToolAttempt) throw forbiddenToolError(provider, capability);
           text.finish();
         } catch (error) {
           await ctx.notify(acp.methods.agent.session.cancel, { sessionId: session.sessionId }).catch(() => undefined);
@@ -312,7 +312,7 @@ export function runAcpQuestion(
       });
 
       if (cancelled) throw new BrokerAcpError("cancelled", "Question was cancelled", false);
-      if (forbiddenToolAttempt) throw forbiddenToolError();
+      if (forbiddenToolAttempt) throw forbiddenToolError(provider, capability);
       return {
         answer,
         images,
@@ -323,7 +323,7 @@ export function runAcpQuestion(
       };
     } catch (error) {
       if (error instanceof BrokerAcpError) throw error;
-      if (error instanceof ForbiddenToolMarkupError || forbiddenToolAttempt) throw forbiddenToolError();
+      if (error instanceof ForbiddenToolMarkupError || forbiddenToolAttempt) throw forbiddenToolError(provider, capability);
       throw new BrokerAcpError(
         cancelled ? "cancelled" : "agent_failed",
         cancelled ? "Question was cancelled" : "The selected harness failed to answer",
@@ -341,9 +341,11 @@ export function runAcpQuestion(
 function secureEnvironment(provider: DiscoveredProvider, capability: Capability): NodeJS.ProcessEnv {
   if (provider.id === "codex") {
     const features = Object.fromEntries((provider.lockdownFeatures ?? [])
-      .map((feature) => [feature, false]));
+      .map((feature) => [feature, capability === "tools" && (feature === "shell_tool" || feature === "unified_exec")]));
     const config = {
-      // Codex read-only still permits reads; on-request is what routes command attempts to our deny-all ACP handler.
+      // Codex read-only still permits reads; on-request routes command attempts
+      // to Quickchat's exact allow-once handler in Tools and deny-all handler in
+      // Answer/Web.
       approval_policy: "on-request",
       sandbox_mode: "read-only",
       web_search: capability === "web" ? "live" : "disabled",
@@ -518,7 +520,10 @@ function isToolUpdate(kind: string): boolean {
   return kind === "tool_call" || kind === "tool_call_update";
 }
 
-function forbiddenToolError(): BrokerAcpError {
+function forbiddenToolError(provider: DiscoveredProvider, capability: Capability): BrokerAcpError {
+  if (capability !== "tools" && provider.capabilities.includes("tools")) {
+    return new BrokerAcpError("tool_mode_required", "This request needs Tools mode. Select Tools and try again", false);
+  }
   return new BrokerAcpError("forbidden_tool_attempt", "The harness attempted a tool that Quickchat does not permit", false);
 }
 

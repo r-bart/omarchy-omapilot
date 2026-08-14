@@ -30,6 +30,12 @@ grep -Fq 'if (providers.length > 0) selectProvider(provider)' \
 test "$(grep -Fc 'root.pendingPermission = null' "$repo_dir/components/QuickchatStore.qml")" -ge 2
 test "$(grep -Fc 'root.permissionQueue = []' "$repo_dir/components/QuickchatStore.qml")" -ge 2
 grep -Fq 'signal escapeRequested()' "$repo_dir/components/Composer.qml"
+grep -Fq 'Codex Tools may read any user-readable file without asking' \
+  "$repo_dir/components/Composer.qml"
+grep -Fq 'QuickchatStore.pendingPermission.authority === "sandboxed"' \
+  "$repo_dir/Panel.qml"
+grep -Fq 'Allow once may read or change device data and access the network' \
+  "$repo_dir/Panel.qml"
 grep -Fq 'readonly property bool popupOpen:' "$repo_dir/components/Composer.qml"
 grep -Fq 'if (composer.popupOpen) composer.closePopups()' "$repo_dir/Panel.qml"
 grep -Fq 'readonly property bool opened:' "$repo_dir/BarWidget.qml"

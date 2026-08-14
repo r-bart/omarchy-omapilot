@@ -18490,7 +18490,7 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
             if (handled.image !== void 0) images.push(handled.image);
           }
           await promptPromise;
-          if (forbiddenToolAttempt) throw forbiddenToolError();
+          if (forbiddenToolAttempt) throw forbiddenToolError(provider, capability);
           text.finish();
         } catch (error48) {
           await ctx.notify(methods.agent.session.cancel, { sessionId: session.sessionId }).catch(() => void 0);
@@ -18500,7 +18500,7 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
         session.dispose();
       });
       if (cancelled) throw new BrokerAcpError("cancelled", "Question was cancelled", false);
-      if (forbiddenToolAttempt) throw forbiddenToolError();
+      if (forbiddenToolAttempt) throw forbiddenToolError(provider, capability);
       return {
         answer,
         images,
@@ -18511,7 +18511,7 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
       };
     } catch (error48) {
       if (error48 instanceof BrokerAcpError) throw error48;
-      if (error48 instanceof ForbiddenToolMarkupError || forbiddenToolAttempt) throw forbiddenToolError();
+      if (error48 instanceof ForbiddenToolMarkupError || forbiddenToolAttempt) throw forbiddenToolError(provider, capability);
       throw new BrokerAcpError(
         cancelled ? "cancelled" : "agent_failed",
         cancelled ? "Question was cancelled" : "The selected harness failed to answer",
@@ -18527,9 +18527,11 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
 }
 function secureEnvironment(provider, capability) {
   if (provider.id === "codex") {
-    const features = Object.fromEntries((provider.lockdownFeatures ?? []).map((feature) => [feature, false]));
+    const features = Object.fromEntries((provider.lockdownFeatures ?? []).map((feature) => [feature, capability === "tools" && (feature === "shell_tool" || feature === "unified_exec")]));
     const config2 = {
-      // Codex read-only still permits reads; on-request is what routes command attempts to our deny-all ACP handler.
+      // Codex read-only still permits reads; on-request routes command attempts
+      // to Quickchat's exact allow-once handler in Tools and deny-all handler in
+      // Answer/Web.
       approval_policy: "on-request",
       sandbox_mode: "read-only",
       web_search: capability === "web" ? "live" : "disabled",
@@ -18670,7 +18672,10 @@ function containsToolMarkup(value) {
 function isToolUpdate(kind) {
   return kind === "tool_call" || kind === "tool_call_update";
 }
-function forbiddenToolError() {
+function forbiddenToolError(provider, capability) {
+  if (capability !== "tools" && provider.capabilities.includes("tools")) {
+    return new BrokerAcpError("tool_mode_required", "This request needs Tools mode. Select Tools and try again", false);
+  }
   return new BrokerAcpError("forbidden_tool_attempt", "The harness attempted a tool that Quickchat does not permit", false);
 }
 var ForbiddenToolMarkupError = class extends Error {
@@ -19197,21 +19202,22 @@ function herdrErrorMessage(stage, errorCode) {
 }
 
 // runtime/src/permissions.ts
-function normalizeToolPermission(requestId, permissionId, request) {
+function normalizeToolPermission(requestId, permissionId, provider, request) {
   const kind = request.toolCall.kind ?? "other";
   if (kind !== "execute") return void 0;
-  const allowOptionId = request.options.find((option) => option.kind === "allow_once")?.optionId;
   const rejectOptionId = request.options.find((option) => option.kind === "reject_once")?.optionId;
   const title = boundedText(request.toolCall.title ?? request.toolCall.name ?? `${kind} tool`, 120);
   const detail = permissionDetail(kind, request.toolCall.rawInput);
-  if (detail === void 0) return void 0;
+  const reviewable = detail !== void 0;
+  const allowOptionId = reviewable ? request.options.find((option) => option.kind === "allow_once")?.optionId : void 0;
   return {
     view: {
       id: permissionId,
       requestId,
-      title: title === "" ? `${kind} tool` : title,
+      title: reviewable ? title === "" ? `${kind} tool` : title : "Command blocked",
       kind,
-      detail,
+      authority: provider === "claude" ? "sandboxed" : "device",
+      detail: detail ?? "Quickchat blocked this command because its complete contents cannot be displayed safely.",
       allowOnce: allowOptionId !== void 0
     },
     ...allowOptionId === void 0 ? {} : { allowOptionId },
@@ -19225,7 +19231,9 @@ function exactInput(kind, value) {
   if (kind !== "execute" || value === null || typeof value !== "object" || Array.isArray(value)) return void 0;
   const source = value;
   if (typeof source.command !== "string" || source.command === "") return void 0;
-  if (hasUnsafeText2(value)) return void 0;
+  if (hasUnsafeCommandText(source.command)) return void 0;
+  const remaining = { ...source, command: "" };
+  if (hasUnsafeText2(remaining)) return void 0;
   let rendered;
   try {
     rendered = JSON.stringify(value, null, 2);
@@ -19234,6 +19242,9 @@ function exactInput(kind, value) {
   }
   if (rendered.length > 3e3) return void 0;
   return rendered;
+}
+function hasUnsafeCommandText(value) {
+  return /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(value);
 }
 function hasUnsafeText2(value, seen = /* @__PURE__ */ new Set()) {
   if (typeof value === "string") return /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(value);
@@ -19331,7 +19342,8 @@ async function discoverProviders(env = process.env) {
     if (executable === void 0) continue;
     const lockdownFeatures = id === "codex" ? await codexToolLockdownFeatures(harnessPath, env) : void 0;
     if (id === "codex" && lockdownFeatures === void 0) continue;
-    const capabilities = id === "claude" ? ["answer", "web", "tools"] : ["answer", "web"];
+    const codexToolsReady = id === "codex" && lockdownFeatures?.includes("shell_tool") === true && lockdownFeatures.includes("unified_exec");
+    const capabilities = id === "claude" || codexToolsReady ? ["answer", "web", "tools"] : ["answer", "web"];
     const providerVersion = await version2(harnessPath, env);
     found.push({
       id,
@@ -19513,7 +19525,7 @@ var QuickchatBroker = class {
       this.#emit,
       9e4,
       this.#images,
-      (request) => this.#requestToolPermission(command.id, request),
+      (request) => this.#requestToolPermission(command.id, provider.id, request),
       () => this.#cancelPermissions(command.id)
     );
     this.#runs.set(command.id, run);
@@ -19592,6 +19604,7 @@ var QuickchatBroker = class {
       requestId,
       title: `Launch ${action.appName}`,
       kind: "local_action",
+      authority: "local_action",
       detail: JSON.stringify({ action: "launch_app", app: action.appName, desktopId: action.desktopId, desktopFile: action.desktopFile }, null, 2),
       allowOnce: true
     };
@@ -19612,9 +19625,9 @@ var QuickchatBroker = class {
       this.#emit({ type: "permission", permission: view });
     });
   }
-  async #requestToolPermission(requestId, request) {
+  async #requestToolPermission(requestId, provider, request) {
     const permissionId = randomUUID2();
-    const pending = normalizeToolPermission(requestId, permissionId, request);
+    const pending = normalizeToolPermission(requestId, permissionId, provider, request);
     if (pending === void 0) return void 0;
     return new Promise((resolvePermission) => {
       const timeout = setTimeout(() => {

@@ -64,17 +64,22 @@ Three capability profiles are exposed:
 
 - **Answer** denies tools, shell, filesystem, MCP, and network capabilities.
 - **Web** allows only a harness capability that can be proven to be web search/fetch. It continues to deny shell, filesystem, edits, MCP, and unrelated tools. If the harness cannot enforce that boundary, Web is unavailable.
-- **Tools** gives Claude a disposable, network-disabled scratch workspace.
-  Every existing top-level host path except system executable/library roots,
-  plus credential-bearing environment variables, is hidden; writes
-  are confined to that per-turn workspace. Commands that fit that boundary can
-  run automatically. Exact provider permission requests are paused behind a
-  card that shows the complete payload and offers only **Allow once** or
-  **Deny**; approval never relaxes the filesystem, credential, write, or network
-  sandbox. Oversized or visually ambiguous requests,
-  persistent grants, arbitrary MCP, browser/computer control, and uninspectable
-  requests remain blocked. Codex and OpenCode remain on Answer/Web because
-  their current ACP paths cannot prove the same local-read boundary.
+- **Tools** is available for Codex and Claude with provider-specific boundaries.
+  Codex starts read-only and network-disabled, but it may read any file the
+  current user can read without asking. Tool output is sent to Codex and may be
+  retained in the saved answer. Broader access pauses behind an **Allow once**
+  or **Deny** card. An approved Codex command can run outside the read-only
+  sandbox and may read or change data or access the network as the current user,
+  so the displayed command and working directory must be reviewed. Claude
+  instead receives a disposable,
+  network-disabled scratch workspace: host paths and credential-bearing
+  environment variables are hidden and writes are confined to per-turn scratch.
+  Commands inside that fixed Claude boundary may run automatically; any surfaced
+  permission still offers only **Allow once** or **Deny** without weakening the
+  sandbox. Oversized or visually ambiguous requests, persistent grants,
+  arbitrary MCP, browser/computer control, and uninspectable requests remain
+  blocked. OpenCode remains on Answer/Web until its ACP path can prove the same
+  inspectable approval handshake.
 
 ACP permission requests are denied in Answer and Web. Web access is enabled only
 through a provider-specific search/fetch capability that was positively

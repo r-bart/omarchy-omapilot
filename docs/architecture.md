@@ -34,13 +34,19 @@ The broker emits events whose `type` is one of `ready`, `providers`, `state`, `c
 
 ACP is the broker's normalization boundary, not the policy boundary. Each
 harness receives its own fail-closed configuration. Answer and Web reject ACP
-permission requests. Tools is advertised only for Claude, whose disposable
-workspace dynamically denies every existing top-level host path except system
-executable/library roots, hides credential-bearing environment variables,
-blocks network, and confines writes to per-turn scratch space. Commands inside
-that boundary may run automatically. Exact,
-classifiable permission requests accept a broker-bound allow-once or reject-once
-decision without relaxing the hard sandbox; unclassified and mutating tool kinds fail closed. Raw tool requests,
+permission requests. Codex Tools keeps the pinned adapter's read-only,
+network-disabled, on-request mode. It may read any user-readable host file
+without asking; tool output is sent to Codex and may be retained in the saved
+answer. Each broader-access request is bound to a broker nonce. The UI exposes only
+provider-native allow-once or reject-once; approval may run that command with
+current-user device and network authority. Claude Tools instead uses a
+disposable workspace that dynamically denies every existing top-level host path
+except system executable/library roots, hides credential-bearing environment
+variables, blocks network, and confines writes to per-turn scratch space.
+Commands inside that boundary may run automatically. Any exact, classifiable
+Claude permission accepts a broker-bound allow-once or reject-once decision
+without relaxing its hard sandbox. OpenCode does not advertise Tools.
+Unclassified tool kinds fail closed. Raw tool requests,
 decisions, updates, and outputs remain ephemeral, while the completed answer may
 contain tool-derived text and is retained like any other answer. Continue in Herdr intentionally leaves that one-shot boundary and
 hands the resumable session or transcript to Herdr, which becomes the authority

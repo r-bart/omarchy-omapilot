@@ -102,19 +102,27 @@ a dedicated Herdr Quickchat workspace.
 
 ## Local actions and IPC repair loop (2026-08-14)
 
-- Goal: replace the owner-observed `forbidden_tool_attempt` for exact local
-  application-launch prompts with a broker-owned, explicit allow-once action;
-  preserve tool-free Answer/Web and Claude's isolated Tools boundary.
-- Done criteria: `open zoom` resolves only to an installed desktop entry,
-  renders the exact application/action before execution, launches only after
-  allow-once approval, rejects malformed/ambiguous/unsupported actions, and
-  never passes model text to a shell.
+- Goal: replace the owner-observed `forbidden_tool_attempt` for generic Codex
+  command use with its pinned ACP adapter's exact allow-once flow; preserve
+  tool-free Answer/Web, Claude's isolated Tools boundary, and OpenCode's
+  fail-closed unsupported state. Application launch remains one independently
+  bounded broker-owned action, not the pattern for arbitrary commands.
+- Done criteria: Codex Answer/Web still denies commands with actionable Tools
+  guidance; Codex Tools keeps its read-only/network-disabled sandbox and renders
+  the adapter-normalized command and working directory for every broader-access
+  request, running it only after a nonce-bound
+  allow-once decision; denial, expiry, cancellation,
+  malformed requests, and unsupported tool kinds never execute. The UI states
+  that approved Codex commands may read or change device data. Claude's
+  scratch-only proof and the existing exact application-launch action remain
+  green.
 - IPC criterion: one Quickchat IPC owner is registered across all monitors;
   `open`, `close`, `newChat`, and `history` remain callable after reload and
   shell restart without duplicate-handler warnings.
 - Source/install criterion: focused and full suites pass, deterministic builds
   remain byte-identical, the installed tree matches the reviewed source, and
-  CUA Driver proves the real panel action flow plus IPC open/close.
+  CUA Driver proves the real Codex command approval/denial flow, resulting
+  state, plus IPC open/close.
 - Publication criterion: independent review is clean, the complete scoped diff
   is committed and pushed, CI is green, and the published revision is recorded.
 - Orchestrator: current Herdr pane `wK:p2`; owns implementation, integration,
@@ -122,21 +130,24 @@ a dedicated Herdr Quickchat workspace.
 - Architecture reviewer: visible named Claude agent `qc_action_arch`, pane
   `wK:p1R`; read-only; owns the smallest-safe action/IPC design review.
   Orchestrator owns cleanup.
-- Forbidden: arbitrary shell approval, silent app launch, host-data access,
-  changes outside this repository/installed plugin copy, credential changes,
-  marketplace submission, or destructive user-data operations.
+- Forbidden: silent or persistent command approval, truncated/uninspectable
+  commands, OpenCode tool enablement, credential changes, marketplace
+  submission, or destructive user-data operations.
 - Current checkpoint: reviewed commit `eb3d2b4` is installed through the native
-  plugin CLI with the owner's prior Codex/model settings restored. CUA Driver's
-  Wayland session reached the desktop, but Hyprland is locked and reports that
-  the lockscreen app died. No Quickchat interaction or launch occurred. The
-  owner must unlock the session before the installed-panel CUA gate, push, tag,
-  release assets, and publication can proceed.
+  plugin CLI with the owner's prior Codex/model settings restored. The desktop
+  is unlocked. CUA Driver captured the exact theme-switch prompt in Codex Answer
+  and the resulting tool denial. Theme-specific dispatch was explicitly rejected
+  and fully reverted. The active stream advertises Codex Tools, shows every
+  command for Allow once/Deny, and adds actionable Answer-mode copy. Source,
+  live harness, installed-panel, independent-review, CI, and publication gates
+  remain open.
 
 ## Current repair evidence (2026-08-13)
 
-- The earlier installed-shell Codex Tools evidence was invalidated: Codex
-  read-only permits arbitrary host reads. Tools is now withheld from Codex and
-  OpenCode instead of presenting that boundary as safe.
+- The earlier claim that Codex Tools could be confined away from host reads was
+  invalidated: Codex read-only permits host reads and an approved escalation can
+  mutate user state. The repaired contract exposes that authority explicitly
+  and requires exact allow-once approval instead of calling it isolated.
 - The real authenticated Claude adapter ran an unpredictable `date +%s%N`
   command inside the fixed sandbox. A second exact, approved read of a random
   host-side file did not expose its contents in streamed events or the answer.

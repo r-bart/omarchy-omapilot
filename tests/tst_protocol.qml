@@ -21,7 +21,7 @@ TestCase {
     var providers = Protocol.normalizeProviders([{
       id: "codex",
       ready: true,
-      capabilities: ["answer", "web"],
+      capabilities: ["answer", "web", "tools"],
       models: [{ id: "gpt-5", name: "GPT-5" }]
     }, {
       id: "claude",
@@ -36,7 +36,7 @@ TestCase {
     compare(providers[0].value, "codex")
     compare(providers[0].models[0].label, "GPT-5")
     verify(Protocol.providerSupportsWeb(providers, "codex"))
-    verify(!Protocol.providerSupportsTools(providers, "codex"))
+    verify(Protocol.providerSupportsTools(providers, "codex"))
     verify(Protocol.providerSupportsTools(providers, "claude"))
     verify(!Protocol.providerSupportsTools(providers, "opencode"))
   }
@@ -44,9 +44,10 @@ TestCase {
   function test_toolPermissionIsBoundToCurrentTurn() {
     var permission = Protocol.normalizedPermission({
       id: "permission-1", requestId: "turn-1", title: "Run uname",
-      kind: "execute", detail: "uname -s", allowOnce: true
+      kind: "execute", authority: "device", detail: "uname -s", allowOnce: true
     }, "turn-1")
     compare(permission.detail, "uname -s")
+    compare(permission.authority, "device")
     verify(permission.allowOnce)
     compare(Protocol.normalizedPermission({ id: "permission-1", requestId: "other", kind: "execute" }, "turn-1"), null)
     compare(Protocol.normalizedPermission({ id: "permission-1", requestId: "turn-1", kind: "edit" }, "turn-1"), null)
@@ -55,9 +56,10 @@ TestCase {
   function test_localActionPermissionIsBoundToCurrentTurn() {
     var permission = Protocol.normalizedPermission({
       id: "permission-2", requestId: "turn-2", title: "Launch Zoom",
-      kind: "local_action", detail: "Zoom.desktop", allowOnce: true
+      kind: "local_action", authority: "local_action", detail: "Zoom.desktop", allowOnce: true
     }, "turn-2")
     compare(permission.kind, "local_action")
+    compare(permission.authority, "local_action")
     compare(permission.title, "Launch Zoom")
     compare(Protocol.normalizedPermission({ id: "permission-2", requestId: "other", kind: "local_action" }, "turn-2"), null)
     compare(Protocol.normalizedPermission({ id: "permission-2", requestId: "turn-2", kind: "arbitrary_action" }, "turn-2"), null)

@@ -70,6 +70,7 @@ export type ToolPermission = {
   requestId: string;
   title: string;
   kind: "execute" | "local_action";
+  authority: "device" | "sandboxed" | "local_action";
   detail: string;
   allowOnce: boolean;
 };

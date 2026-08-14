@@ -10,7 +10,7 @@ import { ImagePolicyError, ImageStore, isAllowedExternalLink } from "./images.js
 import { normalizeToolPermission, type PendingToolPermission } from "./permissions.js";
 import { discoverProviders, fallbackModels, type DiscoveredProvider } from "./providers.js";
 import { resolveExecutable, runCommand } from "./process.js";
-import type { BrokerCommand, BrokerEvent, ChatRecord, ProviderInfo } from "./types.js";
+import type { BrokerCommand, BrokerEvent, ChatRecord, ProviderId, ProviderInfo } from "./types.js";
 import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 
 type DictationClient = Pick<DictationService, "start" | "stop" | "cancel">;
@@ -126,7 +126,7 @@ export class QuickchatBroker {
     const run = runAcpQuestion(
       provider, command.id, command.question, command.model, command.capability,
       this.#emit, 90_000, this.#images,
-      (request) => this.#requestToolPermission(command.id, request),
+      (request) => this.#requestToolPermission(command.id, provider.id, request),
       () => this.#cancelPermissions(command.id)
     );
     this.#runs.set(command.id, run);
@@ -210,6 +210,7 @@ export class QuickchatBroker {
       requestId,
       title: `Launch ${action.appName}`,
       kind: "local_action" as const,
+      authority: "local_action" as const,
       detail: JSON.stringify({ action: "launch_app", app: action.appName, desktopId: action.desktopId, desktopFile: action.desktopFile }, null, 2),
       allowOnce: true
     };
@@ -231,9 +232,9 @@ export class QuickchatBroker {
     });
   }
 
-  async #requestToolPermission(requestId: string, request: RequestPermissionRequest): Promise<string | undefined> {
+  async #requestToolPermission(requestId: string, provider: ProviderId, request: RequestPermissionRequest): Promise<string | undefined> {
     const permissionId = randomUUID();
-    const pending = normalizeToolPermission(requestId, permissionId, request);
+    const pending = normalizeToolPermission(requestId, permissionId, provider, request);
     if (pending === undefined) return undefined;
     return new Promise<string | undefined>((resolvePermission) => {
       const timeout = setTimeout(() => {

@@ -10,22 +10,28 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
 
 - Answer mode denies every tool and external capability.
 - Web mode permits only a provider capability positively identified as web search or fetch.
-- Tools mode is currently available only through Claude. Commands run inside a
-  disposable, network-disabled workspace that denies every existing top-level
-  host path except system executable/library roots, hides credential-bearing
-  environment variables, and confines writes to per-turn
-  scratch space. Commands inside that fixed boundary may run automatically.
-  Permission requests are presented with their complete exact provider payload
-  for an explicit decision, but approval does not weaken the hard sandbox.
-  Only the provider's allow-once
-  option can be selected; persistent grants are never exposed. Oversized
-  requests and control or bidirectional-display characters fail closed rather
-  than being truncated.
-- Tools is withheld from Codex and OpenCode because their current ACP paths
-  cannot prove that local reads are confined away from host data.
-- Editing, deletion, moving files, arbitrary MCP, browser/computer control,
-  unclassified requests, and requests without an inspectable target are denied
-  in every mode. Answer and Web continue to deny filesystem and shell access.
+- Tools mode is available through Codex and Claude. Codex starts in read-only,
+  network-disabled, on-request mode, but may read any file the current user can
+  read without asking. Tool output is sent to Codex and may be retained in the
+  saved answer. A request for broader access pauses behind the adapter-normalized
+  command and working directory, and only its provider-native allow-once or
+  reject-once decision is exposed.
+  Approval can execute the command outside the read-only sandbox with the
+  current user's authority, including host reads, state changes, and network
+  access; the UI states this explicitly. Persistent grants are never exposed.
+- Claude Tools runs inside a disposable, network-disabled workspace that denies
+  every existing top-level host path except system executable/library roots,
+  hides credential-bearing environment variables, and confines writes to
+  per-turn scratch. Commands inside that fixed boundary may run automatically;
+  a surfaced approval does not weaken the hard sandbox.
+- OpenCode Tools remains withheld because its current ACP path cannot prove an
+  inspectable allow-once handshake without raw tool-call markup.
+- Oversized requests and control or bidirectional-display characters fail
+  closed rather than being truncated.
+- Arbitrary MCP, browser/computer control, unclassified requests, and requests
+  without an inspectable target are denied in every mode. Answer and Web deny
+  filesystem and shell access. Codex Tools may edit, delete, move, or otherwise
+  mutate user-accessible state only after exact allow-once command approval.
 - Provider authentication remains in the installed harness. Quickchat must not log, copy, or persist credential output.
 - Adapter bundles are generated from exact package-lock versions and reviewed as tracked files in the same Git commit as their source. Published release archives add SHA-256 verification, provenance, and an SBOM; the runtime does not download or replace adapters.
 - Remote images require a user action and are subject to scheme, redirect, address, MIME, byte-size, complete decode, pixel-area, and cache-quota checks before Quickshell sees them.

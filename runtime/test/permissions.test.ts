@@ -3,7 +3,7 @@ import { normalizeToolPermission } from "../src/permissions.js";
 
 describe("tool permission presentation", () => {
   it("exposes only exact allow-once command requests", () => {
-    const permission = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", {
+    const permission = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "codex", {
       sessionId: "session",
       toolCall: { toolCallId: "tool", kind: "execute", title: "Run uname", rawInput: { command: "uname -s", cwd: "/tmp/chat", timeout: 10 } },
       options: [
@@ -18,6 +18,7 @@ describe("tool permission presentation", () => {
         requestId: "turn-1",
         title: "Run uname",
         kind: "execute",
+        authority: "device",
         detail: '{\n  "command": "uname -s",\n  "cwd": "/tmp/chat",\n  "timeout": 10\n}',
         allowOnce: true
       },
@@ -28,7 +29,7 @@ describe("tool permission presentation", () => {
   });
 
   it.each(["read", "search", "fetch", "edit", "delete", "move", "switch_mode", "other"] as const)("rejects %s before it reaches the UI", (kind) => {
-    expect(normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", {
+    expect(normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "codex", {
       sessionId: "session",
       toolCall: { toolCallId: "tool", kind, title: "Unsafe" },
       options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }]
@@ -36,7 +37,7 @@ describe("tool permission presentation", () => {
   });
 
   it("does not invent a positive decision when allow-once is absent", () => {
-    expect(normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", {
+    expect(normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "codex", {
       sessionId: "session",
       toolCall: { toolCallId: "tool", kind: "execute", rawInput: { command: "uname -s" } },
       options: [{ optionId: "always", name: "Always", kind: "allow_always" }]
@@ -44,18 +45,49 @@ describe("tool permission presentation", () => {
   });
 
   it.each(["x".repeat(3_001), "echo safe\u202eevil", "echo safe\u061cevil", "echo safe\u0085evil"])("rejects oversized, controlled, or directionally ambiguous commands", (command) => {
-    expect(normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", {
+    const pending = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "codex", {
       sessionId: "session",
       toolCall: { toolCallId: "tool", kind: "execute", rawInput: { command } },
-      options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }]
-    })).toBeUndefined();
+      options: [
+        { optionId: "allow", name: "Allow", kind: "allow_once" },
+        { optionId: "deny", name: "Deny", kind: "reject_once" }
+      ]
+    });
+    expect(pending).toMatchObject({
+      view: { title: "Command blocked", authority: "device", allowOnce: false },
+      rejectOptionId: "deny"
+    });
+    expect(pending?.allowOptionId).toBeUndefined();
   });
 
   it("fails closed when the adapter omits a classifiable target", () => {
-    expect(normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", {
+    expect(normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "codex", {
       sessionId: "session",
       toolCall: { toolCallId: "tool", kind: "execute", rawInput: { opaque: "do something" } },
       options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }]
-    })).toBeUndefined();
+    })?.view.allowOnce).toBe(false);
+  });
+
+  it("preserves complete multiline and tabbed commands in a device-authority card", () => {
+    const command = "cat <<'EOF'\nhello\tworld\nEOF\n";
+    const permission = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "codex", {
+      sessionId: "session",
+      toolCall: { toolCallId: "tool", kind: "execute", rawInput: { command, cwd: "/tmp/chat" } },
+      options: [
+        { optionId: "allow", name: "Allow", kind: "allow_once" },
+        { optionId: "deny", name: "Deny", kind: "reject_once" }
+      ]
+    });
+    expect(permission?.view.detail).toContain("cat <<'EOF'\\nhello\\tworld\\nEOF\\n");
+    expect(permission?.view).toMatchObject({ authority: "device", allowOnce: true });
+  });
+
+  it("marks Claude command approvals as sandboxed", () => {
+    const permission = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "claude", {
+      sessionId: "session",
+      toolCall: { toolCallId: "tool", kind: "execute", rawInput: { command: "uname -s" } },
+      options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }]
+    });
+    expect(permission?.view.authority).toBe("sandboxed");
   });
 });

@@ -76,7 +76,7 @@ describe("NDJSON protocol", () => {
     expect(ready.providers.find((provider) => provider.id === "codex")?.models).toContainEqual({ id: "test/default", name: "Default" });
     const capabilities = z.object({ providers: z.array(z.object({ id: z.string(), capabilities: z.array(z.string()) })) })
       .parse(events.find((event) => event.type === "ready")).providers;
-    expect(capabilities.find((provider) => provider.id === "codex")?.capabilities).not.toContain("tools");
+    expect(capabilities.find((provider) => provider.id === "codex")?.capabilities).toContain("tools");
     expect(capabilities.find((provider) => provider.id === "claude")).toBeUndefined();
     expect(capabilities.find((provider) => provider.id === "opencode")?.capabilities).not.toContain("tools");
     child.stdin.write(`${JSON.stringify({ type: "submit", id: "wire-1", question: "Say hello", provider: "codex", capability: "answer" })}\n`);
@@ -117,19 +117,19 @@ describe("NDJSON protocol", () => {
     await new Promise((resolveExit) => child.once("close", resolveExit));
   }, 20_000);
 
-  it("fails a denied tool request without completing or persisting the answer", async () => {
+  it("guides an Answer-mode tool request to Tools without completing or persisting", async () => {
     const events = await forbiddenAttempt("codex", { FAKE_ACP_PERMISSION_ATTEMPT: "1" });
     expect(events.find((event) => event.type === "error")).toMatchObject({
-      code: "forbidden_tool_attempt",
-      message: "The harness attempted a tool that Quickchat does not permit",
+      code: "tool_mode_required",
+      message: "This request needs Tools mode. Select Tools and try again",
       retryable: false
     });
     expect(events.some((event) => event.type === "complete")).toBe(false);
     expect(events.some((event) => event.type === "content")).toBe(false);
   }, 20_000);
 
-  it("rejects Tools for Codex before starting an ACP turn", async () => {
-    const events = await unsupportedCapability("codex", "tools");
+  it("rejects Tools for OpenCode before starting an ACP turn", async () => {
+    const events = await unsupportedCapability("opencode", "tools");
     expect(events.find((event) => event.type === "error")).toMatchObject({
       code: "capability_unavailable",
       message: "This harness cannot safely enforce the selected capability",
@@ -138,7 +138,7 @@ describe("NDJSON protocol", () => {
     expect(events.some((event) => event.type === "state")).toBe(false);
   }, 20_000);
 
-  it("round-trips a bounded allow-once tool decision without exposing provider option IDs", async () => {
+  it.each(["codex", "claude"] as const)("round-trips a bounded allow-once tool decision for %s without exposing provider option IDs", async (provider) => {
     const state = await mkdtemp(join(tmpdir(), "quickchat-tool-permission-")); roots.push(state);
     const child = spawn(resolve("runtime/bin/quickchat-broker"), [], {
       env: {
@@ -156,7 +156,7 @@ describe("NDJSON protocol", () => {
     createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
     child.stdin.write('{"type":"initialize","protocolVersion":1}\n');
     await until(() => events.some((event) => event.type === "ready"));
-    child.stdin.write('{"type":"submit","id":"tool-turn","question":"Run uname","provider":"claude","capability":"tools"}\n');
+    child.stdin.write(`${JSON.stringify({ type: "submit", id: "tool-turn", question: "Run uname", provider, capability: "tools" })}\n`);
     await until(() => events.some((event) => event.type === "permission"));
     const permission = z.object({
       type: z.literal("permission"),
@@ -300,7 +300,7 @@ async function forbiddenAttempt(provider: "codex" | "opencode", extraEnv: NodeJS
   return events;
 }
 
-async function unsupportedCapability(provider: "codex" | "opencode", capability: "tools"): Promise<Record<string, unknown>[]> {
+async function unsupportedCapability(provider: "opencode", capability: "tools"): Promise<Record<string, unknown>[]> {
   const state = await mkdtemp(join(tmpdir(), "quickchat-unsupported-capability-")); roots.push(state);
   const child = spawn(resolve("runtime/bin/quickchat-broker"), [], {
     env: {

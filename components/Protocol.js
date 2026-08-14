@@ -135,6 +135,8 @@ function normalizedPermission(raw, currentRequestId) {
     requestId: requestId,
     title: String(value.title || (kind === "local_action" ? "Local action" : "Tool request")).slice(0, 120),
     kind: kind,
+    authority: value.authority === "device" || value.authority === "sandboxed" || value.authority === "local_action"
+      ? String(value.authority) : "device",
     detail: String(value.detail || "").slice(0, 3000),
     allowOnce: value.allowOnce === true
   }

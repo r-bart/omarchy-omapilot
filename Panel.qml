@@ -289,7 +289,8 @@ Panel {
                     Text {
                       Layout.fillWidth: true
                       text: Quickchat.QuickchatStore.pendingPermission
-                        ? "Allow once: " + Quickchat.QuickchatStore.pendingPermission.title : ""
+                        ? (Quickchat.QuickchatStore.pendingPermission.allowOnce ? "Allow once: " : "Blocked: ")
+                          + Quickchat.QuickchatStore.pendingPermission.title : ""
                       color: root.foreground
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.body
@@ -304,9 +305,12 @@ Panel {
                       Text {
                         Layout.fillWidth: true
                         text: Quickchat.QuickchatStore.pendingPermission
-                          && Quickchat.QuickchatStore.pendingPermission.kind === "local_action"
+                          && Quickchat.QuickchatStore.pendingPermission.authority === "local_action"
                           ? "Quickchat will ask Omarchy to launch this installed application once."
-                          : "This approval applies only to this call; sandbox limits stay active."
+                          : (Quickchat.QuickchatStore.pendingPermission
+                            && Quickchat.QuickchatStore.pendingPermission.authority === "sandboxed"
+                            ? "This approval applies only to this call; sandbox limits stay active."
+                            : "Review the command and working directory. Allow once may read or change device data and access the network.")
                         color: Qt.darker(root.foreground, 1.45)
                         font.family: root.fontFamily
                         font.pixelSize: Style.font.caption

@@ -95,10 +95,18 @@ export async function discoverProviders(env: NodeJS.ProcessEnv = process.env): P
     if (executable === undefined) continue;
     const lockdownFeatures = id === "codex" ? await codexToolLockdownFeatures(harnessPath, env) : undefined;
     if (id === "codex" && lockdownFeatures === undefined) continue;
-    // Codex read-only still exposes the host filesystem to shell commands and
-    // OpenCode cannot prove an equivalent sandbox. Claude is the only current
-    // harness whose sandbox can hide host paths and credential-bearing env.
-    const capabilities: Capability[] = id === "claude" ? ["answer", "web", "tools"] : ["answer", "web"];
+    // Codex exposes inspectable, nonce-bound command approvals through its
+    // pinned ACP adapter. Its read-only mode can still read host files, and an
+    // approved command may escape that sandbox, so the UI must describe Tools
+    // as device access rather than Claude's confined scratch workspace.
+    // OpenCode remains tool-disabled until its ACP path proves the same exact
+    // allow-once handshake without raw tool markup.
+    const codexToolsReady = id === "codex"
+      && lockdownFeatures?.includes("shell_tool") === true
+      && lockdownFeatures.includes("unified_exec");
+    const capabilities: Capability[] = id === "claude" || codexToolsReady
+      ? ["answer", "web", "tools"]
+      : ["answer", "web"];
     const providerVersion = await version(harnessPath, env);
     found.push({
       id,

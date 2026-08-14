@@ -26,7 +26,7 @@ describe("provider security profiles", () => {
     });
   });
 
-  it("keeps every Codex shell and local-tool feature disabled in every profile", () => {
+  it("enables only Codex shell execution in Tools while keeping every unrelated feature disabled", () => {
     const answer: unknown = JSON.parse(providerPolicyEnvironment(provider("codex"), "answer").CODEX_CONFIG ?? "{}");
     const web: unknown = JSON.parse(providerPolicyEnvironment(provider("codex"), "web").CODEX_CONFIG ?? "{}");
     const tools: unknown = JSON.parse(providerPolicyEnvironment(provider("codex"), "tools").CODEX_CONFIG ?? "{}");
@@ -45,7 +45,10 @@ describe("provider security profiles", () => {
       computer_use: false, js_repl: false, view_image: false
     });
     const toolFeatures = featureRecord(tools);
-    for (const feature of provider("codex").lockdownFeatures ?? []) expect(toolFeatures[feature]).toBe(false);
+    expect(toolFeatures).toMatchObject({ shell_tool: true, unified_exec: true });
+    for (const feature of provider("codex").lockdownFeatures ?? []) {
+      if (feature !== "shell_tool" && feature !== "unified_exec") expect(toolFeatures[feature]).toBe(false);
+    }
   });
 
   it("confines Claude Tools to a disposable local scratch space", () => {
@@ -115,7 +118,7 @@ describe("provider security profiles", () => {
     expect(providers.some((provider) => provider.id === "codex")).toBe(false);
   });
 
-  it("advertises Tools only for the confined Claude adapter", async () => {
+  it("advertises Tools only for providers with an inspectable allow-once boundary", async () => {
     const providers = await discoverProviders({
       ...process.env,
       PATH: `${resolve("runtime/test/fixtures/claude-auth")}:${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`,
@@ -123,7 +126,7 @@ describe("provider security profiles", () => {
       QUICKCHAT_CLAUDE_ACP: resolve("runtime/test/fake-acp-agent.mjs")
     });
     expect(providers.find((provider) => provider.id === "claude")?.capabilities).toEqual(["answer", "web", "tools"]);
-    expect(providers.find((provider) => provider.id === "codex")?.capabilities).toEqual(["answer", "web"]);
+    expect(providers.find((provider) => provider.id === "codex")?.capabilities).toEqual(["answer", "web", "tools"]);
     expect(providers.find((provider) => provider.id === "opencode")?.capabilities).toEqual(["answer", "web"]);
   });
 });
