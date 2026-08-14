@@ -298,46 +298,19 @@ Panel {
                       wrapMode: Text.Wrap
                     }
 
-                    RowLayout {
+                    Text {
                       Layout.fillWidth: true
-                      spacing: Style.spacing.md
-
-                      Text {
-                        Layout.fillWidth: true
-                        text: Quickchat.QuickchatStore.pendingPermission
-                          && Quickchat.QuickchatStore.pendingPermission.authority === "local_action"
-                          ? "Quickchat will ask Omarchy to launch this installed application once."
-                          : (Quickchat.QuickchatStore.pendingPermission
-                            && Quickchat.QuickchatStore.pendingPermission.authority === "sandboxed"
-                            ? "This approval applies only to this call; sandbox limits stay active."
-                            : "Review the command and working directory. Allow once may read or change device data and access the network.")
-                        color: Qt.darker(root.foreground, 1.45)
-                        font.family: root.fontFamily
-                        font.pixelSize: Style.font.caption
-                      }
-
-                      Button {
-                        id: denyPermission
-                        text: "Deny"
-                        foreground: root.foreground
-                        background: root.surface
-                        bordered: true
-                        focusable: true
-                        onClicked: Quickchat.QuickchatStore.respondPermission("reject_once")
-                      }
-
-                      Button {
-                        text: "Allow once"
-                        foreground: root.foreground
-                        background: root.surface
-                        accent: root.accent
-                        active: true
-                        bordered: true
-                        focusable: true
-                        enabled: Quickchat.QuickchatStore.pendingPermission
-                          && Quickchat.QuickchatStore.pendingPermission.allowOnce
-                        onClicked: Quickchat.QuickchatStore.respondPermission("allow_once")
-                      }
+                      text: Quickchat.QuickchatStore.pendingPermission
+                        && Quickchat.QuickchatStore.pendingPermission.authority === "local_action"
+                        ? "Quickchat will ask Omarchy to launch this installed application once."
+                        : (Quickchat.QuickchatStore.pendingPermission
+                          && Quickchat.QuickchatStore.pendingPermission.authority === "sandboxed"
+                          ? "This approval applies only to this call; sandbox limits stay active."
+                          : "Review the command and working directory. Allow once may read or change device data and access the network.")
+                      color: Qt.darker(root.foreground, 1.45)
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      wrapMode: Text.Wrap
                     }
 
                     Flickable {
@@ -361,6 +334,36 @@ Panel {
                         textFormat: Text.PlainText
                         readOnly: true
                         selectByMouse: true
+                      }
+                    }
+
+                    RowLayout {
+                      Layout.fillWidth: true
+                      spacing: Style.spacing.md
+
+                      Item { Layout.fillWidth: true }
+
+                      Button {
+                        id: denyPermission
+                        text: "Deny"
+                        foreground: root.foreground
+                        background: root.surface
+                        bordered: true
+                        focusable: true
+                        onClicked: Quickchat.QuickchatStore.respondPermission("reject_once")
+                      }
+
+                      Button {
+                        text: "Allow once"
+                        foreground: root.foreground
+                        background: root.surface
+                        accent: root.accent
+                        active: true
+                        bordered: true
+                        focusable: true
+                        enabled: Quickchat.QuickchatStore.pendingPermission
+                          && Quickchat.QuickchatStore.pendingPermission.allowOnce
+                        onClicked: Quickchat.QuickchatStore.respondPermission("allow_once")
                       }
                     }
 
