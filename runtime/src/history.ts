@@ -105,7 +105,18 @@ export function presentImage(image: StoredImage, paths: QuickchatPaths = quickch
 }
 
 export function presentChat(chat: ChatRecord, paths: QuickchatPaths = quickchatPaths()): ChatView {
-  return { ...chat, images: chat.images.map((image) => presentImage(image, paths)) };
+  return {
+    schemaVersion: chat.schemaVersion,
+    id: chat.id,
+    createdAt: chat.createdAt,
+    title: chat.title,
+    provider: chat.provider,
+    ...(chat.model === undefined ? {} : { model: chat.model }),
+    question: chat.question,
+    answer: chat.answer,
+    images: chat.images.map((image) => presentImage(image, paths)),
+    session: chat.session
+  };
 }
 
 function isUuid(value: string): boolean {

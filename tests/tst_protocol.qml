@@ -12,33 +12,51 @@ TestCase {
   }
 
   function test_protocolCompatibilityFailsClosed() {
-    verify(Protocol.isCompatibleEvent({ protocolVersion: 1 }))
-    verify(!Protocol.isCompatibleEvent({ protocolVersion: 2 }))
+    compare(Protocol.protocolVersion, 2)
+    verify(Protocol.isCompatibleEvent({ protocolVersion: 2 }))
+    verify(!Protocol.isCompatibleEvent({ protocolVersion: 1 }))
     verify(!Protocol.isCompatibleEvent({}))
   }
 
-  function test_providerContractUsesCapabilitiesAndNamedModels() {
+  function test_providerContractUsesNamedModelsWithoutCapabilities() {
     var providers = Protocol.normalizeProviders([{
       id: "codex",
       ready: true,
-      capabilities: ["answer", "web", "tools"],
+      policy: { tools: "device-approval", web: "approved-command", hostReads: true },
       models: [{ id: "gpt-5", name: "GPT-5" }]
     }, {
       id: "claude",
       ready: true,
-      capabilities: ["answer", "web", "tools"]
+      policy: { tools: "sandboxed", web: "search", hostReads: false }
     }, {
       id: "opencode",
       ready: true,
-      capabilities: ["answer", "web"]
+      policy: { tools: "blocked", web: "search", hostReads: false }
     }])
     compare(providers.length, 3)
     compare(providers[0].value, "codex")
     compare(providers[0].models[0].label, "GPT-5")
-    verify(Protocol.providerSupportsWeb(providers, "codex"))
-    verify(Protocol.providerSupportsTools(providers, "codex"))
-    verify(Protocol.providerSupportsTools(providers, "claude"))
-    verify(!Protocol.providerSupportsTools(providers, "opencode"))
+    compare(providers[0].policy.tools, "device-approval")
+    compare(providers[0].policy.web, "approved-command")
+    verify(providers[0].policy.hostReads)
+    compare(providers[1].policy.tools, "sandboxed")
+    compare(providers[1].policy.web, "search")
+    verify(!providers[1].policy.hostReads)
+    compare(providers[2].policy.tools, "blocked")
+    compare(providers[2].policy.web, "search")
+    verify(!providers[2].policy.hostReads)
+    verify(providers[0].capabilities === undefined)
+  }
+
+  function test_providerPolicyDefaultsFailClosed() {
+    var policy = Protocol.normalizedProviderPolicy({ tools: "unknown", web: "unknown", hostReads: "yes" })
+    compare(policy.tools, "blocked")
+    compare(policy.web, "blocked")
+    verify(!policy.hostReads)
+    var missing = Protocol.providerPolicy(Protocol.normalizeProviders([{ id: "codex" }]), "missing")
+    compare(missing.tools, "blocked")
+    compare(missing.web, "blocked")
+    verify(!missing.hostReads)
   }
 
   function test_toolPermissionIsBoundToCurrentTurn() {
@@ -51,27 +69,18 @@ TestCase {
     verify(permission.allowOnce)
     compare(Protocol.normalizedPermission({ id: "permission-1", requestId: "other", kind: "execute" }, "turn-1"), null)
     compare(Protocol.normalizedPermission({ id: "permission-1", requestId: "turn-1", kind: "edit" }, "turn-1"), null)
-  }
-
-  function test_localActionPermissionIsBoundToCurrentTurn() {
-    var permission = Protocol.normalizedPermission({
-      id: "permission-2", requestId: "turn-2", title: "Launch Zoom",
-      kind: "local_action", authority: "local_action", detail: "Zoom.desktop", allowOnce: true
-    }, "turn-2")
-    compare(permission.kind, "local_action")
-    compare(permission.authority, "local_action")
-    compare(permission.title, "Launch Zoom")
-    compare(Protocol.normalizedPermission({ id: "permission-2", requestId: "other", kind: "local_action" }, "turn-2"), null)
-    compare(Protocol.normalizedPermission({ id: "permission-2", requestId: "turn-2", kind: "arbitrary_action" }, "turn-2"), null)
+    compare(Protocol.normalizedPermission({ id: "permission-1", requestId: "turn-1", kind: "local_action" }, "turn-1"), null)
   }
 
   function test_defaultSubmitOmitsEmptyModel() {
-    var payload = Protocol.submitCommand("1", "Hello", "codex", "", "answer")
+    var payload = Protocol.submitCommand("1", "Hello", "codex", "")
     compare(payload.type, "submit")
     compare(payload.provider, "codex")
     verify(payload.model === undefined)
-    payload = Protocol.submitCommand("2", "Hello", "claude", " opus ", "web")
+    verify(payload.capability === undefined)
+    payload = Protocol.submitCommand("2", "Hello", "claude", " opus ")
     compare(payload.model, "opus")
+    verify(payload.capability === undefined)
   }
 
   function test_markdownImagesRequireExplicitLoading() {
@@ -152,6 +161,7 @@ TestCase {
       id: String(i),
       question: "Question " + i,
       answer: "Answer " + i,
+      capability: "tools",
       createdAt: "2026-08-11T12:00:00Z",
       session: { resumable: i === 0 }
     })
@@ -159,5 +169,6 @@ TestCase {
     compare(rows.length, 30)
     compare(rows[0].timestamp, "2026-08-11T12:00:00Z")
     verify(rows[0].resumable)
+    verify(rows[0].capability === undefined)
   }
 }

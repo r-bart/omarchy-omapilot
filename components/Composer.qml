@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
+import "Protocol.js" as Protocol
 
 Item {
   id: root
@@ -92,7 +93,6 @@ Item {
       verticalPadding: Style.spacing.xxs
       Accessible.name: "Quickchat question"
       onTextEdited: {
-        if (root.backend) root.backend.prepareDraft()
         root.draftText = text
       }
       onAccepted: root.submit()
@@ -177,38 +177,28 @@ Item {
         }
       }
 
-      ButtonGroup {
-        Layout.alignment: Qt.AlignVCenter
-        enabled: root.backend && !root.backend.busy
-        options: root.backend && root.backend.toolsSupported ? [
-          { value: "answer", label: "Answer", tooltip: "Answer without tools" },
-          { value: "web", label: "Web", tooltip: root.backend.webSupported ? "Allow web search only" : "Web is unavailable for this selection" },
-          { value: "tools", label: "Tools", tooltip: root.backend.provider === "claude"
-            ? "Run isolated commands in a disposable Claude workspace"
-            : "Run commands with current-user device authority" }
-        ] : [
-          { value: "answer", label: "Answer", tooltip: "Answer without tools" },
-          { value: "web", label: "Web", tooltip: root.backend && root.backend.webSupported ? "Allow web search only" : "Web is unavailable for this selection" }
-        ]
-        value: root.backend ? root.backend.capability : "answer"
-        foreground: root.foreground
-        background: root.background
-        onChanged: function(value) {
-          if (value === "web" && !root.backend.webSupported) return
-          if (value === "tools" && !root.backend.toolsSupported) return
-          root.backend.selectCapability(value)
-        }
-      }
     }
 
     Text {
       Layout.fillWidth: true
-      visible: root.backend && (root.backend.modelOptions.length === 0 || root.backend.capability === "tools")
-      text: root.backend && root.backend.capability === "tools"
-        ? (root.backend.provider === "claude"
-          ? "Claude Tools uses disposable scratch; host data, credentials, network, and outside writes stay blocked."
-          : "Codex Tools may read any user-readable file without asking; output is sent to Codex and saved. Broader access needs Allow once.")
-        : "Using the harness default. This harness did not expose a model catalog."
+      visible: root.backend
+      text: !root.backend ? "" : root.backend.providerPolicy.tools === "sandboxed"
+        ? Protocol.providerLabel(root.backend.provider) + " chooses when to search the web or use disposable scratch. Host files, credentials, direct network access, and outside writes stay blocked."
+        : root.backend.providerPolicy.tools === "blocked"
+          ? Protocol.providerLabel(root.backend.provider) + " chooses when to search the web. Device commands stay blocked until its harness can present an exact approval."
+          : Protocol.providerLabel(root.backend.provider) + " uses device tools when useful. It may read user-readable files; network access and broader commands require Allow once."
+      color: Qt.darker(root.foreground, 1.45)
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      wrapMode: Text.Wrap
+      Accessible.role: Accessible.StaticText
+      Accessible.name: text
+    }
+
+    Text {
+      Layout.fillWidth: true
+      visible: root.backend && root.backend.modelOptions.length === 0
+      text: "Using the harness default. This harness did not expose a model catalog."
       color: Qt.darker(root.foreground, 1.45)
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
@@ -244,7 +234,6 @@ Item {
         background: null
         Accessible.name: "Quickchat question"
         onTextEdited: {
-          if (root.backend) root.backend.prepareDraft()
           root.draftText = text
         }
 

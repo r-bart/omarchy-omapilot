@@ -2,8 +2,6 @@ import { z } from "zod";
 
 export const providerIdSchema = z.enum(["codex", "claude", "opencode"]);
 export type ProviderId = z.infer<typeof providerIdSchema>;
-export const capabilitySchema = z.enum(["answer", "web", "tools"]);
-export type Capability = z.infer<typeof capabilitySchema>;
 
 const initializeCommand = z.object({
   type: z.literal("initialize"),
@@ -15,8 +13,7 @@ const submitCommand = z.object({
   id: z.string().min(1).max(120),
   question: z.string().trim().min(1).max(100_000),
   provider: providerIdSchema,
-  model: z.preprocess((value) => typeof value === "string" && value.trim() === "" ? undefined : value, z.string().min(1).max(500).optional()),
-  capability: capabilitySchema.default("answer")
+  model: z.preprocess((value) => typeof value === "string" && value.trim() === "" ? undefined : value, z.string().min(1).max(500).optional())
 });
 const cancelCommand = z.object({ type: z.literal("cancel"), id: z.string().min(1).max(120) });
 const permissionResponseCommand = z.object({
@@ -44,13 +41,18 @@ export const commandSchema = z.discriminatedUnion("type", [
 export type BrokerCommand = z.infer<typeof commandSchema>;
 
 export type ModelOption = { id: string; name: string; description?: string };
+export type ProviderPolicyInfo = {
+  tools: "device-approval" | "sandboxed" | "blocked";
+  web: "approved-command" | "search" | "blocked";
+  hostReads: boolean;
+};
 export type ProviderInfo = {
   id: ProviderId;
   name: string;
   version?: string;
   models: ModelOption[];
   defaultModel?: string;
-  capabilities: Capability[];
+  policy: ProviderPolicyInfo;
 };
 
 export type StoredImage = {
@@ -69,8 +71,8 @@ export type ToolPermission = {
   id: string;
   requestId: string;
   title: string;
-  kind: "execute" | "local_action";
-  authority: "device" | "sandboxed" | "local_action";
+  kind: "execute";
+  authority: "device" | "sandboxed";
   detail: string;
   allowOnce: boolean;
 };
@@ -82,7 +84,6 @@ export type ChatRecord = {
   title: string;
   provider: ProviderId;
   model?: string;
-  capability: Capability;
   question: string;
   answer: string;
   images: StoredImage[];
@@ -97,7 +98,7 @@ export type ChatRecord = {
 export type ChatView = Omit<ChatRecord, "images"> & { images: RenderableImage[] };
 
 export type BrokerEvent =
-  | { type: "ready"; protocolVersion: 1; providers: ProviderInfo[]; history: ChatView[] }
+  | { type: "ready"; protocolVersion: 2; providers: ProviderInfo[]; history: ChatView[] }
   | { type: "providers"; providers: ProviderInfo[] }
   | { type: "state"; id?: string; state: "idle" | "preparing" | "streaming" | "stopping"; message?: string }
   | { type: "content"; id: string; delta: string }

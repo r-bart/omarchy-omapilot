@@ -30,8 +30,26 @@ grep -Fq 'if (providers.length > 0) selectProvider(provider)' \
 test "$(grep -Fc 'root.pendingPermission = null' "$repo_dir/components/QuickchatStore.qml")" -ge 2
 test "$(grep -Fc 'root.permissionQueue = []' "$repo_dir/components/QuickchatStore.qml")" -ge 2
 grep -Fq 'signal escapeRequested()' "$repo_dir/components/Composer.qml"
-grep -Fq 'Codex Tools may read any user-readable file without asking' \
+grep -Fq 'uses device tools when useful. It may read user-readable files; network access and broader commands require Allow once.' \
   "$repo_dir/components/Composer.qml"
+grep -Fq 'chooses when to search the web or use disposable scratch. Host files, credentials, direct network access, and outside writes stay blocked.' \
+  "$repo_dir/components/Composer.qml"
+grep -Fq 'chooses when to search the web. Device commands stay blocked until its harness can present an exact approval.' \
+  "$repo_dir/components/Composer.qml"
+grep -Fq 'root.backend.providerPolicy.tools === "sandboxed"' "$repo_dir/components/Composer.qml"
+grep -Fq 'root.backend.providerPolicy.tools === "blocked"' "$repo_dir/components/Composer.qml"
+if grep -Fq 'ButtonGroup {' "$repo_dir/components/Composer.qml"; then
+  printf 'Composer must not expose a capability mode selector\n' >&2
+  exit 1
+fi
+if grep -Fqi 'capability' "$repo_dir/components/Protocol.js" "$repo_dir/components/QuickchatStore.qml"; then
+  printf 'QML protocol and store must not expose capability helpers or fields\n' >&2
+  exit 1
+fi
+if grep -Fqi 'local_action' "$repo_dir/Panel.qml" "$repo_dir/components/Protocol.js" "$repo_dir/components/QuickchatStore.qml"; then
+  printf 'QML must not expose hardcoded local-action routing\n' >&2
+  exit 1
+fi
 grep -Fq 'visible: !root.backend || root.backend.pendingPermission === null' \
   "$repo_dir/components/Composer.qml"
 grep -Fq 'QuickchatStore.pendingPermission.authority === "sandboxed"' \

@@ -32,37 +32,34 @@ The UI sends commands whose `type` is one of `initialize`, `submit`, `cancel`, `
 
 The broker emits events whose `type` is one of `ready`, `providers`, `state`, `content`, `permission`, `permission_closed`, `image`, `complete`, `error`, `dictation`, `history`, `herdr`, `link`, or `copied`. The broker's protocol tests are authoritative for exact fields and version negotiation.
 
-ACP is the broker's normalization boundary, not the policy boundary. Each
-harness receives its own fail-closed configuration. Answer and Web reject ACP
-permission requests. Codex Tools keeps the pinned adapter's read-only,
-network-disabled, on-request mode. It may read any user-readable host file
-without asking; tool output is sent to Codex and may be retained in the saved
-answer. Each broader-access request is bound to a broker nonce. The UI exposes only
-provider-native allow-once or reject-once; approval may run that command with
-current-user device and network authority. Claude Tools instead uses a
-disposable workspace that dynamically denies every existing top-level host path
-except system executable/library roots, hides credential-bearing environment
-variables, blocks network, and confines writes to per-turn scratch space.
-Commands inside that boundary may run automatically. Any exact, classifiable
-Claude permission accepts a broker-bound allow-once or reject-once decision
-without relaxing its hard sandbox. OpenCode does not advertise Tools.
+ACP is the broker's normalization boundary, not the policy boundary. The submit
+command contains provider/model/question only; the broker derives one automatic,
+fail-closed policy for that provider. Codex keeps the pinned adapter's read-only,
+on-request mode, disables native web search, and exposes only its strictly validated
+shell/unified-exec features. It may read any user-readable host file without
+asking; tool output is sent to Codex and may be retained in the saved answer.
+Each broader-access request is bound to a broker nonce. The UI exposes only
+provider-native allow-once or reject-once; approval may run that exact command
+with current-user device and network authority. Claude uses a disposable
+workspace that dynamically denies every existing top-level host path except
+system executable/library roots, hides credential-bearing environment variables,
+blocks direct process network access and WebFetch, confines writes to per-turn
+scratch, and allows WebSearch. Commands inside that boundary may run
+automatically. Any exact, classifiable Claude permission accepts a broker-bound
+allow-once or reject-once decision without relaxing the hard sandbox. OpenCode
+receives only websearch permission; fetch/device-tool permissions and raw
+tool-call markup fail closed until an inspectable approval path is proven.
 Unclassified tool kinds fail closed. Raw tool requests,
 decisions, updates, and outputs remain ephemeral, while the completed answer may
 contain tool-derived text and is retained like any other answer. Continue in Herdr intentionally leaves that one-shot boundary and
 hands the resumable session or transcript to Herdr, which becomes the authority
 for native-agent permissions and lifecycle.
 
-Application launch is a broker-owned action, not an ACP capability. An anchored
-imperative prompt may resolve to one exact visible XDG desktop entry. The broker
-then pauses on a nonce-bound allow-once permission and, only after approval,
-uses Omarchy's detached `uwsm-app -- gtk-launch <desktop-id>` argv contract. A
-bounded detached `gio launch <desktop-file>` fallback exists only when the host
-path is unavailable. It never evaluates the entry's `Exec` field or passes
-prompt/model text to a shell. The acknowledgement is ephemeral and does not
-enter history or Herdr; denial, expiry, cancellation, and launch failure produce
-stable events. Unresolved phrases continue through the selected ACP capability
-profile instead of being misclassified as launch failures.
+The broker does not classify prompt text into action-specific code paths.
+Questions and action requests use the same ACP submission contract; the
+selected harness decides whether a tool is needed under its fixed policy, and
+the broker only mediates structured, request-bound permission events.
 
 ## Compatibility rule
 
-The protocol and release metadata are versioned independently of the manifest schema. The plugin must show an actionable incompatibility error when the cached runtime cannot negotiate its supported protocol; it must not guess at provider output or silently broaden permissions.
+The protocol and release metadata are versioned independently of the manifest schema. Protocol 2 removes user-selected capability fields and makes the broker's automatic provider policy authoritative; legacy stored protocol-1 chats remain readable and are projected into the protocol-2 public shape. The plugin must show an actionable incompatibility error when the cached runtime cannot negotiate its supported protocol; it must not guess at provider output or silently broaden permissions.

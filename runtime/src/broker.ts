@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import type { AcpRun } from "./acp.js";
-import { DesktopActionService, type LocalActionClient, type LocalLaunchAction } from "./actions.js";
 import { BrokerAcpError, deleteAcpSession, probeAcpModels, runAcpQuestion } from "./acp.js";
 import { DictationService } from "./dictation.js";
 import { HistoryStore, presentChat, presentImage } from "./history.js";
@@ -31,18 +30,16 @@ export class QuickchatBroker {
   readonly #herdrContinue: HerdrContinue;
   readonly #env: NodeJS.ProcessEnv;
   readonly #permissionTimeoutMs: number;
-  readonly #localActions: LocalActionClient;
   #providers = new Map<string, DiscoveredProvider>();
   #runs = new Map<string, AcpRun>();
   #handoffs = new Map<string, Promise<void>>();
   #permissions = new Map<string, PermissionWaiter>();
-  #pendingLocalActions = new Map<string, AbortController>();
   #submissions = new Set<string>();
   #dictationGeneration = 0;
 
   constructor(
     emit: (event: BrokerEvent) => void,
-    options: { history?: HistoryStore; images?: ImageStore; dictation?: DictationClient; sessionCleaner?: SessionCleaner; herdrContinue?: HerdrContinue; localActions?: LocalActionClient; env?: NodeJS.ProcessEnv; permissionTimeoutMs?: number } = {}
+    options: { history?: HistoryStore; images?: ImageStore; dictation?: DictationClient; sessionCleaner?: SessionCleaner; herdrContinue?: HerdrContinue; env?: NodeJS.ProcessEnv; permissionTimeoutMs?: number } = {}
   ) {
     this.#emit = emit;
     this.#history = options.history ?? new HistoryStore();
@@ -52,7 +49,6 @@ export class QuickchatBroker {
     this.#herdrContinue = options.herdrContinue ?? continueInHerdr;
     this.#env = options.env ?? process.env;
     this.#permissionTimeoutMs = options.permissionTimeoutMs ?? 60_000;
-    this.#localActions = options.localActions ?? new DesktopActionService(this.#env);
   }
 
   async handle(command: BrokerCommand): Promise<boolean> {
@@ -87,8 +83,8 @@ export class QuickchatBroker {
   }
 
   async #initialize(command: Extract<BrokerCommand, { type: "initialize" }>): Promise<void> {
-    if (command.protocolVersion !== 1) {
-      this.#error("unsupported_protocol", "Quickchat supports broker protocol version 1", false);
+    if (command.protocolVersion !== 2) {
+      this.#error("unsupported_protocol", "Quickchat supports broker protocol version 2", false);
       return;
     }
     const discovered = await discoverProviders(this.#env);
@@ -100,7 +96,7 @@ export class QuickchatBroker {
     }));
     this.#providers = new Map(discovered.map((provider) => [provider.id, provider]));
     const history = (await this.#history.list()).map((chat) => presentChat(chat));
-    this.#emit({ type: "ready", protocolVersion: 1, providers: discovered.map(publicProvider), history });
+    this.#emit({ type: "ready", protocolVersion: 2, providers: discovered.map(publicProvider), history });
   }
 
   async #submit(command: Extract<BrokerCommand, { type: "submit" }>): Promise<void> {
@@ -116,15 +112,9 @@ export class QuickchatBroker {
   async #submitOnce(command: Extract<BrokerCommand, { type: "submit" }>): Promise<void> {
     const provider = this.#providers.get(command.provider);
     if (provider === undefined) { this.#error("provider_unavailable", "The selected harness is not installed and authenticated", false, command.id); return; }
-    if (!provider.capabilities.includes(command.capability)) { this.#error("capability_unavailable", "This harness cannot safely enforce the selected capability", false, command.id); return; }
-    const action = await this.#localActions.resolve(command.question);
-    if (action.kind === "launch") {
-      await this.#submitLocalAction(command, action.action);
-      return;
-    }
     this.#emit({ type: "state", id: command.id, state: "preparing", message: `Preparing ${provider.name}…` });
     const run = runAcpQuestion(
-      provider, command.id, command.question, command.model, command.capability,
+      provider, command.id, command.question, command.model,
       this.#emit, 90_000, this.#images,
       (request) => this.#requestToolPermission(command.id, provider.id, request),
       () => this.#cancelPermissions(command.id)
@@ -146,7 +136,6 @@ export class QuickchatBroker {
         title: command.question.replaceAll(/\s+/g, " ").slice(0, 80),
         provider: provider.id,
         ...(selectedModel === undefined ? {} : { model: selectedModel }),
-        capability: command.capability,
         question: command.question,
         answer: result.answer,
         images: result.images,
@@ -168,68 +157,6 @@ export class QuickchatBroker {
       this.#cancelPermissions(command.id);
       this.#runs.delete(command.id);
     }
-  }
-
-  async #submitLocalAction(
-    command: Extract<BrokerCommand, { type: "submit" }>,
-    action: LocalLaunchAction
-  ): Promise<void> {
-    const controller = new AbortController();
-    this.#pendingLocalActions.set(command.id, controller);
-    this.#emit({ type: "state", id: command.id, state: "streaming", message: "Waiting for action approval…" });
-    try {
-      const approved = await this.#requestLocalActionPermission(command.id, action);
-      if (!approved || controller.signal.aborted) {
-        this.#error("cancelled", "Launch canceled", false, command.id);
-        return;
-      }
-      this.#emit({ type: "state", id: command.id, state: "preparing", message: `Opening ${action.appName}…` });
-      if (!await this.#localActions.launch(action, controller.signal)) {
-        if (controller.signal.aborted) {
-          this.#error("cancelled", "Launch canceled", false, command.id);
-          return;
-        }
-        this.#error("app_launch_failed", `Quickchat could not open ${action.appName}`, true, command.id);
-        return;
-      }
-      const answer = `Opened ${action.appName}.`;
-      this.#emit({ type: "content", id: command.id, delta: answer });
-      this.#emit({ type: "complete", id: command.id, answer });
-      this.#emit({ type: "state", id: command.id, state: "idle" });
-    } finally {
-      this.#cancelPermissions(command.id);
-      if (this.#pendingLocalActions.get(command.id) === controller) this.#pendingLocalActions.delete(command.id);
-    }
-  }
-
-  async #requestLocalActionPermission(requestId: string, action: LocalLaunchAction): Promise<boolean> {
-    const permissionId = randomUUID();
-    const allowOptionId = "local-action-allow";
-    const view = {
-      id: permissionId,
-      requestId,
-      title: `Launch ${action.appName}`,
-      kind: "local_action" as const,
-      authority: "local_action" as const,
-      detail: JSON.stringify({ action: "launch_app", app: action.appName, desktopId: action.desktopId, desktopFile: action.desktopFile }, null, 2),
-      allowOnce: true
-    };
-    return new Promise<boolean>((resolvePermission) => {
-      const timeout = setTimeout(() => {
-        this.#permissions.delete(permissionId);
-        this.#emit({ type: "permission_closed", id: requestId, permissionId, reason: "expired" });
-        resolvePermission(false);
-      }, this.#permissionTimeoutMs);
-      timeout.unref();
-      this.#permissions.set(permissionId, {
-        view,
-        allowOptionId,
-        rejectOptionId: "local-action-reject",
-        resolve: (optionId) => resolvePermission(optionId === allowOptionId),
-        timeout
-      });
-      this.#emit({ type: "permission", permission: view });
-    });
   }
 
   async #requestToolPermission(requestId: string, provider: ProviderId, request: RequestPermissionRequest): Promise<string | undefined> {
@@ -270,14 +197,9 @@ export class QuickchatBroker {
 
   async #cancel(id: string): Promise<void> {
     const run = this.#runs.get(id);
-    const localAction = this.#pendingLocalActions.get(id);
-    if (run === undefined && localAction === undefined) return;
+    if (run === undefined) return;
     this.#emit({ type: "state", id, state: "stopping" });
-    if (run !== undefined) await run.cancel();
-    else {
-      localAction?.abort();
-      this.#cancelPermissions(id);
-    }
+    await run.cancel();
   }
 
   async #emitHistory(): Promise<void> {
@@ -379,7 +301,7 @@ function publicProvider(provider: DiscoveredProvider): ProviderInfo {
     id: provider.id,
     name: provider.name,
     models: provider.models,
-    capabilities: provider.capabilities,
+    policy: provider.policy,
     ...(provider.version === undefined ? {} : { version: provider.version }),
     ...(provider.defaultModel === undefined ? {} : { defaultModel: provider.defaultModel })
   };

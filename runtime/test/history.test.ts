@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readdir, rm, truncate, utimes, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { HistoryStore } from "../src/history.js";
+import { HistoryStore, presentChat } from "../src/history.js";
 import { quickchatPaths } from "../src/paths.js";
 import type { ChatRecord, StoredImage } from "../src/types.js";
 
@@ -33,6 +33,20 @@ describe("history store", () => {
     await store.save(record(2));
     expect((await store.clear()).map((chat) => chat.id)).toEqual([record(2).id]);
     expect(await store.list()).toEqual([]);
+  });
+
+  it("loads a legacy capability field but strips it from presented history", async () => {
+    const root = await mkdtemp(join(tmpdir(), "quickchat-history-legacy-")); roots.push(root);
+    const paths = quickchatPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
+    const store = new HistoryStore(paths);
+    const legacy = { ...record(3), capability: "tools" };
+    await mkdir(paths.records, { recursive: true });
+    await writeFile(join(paths.records, `${legacy.id}.json`), `${JSON.stringify(legacy)}\n`);
+    const records = await store.list();
+    expect(records).toHaveLength(1);
+    expect(records[0]?.id).toBe(legacy.id);
+    if (records[0] === undefined) throw new Error("legacy chat did not load");
+    expect(presentChat(records[0])).not.toHaveProperty("capability");
   });
 
   it("removes evicted cache images from retained chat records", async () => {
@@ -67,7 +81,7 @@ function record(index: number): ChatRecord {
   const suffix = index.toString(16).padStart(12, "0");
   return {
     schemaVersion: 1, id: `00000000-0000-4000-8000-${suffix}`, createdAt: new Date(Date.UTC(2026, 7, 11, 0, 0, index)).toISOString(),
-    title: `Chat ${String(index)}`, provider: "codex", capability: "answer", question: "Q", answer: "A", images: [],
+    title: `Chat ${String(index)}`, provider: "codex", question: "Q", answer: "A", images: [],
     session: { resumable: false, resumeKind: "transcript" }
   };
 }

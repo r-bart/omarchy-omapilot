@@ -2,7 +2,7 @@ import { access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Capability, ProviderId, ProviderInfo } from "./types.js";
+import type { ProviderId, ProviderInfo, ProviderPolicyInfo } from "./types.js";
 import { quickchatPaths } from "./paths.js";
 import { resolveExecutable, runCommand, stripAnsi } from "./process.js";
 
@@ -13,6 +13,12 @@ const providerNames: Record<ProviderId, string> = {
   codex: "Codex",
   claude: "Claude",
   opencode: "OpenCode"
+};
+
+const providerPolicies: Record<ProviderId, ProviderPolicyInfo> = {
+  codex: { tools: "device-approval", web: "approved-command", hostReads: true },
+  claude: { tools: "sandboxed", web: "search", hostReads: false },
+  opencode: { tools: "blocked", web: "search", hostReads: false }
 };
 
 async function isExecutable(path: string): Promise<boolean> {
@@ -95,25 +101,20 @@ export async function discoverProviders(env: NodeJS.ProcessEnv = process.env): P
     if (executable === undefined) continue;
     const lockdownFeatures = id === "codex" ? await codexToolLockdownFeatures(harnessPath, env) : undefined;
     if (id === "codex" && lockdownFeatures === undefined) continue;
-    // Codex exposes inspectable, nonce-bound command approvals through its
-    // pinned ACP adapter. Its read-only mode can still read host files, and an
-    // approved command may escape that sandbox, so the UI must describe Tools
-    // as device access rather than Claude's confined scratch workspace.
-    // OpenCode remains tool-disabled until its ACP path proves the same exact
-    // allow-once handshake without raw tool markup.
-    const codexToolsReady = id === "codex"
-      && lockdownFeatures?.includes("shell_tool") === true
-      && lockdownFeatures.includes("unified_exec");
-    const capabilities: Capability[] = id === "claude" || codexToolsReady
-      ? ["answer", "web", "tools"]
-      : ["answer", "web"];
+    // Automatic Codex requires the complete reviewed command boundary. Do not
+    // advertise a degraded text-only Codex provider if the installed harness
+    // cannot prove both execution features under strict configuration.
+    if (id === "codex" && (
+      lockdownFeatures?.includes("shell_tool") !== true
+      || !lockdownFeatures.includes("unified_exec")
+    )) continue;
     const providerVersion = await version(harnessPath, env);
     found.push({
       id,
       name: providerNames[id],
       ...(providerVersion === undefined ? {} : { version: providerVersion }),
       models: [],
-      capabilities,
+      policy: providerPolicies[id],
       harnessPath,
       agent: { executable, args, env: agentEnvironment(id, harnessPath, env) },
       ...(lockdownFeatures === undefined ? {} : { lockdownFeatures })
