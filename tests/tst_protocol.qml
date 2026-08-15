@@ -57,6 +57,9 @@ TestCase {
     compare(missing.tools, "blocked")
     compare(missing.web, "blocked")
     verify(!missing.hostReads)
+    compare(Protocol.providerPolicyDescription("opencode", missing), "OpenCode runs without web or device tools.")
+    verify(Protocol.providerPolicyDescription("opencode", { tools: "blocked", web: "search", hostReads: false }).indexOf("can search the web") >= 0)
+    verify(Protocol.providerPolicyDescription("claude", { tools: "sandboxed", web: "blocked", hostReads: false }).indexOf("search the web") < 0)
   }
 
   function test_toolPermissionIsBoundToCurrentTurn() {

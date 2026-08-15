@@ -182,11 +182,7 @@ Item {
     Text {
       Layout.fillWidth: true
       visible: root.backend
-      text: !root.backend ? "" : root.backend.providerPolicy.tools === "sandboxed"
-        ? Protocol.providerLabel(root.backend.provider) + " chooses when to search the web or use disposable scratch. Host files, credentials, direct network access, and outside writes stay blocked."
-        : root.backend.providerPolicy.tools === "blocked"
-          ? Protocol.providerLabel(root.backend.provider) + " chooses when to search the web. Device commands stay blocked until its harness can present an exact approval."
-          : Protocol.providerLabel(root.backend.provider) + " uses device tools when useful. It may read user-readable files; network access and broader commands require Allow once."
+      text: !root.backend ? "" : Protocol.providerPolicyDescription(root.backend.provider, root.backend.providerPolicy)
       color: Qt.darker(root.foreground, 1.45)
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption

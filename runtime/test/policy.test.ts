@@ -99,8 +99,8 @@ describe("provider security profiles", () => {
       .toEqual({ "*": "deny", websearch: "allow" });
   });
 
-  it.each(["search", "think"])("accepts automatic OpenCode %s tool updates", async (kind) => {
-    const fixture = await openCodeToolUpdateFixture(kind);
+  it.each(["other", "search"])("accepts exact OpenCode websearch identity with ACP kind %s", async (kind) => {
+    const fixture = await openCodeToolUpdateFixture(kind, "websearch");
     const events: BrokerEvent[] = [];
     try {
       const run = runAcpQuestion(fixture.provider, `allowed-${kind}`, "Use the approved tool", undefined, events.push.bind(events), 5_000);
@@ -109,18 +109,6 @@ describe("provider security profiles", () => {
       });
       expect(result).toMatchObject({ answer: "safe" });
       expect(events).toContainEqual({ type: "content", id: `allowed-${kind}`, delta: "safe" });
-    } finally {
-      await rm(fixture.root, { recursive: true, force: true });
-    }
-  });
-
-  it("accepts OpenCode's live-shaped other/websearch update", async () => {
-    const fixture = await openCodeToolUpdateFixture("other", "websearch");
-    const events: BrokerEvent[] = [];
-    try {
-      const result = await runAcpQuestion(fixture.provider, "allowed-websearch", "Search the web", undefined, events.push.bind(events), 5_000).result;
-      expect(result).toMatchObject({ answer: "safe" });
-      expect(events).toContainEqual({ type: "content", id: "allowed-websearch", delta: "safe" });
     } finally {
       await rm(fixture.root, { recursive: true, force: true });
     }
@@ -138,7 +126,7 @@ describe("provider security profiles", () => {
     }
   });
 
-  it.each(["read", "edit", "delete", "move", "execute", "fetch", "switch_mode", "other"])("rejects automatic OpenCode %s tool updates", async (kind) => {
+  it.each(["read", "edit", "delete", "move", "execute", "fetch", "switch_mode", "search", "think", "other"])("rejects unidentified OpenCode %s tool updates", async (kind) => {
     const fixture = await openCodeToolUpdateFixture(kind);
     const events: BrokerEvent[] = [];
     try {

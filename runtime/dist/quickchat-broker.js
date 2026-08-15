@@ -18531,13 +18531,12 @@ function openCodeToolUpdateAllowed(update, allowedCalls) {
     return true;
   }
   if (!allowedCalls.has(toolCallId)) return false;
-  if (update.kind !== void 0 && update.kind !== null && update.kind !== "search" && update.kind !== "think" && update.kind !== "other") return false;
+  if (update.kind !== void 0 && update.kind !== null && update.kind !== "search" && update.kind !== "other") return false;
   if (update.name !== void 0 && update.name !== null && update.name !== "websearch") return false;
   return true;
 }
 function isAllowedOpenCodeTool(update) {
-  if (update.kind === "search" || update.kind === "think") return true;
-  return update.kind === "other" && (update.name === "websearch" || update.title === "websearch");
+  return (update.kind === "other" || update.kind === "search") && (update.name === "websearch" || update.title === "websearch");
 }
 function forbiddenToolError() {
   return new BrokerAcpError("forbidden_tool_attempt", "The selected harness attempted a device tool that Quickchat cannot safely authorize", false);

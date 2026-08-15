@@ -105,6 +105,24 @@ function providerPolicy(providers, provider) {
   return normalizedProviderPolicy(null)
 }
 
+function providerPolicyDescription(provider, rawPolicy) {
+  var label = providerLabel(provider) || "This harness"
+  var policy = normalizedProviderPolicy(rawPolicy)
+  if (policy.tools === "sandboxed") {
+    var searchClause = policy.web === "search" ? " and can search the web" : ""
+    return label + " uses tools in disposable scratch" + searchClause
+      + ". Host files, credentials, direct command network access, and outside writes stay blocked."
+  }
+  if (policy.tools === "blocked") {
+    return policy.web === "search"
+      ? label + " can search the web. Device commands stay blocked until its harness can present an exact approval."
+      : label + " runs without web or device tools."
+  }
+  return policy.web === "approved-command"
+    ? label + " uses device tools when useful. It may read user-readable files; network access and broader commands require Allow once."
+    : label + " uses device tools when useful. It may read user-readable files; broader commands require Allow once."
+}
+
 function modelOptions(providers, provider) {
   var rows = Array.isArray(providers) ? providers : []
   for (var i = 0; i < rows.length; i++) {

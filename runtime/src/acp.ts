@@ -529,17 +529,19 @@ function openCodeToolUpdateAllowed(
   // exact tool identity authoritative, but reject a later structural
   // reclassification to a device/fetch kind or a different programmatic name.
   if (update.kind !== undefined && update.kind !== null
-      && update.kind !== "search" && update.kind !== "think" && update.kind !== "other") return false;
+      && update.kind !== "search" && update.kind !== "other") return false;
   if (update.name !== undefined && update.name !== null && update.name !== "websearch") return false;
   return true;
 }
 
 function isAllowedOpenCodeTool(update: { kind?: string | null; name?: string | null; title?: string | null }): boolean {
-  if (update.kind === "search" || update.kind === "think") return true;
   // OpenCode 1.18 reports its permission-keyed `websearch` tool as ACP kind
-  // `other`, with the exact tool key in the title. Require that exact
-  // structural identifier in addition to OPENCODE_PERMISSION's deny-all rule.
-  return update.kind === "other" && (update.name === "websearch" || update.title === "websearch");
+  // `other`, with the exact tool key in the title. `search` also covers host
+  // grep/glob and `think` covers task, so kind alone is never authority.
+  // Require the exact tool identity in addition to OPENCODE_PERMISSION's
+  // deny-all rule, and reject every device/subagent kind even if mislabeled.
+  return (update.kind === "other" || update.kind === "search")
+    && (update.name === "websearch" || update.title === "websearch");
 }
 
 function forbiddenToolError(): BrokerAcpError {
