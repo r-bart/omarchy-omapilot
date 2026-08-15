@@ -301,7 +301,16 @@ changed.
   delta. Typecheck, lint, 48 focused tests, full validation (118 passed, 6
   explicit live skips), QML contracts (20 passed), and three byte-identical
   runtime builds (`3544884e…ad20` broker, `3de0cc91…12eb` map) are green.
-  Independent review is clean; PR CI and Gonk update/reprobe remain open.
+  Independent review is clean. Draft PR #2 is open at
+  `https://github.com/spencerbull/omarchy-quickchat/pull/2`; exact-head CI run
+  `31912409144` passed. A temporary, non-installed copy of commit `299d409`
+  on Gonk produced seven content events per answer across three authenticated
+  Codex trials: first content at 3.1-4.9 s and completion at 3.7-5.5 s. This
+  verifies that the fixed answer holdback is gone while the remaining initial
+  wait is provider/process first-token latency. Persistent ACP process reuse is
+  deferred because it changes provider lifecycle and security boundaries.
+  Merge, native CLI update on Gonk, protocol reprobe, and the owner's
+  installed-panel feel check remain human-gated.
 
 ## Post-v0.1: OmaAsk rebrand
 
