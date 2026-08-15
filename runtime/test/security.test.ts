@@ -148,7 +148,7 @@ function webp(width: number, height: number, declaredSize?: number): Buffer {
 function sampleChat(): ChatRecord {
   return {
     schemaVersion: 1, id: "11111111-1111-4111-8111-111111111111", createdAt: "2026-08-11T00:00:00.000Z", title: "A",
-    provider: "codex", capability: "answer", question: "Q", answer: "A",
+    provider: "codex", question: "Q", answer: "A",
     images: [{ id: "22222222-2222-4222-8222-222222222222", mimeType: "image/png", path: "image.png", bytes: 20, width: 1, height: 1 }],
     session: { resumable: true, resumeKind: "native" }
   };

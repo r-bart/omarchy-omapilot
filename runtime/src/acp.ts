@@ -7,7 +7,7 @@ import { createInterface } from "node:readline";
 import * as acp from "@agentclientprotocol/sdk";
 import type { ContentBlock, NewSessionRequest, RequestPermissionRequest, SessionConfigOption } from "@agentclientprotocol/sdk";
 import type { DiscoveredProvider } from "./providers.js";
-import type { BrokerEvent, Capability, ModelOption, StoredImage } from "./types.js";
+import type { BrokerEvent, ModelOption, StoredImage } from "./types.js";
 import { ImageStore } from "./images.js";
 import { presentImage } from "./history.js";
 import { quickchatPaths } from "./paths.js";
@@ -24,15 +24,16 @@ export type AcpResult = {
 
 export type AcpRun = { result: Promise<AcpResult>; cancel: () => Promise<void> };
 export type PermissionHandler = (request: RequestPermissionRequest) => Promise<string | undefined>;
+const QUICKCHAT_CLIENT_VERSION = "0.2.0";
 
-export function providerPolicyEnvironment(provider: DiscoveredProvider, capability: Capability): NodeJS.ProcessEnv {
-  return secureEnvironment(provider, capability);
+export function providerPolicyEnvironment(provider: DiscoveredProvider): NodeJS.ProcessEnv {
+  return secureEnvironment(provider);
 }
 
 export async function probeAcpModels(provider: DiscoveredProvider, timeoutMs = 15_000): Promise<{ models: ModelOption[]; defaultModel?: string }> {
   if (provider.id === "codex") return probeCodexModels(provider, timeoutMs);
   const child = spawn(provider.agent.executable, provider.agent.args, {
-    env: secureEnvironment(provider, "answer"), stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32"
+    env: secureEnvironment(provider), stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32"
   });
   const paths = quickchatPaths(provider.agent.env);
   await mkdir(paths.runtime, { recursive: true, mode: 0o700 });
@@ -51,11 +52,11 @@ export async function probeAcpModels(provider: DiscoveredProvider, timeoutMs = 1
         const initialized = await ctx.request(acp.methods.agent.initialize, {
           protocolVersion: acp.PROTOCOL_VERSION,
           clientCapabilities: { session: { configOptions: { boolean: {} } } },
-          clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }
+          clientInfo: { name: "omarchy-quickchat", version: QUICKCHAT_CLIENT_VERSION }
         });
         const ephemeral = provider.id === "claude";
         if (!ephemeral && !canRemoveSession(initialized.agentCapabilities)) return { models: [] };
-        const session = await ctx.buildSession(providerSessionRequest(provider, cwd, "answer", ephemeral)).start();
+        const session = await ctx.buildSession(providerSessionRequest(provider, cwd, ephemeral)).start();
         const config = modelConfiguration(session.newSessionResponse.configOptions ?? []);
         session.dispose();
         if (!ephemeral) await removeSession(ctx, initialized.agentCapabilities, session.sessionId);
@@ -118,7 +119,7 @@ async function probeCodexModels(provider: DiscoveredProvider, timeoutMs: number)
       });
       child.stdin?.write(`${JSON.stringify({
         jsonrpc: "2.0", id: 1, method: "initialize",
-        params: { clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }, capabilities: { experimentalApi: true, requestAttestation: false } }
+        params: { clientInfo: { name: "omarchy-quickchat", version: QUICKCHAT_CLIENT_VERSION }, capabilities: { experimentalApi: true, requestAttestation: false } }
       })}\n`);
     });
     return parseCodexModelCatalog(catalog);
@@ -152,7 +153,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 export async function deleteAcpSession(provider: DiscoveredProvider, sessionId: string, timeoutMs = 15_000): Promise<boolean> {
   const child = spawn(provider.agent.executable, provider.agent.args, {
-    env: secureEnvironment(provider, "answer"), stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32"
+    env: secureEnvironment(provider), stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32"
   });
   const timeout = setTimeout(() => terminateProcessGroup(child.pid), timeoutMs);
   timeout.unref();
@@ -164,7 +165,7 @@ export async function deleteAcpSession(provider: DiscoveredProvider, sessionId: 
         const initialized = await ctx.request(acp.methods.agent.initialize, {
           protocolVersion: acp.PROTOCOL_VERSION,
           clientCapabilities: {},
-          clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }
+          clientInfo: { name: "omarchy-quickchat", version: QUICKCHAT_CLIENT_VERSION }
         });
         return removeSession(ctx, initialized.agentCapabilities, sessionId);
       });
@@ -191,7 +192,6 @@ export function runAcpQuestion(
   requestId: string,
   question: string,
   model: string | undefined,
-  capability: Capability,
   emit: (event: BrokerEvent) => void,
   timeoutMs = 90_000,
   imageStore = new ImageStore(),
@@ -199,7 +199,7 @@ export function runAcpQuestion(
   cancelPermissions?: () => void
 ): AcpRun {
   const child = spawn(provider.agent.executable, provider.agent.args, {
-    env: secureEnvironment(provider, capability),
+    env: secureEnvironment(provider),
     stdio: ["pipe", "pipe", "pipe"],
     detached: process.platform !== "win32"
   });
@@ -231,11 +231,12 @@ export function runAcpQuestion(
       let modelOptions: ModelOption[] = [];
       let defaultModel: string | undefined;
       let resumable = false;
+      const allowedOpenCodeToolCalls = new Set<string>();
 
       const text = new GuardedTextEmitter(requestId, emit);
       const app = acp.client({ name: "omarchy-quickchat" })
         .onRequest(acp.methods.client.session.requestPermission, async ({ params }) => {
-          if (capability !== "tools" || requestPermission === undefined) {
+          if (provider.id === "opencode" || requestPermission === undefined) {
             forbiddenToolAttempt = true;
             return { outcome: { outcome: "cancelled" } };
           }
@@ -256,11 +257,11 @@ export function runAcpQuestion(
         const initialized = await ctx.request(acp.methods.agent.initialize, {
           protocolVersion: acp.PROTOCOL_VERSION,
           clientCapabilities: { session: { configOptions: { boolean: {} } } },
-          clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }
+          clientInfo: { name: "omarchy-quickchat", version: QUICKCHAT_CLIENT_VERSION }
         });
         if (initialized.protocolVersion !== acp.PROTOCOL_VERSION) throw new Error("ACP protocol version is unsupported");
         resumable = initialized.agentCapabilities?.loadSession === true;
-        const newRequest = providerSessionRequest(provider, cwd, capability);
+        const newRequest = providerSessionRequest(provider, cwd);
         const session = await ctx.buildSession(newRequest).start();
         sessionIdentifier = session.sessionId;
         cancelSession = async () => {
@@ -289,7 +290,7 @@ export function runAcpQuestion(
               break;
             }
             if (update.kind === "stop") break;
-            if (capability === "answer" && isToolUpdate(update.update.sessionUpdate)) {
+            if (provider.id === "opencode" && !openCodeToolUpdateAllowed(update.update, allowedOpenCodeToolCalls)) {
               forbiddenToolAttempt = true;
               await ctx.notify(acp.methods.agent.session.cancel, { sessionId: session.sessionId });
               break;
@@ -301,7 +302,7 @@ export function runAcpQuestion(
             if (handled.image !== undefined) images.push(handled.image);
           }
           await promptPromise;
-          if (forbiddenToolAttempt) throw forbiddenToolError(provider, capability);
+          if (forbiddenToolAttempt) throw forbiddenToolError();
           text.finish();
         } catch (error) {
           await ctx.notify(acp.methods.agent.session.cancel, { sessionId: session.sessionId }).catch(() => undefined);
@@ -312,7 +313,7 @@ export function runAcpQuestion(
       });
 
       if (cancelled) throw new BrokerAcpError("cancelled", "Question was cancelled", false);
-      if (forbiddenToolAttempt) throw forbiddenToolError(provider, capability);
+      if (forbiddenToolAttempt) throw forbiddenToolError();
       return {
         answer,
         images,
@@ -323,7 +324,7 @@ export function runAcpQuestion(
       };
     } catch (error) {
       if (error instanceof BrokerAcpError) throw error;
-      if (error instanceof ForbiddenToolMarkupError || forbiddenToolAttempt) throw forbiddenToolError(provider, capability);
+      if (error instanceof ForbiddenToolMarkupError || forbiddenToolAttempt) throw forbiddenToolError();
       throw new BrokerAcpError(
         cancelled ? "cancelled" : "agent_failed",
         cancelled ? "Question was cancelled" : "The selected harness failed to answer",
@@ -338,24 +339,25 @@ export function runAcpQuestion(
   return { result, cancel };
 }
 
-function secureEnvironment(provider: DiscoveredProvider, capability: Capability): NodeJS.ProcessEnv {
+function secureEnvironment(provider: DiscoveredProvider): NodeJS.ProcessEnv {
   if (provider.id === "codex") {
     const features = Object.fromEntries((provider.lockdownFeatures ?? [])
-      .map((feature) => [feature, capability === "tools" && (feature === "shell_tool" || feature === "unified_exec")]));
+      .map((feature) => [feature, feature === "shell_tool" || feature === "unified_exec"]));
     const config = {
-      // Codex read-only still permits reads; on-request routes command attempts
-      // to Quickchat's exact allow-once handler in Tools and deny-all handler in
-      // Answer/Web.
+      // Codex read-only still permits host reads. Keep native web search off so
+      // those unapproved reads cannot be exfiltrated through a model-controlled
+      // search query. On-request routes any network or broader command through
+      // Quickchat's exact allow-once handler.
       approval_policy: "on-request",
       sandbox_mode: "read-only",
-      web_search: capability === "web" ? "live" : "disabled",
+      web_search: "disabled",
       mcp_servers: {},
       features
     };
     return { ...provider.agent.env, CODEX_CONFIG: JSON.stringify(config), INITIAL_AGENT_MODE: "read-only" };
   }
   if (provider.id === "opencode") {
-    const permission = capability === "web" ? { "*": "deny", websearch: "allow", webfetch: "allow" } : { "*": "deny" };
+    const permission = { "*": "deny", websearch: "allow" };
     return { ...provider.agent.env, OPENCODE_PERMISSION: JSON.stringify(permission) };
   }
   return provider.agent.env;
@@ -377,15 +379,11 @@ async function removeSession(
   return false;
 }
 
-export function providerSessionRequest(provider: DiscoveredProvider, cwd: string, capability: Capability, ephemeral = false): NewSessionRequest {
+export function providerSessionRequest(provider: DiscoveredProvider, cwd: string, ephemeral = false): NewSessionRequest {
   const base: NewSessionRequest = { cwd, mcpServers: [] };
   if (provider.id !== "claude") return base;
-  const tools = capability === "tools"
-    ? ["Bash"]
-    : capability === "web" ? ["WebSearch", "WebFetch"] : [];
-  const systemPrompt = capability === "tools"
-    ? "Answer the user's question directly and concisely. You may use Bash only inside the isolated disposable workspace. Host files, credentials, network, and writes outside that workspace are unavailable."
-    : "Answer the user's question directly and concisely. Do not access local files or execute commands.";
+  const tools = ["Bash", "WebSearch"];
+  const systemPrompt = "Answer the user's question directly and concisely. Use web search when current information is useful. You may use Bash only inside the isolated disposable workspace. Host files, credentials, direct network access, and writes outside that workspace are unavailable.";
   return {
     ...base,
     _meta: {
@@ -396,31 +394,29 @@ export function providerSessionRequest(provider: DiscoveredProvider, cwd: string
           ...(ephemeral ? { persistSession: false } : {}),
           disallowedTools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "NotebookEdit", "Task", "Agent", "WebSearch", "WebFetch"].filter((tool) => !tools.includes(tool)),
           settingSources: [],
-          ...(capability === "tools" ? {
-            settings: {
-              permissions: {
-                ask: ["Bash(*)"],
-                deny: ["Write(*)", "Edit(*)", "NotebookEdit(*)", "Task(*)", "Agent(*)"],
-                disableBypassPermissionsMode: "disable"
-              }
-            },
-            sandbox: {
-              enabled: true,
-              failIfUnavailable: true,
-              autoAllowBashIfSandboxed: false,
-              allowUnsandboxedCommands: false,
-              network: { allowedDomains: [], strictAllowlist: true, allowLocalBinding: false, allowUnixSockets: [] },
-              filesystem: {
-                denyRead: sandboxDeniedReadPaths(),
-                allowRead: [cwd, "/dev/null", "/etc/ld.so.cache"],
-                denyWrite: ["/"],
-                allowWrite: [cwd]
-              },
-              credentials: {
-                envVars: sandboxCredentialEnvironment(provider.agent.env)
-              }
+          settings: {
+            permissions: {
+              ask: ["Bash(*)"],
+              deny: ["Write(*)", "Edit(*)", "NotebookEdit(*)", "Task(*)", "Agent(*)"],
+              disableBypassPermissionsMode: "disable"
             }
-          } : {})
+          },
+          sandbox: {
+            enabled: true,
+            failIfUnavailable: true,
+            autoAllowBashIfSandboxed: true,
+            allowUnsandboxedCommands: false,
+            network: { allowedDomains: [], strictAllowlist: true, allowLocalBinding: false, allowUnixSockets: [] },
+            filesystem: {
+              denyRead: sandboxDeniedReadPaths(),
+              allowRead: [cwd, "/dev/null", "/etc/ld.so.cache"],
+              denyWrite: ["/"],
+              allowWrite: [cwd]
+            },
+            credentials: {
+              envVars: sandboxCredentialEnvironment(provider.agent.env)
+            }
+          }
         }
       }
     }
@@ -516,15 +512,40 @@ function containsToolMarkup(value: string): boolean {
   return /<\/?(?:[|｜]{1,2}\s*DSML\s*[|｜]{1,2}\s*)?(?:tool[_ -]?calls?|function[_ -]?calls?|invoke|parameter)\b/iu.test(value);
 }
 
-function isToolUpdate(kind: string): boolean {
-  return kind === "tool_call" || kind === "tool_call_update";
+function openCodeToolUpdateAllowed(
+  update: { sessionUpdate: string; toolCallId?: string; kind?: string | null; name?: string | null; title?: string | null },
+  allowedCalls: Set<string>
+): boolean {
+  if (update.sessionUpdate !== "tool_call" && update.sessionUpdate !== "tool_call_update") return true;
+  const toolCallId = typeof update.toolCallId === "string" ? update.toolCallId : "";
+  if (toolCallId === "") return false;
+  if (update.sessionUpdate === "tool_call") {
+    if (!isAllowedOpenCodeTool(update)) return false;
+    allowedCalls.add(toolCallId);
+    return true;
+  }
+  if (!allowedCalls.has(toolCallId)) return false;
+  // Updates may replace the human title with progress text. Keep the initial,
+  // exact tool identity authoritative, but reject a later structural
+  // reclassification to a device/fetch kind or a different programmatic name.
+  if (update.kind !== undefined && update.kind !== null
+      && update.kind !== "search" && update.kind !== "other") return false;
+  if (update.name !== undefined && update.name !== null && update.name !== "websearch") return false;
+  return true;
 }
 
-function forbiddenToolError(provider: DiscoveredProvider, capability: Capability): BrokerAcpError {
-  if (capability !== "tools" && provider.capabilities.includes("tools")) {
-    return new BrokerAcpError("tool_mode_required", "This request needs Tools mode. Select Tools and try again", false);
-  }
-  return new BrokerAcpError("forbidden_tool_attempt", "The harness attempted a tool that Quickchat does not permit", false);
+function isAllowedOpenCodeTool(update: { kind?: string | null; name?: string | null; title?: string | null }): boolean {
+  // OpenCode 1.18 reports its permission-keyed `websearch` tool as ACP kind
+  // `other`, with the exact tool key in the title. `search` also covers host
+  // grep/glob and `think` covers task, so kind alone is never authority.
+  // Require the exact tool identity in addition to OPENCODE_PERMISSION's
+  // deny-all rule, and reject every device/subagent kind even if mislabeled.
+  return (update.kind === "other" || update.kind === "search")
+    && (update.name === "websearch" || update.title === "websearch");
+}
+
+function forbiddenToolError(): BrokerAcpError {
+  return new BrokerAcpError("forbidden_tool_attempt", "The selected harness attempted a device tool that Quickchat cannot safely authorize", false);
 }
 
 class ForbiddenToolMarkupError extends Error {

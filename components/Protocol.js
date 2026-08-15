@@ -4,7 +4,7 @@
 // policy, persistence, URL opening, clipboard writes, and Herdr control. QML
 // only sends typed commands and renders normalized events.
 
-var protocolVersion = 1
+var protocolVersion = 2
 var validStates = [
   "idle", "composing", "preparing", "dictating", "streaming",
   "complete", "canceled", "error", "unavailable", "history"
@@ -17,12 +17,11 @@ function command(type, values) {
   return result
 }
 
-function submitCommand(id, question, provider, model, capability) {
+function submitCommand(id, question, provider, model) {
   var payload = command("submit", {
     id: String(id || ""),
     question: String(question || ""),
-    provider: normalizedProvider(provider) || "codex",
-    capability: normalizedCapability(capability)
+    provider: normalizedProvider(provider) || "codex"
   })
   var selectedModel = String(model || "").trim()
   if (selectedModel !== "") payload.model = selectedModel
@@ -50,11 +49,6 @@ function normalizedState(value, fallback) {
 function normalizedProvider(value) {
   var provider = String(value || "").toLowerCase()
   return ["codex", "claude", "opencode"].indexOf(provider) >= 0 ? provider : ""
-}
-
-function normalizedCapability(value) {
-  var capability = String(value || "").toLowerCase()
-  return ["answer", "web", "tools"].indexOf(capability) >= 0 ? capability : "answer"
 }
 
 function providerLabel(value) {
@@ -88,15 +82,45 @@ function normalizeProviders(input) {
       label: String(raw && typeof raw === "object" ? raw.label || raw.name || providerLabel(id) : providerLabel(id)),
       models: normalizedModels,
       defaultModel: String(raw && typeof raw === "object" ? raw.defaultModel || "" : ""),
-      web: raw && typeof raw === "object" && Array.isArray(raw.capabilities)
-        ? raw.capabilities.indexOf("web") >= 0
-        : !(raw && typeof raw === "object" && raw.web === false),
-      tools: raw && typeof raw === "object" && Array.isArray(raw.capabilities)
-        ? raw.capabilities.indexOf("tools") >= 0
-        : false
+      policy: normalizedProviderPolicy(raw && typeof raw === "object" ? raw.policy : null)
     })
   }
   return result
+}
+
+function normalizedProviderPolicy(raw) {
+  var value = raw && typeof raw === "object" ? raw : {}
+  var tools = ["device-approval", "sandboxed", "blocked"].indexOf(value.tools) >= 0
+    ? String(value.tools) : "blocked"
+  var web = ["approved-command", "search", "blocked"].indexOf(value.web) >= 0
+    ? String(value.web) : "blocked"
+  return { tools: tools, web: web, hostReads: value.hostReads === true }
+}
+
+function providerPolicy(providers, provider) {
+  var rows = Array.isArray(providers) ? providers : []
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].value === provider) return rows[i].policy
+  }
+  return normalizedProviderPolicy(null)
+}
+
+function providerPolicyDescription(provider, rawPolicy) {
+  var label = providerLabel(provider) || "This harness"
+  var policy = normalizedProviderPolicy(rawPolicy)
+  if (policy.tools === "sandboxed") {
+    var searchClause = policy.web === "search" ? " and can search the web" : ""
+    return label + " uses tools in disposable scratch" + searchClause
+      + ". Host files, credentials, direct command network access, and outside writes stay blocked."
+  }
+  if (policy.tools === "blocked") {
+    return policy.web === "search"
+      ? label + " can search the web. Device commands stay blocked until its harness can present an exact approval."
+      : label + " runs without web or device tools."
+  }
+  return policy.web === "approved-command"
+    ? label + " uses device tools when useful. It may read user-readable files; network access and broader commands require Allow once."
+    : label + " uses device tools when useful. It may read user-readable files; broader commands require Allow once."
 }
 
 function modelOptions(providers, provider) {
@@ -107,35 +131,18 @@ function modelOptions(providers, provider) {
   return []
 }
 
-function providerSupportsWeb(providers, provider) {
-  var rows = Array.isArray(providers) ? providers : []
-  for (var i = 0; i < rows.length; i++) {
-    if (rows[i].value === provider) return rows[i].web !== false
-  }
-  return false
-}
-
-function providerSupportsTools(providers, provider) {
-  var rows = Array.isArray(providers) ? providers : []
-  for (var i = 0; i < rows.length; i++) {
-    if (rows[i].value === provider) return rows[i].tools === true
-  }
-  return false
-}
-
 function normalizedPermission(raw, currentRequestId) {
   var value = raw && typeof raw === "object" ? raw : {}
   var id = String(value.id || "")
   var requestId = String(value.requestId || "")
   var kind = String(value.kind || "")
-  if (!id || requestId !== String(currentRequestId || "")
-      || (kind !== "execute" && kind !== "local_action")) return null
+  if (!id || requestId !== String(currentRequestId || "") || kind !== "execute") return null
   return {
     id: id,
     requestId: requestId,
-    title: String(value.title || (kind === "local_action" ? "Local action" : "Tool request")).slice(0, 120),
+    title: String(value.title || "Tool request").slice(0, 120),
     kind: kind,
-    authority: value.authority === "device" || value.authority === "sandboxed" || value.authority === "local_action"
+    authority: value.authority === "device" || value.authority === "sandboxed"
       ? String(value.authority) : "device",
     detail: String(value.detail || "").slice(0, 3000),
     allowOnce: value.allowOnce === true
@@ -283,7 +290,6 @@ function normalizedHistory(input) {
       answer: String(row.answer || row.markdown || ""),
       provider: normalizedProvider(row.provider) || "codex",
       model: String(row.model || ""),
-      capability: normalizedCapability(row.capability),
       timestamp: String(row.createdAt || row.timestamp || ""),
       images: Array.isArray(row.images) ? row.images : [],
       resumable: row.resumable === true || (row.session && row.session.resumable === true)

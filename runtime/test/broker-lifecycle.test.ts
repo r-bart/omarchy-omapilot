@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +9,6 @@ import { HistoryStore } from "../src/history.js";
 import { ImageStore } from "../src/images.js";
 import { quickchatPaths } from "../src/paths.js";
 import type { DiscoveredProvider } from "../src/providers.js";
-import type { LocalActionClient, LocalLaunchAction } from "../src/actions.js";
 import type { BrokerEvent, ChatRecord, ProviderId } from "../src/types.js";
 
 const roots: string[] = [];
@@ -24,7 +23,7 @@ describe("broker lifecycle cleanup", () => {
       history: fixture.history, images: new ImageStore(fixture.paths), env: fixture.env,
       sessionCleaner: (_provider, sessionId) => { cleaned.push(sessionId); return Promise.reject(new Error("provider offline")); }
     });
-    await broker.handle({ type: "initialize", protocolVersion: 1 });
+    await broker.handle({ type: "initialize", protocolVersion: 2 });
     await broker.handle({ type: "history_delete", chatId: record(1).id });
     expect(await fixture.history.list()).toEqual([]);
     expect(cleaned).toEqual(["provider-session-1"]);
@@ -40,7 +39,7 @@ describe("broker lifecycle cleanup", () => {
       history: fixture.history, images: new ImageStore(fixture.paths), env: fixture.env,
       sessionCleaner: (_provider, sessionId) => { cleaned.push(sessionId); return Promise.resolve(sessionId !== "provider-session-1"); }
     });
-    await broker.handle({ type: "initialize", protocolVersion: 1 });
+    await broker.handle({ type: "initialize", protocolVersion: 2 });
     await broker.handle({ type: "history_clear" });
     expect(await fixture.history.list()).toEqual([]);
     expect(cleaned.sort()).toEqual(["provider-session-1", "provider-session-2"]);
@@ -54,8 +53,8 @@ describe("broker lifecycle cleanup", () => {
       history: fixture.history, images: new ImageStore(fixture.paths), env: fixture.env,
       sessionCleaner: (_provider, sessionId) => { cleaned.push(sessionId); return Promise.resolve(true); }
     });
-    await broker.handle({ type: "initialize", protocolVersion: 1 });
-    await broker.handle({ type: "submit", id: "evict", question: "Newest", provider: "codex", capability: "answer" });
+    await broker.handle({ type: "initialize", protocolVersion: 2 });
+    await broker.handle({ type: "submit", id: "evict", question: "Newest", provider: "codex" });
     expect((await fixture.history.list())).toHaveLength(30);
     expect(cleaned).toContain("provider-session-0");
   }, 20_000);
@@ -65,7 +64,7 @@ describe("broker lifecycle cleanup", () => {
     const audit = join(root, "session-audit.txt");
     const agentEnvironment = { ...process.env, FAKE_ACP_NO_DELETE: "1", OPENCODE_SESSION_AUDIT: audit };
     const provider: DiscoveredProvider = {
-      id: "opencode", name: "OpenCode", models: [], capabilities: ["answer", "web"],
+      id: "opencode", name: "OpenCode", models: [], policy: { tools: "blocked", web: "search", hostReads: false },
       harnessPath: resolve("runtime/test/fixtures/session-bin/opencode"),
       agent: { executable: resolve("runtime/test/fake-acp-agent.mjs"), args: [], env: agentEnvironment }
     };
@@ -103,8 +102,8 @@ describe("tool permission lifecycle", () => {
       env: { ...fixture.env, FAKE_ACP_PERMISSION_ATTEMPT: "1" },
       permissionTimeoutMs: 20
     });
-    await broker.handle({ type: "initialize", protocolVersion: 1 });
-    await broker.handle({ type: "submit", id: "expires", question: "Run uname", provider: "claude", capability: "tools" });
+    await broker.handle({ type: "initialize", protocolVersion: 2 });
+    await broker.handle({ type: "submit", id: "expires", question: "Run uname", provider: "claude" });
     const permission = fixture.events.find((event) => event.type === "permission");
     expect(permission?.type).toBe("permission");
     if (permission?.type !== "permission") throw new Error("permission event missing");
@@ -115,98 +114,6 @@ describe("tool permission lifecycle", () => {
       reason: "expired"
     });
     expect(fixture.events.some((event) => event.type === "complete")).toBe(true);
-  }, 20_000);
-});
-
-describe("local application action lifecycle", () => {
-  it("requires allow-once before launching and completes without adding history", async () => {
-    const fixture = await setup();
-    const promptAudit = join(fixture.paths.state, "local-action-prompt-audit");
-    await mkdir(fixture.paths.state, { recursive: true });
-    await writeFile(promptAudit, "");
-    fixture.env.FAKE_ACP_PROMPT_AUDIT = promptAudit;
-    const launched: LocalLaunchAction[] = [];
-    const localActions = fakeLocalActions(launched);
-    const broker = new QuickchatBroker(fixture.events.push.bind(fixture.events), {
-      history: fixture.history, images: new ImageStore(fixture.paths), env: fixture.env, localActions
-    });
-    await broker.handle({ type: "initialize", protocolVersion: 1 });
-    const submitting = broker.handle({ type: "submit", id: "launch", question: "open zoom", provider: "codex", capability: "answer" });
-    await vi.waitFor(() => expect(fixture.events.some((event) => event.type === "permission")).toBe(true));
-    const permission = fixture.events.find((event) => event.type === "permission");
-    if (permission?.type !== "permission") throw new Error("local action permission missing");
-    expect(permission.permission).toMatchObject({ requestId: "launch", title: "Launch Zoom", kind: "local_action", allowOnce: true });
-    expect(launched).toEqual([]);
-    await broker.handle({ type: "permission_response", id: "launch", permissionId: permission.permission.id, decision: "allow_once" });
-    await submitting;
-    expect(launched).toHaveLength(1);
-    expect(fixture.events).toContainEqual({ type: "content", id: "launch", delta: "Opened Zoom." });
-    expect(fixture.events).toContainEqual({ type: "complete", id: "launch", answer: "Opened Zoom." });
-    expect(await fixture.history.list()).toEqual([]);
-    expect(await readFile(promptAudit, "utf8")).toBe("");
-  }, 20_000);
-
-  it("falls through unresolved action-shaped questions to ACP", async () => {
-    const fixture = await setup();
-    const broker = new QuickchatBroker(fixture.events.push.bind(fixture.events), {
-      history: fixture.history,
-      images: new ImageStore(fixture.paths),
-      env: fixture.env,
-      localActions: {
-        resolve: () => Promise.resolve({ kind: "unresolved", appName: "source alternatives to Photoshop" }),
-        launch: () => Promise.reject(new Error("unresolved actions must never launch"))
-      }
-    });
-    await broker.handle({ type: "initialize", protocolVersion: 1 });
-    await broker.handle({
-      type: "submit", id: "question", question: "open source alternatives to Photoshop",
-      provider: "codex", capability: "answer"
-    });
-    expect(fixture.events.some((event) => event.type === "complete" && "chat" in event && event.chat.answer.includes("Hello"))).toBe(true);
-    expect(fixture.events.some((event) => event.type === "permission")).toBe(false);
-  }, 20_000);
-
-  it("does not launch after denial", async () => {
-    const fixture = await setup();
-    const launched: LocalLaunchAction[] = [];
-    const broker = new QuickchatBroker(fixture.events.push.bind(fixture.events), {
-      history: fixture.history, images: new ImageStore(fixture.paths), env: fixture.env, localActions: fakeLocalActions(launched)
-    });
-    await broker.handle({ type: "initialize", protocolVersion: 1 });
-    const submitting = broker.handle({ type: "submit", id: "deny-launch", question: "open zoom", provider: "codex", capability: "answer" });
-    await vi.waitFor(() => expect(fixture.events.some((event) => event.type === "permission")).toBe(true));
-    const permission = fixture.events.find((event) => event.type === "permission");
-    if (permission?.type !== "permission") throw new Error("local action permission missing");
-    await broker.handle({ type: "permission_response", id: "deny-launch", permissionId: permission.permission.id, decision: "reject_once" });
-    await submitting;
-    expect(launched).toEqual([]);
-    expect(fixture.events).toContainEqual({ type: "error", id: "deny-launch", code: "cancelled", message: "Launch canceled", retryable: false });
-    expect(fixture.events.some((event) => event.type === "complete")).toBe(false);
-  }, 20_000);
-
-  it("does not launch after the approval expires or the request is canceled", async () => {
-    const fixture = await setup();
-    const launched: LocalLaunchAction[] = [];
-    const expiringBroker = new QuickchatBroker(fixture.events.push.bind(fixture.events), {
-      history: fixture.history, images: new ImageStore(fixture.paths), env: fixture.env,
-      localActions: fakeLocalActions(launched), permissionTimeoutMs: 20
-    });
-    await expiringBroker.handle({ type: "initialize", protocolVersion: 1 });
-    await expiringBroker.handle({ type: "submit", id: "expire-launch", question: "open zoom", provider: "codex", capability: "answer" });
-    expect(launched).toEqual([]);
-    expect(fixture.events.some((event) => event.type === "permission_closed" && event.id === "expire-launch" && event.reason === "expired")).toBe(true);
-
-    const cancelingBroker = new QuickchatBroker(fixture.events.push.bind(fixture.events), {
-      history: fixture.history, images: new ImageStore(fixture.paths), env: fixture.env,
-      localActions: fakeLocalActions(launched), permissionTimeoutMs: 1_000
-    });
-    await cancelingBroker.handle({ type: "initialize", protocolVersion: 1 });
-    const canceling = cancelingBroker.handle({ type: "submit", id: "cancel-launch", question: "open zoom", provider: "codex", capability: "answer" });
-    await vi.waitFor(() => expect(fixture.events.some((event) => event.type === "permission" && event.permission.requestId === "cancel-launch")).toBe(true));
-    await cancelingBroker.handle({ type: "cancel", id: "cancel-launch" });
-    await canceling;
-    expect(launched).toEqual([]);
-    expect(fixture.events.some((event) => event.type === "permission_closed" && event.id === "cancel-launch" && event.reason === "cancelled")).toBe(true);
   }, 20_000);
 });
 
@@ -295,20 +202,9 @@ function record(index: number, provider: ProviderId = "codex"): ChatRecord {
     createdAt: new Date(Date.UTC(2026, 7, 11, 0, 0, index)).toISOString(),
     title: `Chat ${String(index)}`,
     provider,
-    capability: "answer",
     question: "Question",
     answer: "Answer",
     images: [],
     session: { acpId: `provider-session-${String(index)}`, resumable: true, resumeKind: "native" }
-  };
-}
-
-function fakeLocalActions(launched: LocalLaunchAction[]): LocalActionClient {
-  const action: LocalLaunchAction = {
-    kind: "launch_app", appName: "Zoom", desktopId: "Zoom.desktop", desktopFile: "/fixtures/Zoom.desktop"
-  };
-  return {
-    resolve: (question) => Promise.resolve(question === "open zoom" ? { kind: "launch", action } : { kind: "none" }),
-    launch: (requested) => { launched.push(requested); return Promise.resolve(true); }
   };
 }

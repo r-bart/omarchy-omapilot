@@ -1,8 +1,12 @@
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { resolve } from "node:path";
 import { z } from "zod";
-import { parseCodexModelCatalog, probeAcpModels, providerPolicyEnvironment, providerSessionRequest } from "../src/acp.js";
+import { parseCodexModelCatalog, probeAcpModels, providerPolicyEnvironment, providerSessionRequest, runAcpQuestion } from "../src/acp.js";
 import { codexToolLockdownFeatures, discoverProviders, type DiscoveredProvider } from "../src/providers.js";
+import type { BrokerEvent } from "../src/types.js";
 
 describe("provider security profiles", () => {
   it("normalizes the Codex app-server model catalog without hidden or invalid rows", () => {
@@ -26,43 +30,34 @@ describe("provider security profiles", () => {
     });
   });
 
-  it("enables only Codex shell execution in Tools while keeping every unrelated feature disabled", () => {
-    const answer: unknown = JSON.parse(providerPolicyEnvironment(provider("codex"), "answer").CODEX_CONFIG ?? "{}");
-    const web: unknown = JSON.parse(providerPolicyEnvironment(provider("codex"), "web").CODEX_CONFIG ?? "{}");
-    const tools: unknown = JSON.parse(providerPolicyEnvironment(provider("codex"), "tools").CODEX_CONFIG ?? "{}");
-    expect(answer).toMatchObject({ approval_policy: "on-request", sandbox_mode: "read-only", web_search: "disabled", mcp_servers: {} });
-    expect(web).toMatchObject({ approval_policy: "on-request", sandbox_mode: "read-only", web_search: "live", mcp_servers: {} });
-    expect(tools).toMatchObject({ approval_policy: "on-request", sandbox_mode: "read-only", web_search: "disabled", mcp_servers: {} });
-    const answerFeatures = featureRecord(answer);
-    const webFeatures = featureRecord(web);
-    for (const feature of provider("codex").lockdownFeatures ?? []) {
-      expect(answerFeatures[feature]).toBe(false);
-      expect(webFeatures[feature]).toBe(false);
-    }
-    expect(answerFeatures).toMatchObject({
-      shell_tool: false, unified_exec: false, code_mode: false, code_mode_host: false,
-      apps: false, plugins: false, browser_use: false, in_app_browser: false,
-      computer_use: false, js_repl: false, view_image: false
+  it("enables only reviewed Codex execution features in the automatic profile", () => {
+    const automatic: unknown = JSON.parse(providerPolicyEnvironment(provider("codex")).CODEX_CONFIG ?? "{}");
+    expect(automatic).toMatchObject({
+      approval_policy: "on-request",
+      sandbox_mode: "read-only",
+      web_search: "disabled",
+      mcp_servers: {}
     });
-    const toolFeatures = featureRecord(tools);
-    expect(toolFeatures).toMatchObject({ shell_tool: true, unified_exec: true });
+    const automaticFeatures = featureRecord(automatic);
+    expect(automaticFeatures).toMatchObject({ shell_tool: true, unified_exec: true });
     for (const feature of provider("codex").lockdownFeatures ?? []) {
-      if (feature !== "shell_tool" && feature !== "unified_exec") expect(toolFeatures[feature]).toBe(false);
+      if (feature !== "shell_tool" && feature !== "unified_exec") expect(automaticFeatures[feature]).toBe(false);
     }
   });
 
-  it("confines Claude Tools to a disposable local scratch space", () => {
+  it("gives automatic Claude Bash and web tools inside disposable local scratch", () => {
     const request = providerSessionRequest({
-      id: "claude", name: "Claude", models: [], capabilities: ["answer", "web", "tools"],
+      id: "claude", name: "Claude", models: [], policy: { tools: "sandboxed", web: "search", hostReads: false },
       harnessPath: "/test/claude",
       agent: {
         executable: "/test/claude-acp", args: [],
         env: { PATH: "/usr/bin", LANG: "C.UTF-8", HOME: "/home/private", API_TOKEN: "secret", USER: "private-user" }
       }
-    }, "/run/user/1000/quickchat/tool-turn", "tools");
+    }, "/run/user/1000/quickchat/automatic-turn");
     const serialized = JSON.parse(JSON.stringify(request)) as {
       _meta: { claudeCode: { options: {
         tools: string[];
+        disallowedTools: string[];
         sandbox: {
           enabled: boolean; failIfUnavailable: boolean; autoAllowBashIfSandboxed: boolean;
           allowUnsandboxedCommands: boolean;
@@ -73,17 +68,19 @@ describe("provider security profiles", () => {
       } } }
     };
     const options = serialized._meta.claudeCode.options;
-    expect(options.tools).toEqual(["Bash"]);
+    expect(request.mcpServers).toEqual([]);
+    expect(options.tools).toEqual(["Bash", "WebSearch"]);
+    expect(serialized._meta.claudeCode.options).toMatchObject({ disallowedTools: expect.arrayContaining(["WebFetch"]) });
     expect(options.sandbox).toMatchObject({
       enabled: true,
       failIfUnavailable: true,
-      autoAllowBashIfSandboxed: false,
+      autoAllowBashIfSandboxed: true,
       allowUnsandboxedCommands: false,
       network: { allowedDomains: [], strictAllowlist: true, allowLocalBinding: false, allowUnixSockets: [] },
       filesystem: {
-        allowRead: ["/run/user/1000/quickchat/tool-turn", "/dev/null", "/etc/ld.so.cache"],
+        allowRead: ["/run/user/1000/quickchat/automatic-turn", "/dev/null", "/etc/ld.so.cache"],
         denyWrite: ["/"],
-        allowWrite: ["/run/user/1000/quickchat/tool-turn"]
+        allowWrite: ["/run/user/1000/quickchat/automatic-turn"]
       }
     });
     expect(options.sandbox.filesystem.denyRead).toEqual(expect.arrayContaining([
@@ -97,16 +94,51 @@ describe("provider security profiles", () => {
     ]);
   });
 
-  it("denies every OpenCode permission except explicit web fetch/search in Web", () => {
-    expect(JSON.parse(providerPolicyEnvironment(provider("opencode"), "answer").OPENCODE_PERMISSION ?? "{}"))
-      .toEqual({ "*": "deny" });
-    expect(JSON.parse(providerPolicyEnvironment(provider("opencode"), "web").OPENCODE_PERMISSION ?? "{}"))
-      .toEqual({ "*": "deny", websearch: "allow", webfetch: "allow" });
-    expect(JSON.parse(providerPolicyEnvironment(provider("opencode"), "tools").OPENCODE_PERMISSION ?? "{}"))
-      .toEqual({ "*": "deny" });
+  it("automatically permits only OpenCode web search", () => {
+    expect(JSON.parse(providerPolicyEnvironment(provider("opencode")).OPENCODE_PERMISSION ?? "{}"))
+      .toEqual({ "*": "deny", websearch: "allow" });
   });
 
-  it("advertises Codex capabilities only when every lockdown feature validates", async () => {
+  it.each(["other", "search"])("accepts exact OpenCode websearch identity with ACP kind %s", async (kind) => {
+    const fixture = await openCodeToolUpdateFixture(kind, "websearch");
+    const events: BrokerEvent[] = [];
+    try {
+      const run = runAcpQuestion(fixture.provider, `allowed-${kind}`, "Use the approved tool", undefined, events.push.bind(events), 5_000);
+      const result = await run.result.catch(async (error: unknown) => {
+        throw new Error(`${String(error)}\n${await readFile(fixture.audit, "utf8").catch(() => "no audit")}`);
+      });
+      expect(result).toMatchObject({ answer: "safe" });
+      expect(events).toContainEqual({ type: "content", id: `allowed-${kind}`, delta: "safe" });
+    } finally {
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a tracked OpenCode websearch call reclassified as a device tool", async () => {
+    const fixture = await openCodeToolUpdateFixture("other", "websearch", "execute");
+    const events: BrokerEvent[] = [];
+    try {
+      await expect(runAcpQuestion(fixture.provider, "reclassified-websearch", "Search the web", undefined, events.push.bind(events), 5_000).result)
+        .rejects.toMatchObject({ code: "forbidden_tool_attempt" });
+      expect(events.filter((event) => event.type === "content")).toEqual([]);
+    } finally {
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it.each(["read", "edit", "delete", "move", "execute", "fetch", "switch_mode", "search", "think", "other"])("rejects unidentified OpenCode %s tool updates", async (kind) => {
+    const fixture = await openCodeToolUpdateFixture(kind);
+    const events: BrokerEvent[] = [];
+    try {
+      await expect(runAcpQuestion(fixture.provider, `blocked-${kind}`, "Attempt a blocked tool", undefined, events.push.bind(events), 5_000).result)
+        .rejects.toMatchObject({ code: "forbidden_tool_attempt" });
+      expect(events.filter((event) => event.type === "content")).toEqual([]);
+    } finally {
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it("discovers Codex only when every lockdown feature validates", async () => {
     const features = await codexToolLockdownFeatures(resolve("runtime/test/fixtures/bin/codex"), process.env);
     expect(features).toContain("future_tool_feature");
     expect(await codexToolLockdownFeatures("/bin/false", process.env)).toBeUndefined();
@@ -118,16 +150,20 @@ describe("provider security profiles", () => {
     expect(providers.some((provider) => provider.id === "codex")).toBe(false);
   });
 
-  it("advertises Tools only for providers with an inspectable allow-once boundary", async () => {
+  it("discovers automatic providers without public capability metadata", async () => {
     const providers = await discoverProviders({
       ...process.env,
       PATH: `${resolve("runtime/test/fixtures/claude-auth")}:${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`,
       QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
       QUICKCHAT_CLAUDE_ACP: resolve("runtime/test/fake-acp-agent.mjs")
     });
-    expect(providers.find((provider) => provider.id === "claude")?.capabilities).toEqual(["answer", "web", "tools"]);
-    expect(providers.find((provider) => provider.id === "codex")?.capabilities).toEqual(["answer", "web", "tools"]);
-    expect(providers.find((provider) => provider.id === "opencode")?.capabilities).toEqual(["answer", "web"]);
+    expect(providers.map((provider) => provider.id)).toEqual(["codex", "claude", "opencode"]);
+    expect(providers.every((provider) => !("capabilities" in provider))).toBe(true);
+    expect(providers.map(({ id, policy }) => ({ id, policy }))).toEqual([
+      { id: "codex", policy: { tools: "device-approval", web: "approved-command", hostReads: true } },
+      { id: "claude", policy: { tools: "sandboxed", web: "search", hostReads: false } },
+      { id: "opencode", policy: { tools: "blocked", web: "search", hostReads: false } }
+    ]);
   });
 });
 
@@ -138,8 +174,83 @@ function featureRecord(config: unknown): Record<string, unknown> {
 
 function provider(id: "codex" | "opencode"): DiscoveredProvider {
   return {
-    id, name: id, models: [], capabilities: ["answer", "web", "tools"], harnessPath: `/test/${id}`,
+    id, name: id, models: [],
+    policy: id === "codex"
+      ? { tools: "device-approval", web: "approved-command", hostReads: true }
+      : { tools: "blocked", web: "search", hostReads: false },
+    harnessPath: `/test/${id}`,
     agent: { executable: "/test/acp", args: [], env: { PATH: "/test" } },
     ...(id === "codex" ? { lockdownFeatures: ["shell_tool", "unified_exec", "code_mode", "code_mode_host", "apps", "plugins", "browser_use", "in_app_browser", "computer_use", "js_repl", "view_image"] } : {})
+  };
+}
+
+async function openCodeToolUpdateFixture(kind: string, title = "Policy probe", updateKind = kind === "other" && title === "websearch" ? "other" : ""): Promise<{ root: string; audit: string; provider: DiscoveredProvider }> {
+  const root = await mkdtemp(join(tmpdir(), "quickchat-opencode-tool-update-"));
+  const script = join(root, "agent.mjs");
+  const audit = join(root, "audit.log");
+  const sdk = pathToFileURL(resolve("node_modules/@agentclientprotocol/sdk/dist/acp.js")).href;
+  await writeFile(script, `
+import * as acp from ${JSON.stringify(sdk)};
+import { appendFileSync } from "node:fs";
+import { Readable, Writable } from "node:stream";
+
+const audit = process.env.FAKE_TOOL_AUDIT;
+const log = (message) => appendFileSync(audit, message + "\\n");
+process.on("uncaughtException", (error) => { log("uncaught:" + String(error?.stack || error)); process.exit(1); });
+process.on("unhandledRejection", (error) => { log("rejection:" + String(error?.stack || error)); process.exit(1); });
+let pending;
+const stream = acp.ndJsonStream(Writable.toWeb(process.stdout), Readable.toWeb(process.stdin));
+const server = acp.agent({ name: "quickchat-opencode-tool-update" })
+  .onRequest(acp.methods.agent.initialize, () => { log("initialize"); return { protocolVersion: acp.PROTOCOL_VERSION, agentCapabilities: {} }; })
+  .onRequest(acp.methods.agent.session.new, () => ({
+    sessionId: "tool-update-session",
+    modes: { currentModeId: "default", availableModes: [{ id: "default", name: "Default" }] },
+    configOptions: []
+  }))
+  .onRequest(acp.methods.agent.session.prompt, async ({ params, client }) => {
+    log("prompt");
+    const controller = new AbortController();
+    pending = controller;
+    await client.notify(acp.methods.client.session.update, {
+      sessionId: params.sessionId,
+      update: { sessionUpdate: "tool_call", toolCallId: "tool-1", title: process.env.FAKE_TOOL_TITLE, kind: process.env.FAKE_TOOL_KIND, status: "in_progress" }
+    });
+    await client.notify(acp.methods.client.session.update, {
+      sessionId: params.sessionId,
+      update: { sessionUpdate: "tool_call_update", toolCallId: "tool-1", title: "Exa Web Search progress", kind: process.env.FAKE_TOOL_UPDATE_KIND || undefined, status: "completed" }
+    });
+    await client.notify(acp.methods.client.session.update, {
+      sessionId: params.sessionId,
+      update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "safe" } }
+    });
+    return { stopReason: controller.signal.aborted ? "cancelled" : "end_turn" };
+  })
+  .onNotification(acp.methods.agent.session.cancel, () => { pending?.abort(); });
+server.connect(stream);
+`);
+  return {
+    root,
+    audit,
+    provider: {
+      id: "opencode",
+      name: "OpenCode",
+      models: [],
+      policy: { tools: "blocked", web: "search", hostReads: false },
+      harnessPath: process.execPath,
+      agent: {
+        executable: process.execPath,
+        args: [script],
+        env: {
+          ...process.env,
+          FAKE_TOOL_KIND: kind,
+          FAKE_TOOL_TITLE: title,
+          FAKE_TOOL_UPDATE_KIND: updateKind,
+          FAKE_TOOL_AUDIT: audit,
+          XDG_RUNTIME_DIR: join(root, "run"),
+          XDG_STATE_HOME: join(root, "state"),
+          XDG_CACHE_HOME: join(root, "cache")
+        }
+      }
+    }
   };
 }

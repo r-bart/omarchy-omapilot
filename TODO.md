@@ -12,9 +12,9 @@ a dedicated Herdr Quickchat workspace.
 - Root manifest validates with `omarchy plugin validate .`.
 - Native bar widget and coordinated popout match the selected concept.
 - Authenticated provider and harness-owned model discovery work.
-- Answer and Web-only profiles fail closed; Tools is exposed only where the
-  provider's authority is stated truthfully and every broader command crosses
-  an inspectable, request-bound allow-once boundary.
+- One automatic provider policy chooses web/tools as needed, states its
+  authority truthfully, and keeps every broader command behind an inspectable,
+  request-bound allow-once boundary.
 - Markdown, safe links, direct images, and click-to-load remote images render.
 - The newest 30 completed chats persist with bounded cached content.
 - Voxtype file-output dictation and Herdr native/transcript handoff work.
@@ -28,6 +28,63 @@ a dedicated Herdr Quickchat workspace.
 | QML surface | `quattro-ui` / `/home/sbull/worktrees/omarchy-quickchat-ui` | Bar widget, panel, components, QML tests | Implemented and integrated on `main` |
 | ACP runtime | `broker-runtime` / `/home/sbull/worktrees/omarchy-quickchat-broker` | Broker, provider adapters, history, Herdr/Voxtype helpers, unit tests | Integrated and independently reviewed on `main` |
 | Plugin/release | `plugin-compliance` / `/home/sbull/worktrees/omarchy-quickchat-compliance` | Manifest, docs, validation, CI/release packaging | Implemented and integrated on `main` |
+
+## Automatic interaction goal (2026-08-15)
+
+- Goal: remove the user-facing Answer/Web/Tools profiles. A user selects only a
+  harness/model, writes one prompt, and the broker supplies that harness's
+  reviewed web/tool policy automatically.
+- Product contract: there is no capability picker, retry-in-Tools instruction,
+  or capability field in new submit/history records. Provider-specific
+  authority remains truthful: Codex may read user-readable device files while
+  network and broader commands require exact Allow once; Claude may search the
+  web and run commands only in disposable scratch; OpenCode may answer and
+  search the web but fetch/device commands remain fail-closed until its ACP path
+  can prove the same inspectable approval boundary. The broker does not parse
+  prompt phrases into hardcoded actions; every ordinary prompt uses the same
+  provider path.
+- Done criteria: legacy history still loads; one-prompt Codex and Claude command
+  use, web policy, OpenCode denial, permission nonce/expiry/cancel behavior,
+  Markdown/history/Herdr, and provider/model persistence pass focused tests;
+  the complete suite and deterministic bundle pass; independent review has no
+  unresolved findings; a draft PR is open and its CI is green.
+- Branch/worktree: `automatic-capabilities` at
+  `/home/sbull/worktrees/omarchy-quickchat-automatic`, based on `main` commit
+  `ff93db8`. The orchestrator owns implementation and integration.
+- Allowed: scoped repository edits, local dependencies/tests, commits, push of
+  this branch, and a draft PR to `spencerbull/omarchy-quickchat:main`.
+- Forbidden: merge, tag, release, marketplace submission, installed-plugin or
+  desktop mutation, provider credential/configuration changes, CUA, secrets,
+  billing, and user-data operations.
+- Reviewer: existing visible Claude Herdr agent `qc_action_arch`, pane `wK:p1R`,
+  main checkout, read-only design and final diff review; orchestrator owns
+  follow-up and cleanup.
+- Test migration worker: visible Codex Herdr agent `qc_auto_tests`, pane
+  `wK:p1X`, automatic worktree/branch; owns test fixtures and assertions only,
+  with no commit/push/install authority. Orchestrator owns diff review and
+  cleanup.
+- [x] Approve the automatic provider-policy design against current ACP adapters.
+- [x] Remove capability selection from QML, protocol, persistence, and public
+  documentation while accepting legacy stored records safely.
+- [x] Prove automatic Codex/Claude tools and web policy plus fail-closed OpenCode.
+- [x] Pass focused QML/runtime tests, full validation, and deterministic build.
+- [x] Receive independent `CLEAN` review or fix every verified finding.
+- [x] Push the branch, open the draft PR, and pass exact-head CI.
+
+Final evidence: `./scripts/validate.sh` passes 105 runtime tests with
+six explicit live skips; the QML contract passes 17 protocol and three
+permission-focus tests; authenticated direct tests pass Codex automatic
+read-only plus one exact allow-once command, Claude automatic scratch command,
+host-read denial, and WebSearch, and OpenCode automatic websearch. The OpenCode
+test covers its live ACP `other`/`websearch` identity plus fail-closed
+reclassification. Two consecutive broker builds are byte-identical and
+`npm audit --omit=dev` reports zero vulnerabilities. Independent Claude review
+found one Medium and one Low; both were fixed in `3ef737d`, and the exact-fix
+re-review returned `CLEAN`. Draft PR
+<https://github.com/spencerbull/omarchy-quickchat/pull/1> targets `main`; its
+validate/package workflow is required green on the final PR head. No CUA,
+installed plugin, desktop configuration, release, or marketplace state was
+changed.
 
 ## Allowed actions
 

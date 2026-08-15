@@ -10,250 +10,13 @@ import { createInterface as createInterface2 } from "node:readline";
 
 // runtime/src/broker.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
-import { spawn as spawn5 } from "node:child_process";
-
-// runtime/src/actions.ts
-import { spawn as spawn2 } from "node:child_process";
-import { readdir, readFile } from "node:fs/promises";
-import { basename, join } from "node:path";
-
-// runtime/src/process.ts
-import { spawn } from "node:child_process";
-import { access } from "node:fs/promises";
-import { constants } from "node:fs";
-import { delimiter, isAbsolute } from "node:path";
-async function runCommand(executable, args, options = {}) {
-  const maxOutput = options.maxOutput ?? 1e6;
-  return new Promise((resolve2, reject) => {
-    const child = spawn(executable, args, {
-      cwd: options.cwd,
-      env: options.env,
-      stdio: ["ignore", "pipe", "pipe"],
-      detached: process.platform !== "win32"
-    });
-    let stdout = "";
-    let stderr = "";
-    const append = (current, chunk) => (current + chunk.toString("utf8")).slice(-maxOutput);
-    child.stdout.on("data", (chunk) => {
-      stdout = append(stdout, chunk);
-    });
-    child.stderr.on("data", (chunk) => {
-      stderr = append(stderr, chunk);
-    });
-    child.once("error", reject);
-    const timer = setTimeout(() => {
-      terminateProcessGroup(child.pid);
-    }, options.timeoutMs ?? 1e4);
-    timer.unref();
-    child.once("close", (code) => {
-      clearTimeout(timer);
-      resolve2({ code: code ?? 1, stdout, stderr });
-    });
-  });
-}
-function terminateProcessGroup(pid) {
-  if (pid === void 0) return;
-  try {
-    process.kill(process.platform === "win32" ? pid : -pid, "SIGTERM");
-  } catch {
-  }
-  const timer = setTimeout(() => {
-    try {
-      process.kill(process.platform === "win32" ? pid : -pid, "SIGKILL");
-    } catch {
-    }
-  }, 2e3);
-  timer.unref();
-}
-async function executableFile(candidate) {
-  try {
-    await access(candidate, constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-async function resolveExecutable(name, env = process.env) {
-  const mise = await resolveFromPath("mise", env);
-  if (mise !== void 0) {
-    const result = await runCommand(mise, ["which", name], { env, timeoutMs: 5e3, maxOutput: 16384 });
-    const candidate = result.stdout.trim().split("\n")[0];
-    if (result.code === 0 && candidate !== void 0 && isAbsolute(candidate) && await executableFile(candidate)) return candidate;
-  }
-  return resolveFromPath(name, env);
-}
-async function resolveFromPath(name, env) {
-  for (const directory of (env.PATH ?? "").split(delimiter)) {
-    if (directory.length === 0) continue;
-    const candidate = `${directory}/${name}`;
-    if (await executableFile(candidate)) return candidate;
-  }
-  return void 0;
-}
-function stripAnsi(value) {
-  return value.replaceAll(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
-}
-
-// runtime/src/actions.ts
-var DesktopActionService = class {
-  #env;
-  constructor(env = process.env) {
-    this.#env = env;
-  }
-  async resolve(question) {
-    const requested = requestedApplication(question);
-    if (requested === void 0) return { kind: "none" };
-    const normalized = normalizeName(requested);
-    const entries = await this.#desktopEntries();
-    const exact = entries.filter(
-      (entry) => normalizeName(entry.appName) === normalized || normalizeName(entry.desktopId.replace(/\.desktop$/i, "")) === normalized
-    );
-    if (exact.length === 0) return { kind: "unresolved", appName: requested };
-    const bestPriority = Math.min(...exact.map((entry) => entry.priority));
-    const best = exact.filter((entry) => entry.priority === bestPriority);
-    const unique = new Map(best.map((entry) => [entry.desktopFile, entry]));
-    if (unique.size !== 1) return { kind: "unresolved", appName: requested };
-    const selected = unique.values().next().value;
-    if (selected === void 0) return { kind: "unresolved", appName: requested };
-    return {
-      kind: "launch",
-      action: {
-        kind: "launch_app",
-        appName: selected.appName,
-        desktopId: selected.desktopId,
-        desktopFile: selected.desktopFile
-      }
-    };
-  }
-  async launch(action, signal) {
-    if (isAborted(signal)) return false;
-    const [uwsmApp, gtkLaunch] = await Promise.all([
-      resolveExecutable("uwsm-app", this.#env),
-      resolveExecutable("gtk-launch", this.#env)
-    ]);
-    if (isAborted(signal)) return false;
-    if (uwsmApp !== void 0 && gtkLaunch !== void 0)
-      return runDetachedLauncher(uwsmApp, ["--", gtkLaunch, action.desktopId], this.#env, signal);
-    const gio = await resolveExecutable("gio", this.#env);
-    if (gio === void 0 || isAborted(signal)) return false;
-    return runDetachedLauncher(gio, ["launch", action.desktopFile], this.#env, signal);
-  }
-  async #desktopEntries() {
-    const entries = [];
-    const directories = desktopDirectories(this.#env);
-    for (let priority = 0; priority < directories.length; priority += 1) {
-      const directory = directories[priority];
-      if (directory === void 0) continue;
-      let names;
-      try {
-        names = await readdir(directory);
-      } catch {
-        continue;
-      }
-      for (const name of names.sort()) {
-        if (!name.toLowerCase().endsWith(".desktop")) continue;
-        if (!/^[A-Za-z0-9][A-Za-z0-9._+-]{0,199}\.desktop$/.test(name)) continue;
-        const desktopFile = join(directory, name);
-        let source;
-        try {
-          source = await readFile(desktopFile, { encoding: "utf8", flag: "r" });
-        } catch {
-          continue;
-        }
-        const parsed = parseDesktopEntry(source);
-        if (parsed === void 0) continue;
-        entries.push({
-          kind: "launch_app",
-          appName: parsed.name,
-          desktopId: basename(name),
-          desktopFile,
-          priority
-        });
-      }
-    }
-    return entries;
-  }
-};
-function requestedApplication(question) {
-  const match = /^(?:please\s+)?(?:open|launch|start)\s+(.+?)(?:\s+please)?[.!]?$/i.exec(question.trim());
-  if (match === null) return void 0;
-  const value = String(match[1] ?? "").trim();
-  if (!/^[\p{L}\p{N}][\p{L}\p{N} ._+'-]{0,79}$/u.test(value)) return void 0;
-  if (/\s{2,}/.test(value) || value.includes("..") || /\b(?:and|then)\b/i.test(value)) return void 0;
-  return value;
-}
-function normalizeName(value) {
-  return value.normalize("NFKC").trim().replaceAll(/\s+/g, " ").toLocaleLowerCase("en-US");
-}
-function desktopDirectories(env) {
-  const home = env.HOME;
-  const dataHome = env.XDG_DATA_HOME ?? (home === void 0 ? void 0 : join(home, ".local", "share"));
-  const dataDirs = (env.XDG_DATA_DIRS ?? "/usr/local/share:/usr/share").split(":").filter(Boolean);
-  return [dataHome, ...dataDirs].filter((value) => value !== void 0).map((value) => join(value, "applications"));
-}
-function parseDesktopEntry(source) {
-  let inDesktopEntry = false;
-  let type = "";
-  let name = "";
-  let hidden = false;
-  let noDisplay = false;
-  for (const line of source.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-      inDesktopEntry = trimmed === "[Desktop Entry]";
-      continue;
-    }
-    if (!inDesktopEntry || trimmed.startsWith("#")) continue;
-    const separator = trimmed.indexOf("=");
-    if (separator < 1) continue;
-    const key = trimmed.slice(0, separator);
-    const value = trimmed.slice(separator + 1).trim();
-    if (key === "Type") type = value;
-    else if (key === "Name") name = value;
-    else if (key === "Hidden") hidden = value.toLowerCase() === "true";
-    else if (key === "NoDisplay") noDisplay = value.toLowerCase() === "true";
-  }
-  if (type !== "Application" || name === "" || name.length > 120 || hasUnsafeText(name) || hidden || noDisplay) return void 0;
-  return { name };
-}
-function hasUnsafeText(value) {
-  return /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(value);
-}
-function isAborted(signal) {
-  return signal?.aborted === true;
-}
-function runDetachedLauncher(executable, args, env, signal) {
-  return new Promise((resolveLaunch) => {
-    const child = spawn2(executable, args, { env, stdio: "ignore", detached: true });
-    child.unref();
-    let settled = false;
-    const onAbort = () => {
-      child.kill("SIGTERM");
-      finish(false);
-    };
-    const finish = (result) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", onAbort);
-      resolveLaunch(result);
-    };
-    const timer = setTimeout(() => {
-      child.kill("SIGTERM");
-      finish(false);
-    }, 5e3);
-    timer.unref();
-    signal?.addEventListener("abort", onAbort, { once: true });
-    child.once("error", () => finish(false));
-    child.once("exit", (code) => finish(code === 0));
-  });
-}
+import { spawn as spawn4 } from "node:child_process";
 
 // runtime/src/acp.ts
-import { spawn as spawn3 } from "node:child_process";
+import { spawn as spawn2 } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { mkdir as mkdir3, mkdtemp as mkdtemp2, rm as rm3 } from "node:fs/promises";
-import { join as join5 } from "node:path";
+import { join as join4 } from "node:path";
 import { createInterface } from "node:readline";
 
 // node_modules/@agentclientprotocol/sdk/dist/schema/index.js
@@ -2576,14 +2339,14 @@ var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
     });
   } else {
     const runChecks = (payload, checks2, ctx) => {
-      let isAborted2 = aborted(payload);
+      let isAborted = aborted(payload);
       let asyncResult;
       for (const ch of checks2) {
         if (ch._zod.def.when) {
           const shouldRun = ch._zod.def.when(payload);
           if (!shouldRun)
             continue;
-        } else if (isAborted2) {
+        } else if (isAborted) {
           continue;
         }
         const currLen = payload.issues.length;
@@ -2597,15 +2360,15 @@ var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
             const nextLen = payload.issues.length;
             if (nextLen === currLen)
               return;
-            if (!isAborted2)
-              isAborted2 = aborted(payload, currLen);
+            if (!isAborted)
+              isAborted = aborted(payload, currLen);
           });
         } else {
           const nextLen = payload.issues.length;
           if (nextLen === currLen)
             continue;
-          if (!isAborted2)
-            isAborted2 = aborted(payload, currLen);
+          if (!isAborted)
+            isAborted = aborted(payload, currLen);
         }
       }
       if (asyncResult) {
@@ -17722,32 +17485,109 @@ var legacyClientNotificationMethods = /* @__PURE__ */ new Set([
 
 // runtime/src/images.ts
 import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, open, readFile as readFile2, readdir as readdir2, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { get } from "node:https";
 import { isIP } from "node:net";
 import { lookup } from "node:dns/promises";
-import { basename as basename2, extname, join as join3 } from "node:path";
+import { basename, extname, join as join2 } from "node:path";
 
 // runtime/src/paths.ts
 import { homedir, tmpdir } from "node:os";
-import { join as join2 } from "node:path";
+import { join } from "node:path";
 function xdg(env, key, fallback) {
   const value = env[key];
   return value !== void 0 && value.startsWith("/") ? value : fallback;
 }
 function quickchatPaths(env = process.env) {
   const home = env.HOME ?? homedir();
-  const stateRoot = xdg(env, "XDG_STATE_HOME", join2(home, ".local/state"));
-  const cacheRoot = xdg(env, "XDG_CACHE_HOME", join2(home, ".cache"));
+  const stateRoot = xdg(env, "XDG_STATE_HOME", join(home, ".local/state"));
+  const cacheRoot = xdg(env, "XDG_CACHE_HOME", join(home, ".cache"));
   const runtimeRoot = xdg(env, "XDG_RUNTIME_DIR", tmpdir());
   return {
-    state: join2(stateRoot, "quickchat"),
-    records: join2(stateRoot, "quickchat/chats"),
-    cache: join2(cacheRoot, "quickchat"),
-    images: join2(cacheRoot, "quickchat/images"),
-    adapters: join2(cacheRoot, "quickchat/adapters"),
-    runtime: join2(runtimeRoot, "quickchat")
+    state: join(stateRoot, "quickchat"),
+    records: join(stateRoot, "quickchat/chats"),
+    cache: join(cacheRoot, "quickchat"),
+    images: join(cacheRoot, "quickchat/images"),
+    adapters: join(cacheRoot, "quickchat/adapters"),
+    runtime: join(runtimeRoot, "quickchat")
   };
+}
+
+// runtime/src/process.ts
+import { spawn } from "node:child_process";
+import { access } from "node:fs/promises";
+import { constants } from "node:fs";
+import { delimiter, isAbsolute } from "node:path";
+async function runCommand(executable, args, options = {}) {
+  const maxOutput = options.maxOutput ?? 1e6;
+  return new Promise((resolve2, reject) => {
+    const child = spawn(executable, args, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32"
+    });
+    let stdout = "";
+    let stderr = "";
+    const append = (current, chunk) => (current + chunk.toString("utf8")).slice(-maxOutput);
+    child.stdout.on("data", (chunk) => {
+      stdout = append(stdout, chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr = append(stderr, chunk);
+    });
+    child.once("error", reject);
+    const timer = setTimeout(() => {
+      terminateProcessGroup(child.pid);
+    }, options.timeoutMs ?? 1e4);
+    timer.unref();
+    child.once("close", (code) => {
+      clearTimeout(timer);
+      resolve2({ code: code ?? 1, stdout, stderr });
+    });
+  });
+}
+function terminateProcessGroup(pid) {
+  if (pid === void 0) return;
+  try {
+    process.kill(process.platform === "win32" ? pid : -pid, "SIGTERM");
+  } catch {
+  }
+  const timer = setTimeout(() => {
+    try {
+      process.kill(process.platform === "win32" ? pid : -pid, "SIGKILL");
+    } catch {
+    }
+  }, 2e3);
+  timer.unref();
+}
+async function executableFile(candidate) {
+  try {
+    await access(candidate, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function resolveExecutable(name, env = process.env) {
+  const mise = await resolveFromPath("mise", env);
+  if (mise !== void 0) {
+    const result = await runCommand(mise, ["which", name], { env, timeoutMs: 5e3, maxOutput: 16384 });
+    const candidate = result.stdout.trim().split("\n")[0];
+    if (result.code === 0 && candidate !== void 0 && isAbsolute(candidate) && await executableFile(candidate)) return candidate;
+  }
+  return resolveFromPath(name, env);
+}
+async function resolveFromPath(name, env) {
+  for (const directory of (env.PATH ?? "").split(delimiter)) {
+    if (directory.length === 0) continue;
+    const candidate = `${directory}/${name}`;
+    if (await executableFile(candidate)) return candidate;
+  }
+  return void 0;
+}
+function stripAnsi(value) {
+  return value.replaceAll(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
 }
 
 // runtime/src/images.ts
@@ -17793,11 +17633,11 @@ var ImageStore = class {
     const extension = MIME_EXTENSIONS.get(detected.mime);
     if (extension === void 0) throw new ImagePolicyError("image_mime", "Unsupported normalized image type");
     const filename = `${id}${extension}`;
-    await writeFile(join3(this.#paths.images, filename), normalized, { flag: "wx", mode: 384 });
+    await writeFile(join2(this.#paths.images, filename), normalized, { flag: "wx", mode: 384 });
     const image = {
       id,
       mimeType: detected.mime,
-      path: basename2(filename),
+      path: basename(filename),
       bytes: normalized.byteLength,
       width: detected.width,
       height: detected.height,
@@ -17811,12 +17651,12 @@ async function normalizeImage(bytes, mime, paths, env) {
   const magick = await resolveExecutable("magick", env);
   if (magick === void 0) throw new ImagePolicyError("image_decoder_unavailable", "Secure image decoding is unavailable");
   await mkdir(paths.runtime, { recursive: true, mode: 448 });
-  const temporary = await mkdtemp(join3(paths.runtime, "image-"));
+  const temporary = await mkdtemp(join2(paths.runtime, "image-"));
   try {
     const extension = MIME_EXTENSIONS.get(mime);
     if (extension === void 0) throw new ImagePolicyError("image_mime", "Unsupported image type");
-    const input2 = join3(temporary, `source${extension}`);
-    const output = join3(temporary, `normalized${extension}`);
+    const input2 = join2(temporary, `source${extension}`);
+    const output = join2(temporary, `normalized${extension}`);
     const outputTarget = mime === "image/png" ? `PNG32:${output}` : mime === "image/jpeg" ? `JPEG:${output}` : `WEBP:${output}`;
     await writeFile(input2, bytes, { flag: "wx", mode: 384 });
     const result = await runCommand(magick, [
@@ -17845,7 +17685,7 @@ async function normalizeImage(bytes, mime, paths, env) {
       outputTarget
     ], { env, timeoutMs: 15e3, maxOutput: 32768 });
     if (result.code !== 0) throw new ImagePolicyError("image_decode", "Image decoder rejected the payload");
-    const normalized = await readFile2(output);
+    const normalized = await readFile(output);
     if (normalized.byteLength === 0 || normalized.byteLength > MAX_IMAGE_BYTES) throw new ImagePolicyError("image_size", "Normalized image exceeds the 5 MiB limit");
     return normalized;
   } catch (error48) {
@@ -17967,9 +17807,9 @@ function validateDimensions(dimensions) {
 }
 async function pruneImageCache(paths = quickchatPaths()) {
   await mkdir(paths.images, { recursive: true, mode: 448 });
-  const files = (await Promise.all((await readdir2(paths.images)).map(async (name) => {
+  const files = (await Promise.all((await readdir(paths.images)).map(async (name) => {
     try {
-      const info = await stat(join3(paths.images, name));
+      const info = await stat(join2(paths.images, name));
       return info.isFile() ? { name, bytes: info.size, modified: info.mtimeMs } : void 0;
     } catch {
       return void 0;
@@ -17984,15 +17824,15 @@ async function pruneImageCache(paths = quickchatPaths()) {
   }
   if (evicted.length === 0) return;
   await removeEvictedImageReferences(paths, new Set(evicted));
-  await Promise.all(evicted.map((name) => rm(join3(paths.images, name), { force: true })));
+  await Promise.all(evicted.map((name) => rm(join2(paths.images, name), { force: true })));
 }
 async function removeEvictedImageReferences(paths, evicted) {
   await mkdir(paths.records, { recursive: true, mode: 448 });
-  for (const name of (await readdir2(paths.records)).filter((value) => /^[0-9a-f-]{36}\.json$/iu.test(value))) {
-    const destination = join3(paths.records, name);
+  for (const name of (await readdir(paths.records)).filter((value) => /^[0-9a-f-]{36}\.json$/iu.test(value))) {
+    const destination = join2(paths.records, name);
     let value;
     try {
-      value = JSON.parse(await readFile2(destination, "utf8"));
+      value = JSON.parse(await readFile(destination, "utf8"));
     } catch {
       continue;
     }
@@ -18018,7 +17858,7 @@ function isRecordWithImages(value) {
 }
 function referencesEvictedImage(value, evicted) {
   if (typeof value !== "object" || value === null || !("path" in value) || typeof value.path !== "string") return false;
-  return basename2(value.path) === value.path && evicted.has(value.path);
+  return basename(value.path) === value.path && evicted.has(value.path);
 }
 function isPublicAddress(address) {
   const version3 = isIP(address);
@@ -18110,8 +17950,8 @@ function isAllowedExternalLink(rawUrl) {
 }
 
 // runtime/src/history.ts
-import { mkdir as mkdir2, open as open2, readdir as readdir3, readFile as readFile3, rename as rename2, rm as rm2, unlink, writeFile as writeFile2 } from "node:fs/promises";
-import { basename as basename3, join as join4 } from "node:path";
+import { mkdir as mkdir2, open as open2, readdir as readdir2, readFile as readFile2, rename as rename2, rm as rm2, unlink, writeFile as writeFile2 } from "node:fs/promises";
+import { basename as basename2, join as join3 } from "node:path";
 import { pathToFileURL } from "node:url";
 var MAX_CHATS = 30;
 var HistoryStore = class {
@@ -18121,11 +17961,11 @@ var HistoryStore = class {
   }
   async list() {
     await mkdir2(this.#paths.records, { recursive: true, mode: 448 });
-    const names = await readdir3(this.#paths.records);
+    const names = await readdir2(this.#paths.records);
     const records = [];
     for (const name of names.filter((value) => /^[0-9a-f-]{36}\.json$/u.test(value))) {
       try {
-        const parsed = JSON.parse(await readFile3(join4(this.#paths.records, name), "utf8"));
+        const parsed = JSON.parse(await readFile2(join3(this.#paths.records, name), "utf8"));
         if (isChatRecord(parsed)) records.push(parsed);
       } catch {
       }
@@ -18135,7 +17975,7 @@ var HistoryStore = class {
   async get(id) {
     if (!isUuid(id)) return void 0;
     try {
-      const parsed = JSON.parse(await readFile3(join4(this.#paths.records, `${id}.json`), "utf8"));
+      const parsed = JSON.parse(await readFile2(join3(this.#paths.records, `${id}.json`), "utf8"));
       return isChatRecord(parsed) ? parsed : void 0;
     } catch {
       return void 0;
@@ -18143,7 +17983,7 @@ var HistoryStore = class {
   }
   async save(chat) {
     await mkdir2(this.#paths.records, { recursive: true, mode: 448 });
-    const destination = join4(this.#paths.records, `${chat.id}.json`);
+    const destination = join3(this.#paths.records, `${chat.id}.json`);
     const temporary = `${destination}.${process.pid}.tmp`;
     await writeFile2(temporary, `${JSON.stringify(chat)}
 `, { encoding: "utf8", mode: 384, flag: "wx" });
@@ -18159,13 +17999,13 @@ var HistoryStore = class {
     if (!isUuid(id)) return void 0;
     const chat = await this.get(id);
     try {
-      await unlink(join4(this.#paths.records, `${id}.json`));
+      await unlink(join3(this.#paths.records, `${id}.json`));
     } catch {
       return void 0;
     }
     if (chat !== void 0) {
       await Promise.all(chat.images.map(async (image) => {
-        if (basename3(image.path) === image.path) await rm2(join4(this.#paths.images, image.path), { force: true });
+        if (basename2(image.path) === image.path) await rm2(join3(this.#paths.images, image.path), { force: true });
       }));
     }
     return chat;
@@ -18184,10 +18024,10 @@ var HistoryStore = class {
   }
   async listAll() {
     await mkdir2(this.#paths.records, { recursive: true, mode: 448 });
-    const names = await readdir3(this.#paths.records);
+    const names = await readdir2(this.#paths.records);
     const records = await Promise.all(names.filter((name) => name.endsWith(".json")).map(async (name) => {
       try {
-        const parsed = JSON.parse(await readFile3(join4(this.#paths.records, name), "utf8"));
+        const parsed = JSON.parse(await readFile2(join3(this.#paths.records, name), "utf8"));
         return isChatRecord(parsed) ? parsed : void 0;
       } catch {
         return void 0;
@@ -18197,10 +18037,21 @@ var HistoryStore = class {
   }
 };
 function presentImage(image, paths = quickchatPaths()) {
-  return { ...image, path: basename3(image.path), localUrl: pathToFileURL(join4(paths.images, basename3(image.path))).toString() };
+  return { ...image, path: basename2(image.path), localUrl: pathToFileURL(join3(paths.images, basename2(image.path))).toString() };
 }
 function presentChat(chat, paths = quickchatPaths()) {
-  return { ...chat, images: chat.images.map((image) => presentImage(image, paths)) };
+  return {
+    schemaVersion: chat.schemaVersion,
+    id: chat.id,
+    createdAt: chat.createdAt,
+    title: chat.title,
+    provider: chat.provider,
+    ...chat.model === void 0 ? {} : { model: chat.model },
+    question: chat.question,
+    answer: chat.answer,
+    images: chat.images.map((image) => presentImage(image, paths)),
+    session: chat.session
+  };
 }
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
@@ -18211,16 +18062,17 @@ function isChatRecord(value) {
 }
 
 // runtime/src/acp.ts
+var QUICKCHAT_CLIENT_VERSION = "0.2.0";
 async function probeAcpModels(provider, timeoutMs = 15e3) {
   if (provider.id === "codex") return probeCodexModels(provider, timeoutMs);
-  const child = spawn3(provider.agent.executable, provider.agent.args, {
-    env: secureEnvironment(provider, "answer"),
+  const child = spawn2(provider.agent.executable, provider.agent.args, {
+    env: secureEnvironment(provider),
     stdio: ["pipe", "pipe", "ignore"],
     detached: process.platform !== "win32"
   });
   const paths = quickchatPaths(provider.agent.env);
   await mkdir3(paths.runtime, { recursive: true, mode: 448 });
-  const cwd = await mkdtemp2(join5(paths.runtime, "probe-"));
+  const cwd = await mkdtemp2(join4(paths.runtime, "probe-"));
   const timeout = setTimeout(() => terminateProcessGroup(child.pid), timeoutMs);
   timeout.unref();
   try {
@@ -18233,11 +18085,11 @@ async function probeAcpModels(provider, timeoutMs = 15e3) {
       const initialized = await ctx.request(methods.agent.initialize, {
         protocolVersion: PROTOCOL_VERSION,
         clientCapabilities: { session: { configOptions: { boolean: {} } } },
-        clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }
+        clientInfo: { name: "omarchy-quickchat", version: QUICKCHAT_CLIENT_VERSION }
       });
       const ephemeral = provider.id === "claude";
       if (!ephemeral && !canRemoveSession(initialized.agentCapabilities)) return { models: [] };
-      const session = await ctx.buildSession(providerSessionRequest(provider, cwd, "answer", ephemeral)).start();
+      const session = await ctx.buildSession(providerSessionRequest(provider, cwd, ephemeral)).start();
       const config2 = modelConfiguration(session.newSessionResponse.configOptions ?? []);
       session.dispose();
       if (!ephemeral) await removeSession(ctx, initialized.agentCapabilities, session.sessionId);
@@ -18254,7 +18106,7 @@ async function probeAcpModels(provider, timeoutMs = 15e3) {
 async function probeCodexModels(provider, timeoutMs) {
   const maximumResponseLineBytes = 4 * 1024 * 1024;
   const featureArgs = (provider.lockdownFeatures ?? []).flatMap((feature) => ["-c", `features.${feature}=false`]);
-  const child = spawn3(provider.harnessPath, [
+  const child = spawn2(provider.harnessPath, [
     "app-server",
     "--strict-config",
     "-c",
@@ -18319,7 +18171,7 @@ async function probeCodexModels(provider, timeoutMs) {
         jsonrpc: "2.0",
         id: 1,
         method: "initialize",
-        params: { clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }, capabilities: { experimentalApi: true, requestAttestation: false } }
+        params: { clientInfo: { name: "omarchy-quickchat", version: QUICKCHAT_CLIENT_VERSION }, capabilities: { experimentalApi: true, requestAttestation: false } }
       })}
 `);
     });
@@ -18350,8 +18202,8 @@ function isObject2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 async function deleteAcpSession(provider, sessionId, timeoutMs = 15e3) {
-  const child = spawn3(provider.agent.executable, provider.agent.args, {
-    env: secureEnvironment(provider, "answer"),
+  const child = spawn2(provider.agent.executable, provider.agent.args, {
+    env: secureEnvironment(provider),
     stdio: ["pipe", "pipe", "ignore"],
     detached: process.platform !== "win32"
   });
@@ -18363,7 +18215,7 @@ async function deleteAcpSession(provider, sessionId, timeoutMs = 15e3) {
       const initialized = await ctx.request(methods.agent.initialize, {
         protocolVersion: PROTOCOL_VERSION,
         clientCapabilities: {},
-        clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }
+        clientInfo: { name: "omarchy-quickchat", version: QUICKCHAT_CLIENT_VERSION }
       });
       return removeSession(ctx, initialized.agentCapabilities, sessionId);
     });
@@ -18384,9 +18236,9 @@ async function deleteAcpSession(provider, sessionId, timeoutMs = 15e3) {
     terminateProcessGroup(child.pid);
   }
 }
-function runAcpQuestion(provider, requestId, question, model, capability, emit2, timeoutMs = 9e4, imageStore = new ImageStore(), requestPermission, cancelPermissions) {
-  const child = spawn3(provider.agent.executable, provider.agent.args, {
-    env: secureEnvironment(provider, capability),
+function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs = 9e4, imageStore = new ImageStore(), requestPermission, cancelPermissions) {
+  const child = spawn2(provider.agent.executable, provider.agent.args, {
+    env: secureEnvironment(provider),
     stdio: ["pipe", "pipe", "pipe"],
     detached: process.platform !== "win32"
   });
@@ -18404,7 +18256,7 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
   const result = (async () => {
     const paths = quickchatPaths(provider.agent.env);
     await mkdir3(paths.runtime, { recursive: true, mode: 448 });
-    const cwd = await mkdtemp2(join5(paths.runtime, "chat-"));
+    const cwd = await mkdtemp2(join4(paths.runtime, "chat-"));
     const timeout = setTimeout(() => {
       void cancel();
     }, timeoutMs);
@@ -18418,9 +18270,10 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
       let modelOptions = [];
       let defaultModel;
       let resumable = false;
+      const allowedOpenCodeToolCalls = /* @__PURE__ */ new Set();
       const text = new GuardedTextEmitter(requestId, emit2);
       const app = client({ name: "omarchy-quickchat" }).onRequest(methods.client.session.requestPermission, async ({ params }) => {
-        if (capability !== "tools" || requestPermission === void 0) {
+        if (provider.id === "opencode" || requestPermission === void 0) {
           forbiddenToolAttempt = true;
           return { outcome: { outcome: "cancelled" } };
         }
@@ -18445,11 +18298,11 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
         const initialized = await ctx.request(methods.agent.initialize, {
           protocolVersion: PROTOCOL_VERSION,
           clientCapabilities: { session: { configOptions: { boolean: {} } } },
-          clientInfo: { name: "omarchy-quickchat", version: "0.1.0" }
+          clientInfo: { name: "omarchy-quickchat", version: QUICKCHAT_CLIENT_VERSION }
         });
         if (initialized.protocolVersion !== PROTOCOL_VERSION) throw new Error("ACP protocol version is unsupported");
         resumable = initialized.agentCapabilities?.loadSession === true;
-        const newRequest = providerSessionRequest(provider, cwd, capability);
+        const newRequest = providerSessionRequest(provider, cwd);
         const session = await ctx.buildSession(newRequest).start();
         sessionIdentifier = session.sessionId;
         cancelSession = async () => {
@@ -18478,7 +18331,7 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
               break;
             }
             if (update.kind === "stop") break;
-            if (capability === "answer" && isToolUpdate(update.update.sessionUpdate)) {
+            if (provider.id === "opencode" && !openCodeToolUpdateAllowed(update.update, allowedOpenCodeToolCalls)) {
               forbiddenToolAttempt = true;
               await ctx.notify(methods.agent.session.cancel, { sessionId: session.sessionId });
               break;
@@ -18490,7 +18343,7 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
             if (handled.image !== void 0) images.push(handled.image);
           }
           await promptPromise;
-          if (forbiddenToolAttempt) throw forbiddenToolError(provider, capability);
+          if (forbiddenToolAttempt) throw forbiddenToolError();
           text.finish();
         } catch (error48) {
           await ctx.notify(methods.agent.session.cancel, { sessionId: session.sessionId }).catch(() => void 0);
@@ -18500,7 +18353,7 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
         session.dispose();
       });
       if (cancelled) throw new BrokerAcpError("cancelled", "Question was cancelled", false);
-      if (forbiddenToolAttempt) throw forbiddenToolError(provider, capability);
+      if (forbiddenToolAttempt) throw forbiddenToolError();
       return {
         answer,
         images,
@@ -18511,7 +18364,7 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
       };
     } catch (error48) {
       if (error48 instanceof BrokerAcpError) throw error48;
-      if (error48 instanceof ForbiddenToolMarkupError || forbiddenToolAttempt) throw forbiddenToolError(provider, capability);
+      if (error48 instanceof ForbiddenToolMarkupError || forbiddenToolAttempt) throw forbiddenToolError();
       throw new BrokerAcpError(
         cancelled ? "cancelled" : "agent_failed",
         cancelled ? "Question was cancelled" : "The selected harness failed to answer",
@@ -18525,23 +18378,24 @@ function runAcpQuestion(provider, requestId, question, model, capability, emit2,
   })();
   return { result, cancel };
 }
-function secureEnvironment(provider, capability) {
+function secureEnvironment(provider) {
   if (provider.id === "codex") {
-    const features = Object.fromEntries((provider.lockdownFeatures ?? []).map((feature) => [feature, capability === "tools" && (feature === "shell_tool" || feature === "unified_exec")]));
+    const features = Object.fromEntries((provider.lockdownFeatures ?? []).map((feature) => [feature, feature === "shell_tool" || feature === "unified_exec"]));
     const config2 = {
-      // Codex read-only still permits reads; on-request routes command attempts
-      // to Quickchat's exact allow-once handler in Tools and deny-all handler in
-      // Answer/Web.
+      // Codex read-only still permits host reads. Keep native web search off so
+      // those unapproved reads cannot be exfiltrated through a model-controlled
+      // search query. On-request routes any network or broader command through
+      // Quickchat's exact allow-once handler.
       approval_policy: "on-request",
       sandbox_mode: "read-only",
-      web_search: capability === "web" ? "live" : "disabled",
+      web_search: "disabled",
       mcp_servers: {},
       features
     };
     return { ...provider.agent.env, CODEX_CONFIG: JSON.stringify(config2), INITIAL_AGENT_MODE: "read-only" };
   }
   if (provider.id === "opencode") {
-    const permission = capability === "web" ? { "*": "deny", websearch: "allow", webfetch: "allow" } : { "*": "deny" };
+    const permission = { "*": "deny", websearch: "allow" };
     return { ...provider.agent.env, OPENCODE_PERMISSION: JSON.stringify(permission) };
   }
   return provider.agent.env;
@@ -18556,11 +18410,11 @@ async function removeSession(ctx, capabilities, sessionId) {
   }
   return false;
 }
-function providerSessionRequest(provider, cwd, capability, ephemeral = false) {
+function providerSessionRequest(provider, cwd, ephemeral = false) {
   const base = { cwd, mcpServers: [] };
   if (provider.id !== "claude") return base;
-  const tools = capability === "tools" ? ["Bash"] : capability === "web" ? ["WebSearch", "WebFetch"] : [];
-  const systemPrompt = capability === "tools" ? "Answer the user's question directly and concisely. You may use Bash only inside the isolated disposable workspace. Host files, credentials, network, and writes outside that workspace are unavailable." : "Answer the user's question directly and concisely. Do not access local files or execute commands.";
+  const tools = ["Bash", "WebSearch"];
+  const systemPrompt = "Answer the user's question directly and concisely. Use web search when current information is useful. You may use Bash only inside the isolated disposable workspace. Host files, credentials, direct network access, and writes outside that workspace are unavailable.";
   return {
     ...base,
     _meta: {
@@ -18571,31 +18425,29 @@ function providerSessionRequest(provider, cwd, capability, ephemeral = false) {
           ...ephemeral ? { persistSession: false } : {},
           disallowedTools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "NotebookEdit", "Task", "Agent", "WebSearch", "WebFetch"].filter((tool) => !tools.includes(tool)),
           settingSources: [],
-          ...capability === "tools" ? {
-            settings: {
-              permissions: {
-                ask: ["Bash(*)"],
-                deny: ["Write(*)", "Edit(*)", "NotebookEdit(*)", "Task(*)", "Agent(*)"],
-                disableBypassPermissionsMode: "disable"
-              }
-            },
-            sandbox: {
-              enabled: true,
-              failIfUnavailable: true,
-              autoAllowBashIfSandboxed: false,
-              allowUnsandboxedCommands: false,
-              network: { allowedDomains: [], strictAllowlist: true, allowLocalBinding: false, allowUnixSockets: [] },
-              filesystem: {
-                denyRead: sandboxDeniedReadPaths(),
-                allowRead: [cwd, "/dev/null", "/etc/ld.so.cache"],
-                denyWrite: ["/"],
-                allowWrite: [cwd]
-              },
-              credentials: {
-                envVars: sandboxCredentialEnvironment(provider.agent.env)
-              }
+          settings: {
+            permissions: {
+              ask: ["Bash(*)"],
+              deny: ["Write(*)", "Edit(*)", "NotebookEdit(*)", "Task(*)", "Agent(*)"],
+              disableBypassPermissionsMode: "disable"
             }
-          } : {}
+          },
+          sandbox: {
+            enabled: true,
+            failIfUnavailable: true,
+            autoAllowBashIfSandboxed: true,
+            allowUnsandboxedCommands: false,
+            network: { allowedDomains: [], strictAllowlist: true, allowLocalBinding: false, allowUnixSockets: [] },
+            filesystem: {
+              denyRead: sandboxDeniedReadPaths(),
+              allowRead: [cwd, "/dev/null", "/etc/ld.so.cache"],
+              denyWrite: ["/"],
+              allowWrite: [cwd]
+            },
+            credentials: {
+              envVars: sandboxCredentialEnvironment(provider.agent.env)
+            }
+          }
         }
       }
     }
@@ -18669,14 +18521,25 @@ var GuardedTextEmitter = class {
 function containsToolMarkup(value) {
   return /<\/?(?:[|｜]{1,2}\s*DSML\s*[|｜]{1,2}\s*)?(?:tool[_ -]?calls?|function[_ -]?calls?|invoke|parameter)\b/iu.test(value);
 }
-function isToolUpdate(kind) {
-  return kind === "tool_call" || kind === "tool_call_update";
-}
-function forbiddenToolError(provider, capability) {
-  if (capability !== "tools" && provider.capabilities.includes("tools")) {
-    return new BrokerAcpError("tool_mode_required", "This request needs Tools mode. Select Tools and try again", false);
+function openCodeToolUpdateAllowed(update, allowedCalls) {
+  if (update.sessionUpdate !== "tool_call" && update.sessionUpdate !== "tool_call_update") return true;
+  const toolCallId = typeof update.toolCallId === "string" ? update.toolCallId : "";
+  if (toolCallId === "") return false;
+  if (update.sessionUpdate === "tool_call") {
+    if (!isAllowedOpenCodeTool(update)) return false;
+    allowedCalls.add(toolCallId);
+    return true;
   }
-  return new BrokerAcpError("forbidden_tool_attempt", "The harness attempted a tool that Quickchat does not permit", false);
+  if (!allowedCalls.has(toolCallId)) return false;
+  if (update.kind !== void 0 && update.kind !== null && update.kind !== "search" && update.kind !== "other") return false;
+  if (update.name !== void 0 && update.name !== null && update.name !== "websearch") return false;
+  return true;
+}
+function isAllowedOpenCodeTool(update) {
+  return (update.kind === "other" || update.kind === "search") && (update.name === "websearch" || update.title === "websearch");
+}
+function forbiddenToolError() {
+  return new BrokerAcpError("forbidden_tool_attempt", "The selected harness attempted a device tool that Quickchat cannot safely authorize", false);
 }
 var ForbiddenToolMarkupError = class extends Error {
   constructor() {
@@ -18751,8 +18614,8 @@ function webReadable(child) {
 }
 
 // runtime/src/dictation.ts
-import { mkdir as mkdir4, readFile as readFile4, rm as rm4 } from "node:fs/promises";
-import { join as join6 } from "node:path";
+import { mkdir as mkdir4, readFile as readFile3, rm as rm4 } from "node:fs/promises";
+import { join as join5 } from "node:path";
 var DictationService = class {
   #paths;
   #env;
@@ -18763,7 +18626,7 @@ var DictationService = class {
   constructor(paths = quickchatPaths(), env = process.env) {
     this.#paths = paths;
     this.#env = env;
-    this.#transcript = join6(paths.runtime, "dictation.txt");
+    this.#transcript = join5(paths.runtime, "dictation.txt");
   }
   async available() {
     this.#voxtype ??= await resolveExecutable("voxtype", this.#env);
@@ -18799,7 +18662,7 @@ var DictationService = class {
     while (Date.now() < deadline) {
       if (generation !== this.#generation) throw new DictationCancelledError();
       try {
-        const text = (await readFile4(this.#transcript, "utf8")).trim();
+        const text = (await readFile3(this.#transcript, "utf8")).trim();
         if (text !== "") {
           await rm4(this.#transcript, { force: true });
           return text;
@@ -18835,7 +18698,7 @@ function dictationStartArgs(transcript) {
 }
 
 // runtime/src/herdr.ts
-import { spawn as spawn4 } from "node:child_process";
+import { spawn as spawn3 } from "node:child_process";
 var HerdrHandoffError = class extends Error {
   stage;
   errorCode;
@@ -18989,7 +18852,7 @@ async function continueInHerdr(chat, env = process.env, dependencies = {}) {
 }
 async function launchDetached(executable, args, env) {
   await new Promise((resolveLaunch, rejectLaunch) => {
-    const child = spawn4(executable, args, { env, stdio: "ignore", detached: true });
+    const child = spawn3(executable, args, { env, stdio: "ignore", detached: true });
     child.once("error", rejectLaunch);
     child.once("spawn", () => {
       child.unref();
@@ -19233,7 +19096,7 @@ function exactInput(kind, value) {
   if (typeof source.command !== "string" || source.command === "") return void 0;
   if (hasUnsafeCommandText(source.command)) return void 0;
   const remaining = { ...source, command: "" };
-  if (hasUnsafeText2(remaining)) return void 0;
+  if (hasUnsafeText(remaining)) return void 0;
   let rendered;
   try {
     rendered = JSON.stringify(value, null, 2);
@@ -19246,13 +19109,13 @@ function exactInput(kind, value) {
 function hasUnsafeCommandText(value) {
   return /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(value);
 }
-function hasUnsafeText2(value, seen = /* @__PURE__ */ new Set()) {
+function hasUnsafeText(value, seen = /* @__PURE__ */ new Set()) {
   if (typeof value === "string") return /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(value);
   if (value === null || typeof value !== "object") return false;
   if (seen.has(value)) return true;
   seen.add(value);
-  if (Array.isArray(value)) return value.some((item) => hasUnsafeText2(item, seen));
-  return Object.entries(value).some(([key, item]) => hasUnsafeText2(key, seen) || hasUnsafeText2(item, seen));
+  if (Array.isArray(value)) return value.some((item) => hasUnsafeText(item, seen));
+  return Object.entries(value).some(([key, item]) => hasUnsafeText(key, seen) || hasUnsafeText(item, seen));
 }
 function boundedText(value, limit) {
   return value.replaceAll(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu, " ").trim().slice(0, limit);
@@ -19267,6 +19130,11 @@ var providerNames = {
   codex: "Codex",
   claude: "Claude",
   opencode: "OpenCode"
+};
+var providerPolicies = {
+  codex: { tools: "device-approval", web: "approved-command", hostReads: true },
+  claude: { tools: "sandboxed", web: "search", hostReads: false },
+  opencode: { tools: "blocked", web: "search", hostReads: false }
 };
 async function isExecutable(path) {
   try {
@@ -19342,15 +19210,14 @@ async function discoverProviders(env = process.env) {
     if (executable === void 0) continue;
     const lockdownFeatures = id === "codex" ? await codexToolLockdownFeatures(harnessPath, env) : void 0;
     if (id === "codex" && lockdownFeatures === void 0) continue;
-    const codexToolsReady = id === "codex" && lockdownFeatures?.includes("shell_tool") === true && lockdownFeatures.includes("unified_exec");
-    const capabilities = id === "claude" || codexToolsReady ? ["answer", "web", "tools"] : ["answer", "web"];
+    if (id === "codex" && (lockdownFeatures?.includes("shell_tool") !== true || !lockdownFeatures.includes("unified_exec"))) continue;
     const providerVersion = await version2(harnessPath, env);
     found.push({
       id,
       name: providerNames[id],
       ...providerVersion === void 0 ? {} : { version: providerVersion },
       models: [],
-      capabilities,
+      policy: providerPolicies[id],
       harnessPath,
       agent: { executable, args, env: agentEnvironment(id, harnessPath, env) },
       ...lockdownFeatures === void 0 ? {} : { lockdownFeatures }
@@ -19397,12 +19264,10 @@ var QuickchatBroker = class {
   #herdrContinue;
   #env;
   #permissionTimeoutMs;
-  #localActions;
   #providers = /* @__PURE__ */ new Map();
   #runs = /* @__PURE__ */ new Map();
   #handoffs = /* @__PURE__ */ new Map();
   #permissions = /* @__PURE__ */ new Map();
-  #pendingLocalActions = /* @__PURE__ */ new Map();
   #submissions = /* @__PURE__ */ new Set();
   #dictationGeneration = 0;
   constructor(emit2, options = {}) {
@@ -19414,7 +19279,6 @@ var QuickchatBroker = class {
     this.#herdrContinue = options.herdrContinue ?? continueInHerdr;
     this.#env = options.env ?? process.env;
     this.#permissionTimeoutMs = options.permissionTimeoutMs ?? 6e4;
-    this.#localActions = options.localActions ?? new DesktopActionService(this.#env);
   }
   async handle(command) {
     switch (command.type) {
@@ -19473,8 +19337,8 @@ var QuickchatBroker = class {
     return true;
   }
   async #initialize(command) {
-    if (command.protocolVersion !== 1) {
-      this.#error("unsupported_protocol", "Quickchat supports broker protocol version 1", false);
+    if (command.protocolVersion !== 2) {
+      this.#error("unsupported_protocol", "Quickchat supports broker protocol version 2", false);
       return;
     }
     const discovered = await discoverProviders(this.#env);
@@ -19486,7 +19350,7 @@ var QuickchatBroker = class {
     }));
     this.#providers = new Map(discovered.map((provider) => [provider.id, provider]));
     const history = (await this.#history.list()).map((chat) => presentChat(chat));
-    this.#emit({ type: "ready", protocolVersion: 1, providers: discovered.map(publicProvider), history });
+    this.#emit({ type: "ready", protocolVersion: 2, providers: discovered.map(publicProvider), history });
   }
   async #submit(command) {
     if (this.#submissions.has(command.id)) {
@@ -19506,22 +19370,12 @@ var QuickchatBroker = class {
       this.#error("provider_unavailable", "The selected harness is not installed and authenticated", false, command.id);
       return;
     }
-    if (!provider.capabilities.includes(command.capability)) {
-      this.#error("capability_unavailable", "This harness cannot safely enforce the selected capability", false, command.id);
-      return;
-    }
-    const action = await this.#localActions.resolve(command.question);
-    if (action.kind === "launch") {
-      await this.#submitLocalAction(command, action.action);
-      return;
-    }
     this.#emit({ type: "state", id: command.id, state: "preparing", message: `Preparing ${provider.name}\u2026` });
     const run = runAcpQuestion(
       provider,
       command.id,
       command.question,
       command.model,
-      command.capability,
       this.#emit,
       9e4,
       this.#images,
@@ -19545,7 +19399,6 @@ var QuickchatBroker = class {
         title: command.question.replaceAll(/\s+/g, " ").slice(0, 80),
         provider: provider.id,
         ...selectedModel === void 0 ? {} : { model: selectedModel },
-        capability: command.capability,
         question: command.question,
         answer: result.answer,
         images: result.images,
@@ -19567,63 +19420,6 @@ var QuickchatBroker = class {
       this.#cancelPermissions(command.id);
       this.#runs.delete(command.id);
     }
-  }
-  async #submitLocalAction(command, action) {
-    const controller = new AbortController();
-    this.#pendingLocalActions.set(command.id, controller);
-    this.#emit({ type: "state", id: command.id, state: "streaming", message: "Waiting for action approval\u2026" });
-    try {
-      const approved = await this.#requestLocalActionPermission(command.id, action);
-      if (!approved || controller.signal.aborted) {
-        this.#error("cancelled", "Launch canceled", false, command.id);
-        return;
-      }
-      this.#emit({ type: "state", id: command.id, state: "preparing", message: `Opening ${action.appName}\u2026` });
-      if (!await this.#localActions.launch(action, controller.signal)) {
-        if (controller.signal.aborted) {
-          this.#error("cancelled", "Launch canceled", false, command.id);
-          return;
-        }
-        this.#error("app_launch_failed", `Quickchat could not open ${action.appName}`, true, command.id);
-        return;
-      }
-      const answer = `Opened ${action.appName}.`;
-      this.#emit({ type: "content", id: command.id, delta: answer });
-      this.#emit({ type: "complete", id: command.id, answer });
-      this.#emit({ type: "state", id: command.id, state: "idle" });
-    } finally {
-      this.#cancelPermissions(command.id);
-      if (this.#pendingLocalActions.get(command.id) === controller) this.#pendingLocalActions.delete(command.id);
-    }
-  }
-  async #requestLocalActionPermission(requestId, action) {
-    const permissionId = randomUUID2();
-    const allowOptionId = "local-action-allow";
-    const view = {
-      id: permissionId,
-      requestId,
-      title: `Launch ${action.appName}`,
-      kind: "local_action",
-      authority: "local_action",
-      detail: JSON.stringify({ action: "launch_app", app: action.appName, desktopId: action.desktopId, desktopFile: action.desktopFile }, null, 2),
-      allowOnce: true
-    };
-    return new Promise((resolvePermission) => {
-      const timeout = setTimeout(() => {
-        this.#permissions.delete(permissionId);
-        this.#emit({ type: "permission_closed", id: requestId, permissionId, reason: "expired" });
-        resolvePermission(false);
-      }, this.#permissionTimeoutMs);
-      timeout.unref();
-      this.#permissions.set(permissionId, {
-        view,
-        allowOptionId,
-        rejectOptionId: "local-action-reject",
-        resolve: (optionId) => resolvePermission(optionId === allowOptionId),
-        timeout
-      });
-      this.#emit({ type: "permission", permission: view });
-    });
   }
   async #requestToolPermission(requestId, provider, request) {
     const permissionId = randomUUID2();
@@ -19660,14 +19456,9 @@ var QuickchatBroker = class {
   }
   async #cancel(id) {
     const run = this.#runs.get(id);
-    const localAction = this.#pendingLocalActions.get(id);
-    if (run === void 0 && localAction === void 0) return;
+    if (run === void 0) return;
     this.#emit({ type: "state", id, state: "stopping" });
-    if (run !== void 0) await run.cancel();
-    else {
-      localAction?.abort();
-      this.#cancelPermissions(id);
-    }
+    await run.cancel();
   }
   async #emitHistory() {
     this.#emit({ type: "history", history: (await this.#history.list()).map((chat) => presentChat(chat)) });
@@ -19753,7 +19544,7 @@ var QuickchatBroker = class {
       return;
     }
     const copied = await new Promise((resolveCopy) => {
-      const child = spawn5(copy, [], { env: this.#env, stdio: ["pipe", "ignore", "ignore"] });
+      const child = spawn4(copy, [], { env: this.#env, stdio: ["pipe", "ignore", "ignore"] });
       child.stdin.end(text);
       child.once("error", () => resolveCopy(false));
       child.once("close", (code) => resolveCopy(code === 0));
@@ -19776,7 +19567,7 @@ function publicProvider(provider) {
     id: provider.id,
     name: provider.name,
     models: provider.models,
-    capabilities: provider.capabilities,
+    policy: provider.policy,
     ...provider.version === void 0 ? {} : { version: provider.version },
     ...provider.defaultModel === void 0 ? {} : { defaultModel: provider.defaultModel }
   };
@@ -19784,7 +19575,6 @@ function publicProvider(provider) {
 
 // runtime/src/types.ts
 var providerIdSchema = external_exports.enum(["codex", "claude", "opencode"]);
-var capabilitySchema = external_exports.enum(["answer", "web", "tools"]);
 var initializeCommand = external_exports.object({
   type: external_exports.literal("initialize"),
   protocolVersion: external_exports.number().int().positive(),
@@ -19795,8 +19585,7 @@ var submitCommand = external_exports.object({
   id: external_exports.string().min(1).max(120),
   question: external_exports.string().trim().min(1).max(1e5),
   provider: providerIdSchema,
-  model: external_exports.preprocess((value) => typeof value === "string" && value.trim() === "" ? void 0 : value, external_exports.string().min(1).max(500).optional()),
-  capability: capabilitySchema.default("answer")
+  model: external_exports.preprocess((value) => typeof value === "string" && value.trim() === "" ? void 0 : value, external_exports.string().min(1).max(500).optional())
 });
 var cancelCommand = external_exports.object({ type: external_exports.literal("cancel"), id: external_exports.string().min(1).max(120) });
 var permissionResponseCommand = external_exports.object({

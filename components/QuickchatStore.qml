@@ -33,10 +33,8 @@ Scope {
   property var history: []
   property string provider: "codex"
   property string model: ""
-  property string capability: "answer"
   property var pendingPermission: null
   property var permissionQueue: []
-  property bool capabilityChosenForNextQuestion: false
   property string transcript: ""
   property string dictationPhase: ""
   property bool initialized: false
@@ -52,8 +50,7 @@ Scope {
   readonly property bool canSubmit: initialized && providers.length > 0 && !busy
   readonly property bool canRetry: !processStarted && !broker.running && state === "unavailable"
   readonly property var modelOptions: Protocol.modelOptions(providers, provider)
-  readonly property bool webSupported: Protocol.providerSupportsWeb(providers, provider)
-  readonly property bool toolsSupported: Protocol.providerSupportsTools(providers, provider)
+  readonly property var providerPolicy: Protocol.providerPolicy(providers, provider)
 
   signal answerChanged()
   signal focusComposerRequested()
@@ -112,7 +109,6 @@ Scope {
         if (providers[p].value === provider) preferred = String(providers[p].defaultModel || "")
       model = preferred || (options.length > 0 ? options[0].value : "")
     }
-    if ((capability === "web" && !webSupported) || (capability === "tools" && !toolsSupported)) capability = "answer"
   }
 
   function sendCommand(payload) {
@@ -152,8 +148,7 @@ Scope {
     permissionQueue = []
     state = "preparing"
     statusMessage = "Preparing " + Protocol.providerLabel(provider) + "…"
-    sendCommand(Protocol.submitCommand(currentId, prompt, provider, model, capability))
-    capabilityChosenForNextQuestion = false
+    sendCommand(Protocol.submitCommand(currentId, prompt, provider, model))
     answerChanged()
     return true
   }
@@ -196,8 +191,6 @@ Scope {
     pendingPermission = null
     permissionQueue = []
     transcript = ""
-    capability = "answer"
-    capabilityChosenForNextQuestion = false
     state = initialized ? "composing" : "preparing"
     statusMessage = initialized ? "" : "Starting Quickchat…"
     focusComposerRequested()
@@ -218,18 +211,6 @@ Scope {
   function deleteHistory(chatId) { sendCommand(Protocol.command("history_delete", { chatId: String(chatId) })) }
   function clearHistory() { sendCommand(Protocol.command("history_clear")) }
   function copyText(text) { sendCommand(Protocol.command("copy", { text: String(text || "") })) }
-
-  function selectCapability(value) {
-    var desired = Protocol.normalizedCapability(value)
-    if (desired === "web" && !webSupported) return
-    if (desired === "tools" && !toolsSupported) return
-    capability = desired
-    capabilityChosenForNextQuestion = state === "complete"
-  }
-
-  function prepareDraft() {
-    if (state === "complete" && !capabilityChosenForNextQuestion) capability = "answer"
-  }
 
   function retryBroker() {
     if (!canRetry) return
@@ -271,9 +252,7 @@ Scope {
     images = Array.isArray(chat.images) ? chat.images : []
     provider = Protocol.normalizedProvider(chat.provider) || provider
     model = String(chat.model || "")
-    capability = Protocol.normalizedCapability(chat.capability)
     pendingPermission = null
-    capabilityChosenForNextQuestion = false
     state = "complete"
     statusMessage = ""
     answerChanged()
@@ -351,16 +330,14 @@ Scope {
       permissionQueue = queued
       if (!pendingPermission) pendingPermission = permission
       state = "streaming"
-      statusMessage = permission.kind === "local_action" ? "Waiting for action approval…" : "Waiting for tool approval…"
+      statusMessage = "Waiting for tool approval…"
       return
     }
     if (type === "permission_closed") {
       if (String(event.id || "") !== currentId) return
-      var closedKind = pendingPermission && String(pendingPermission.id || "") === String(event.permissionId || "")
-        ? String(pendingPermission.kind || "") : ""
       closePermission(event.permissionId)
       if (String(event.reason || "") === "expired")
-        toastRequested(closedKind === "local_action" ? "Action approval expired" : "Tool approval expired")
+        toastRequested("Tool approval expired")
       return
     }
     if (type === "image") {

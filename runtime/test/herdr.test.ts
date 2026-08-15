@@ -158,7 +158,6 @@ function chat(options: { provider?: ProviderId; resumable?: boolean } = {}): Cha
     createdAt: "2026-08-11T00:00:00.000Z",
     title: "Test",
     provider: options.provider ?? "claude",
-    capability: "answer",
     question: "Question",
     answer: "Answer",
     images: [],

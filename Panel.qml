@@ -301,12 +301,9 @@ Panel {
                     Text {
                       Layout.fillWidth: true
                       text: Quickchat.QuickchatStore.pendingPermission
-                        && Quickchat.QuickchatStore.pendingPermission.authority === "local_action"
-                        ? "Quickchat will ask Omarchy to launch this installed application once."
-                        : (Quickchat.QuickchatStore.pendingPermission
-                          && Quickchat.QuickchatStore.pendingPermission.authority === "sandboxed"
+                        && Quickchat.QuickchatStore.pendingPermission.authority === "sandboxed"
                           ? "This approval applies only to this call; sandbox limits stay active."
-                          : "Review the command and working directory. Allow once may read or change device data and access the network.")
+                          : "Review the command and working directory. Allow once may read or change device data and access the network."
                       color: Qt.darker(root.foreground, 1.45)
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.caption

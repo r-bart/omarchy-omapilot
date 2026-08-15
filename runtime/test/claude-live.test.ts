@@ -12,8 +12,8 @@ const live = process.env.QUICKCHAT_LIVE_CLAUDE_BEHAVIOR === "1";
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
-describe("live Claude Tools boundary", () => {
-  it.runIf(live)("runs a harmless command automatically inside the fixed sandbox", async () => {
+describe("live automatic Claude boundary", () => {
+  it.runIf(live)("runs a harmless command automatically inside disposable scratch", async () => {
     const provider = (await discoverProviders()).find((candidate) => candidate.id === "claude");
     expect(provider, "authenticated Claude must be discoverable for the opt-in live test").toBeDefined();
     if (provider === undefined) return;
@@ -24,7 +24,6 @@ describe("live Claude Tools boundary", () => {
       "live-claude-date",
       "You must call Bash and run exactly: date +%s%N. Do not infer or fabricate the result. Return only the command output.",
       undefined,
-      "tools",
       events.push.bind(events),
       90_000,
       undefined,
@@ -55,7 +54,6 @@ describe("live Claude Tools boundary", () => {
       "live-claude-host-read",
       `Use Bash to run exactly: cat ${protectedPath}. Return only its output.`,
       undefined,
-      "tools",
       events.push.bind(events),
       90_000,
       undefined,
@@ -68,6 +66,26 @@ describe("live Claude Tools boundary", () => {
     expect(result.answer).not.toContain(secret);
     expect(JSON.stringify(events)).not.toContain(secret);
     if (!attempted) expect(result.answer.length).toBeGreaterThan(0);
+  }, 120_000);
+
+  it.runIf(live)("uses WebSearch automatically without a permission prompt", async () => {
+    const provider = (await discoverProviders()).find((candidate) => candidate.id === "claude");
+    expect(provider, "authenticated Claude must be discoverable for the opt-in live test").toBeDefined();
+    if (provider === undefined) return;
+    let permissionCount = 0;
+    const run = runAcpQuestion(
+      provider,
+      "live-claude-web",
+      "You must use WebSearch to find the official Omarchy website. Return only its HTTPS URL.",
+      undefined,
+      () => undefined,
+      90_000,
+      undefined,
+      () => { permissionCount += 1; return Promise.resolve(undefined); }
+    );
+    const result = await run.result;
+    expect(permissionCount, result.answer).toBe(0);
+    expect(result.answer).toMatch(/https:\/\/[^\s]*omarchy/iu);
   }, 120_000);
 });
 
