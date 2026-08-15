@@ -68,18 +68,23 @@ a dedicated Herdr Quickchat workspace.
   documentation while accepting legacy stored records safely.
 - [x] Prove automatic Codex/Claude tools and web policy plus fail-closed OpenCode.
 - [x] Pass focused QML/runtime tests, full validation, and deterministic build.
-- [ ] Receive independent `CLEAN` review or fix every verified finding.
-- [ ] Push the branch, open the draft PR, and pass exact-head CI.
+- [x] Receive independent `CLEAN` review or fix every verified finding.
+- [x] Push the branch, open the draft PR, and pass exact-head CI.
 
-Evidence before review: `./scripts/validate.sh` passes 104 runtime tests with
+Final evidence: `./scripts/validate.sh` passes 105 runtime tests with
 six explicit live skips; the QML contract passes 17 protocol and three
 permission-focus tests; authenticated direct tests pass Codex automatic
 read-only plus one exact allow-once command, Claude automatic scratch command,
 host-read denial, and WebSearch, and OpenCode automatic websearch. The OpenCode
 test covers its live ACP `other`/`websearch` identity plus fail-closed
 reclassification. Two consecutive broker builds are byte-identical and
-`npm audit --omit=dev` reports zero vulnerabilities. No CUA, installed plugin,
-desktop configuration, release, or marketplace state was changed.
+`npm audit --omit=dev` reports zero vulnerabilities. Independent Claude review
+found one Medium and one Low; both were fixed in `3ef737d`, and the exact-fix
+re-review returned `CLEAN`. Draft PR
+<https://github.com/spencerbull/omarchy-quickchat/pull/1> targets `main`; its
+validate/package workflow is required green on the final PR head. No CUA,
+installed plugin, desktop configuration, release, or marketplace state was
+changed.
 
 ## Allowed actions
 
