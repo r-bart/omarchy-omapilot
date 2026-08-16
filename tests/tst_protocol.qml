@@ -75,7 +75,7 @@ TestCase {
     compare(missing.tools, "blocked")
     compare(missing.web, "blocked")
     verify(!missing.hostReads)
-    compare(Protocol.providerPolicyDescription("opencode", missing), "OpenCode runs without web or device tools.")
+    compare(Protocol.providerPolicyDescription("opencode", missing), "OpenCode tool policy is unavailable.")
     verify(Protocol.providerPolicyDescription("opencode", { tools: "device-approval", web: "search", hostReads: false }).indexOf("relevant installed skills") >= 0)
     verify(Protocol.providerPolicyDescription("claude", { tools: "device-approval", web: "blocked", hostReads: false }).indexOf("web search") < 0)
   }

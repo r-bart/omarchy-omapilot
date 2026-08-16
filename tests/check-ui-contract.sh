@@ -74,8 +74,11 @@ if grep -Fqi 'local_action' "$repo_dir/Panel.qml" "$repo_dir/components/Protocol
 fi
 grep -Fq 'visible: !root.backend || root.backend.pendingPermission === null' \
   "$repo_dir/components/Composer.qml"
-grep -Fq 'QuickchatStore.pendingPermission.authority === "sandboxed"' \
-  "$repo_dir/Panel.qml"
+if rg -n 'sandboxed|Device commands stay blocked|sandbox limits stay active' \
+  "$repo_dir/Panel.qml" "$repo_dir/components/Protocol.js"; then
+  printf 'QML permission copy must not retain unreachable legacy policy branches\n' >&2
+  exit 1
+fi
 grep -Fq 'Allow once may read or change device data and access the network' \
   "$repo_dir/Panel.qml"
 grep -Fq 'readonly property bool popupOpen:' "$repo_dir/components/Composer.qml"

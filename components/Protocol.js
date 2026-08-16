@@ -223,8 +223,7 @@ function normalizeProviders(input) {
 
 function normalizedProviderPolicy(raw) {
   var value = raw && typeof raw === "object" ? raw : {}
-  var tools = ["device-approval", "sandboxed", "blocked"].indexOf(value.tools) >= 0
-    ? String(value.tools) : "blocked"
+  var tools = value.tools === "device-approval" ? "device-approval" : "blocked"
   var web = ["approved-command", "search", "blocked"].indexOf(value.web) >= 0
     ? String(value.web) : "blocked"
   return { tools: tools, web: web, hostReads: value.hostReads === true }
@@ -241,16 +240,7 @@ function providerPolicy(providers, provider) {
 function providerPolicyDescription(provider, rawPolicy) {
   var label = providerLabel(provider) || "This harness"
   var policy = normalizedProviderPolicy(rawPolicy)
-  if (policy.tools === "sandboxed") {
-    var searchClause = policy.web === "search" ? " and can search the web" : ""
-    return label + " uses tools in disposable scratch" + searchClause
-      + ". Host files, credentials, direct command network access, and outside writes stay blocked."
-  }
-  if (policy.tools === "blocked") {
-    return policy.web === "search"
-      ? label + " can search the web. Device commands stay blocked until its harness can present an exact approval."
-      : label + " runs without web or device tools."
-  }
+  if (policy.tools !== "device-approval") return label + " tool policy is unavailable."
   var skillsClause = " It can load relevant installed skills automatically."
   if (policy.hostReads) {
     return policy.web === "approved-command"
@@ -280,8 +270,7 @@ function normalizedPermission(raw, currentRequestId) {
     requestId: requestId,
     title: String(value.title || "Tool request").slice(0, 120),
     kind: kind,
-    authority: value.authority === "device" || value.authority === "sandboxed"
-      ? String(value.authority) : "device",
+    authority: "device",
     detail: String(value.detail || "").slice(0, 3000),
     allowOnce: value.allowOnce === true
   }

@@ -184,9 +184,14 @@ turn per provider.
   skill loading, harmless approved commands for all providers, Claude/OpenCode
   web behavior, Claude scratch execution, Claude denied host-file isolation,
   and OpenCode denied-command integrity.
-  Two release archives were byte-identical (SHA-256
-  `063e269c520d7b1dd357b888a4e742fac6d0f581974d16ddef13b01419f3b5ae`).
-- [ ] Receive a clean independent final review or fix every verified finding.
+  Two release archives from the same tree were byte-identical. Their SHA-256
+  stays out-of-band because the archive provenance embeds the commit and Node
+  version; a hash committed into this ledger would necessarily describe its
+  parent tree rather than the commit containing it.
+- [x] Receive a clean independent final review or fix every verified finding.
+  `qc_tools_review` returned CLEAN for `271966f..a773559`; its medium findings
+  were resolved and the exact remediation tree passed source/dist and package
+  parity checks.
 - [ ] Push, open the PR, pass exact-head CI, and install the reviewed candidate.
 
 ## Allowed actions

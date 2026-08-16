@@ -352,7 +352,7 @@ const readySchema = z.object({
     id: z.string(),
     models: z.array(z.object({ id: z.string(), name: z.string() })),
     policy: z.object({
-      tools: z.enum(["device-approval", "sandboxed", "blocked"]),
+      tools: z.literal("device-approval"),
       web: z.enum(["approved-command", "search", "blocked"]),
       hostReads: z.boolean()
     })

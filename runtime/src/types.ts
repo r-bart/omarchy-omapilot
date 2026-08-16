@@ -75,7 +75,7 @@ export type BrokerCommand = z.infer<typeof commandSchema>;
 
 export type ModelOption = { id: string; name: string; description?: string };
 export type ProviderPolicyInfo = {
-  tools: "device-approval" | "sandboxed" | "blocked";
+  tools: "device-approval";
   web: "approved-command" | "search" | "blocked";
   hostReads: boolean;
 };
@@ -105,7 +105,7 @@ export type ToolPermission = {
   requestId: string;
   title: string;
   kind: "execute";
-  authority: "device" | "sandboxed";
+  authority: "device";
   detail: string;
   allowOnce: boolean;
 };
