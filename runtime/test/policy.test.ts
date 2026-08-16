@@ -311,6 +311,10 @@ describe("provider security profiles", () => {
       { id: "claude", policy: { tools: "device-approval", web: "search", hostReads: false } },
       { id: "opencode", policy: { tools: "device-approval", web: "search", hostReads: false } }
     ]);
+    const opencode = providers.find((provider) => provider.id === "opencode");
+    expect(opencode).toBeDefined();
+    const config = JSON.parse(opencode?.agent.env.OPENCODE_CONFIG_CONTENT ?? "{}");
+    expect(config).toMatchObject({ default_agent: "build", skills: { urls: [] }, mcp: { "fixture-user-mcp": false } });
   });
 });
 
