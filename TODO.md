@@ -192,7 +192,14 @@ turn per provider.
   `qc_tools_review` returned CLEAN for `271966f..a773559`; its medium findings
   were resolved and the exact remediation tree passed source/dist and package
   parity checks.
-- [ ] Push, open the PR, pass exact-head CI, and install the reviewed candidate.
+- [x] Push, open the PR, pass exact-head CI, and install the reviewed candidate.
+  PR #3 targets `main`; GitHub Actions run 34 passed validation and packaging at
+  reviewed code SHA `a72436c`. That payload is installed at
+  `~/.config/omarchy/plugins/io.github.spencerbull.quickchat`; the installed
+  broker returned protocol 2, three providers, and `desktop-context` before a
+  lock-guarded shell restart. `shell.json` remained byte-identical, preserving
+  the center placement and provider/model settings. Rollback snapshot:
+  `~/.local/state/omarchy-quickchat-backups/20260816-1428-before-a72436c`.
 
 ## Allowed actions
 
