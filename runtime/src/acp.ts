@@ -204,12 +204,14 @@ export function runAcpQuestion(
     detached: process.platform !== "win32"
   });
   let cancelSession: (() => Promise<void>) | undefined;
+  let activeText: GuardedTextEmitter | undefined;
   let cancelled = false;
   let forbiddenToolAttempt = false;
   child.stderr?.resume();
 
   const cancel = async (): Promise<void> => {
     cancelled = true;
+    activeText?.discard();
     cancelPermissions?.();
     if (cancelSession !== undefined) await cancelSession().catch(() => undefined);
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
@@ -234,6 +236,7 @@ export function runAcpQuestion(
       const allowedOpenCodeToolCalls = new Set<string>();
 
       const text = new GuardedTextEmitter(requestId, emit);
+      activeText = text;
       const app = acp.client({ name: "omarchy-quickchat" })
         .onRequest(acp.methods.client.session.requestPermission, async ({ params }) => {
           if (provider.id === "opencode" || requestPermission === undefined) {
@@ -303,8 +306,10 @@ export function runAcpQuestion(
           }
           await promptPromise;
           if (forbiddenToolAttempt) throw forbiddenToolError();
-          text.finish();
+          if (cancelled) text.discard();
+          else text.finish();
         } catch (error) {
+          text.discard();
           await ctx.notify(acp.methods.agent.session.cancel, { sessionId: session.sessionId }).catch(() => undefined);
           await promptPromise.catch(() => undefined);
           throw error;
@@ -331,6 +336,8 @@ export function runAcpQuestion(
         !cancelled
       );
     } finally {
+      activeText?.discard();
+      activeText = undefined;
       clearTimeout(timeout);
       terminateProcessGroup(child.pid);
       await rm(cwd, { recursive: true, force: true });
@@ -485,27 +492,141 @@ async function handleContent(
   return {};
 }
 
-const TEXT_GUARD_TAIL = 64;
+const STREAM_FLUSH_INTERVAL_MS = 32;
+const STREAM_FLUSH_SIZE = 2_048;
+const MAX_TOOL_MARKUP_PREFIX = 4_096;
+const TOOL_MARKUP_NAMES = [
+  "toolcall", "toolcalls", "tool_call", "tool_calls", "tool-call", "tool-calls", "tool call", "tool calls",
+  "functioncall", "functioncalls", "function_call", "function_calls", "function-call", "function-calls", "function call", "function calls",
+  "invoke", "parameter"
+];
 
-class GuardedTextEmitter {
+export class GuardedTextEmitter {
   #pending = "";
+  #queued = "";
+  #flushTimer: ReturnType<typeof setTimeout> | undefined;
+  #closed = false;
 
   constructor(readonly requestId: string, readonly emit: (event: BrokerEvent) => void) {}
 
   write(delta: string): void {
+    if (this.#closed || delta === "") return;
     this.#pending += delta;
-    if (containsToolMarkup(this.#pending)) throw new ForbiddenToolMarkupError();
-    if (this.#pending.length <= TEXT_GUARD_TAIL) return;
-    const boundary = this.#pending.length - TEXT_GUARD_TAIL;
-    this.emit({ type: "content", id: this.requestId, delta: this.#pending.slice(0, boundary) });
-    this.#pending = this.#pending.slice(boundary);
+    if (containsToolMarkup(this.#pending)) {
+      this.discard();
+      throw new ForbiddenToolMarkupError();
+    }
+    const boundary = guardedEmissionBoundary(this.#pending);
+    if (boundary > 0) {
+      this.#queue(this.#pending.slice(0, boundary));
+      this.#pending = this.#pending.slice(boundary);
+    }
+    if (this.#pending.length > MAX_TOOL_MARKUP_PREFIX) {
+      // Whitespace in the optional DSML prefix is unbounded. Once a provider
+      // holds a still-valid marker prefix beyond this cap, emitting it would
+      // weaken the cross-chunk guard, so fail closed instead of buffering it.
+      this.discard();
+      throw new ForbiddenToolMarkupError();
+    }
   }
 
   finish(): void {
-    if (containsToolMarkup(this.#pending)) throw new ForbiddenToolMarkupError();
-    if (this.#pending !== "") this.emit({ type: "content", id: this.requestId, delta: this.#pending });
+    if (this.#closed) return;
+    if (containsToolMarkup(this.#pending)) {
+      this.discard();
+      throw new ForbiddenToolMarkupError();
+    }
+    this.#queued += this.#pending;
+    this.#pending = "";
+    this.#flush();
+  }
+
+  discard(): void {
+    this.#closed = true;
+    if (this.#flushTimer !== undefined) clearTimeout(this.#flushTimer);
+    this.#flushTimer = undefined;
+    this.#queued = "";
     this.#pending = "";
   }
+
+  #queue(delta: string): void {
+    this.#queued += delta;
+    if (this.#queued.length >= STREAM_FLUSH_SIZE) {
+      this.#flush();
+      return;
+    }
+    if (this.#flushTimer === undefined) {
+      this.#flushTimer = setTimeout(() => this.#flush(), STREAM_FLUSH_INTERVAL_MS);
+    }
+  }
+
+  #flush(): void {
+    if (this.#flushTimer !== undefined) clearTimeout(this.#flushTimer);
+    this.#flushTimer = undefined;
+    if (this.#queued === "") return;
+    this.emit({ type: "content", id: this.requestId, delta: this.#queued });
+    this.#queued = "";
+  }
+}
+
+function guardedEmissionBoundary(value: string): number {
+  const possibleStart = value.lastIndexOf("<");
+  return possibleStart >= 0 && possibleToolMarkupPrefix(value.slice(possibleStart)) ? possibleStart : value.length;
+}
+
+function possibleToolMarkupPrefix(value: string): boolean {
+  if (!value.startsWith("<")) return false;
+  let offset = 1;
+  if (offset === value.length) return true;
+  if (value[offset] === "/") {
+    offset += 1;
+    if (offset === value.length) return true;
+  }
+  if (isMarkupPipe(value[offset])) {
+    offset = consumeMarkupPipes(value, offset);
+    if (offset < 0) return false;
+    offset = consumeWhitespace(value, offset);
+    if (offset === value.length) return true;
+    const dsml = consumeLiteral(value, offset, "dsml");
+    if (dsml === undefined) return false;
+    if (!dsml.complete) return true;
+    offset = consumeWhitespace(value, dsml.offset);
+    if (offset === value.length) return true;
+    if (!isMarkupPipe(value[offset])) return false;
+    offset = consumeMarkupPipes(value, offset);
+    if (offset < 0) return false;
+    offset = consumeWhitespace(value, offset);
+    if (offset === value.length) return true;
+  }
+  return TOOL_MARKUP_NAMES.some((name) => name.startsWith(value.slice(offset).toLowerCase()));
+}
+
+function consumeMarkupPipes(value: string, start: number): number {
+  let offset = start;
+  let count = 0;
+  while (offset < value.length && isMarkupPipe(value[offset])) {
+    offset += 1;
+    count += 1;
+  }
+  return count >= 1 && count <= 2 ? offset : -1;
+}
+
+function consumeWhitespace(value: string, start: number): number {
+  let offset = start;
+  while (offset < value.length && /\s/u.test(value[offset] ?? "")) offset += 1;
+  return offset;
+}
+
+function consumeLiteral(value: string, start: number, literal: string): { complete: boolean; offset: number } | undefined {
+  const remaining = value.slice(start).toLowerCase();
+  if (remaining.length < literal.length) {
+    return literal.startsWith(remaining) ? { complete: false, offset: value.length } : undefined;
+  }
+  return remaining.startsWith(literal) ? { complete: true, offset: start + literal.length } : undefined;
+}
+
+function isMarkupPipe(value: string | undefined): boolean {
+  return value === "|" || value === "｜";
 }
 
 function containsToolMarkup(value: string): boolean {

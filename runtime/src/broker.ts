@@ -120,7 +120,7 @@ export class QuickchatBroker {
       () => this.#cancelPermissions(command.id)
     );
     this.#runs.set(command.id, run);
-    this.#emit({ type: "state", id: command.id, state: "streaming" });
+    this.#emit({ type: "state", id: command.id, state: "streaming", message: `Waiting for ${provider.name}…` });
     try {
       const result = await run.result;
       const selectedModel = result.defaultModel ?? command.model;

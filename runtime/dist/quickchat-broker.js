@@ -18243,11 +18243,13 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
     detached: process.platform !== "win32"
   });
   let cancelSession;
+  let activeText;
   let cancelled = false;
   let forbiddenToolAttempt = false;
   child.stderr?.resume();
   const cancel = async () => {
     cancelled = true;
+    activeText?.discard();
     cancelPermissions?.();
     if (cancelSession !== void 0) await cancelSession().catch(() => void 0);
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
@@ -18272,6 +18274,7 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
       let resumable = false;
       const allowedOpenCodeToolCalls = /* @__PURE__ */ new Set();
       const text = new GuardedTextEmitter(requestId, emit2);
+      activeText = text;
       const app = client({ name: "omarchy-quickchat" }).onRequest(methods.client.session.requestPermission, async ({ params }) => {
         if (provider.id === "opencode" || requestPermission === void 0) {
           forbiddenToolAttempt = true;
@@ -18344,8 +18347,10 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
           }
           await promptPromise;
           if (forbiddenToolAttempt) throw forbiddenToolError();
-          text.finish();
+          if (cancelled) text.discard();
+          else text.finish();
         } catch (error48) {
+          text.discard();
           await ctx.notify(methods.agent.session.cancel, { sessionId: session.sessionId }).catch(() => void 0);
           await promptPromise.catch(() => void 0);
           throw error48;
@@ -18371,6 +18376,8 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
         !cancelled
       );
     } finally {
+      activeText?.discard();
+      activeText = void 0;
       clearTimeout(timeout);
       terminateProcessGroup(child.pid);
       await rm3(cwd, { recursive: true, force: true });
@@ -18497,27 +18504,144 @@ async function handleContent(content, requestId, text, emit2, imageStore, imageC
   }
   return {};
 }
-var TEXT_GUARD_TAIL = 64;
+var STREAM_FLUSH_INTERVAL_MS = 32;
+var STREAM_FLUSH_SIZE = 2048;
+var MAX_TOOL_MARKUP_PREFIX = 4096;
+var TOOL_MARKUP_NAMES = [
+  "toolcall",
+  "toolcalls",
+  "tool_call",
+  "tool_calls",
+  "tool-call",
+  "tool-calls",
+  "tool call",
+  "tool calls",
+  "functioncall",
+  "functioncalls",
+  "function_call",
+  "function_calls",
+  "function-call",
+  "function-calls",
+  "function call",
+  "function calls",
+  "invoke",
+  "parameter"
+];
 var GuardedTextEmitter = class {
   constructor(requestId, emit2) {
     this.requestId = requestId;
     this.emit = emit2;
   }
   #pending = "";
+  #queued = "";
+  #flushTimer;
+  #closed = false;
   write(delta) {
+    if (this.#closed || delta === "") return;
     this.#pending += delta;
-    if (containsToolMarkup(this.#pending)) throw new ForbiddenToolMarkupError();
-    if (this.#pending.length <= TEXT_GUARD_TAIL) return;
-    const boundary = this.#pending.length - TEXT_GUARD_TAIL;
-    this.emit({ type: "content", id: this.requestId, delta: this.#pending.slice(0, boundary) });
-    this.#pending = this.#pending.slice(boundary);
+    if (containsToolMarkup(this.#pending)) {
+      this.discard();
+      throw new ForbiddenToolMarkupError();
+    }
+    const boundary = guardedEmissionBoundary(this.#pending);
+    if (boundary > 0) {
+      this.#queue(this.#pending.slice(0, boundary));
+      this.#pending = this.#pending.slice(boundary);
+    }
+    if (this.#pending.length > MAX_TOOL_MARKUP_PREFIX) {
+      this.discard();
+      throw new ForbiddenToolMarkupError();
+    }
   }
   finish() {
-    if (containsToolMarkup(this.#pending)) throw new ForbiddenToolMarkupError();
-    if (this.#pending !== "") this.emit({ type: "content", id: this.requestId, delta: this.#pending });
+    if (this.#closed) return;
+    if (containsToolMarkup(this.#pending)) {
+      this.discard();
+      throw new ForbiddenToolMarkupError();
+    }
+    this.#queued += this.#pending;
+    this.#pending = "";
+    this.#flush();
+  }
+  discard() {
+    this.#closed = true;
+    if (this.#flushTimer !== void 0) clearTimeout(this.#flushTimer);
+    this.#flushTimer = void 0;
+    this.#queued = "";
     this.#pending = "";
   }
+  #queue(delta) {
+    this.#queued += delta;
+    if (this.#queued.length >= STREAM_FLUSH_SIZE) {
+      this.#flush();
+      return;
+    }
+    if (this.#flushTimer === void 0) {
+      this.#flushTimer = setTimeout(() => this.#flush(), STREAM_FLUSH_INTERVAL_MS);
+    }
+  }
+  #flush() {
+    if (this.#flushTimer !== void 0) clearTimeout(this.#flushTimer);
+    this.#flushTimer = void 0;
+    if (this.#queued === "") return;
+    this.emit({ type: "content", id: this.requestId, delta: this.#queued });
+    this.#queued = "";
+  }
 };
+function guardedEmissionBoundary(value) {
+  const possibleStart = value.lastIndexOf("<");
+  return possibleStart >= 0 && possibleToolMarkupPrefix(value.slice(possibleStart)) ? possibleStart : value.length;
+}
+function possibleToolMarkupPrefix(value) {
+  if (!value.startsWith("<")) return false;
+  let offset = 1;
+  if (offset === value.length) return true;
+  if (value[offset] === "/") {
+    offset += 1;
+    if (offset === value.length) return true;
+  }
+  if (isMarkupPipe(value[offset])) {
+    offset = consumeMarkupPipes(value, offset);
+    if (offset < 0) return false;
+    offset = consumeWhitespace(value, offset);
+    if (offset === value.length) return true;
+    const dsml = consumeLiteral(value, offset, "dsml");
+    if (dsml === void 0) return false;
+    if (!dsml.complete) return true;
+    offset = consumeWhitespace(value, dsml.offset);
+    if (offset === value.length) return true;
+    if (!isMarkupPipe(value[offset])) return false;
+    offset = consumeMarkupPipes(value, offset);
+    if (offset < 0) return false;
+    offset = consumeWhitespace(value, offset);
+    if (offset === value.length) return true;
+  }
+  return TOOL_MARKUP_NAMES.some((name) => name.startsWith(value.slice(offset).toLowerCase()));
+}
+function consumeMarkupPipes(value, start) {
+  let offset = start;
+  let count = 0;
+  while (offset < value.length && isMarkupPipe(value[offset])) {
+    offset += 1;
+    count += 1;
+  }
+  return count >= 1 && count <= 2 ? offset : -1;
+}
+function consumeWhitespace(value, start) {
+  let offset = start;
+  while (offset < value.length && /\s/u.test(value[offset] ?? "")) offset += 1;
+  return offset;
+}
+function consumeLiteral(value, start, literal2) {
+  const remaining = value.slice(start).toLowerCase();
+  if (remaining.length < literal2.length) {
+    return literal2.startsWith(remaining) ? { complete: false, offset: value.length } : void 0;
+  }
+  return remaining.startsWith(literal2) ? { complete: true, offset: start + literal2.length } : void 0;
+}
+function isMarkupPipe(value) {
+  return value === "|" || value === "\uFF5C";
+}
 function containsToolMarkup(value) {
   return /<\/?(?:[|｜]{1,2}\s*DSML\s*[|｜]{1,2}\s*)?(?:tool[_ -]?calls?|function[_ -]?calls?|invoke|parameter)\b/iu.test(value);
 }
@@ -19383,7 +19507,7 @@ var QuickchatBroker = class {
       () => this.#cancelPermissions(command.id)
     );
     this.#runs.set(command.id, run);
-    this.#emit({ type: "state", id: command.id, state: "streaming" });
+    this.#emit({ type: "state", id: command.id, state: "streaming", message: `Waiting for ${provider.name}\u2026` });
     try {
       const result = await run.result;
       const selectedModel = result.defaultModel ?? command.model;

@@ -83,6 +83,7 @@ describe("NDJSON protocol", () => {
     child.stdin.write(`${JSON.stringify({ type: "submit", id: "wire-1", question: "Say hello", provider: "codex" })}\n`);
     await until(() => events.some((event) => event.type === "complete"));
     expect(events).toContainEqual({ type: "content", id: "wire-1", delta: "# Answer\n\nHello [link](https://example.com)." });
+    expect(events).toContainEqual({ type: "state", id: "wire-1", state: "streaming", message: "Waiting for Codex…" });
     const complete = completeSchema.parse(events.find((event) => event.type === "complete"));
     expect(complete.chat.answer).toContain("Hello");
     const saved = await readFile(join(state, "state/quickchat/chats", `${complete.chat.id}.json`), "utf8");
@@ -92,6 +93,35 @@ describe("NDJSON protocol", () => {
     child.stdin.end(`${JSON.stringify({ type: "shutdown" })}\n`);
     await new Promise((resolveExit) => child.once("close", resolveExit));
   }, 25_000);
+
+  it("forwards a sub-64-character answer before the turn completes", async () => {
+    const state = await mkdtemp(join(tmpdir(), "quickchat-short-stream-")); roots.push(state);
+    const child = spawn(brokerExecutable(), [], {
+      env: {
+        ...process.env,
+        XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
+        QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+        FAKE_ACP_STREAM_CHUNKS: JSON.stringify(["Short ", "answer ", "streams ", "in ", "pieces."]),
+        FAKE_ACP_CHUNK_DELAY_MS: "50",
+        PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+      },
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    const events: Record<string, unknown>[] = [];
+    createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
+    child.stdin.write('{"type":"initialize","protocolVersion":2}\n');
+    await until(() => events.some((event) => event.type === "ready"));
+    child.stdin.write('{"type":"submit","id":"short-stream","question":"Keep it short","provider":"codex"}\n');
+    await until(() => events.some((event) => event.type === "content"));
+    expect(events.some((event) => event.type === "complete")).toBe(false);
+    await until(() => events.some((event) => event.type === "complete"));
+    const deltas = events.filter((event) => event.type === "content")
+      .map((event) => typeof event.delta === "string" ? event.delta : "");
+    expect(deltas.length).toBeGreaterThanOrEqual(2);
+    expect(deltas.join("")).toBe("Short answer streams in pieces.");
+    child.stdin.end('{"type":"shutdown"}\n');
+    await new Promise((resolveExit) => child.once("close", resolveExit));
+  }, 20_000);
 
   it("refreshes provider models from the real answer session", async () => {
     const state = await mkdtemp(join(tmpdir(), "quickchat-late-models-")); roots.push(state);
@@ -253,10 +283,14 @@ describe("NDJSON protocol", () => {
   it("cooperatively cancels an active ACP turn without saving it", async () => {
     const state = await mkdtemp(join(tmpdir(), "quickchat-cancel-")); roots.push(state);
     const fake = resolve("runtime/test/fake-acp-agent.mjs");
+    const chunkAudit = join(state, "chunk-audit.txt");
     const child = spawn(brokerExecutable(), [], {
       env: {
         ...process.env, FAKE_ACP_WAIT: "1", XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
-        QUICKCHAT_CODEX_ACP: fake, QUICKCHAT_CLAUDE_ACP: fake, PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+        QUICKCHAT_CODEX_ACP: fake, QUICKCHAT_CLAUDE_ACP: fake,
+        FAKE_ACP_STREAM_CHUNKS: JSON.stringify(["partial <"]), FAKE_ACP_CHUNK_AUDIT: chunkAudit,
+        FAKE_ACP_LATE_AFTER_CANCEL: "1",
+        PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
       },
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -266,9 +300,13 @@ describe("NDJSON protocol", () => {
     await until(() => events.some((event) => event.type === "ready"));
     child.stdin.write('{"type":"submit","id":"cancel-me","question":"wait","provider":"codex"}\n');
     await until(() => events.some((event) => event.type === "state" && event.state === "streaming"));
+    await until(async () => await readFile(chunkAudit, "utf8").catch(() => "") === "chunks\n");
     child.stdin.write('{"type":"cancel","id":"cancel-me"}\n');
     await until(() => events.some((event) => event.type === "error" && event.code === "cancelled"));
     expect(events.some((event) => event.type === "complete")).toBe(false);
+    const streamed = events.filter((event) => event.type === "content").map((event) => JSON.stringify(event)).join("");
+    expect(streamed).not.toContain("<");
+    expect(streamed).not.toContain("late ordinary text");
     child.stdin.end('{"type":"shutdown"}\n');
     await new Promise((resolveExit) => child.once("close", resolveExit));
   }, 25_000);

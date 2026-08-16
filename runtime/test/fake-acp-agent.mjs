@@ -57,20 +57,36 @@ const server = acp.agent({ name: "quickchat-fake" })
     const answer = process.env.FAKE_ACP_RAW_TOOL_MARKUP === "1"
       ? '<｜｜DSML｜｜tool_calls>\n<｜｜DSML｜｜invoke name="Bash">\n<｜｜DSML｜｜parameter name="command" string="true">cat /etc/hostname</｜｜DSML｜｜parameter>\n</｜｜DSML｜｜invoke>\n</｜｜DSML｜｜tool_calls>'
       : "# Answer\n\nHello [link](https://example.com).";
-    const chunks = process.env.FAKE_ACP_RAW_TOOL_MARKUP === "1"
-      ? [answer.slice(0, 5), answer.slice(5, 14), answer.slice(14)]
-      : [answer];
+    const configuredChunks = process.env.FAKE_ACP_STREAM_CHUNKS === undefined
+      ? undefined
+      : JSON.parse(process.env.FAKE_ACP_STREAM_CHUNKS);
+    const chunks = Array.isArray(configuredChunks) && configuredChunks.every((chunk) => typeof chunk === "string")
+      ? configuredChunks
+      : process.env.FAKE_ACP_RAW_TOOL_MARKUP === "1"
+        ? [answer.slice(0, 5), answer.slice(5, 14), answer.slice(14)]
+        : [answer];
+    const chunkDelay = Number(process.env.FAKE_ACP_CHUNK_DELAY_MS ?? 0);
     for (const text of chunks) {
       await client.notify(acp.methods.client.session.update, {
         sessionId: params.sessionId,
         update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text } }
       });
+      if (Number.isFinite(chunkDelay) && chunkDelay > 0)
+        await new Promise((resolve) => setTimeout(resolve, chunkDelay));
     }
+    if (process.env.FAKE_ACP_CHUNK_AUDIT) await appendFile(process.env.FAKE_ACP_CHUNK_AUDIT, "chunks\n");
     if (process.env.FAKE_ACP_WAIT === "1") {
       await new Promise((resolve) => {
         const timer = setTimeout(resolve, 30_000);
         controller.signal.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
       });
+    }
+    if (controller.signal.aborted && process.env.FAKE_ACP_LATE_AFTER_CANCEL === "1") {
+      await client.notify(acp.methods.client.session.update, {
+        sessionId: params.sessionId,
+        update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "late ordinary text" } }
+      });
+      await new Promise((resolve) => setTimeout(resolve, 75));
     }
     return { stopReason: controller.signal.aborted ? "cancelled" : "end_turn" };
   })

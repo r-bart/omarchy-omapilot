@@ -256,6 +256,62 @@ changed.
 - The checked-in runtime layout works after a plain Omarchy clone without hooks;
   final-tag CI rebuilt the archive twice and proved it deterministic.
 
+## Streaming latency loop (2026-08-15)
+
+- Goal: determine whether Quickchat's apparently stalled answer rendering on
+  Gonk is caused by provider first-token latency, ACP event buffering, broker
+  NDJSON emission, QML parsing/rendering, or a lifecycle race; implement only
+  evidence-backed latency and progress-feedback improvements.
+- Done criteria: a timestamped programmatic reproduction identifies time to
+  initialize, submit, first state, first content, and completion; focused tests
+  cover any repaired boundary; the full validation suite and deterministic
+  runtime build pass; an independent reviewer reports no unresolved findings;
+  CI is green; and the reviewed commit is updated on Gonk with a protocol-2
+  broker timing check. Installed-panel feel remains an owner-run gate.
+- Stream: branch `streaming-latency`, worktree
+  `/home/sbull/worktrees/omarchy-quickchat-streaming`; the orchestrator owns
+  reproduction, implementation, integration, review fixes, PR, and Gonk
+  verification.
+- Claude worker: visible agent `qc_stream_trace` in tab `wK:t16`, pane
+  `wK:p29`, Claude session `b4e2da30-1d92-4db5-988d-3ed8090ede66`, cwd
+  `/home/sbull/worktrees/omarchy-quickchat-streaming`; read-only; owns an
+  independent trace of broker, ACP, NDJSON, and QML streaming semantics plus
+  smallest-safe optimization recommendations. The orchestrator owns the tab
+  and cleanup.
+- Required gates: current-source inspection, Gonk and local timestamped broker
+  probes, focused tests, full `./scripts/validate.sh`, reproducible checked-in
+  bundle, independent review, PR CI, and post-update Gonk protocol check.
+- Independent review: Codex agent `qc_stream_review` in loop-created tab
+  `wK:t17` failed to return a bounded verdict and issued an unrelated Herdr
+  command after interruption; its output is inconclusive and the tab was
+  closed. Read-only Claude agent `qc_stream_trace` in `wK:t16` reviewed the
+  final diff, found two cancellation-window issues, and returned `CLEAN` after
+  both were covered by a latching discard and late-chunk integration test. The
+  orchestrator closed both loop-created review tabs.
+- Allowed: scoped repository edits, tests, branch commits, push, draft PR, and
+  updating the Quickchat plugin on Gonk after review and CI. Forbidden: tags,
+  releases, marketplace changes, credential/provider configuration changes,
+  destructive resets, unrelated desktop changes, and CUA automation.
+- Current status: Gonk reproduced 3.1-3.5 s to first visible content for short
+  Codex answers that completed in 3.3-3.8 s. Claude independently measured the
+  fixed 64-character guard adding 256-1212 ms with probe streams and confirmed
+  the blank `streaming` state. The candidate replaces that fixed tail with a
+  boundary-aware fail-closed marker prefix, coalesces safe chunks on a 32 ms
+  frame interval, and keeps `Waiting for <provider>…` visible before the first
+  delta. Typecheck, lint, 48 focused tests, full validation (118 passed, 6
+  explicit live skips), QML contracts (20 passed), and three byte-identical
+  runtime builds (`3544884e…ad20` broker, `3de0cc91…12eb` map) are green.
+  Independent review is clean. Draft PR #2 is open at
+  `https://github.com/spencerbull/omarchy-quickchat/pull/2`; exact-head CI run
+  `31912409144` passed. A temporary, non-installed copy of commit `299d409`
+  on Gonk produced seven content events per answer across three authenticated
+  Codex trials: first content at 3.1-4.9 s and completion at 3.7-5.5 s. This
+  verifies that the fixed answer holdback is gone while the remaining initial
+  wait is provider/process first-token latency. Persistent ACP process reuse is
+  deferred because it changes provider lifecycle and security boundaries.
+  Merge, native CLI update on Gonk, protocol reprobe, and the owner's
+  installed-panel feel check remain human-gated.
+
 ## Post-v0.1: OmaAsk rebrand
 
 - [ ] Approve the final `OmaAsk` capitalization, repository name, and public
