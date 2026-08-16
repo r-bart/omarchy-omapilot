@@ -33,7 +33,18 @@ The UI sends commands whose `type` is one of `initialize`, `submit`, `cancel`, `
 The broker emits events whose `type` is one of `ready`, `providers`, `state`, `content`, `permission`, `permission_closed`, `image`, `complete`, `error`, `dictation`, `history`, `herdr`, `link`, or `copied`. The broker's protocol tests are authoritative for exact fields and version negotiation.
 
 ACP is the broker's normalization boundary, not the policy boundary. The submit
-command contains provider/model/question only; the broker derives one automatic,
+command contains provider/model/question plus an optional versioned desktop
+snapshot. QML latches the active app immediately before the panel takes focus
+and synchronously reads the current app/workspace/media inventory from
+Quickshell's public Hyprland and MPRIS objects at submit time; it does not poll
+`hyprctl` or create a second desktop service. The broker independently validates
+field counts, lengths, and control characters, then frames the snapshot as
+untrusted observational JSON before the authoritative user request. It sends
+the combined prompt to the selected ACP session but stores only the original
+question in Quickchat history. Provider-native session retention still applies.
+Native Herdr resume therefore inherits provider-retained context, while the
+transcript fallback contains only the stored question and answer.
+The broker derives one automatic,
 fail-closed policy for that provider. Codex keeps the pinned adapter's read-only,
 on-request mode, disables native web search, and exposes only its strictly validated
 shell/unified-exec features. It may read any user-readable host file without

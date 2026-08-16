@@ -86,6 +86,44 @@ validate/package workflow is required green on the final PR head. No CUA,
 installed plugin, desktop configuration, release, or marketplace state was
 changed.
 
+## Submit-time desktop context (2026-08-15)
+
+- Goal: attach the useful context Omarchy already exposes—active window, open
+  windows/workspaces, and playing media—to each new request without adding a
+  mode, prompt classifier, polling daemon, or browser-control dependency.
+- Done criteria: the snapshot uses public Quickshell APIs, is visibly disclosed
+  and default-on with an Omarchy setting, is bounded/sanitized/strictly
+  validated, reaches the ACP prompt, never replaces the stored original
+  question, and does not change provider tool authority. README/security docs
+  describe provider retention honestly and record the optional OmaAsk Browser
+  Companion as future work. Focused/full suites, deterministic bundle checks,
+  and independent review must pass.
+- Branch/worktree: `desktop-context` at
+  `/home/sbull/worktrees/omarchy-quickchat-context`, based on merged `main`
+  commit `caa2439`. The orchestrator owns implementation and integration.
+- Allowed: scoped source/docs/tests/build-artifact edits and local validation.
+  Forbidden: merge, tag, release, installed-plugin mutation, browser extension
+  installation, desktop control, provider configuration, or credential access.
+- Reviewer: visible Claude Herdr agent `qc_context_review`, pane `wK:p2F`,
+  read-only design and final diff review; the orchestrator owns cleanup.
+- [x] Define the bounded versioned context contract and privacy boundary.
+- [x] Capture submit-time Hyprland/MPRIS context with no polling.
+- [x] Add a default-on Omarchy setting and in-composer disclosure.
+- [x] Document current behavior and the future OmaAsk browser companion.
+- [x] Pass focused QML/runtime tests and full repository validation.
+- [x] Receive an independent clean review or fix every verified finding.
+
+Current evidence: QML contract passes 22 protocol and three permission-focus
+tests plus a real Wayland smoke load. `./scripts/validate.sh` passes 122 runtime
+tests with six explicit live-provider skips; production dependency audit has
+zero vulnerabilities; two consecutive broker builds are byte-identical.
+Claude reviewer `qc_context_review` fuzzed 60,000 QML-to-broker snapshots and
+found no validation mismatch or question mutation. Its BiDi, stale-latch,
+contract-test, and feature-type findings were fixed; the bounded re-review was
+`CLEAN`. Remaining live-only checks are active-window latching under real panel
+focus, playing MPRIS metadata, focused-monitor routing, and one real context
+turn per provider.
+
 ## Allowed actions
 
 - Create, test, commit, and push scoped branches in this repository.

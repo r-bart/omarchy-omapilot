@@ -34,7 +34,7 @@ trap 'rm -rf -- "$stage_parent"' EXIT
 stage="$stage_parent/plugin"
 mkdir -p "$stage"
 tar -C "$repo_root" \
-  --exclude=.git --exclude=node_modules --exclude=dist --exclude=.cache --exclude=.tmp \
+  --exclude=./.git --exclude=./node_modules --exclude=./dist --exclude=./.cache --exclude=./.tmp \
   -cf - . | tar -C "$stage" -xf -
 
 if command -v omarchy-plugin-validate >/dev/null; then

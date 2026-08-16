@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import type { AcpRun } from "./acp.js";
 import { BrokerAcpError, deleteAcpSession, probeAcpModels, runAcpQuestion } from "./acp.js";
 import { DictationService } from "./dictation.js";
+import { promptWithDesktopContext } from "./context.js";
 import { HistoryStore, presentChat, presentImage } from "./history.js";
 import { continueInHerdr, describeHerdrError } from "./herdr.js";
 import { ImagePolicyError, ImageStore, isAllowedExternalLink } from "./images.js";
@@ -96,7 +97,7 @@ export class QuickchatBroker {
     }));
     this.#providers = new Map(discovered.map((provider) => [provider.id, provider]));
     const history = (await this.#history.list()).map((chat) => presentChat(chat));
-    this.#emit({ type: "ready", protocolVersion: 2, providers: discovered.map(publicProvider), history });
+    this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context"], providers: discovered.map(publicProvider), history });
   }
 
   async #submit(command: Extract<BrokerCommand, { type: "submit" }>): Promise<void> {
@@ -114,7 +115,7 @@ export class QuickchatBroker {
     if (provider === undefined) { this.#error("provider_unavailable", "The selected harness is not installed and authenticated", false, command.id); return; }
     this.#emit({ type: "state", id: command.id, state: "preparing", message: `Preparing ${provider.name}…` });
     const run = runAcpQuestion(
-      provider, command.id, command.question, command.model,
+      provider, command.id, promptWithDesktopContext(command.question, command.desktopContext), command.model,
       this.#emit, 90_000, this.#images,
       (request) => this.#requestToolPermission(command.id, provider.id, request),
       () => this.#cancelPermissions(command.id)

@@ -46,6 +46,7 @@ Panel {
     openedFromHotkey = false
     viewMode = "chat"
     setCenterHoverRevealSuppressed(false)
+    Quickchat.QuickchatStore.latchDesktopContext()
     root.controller.show()
     Qt.callLater(function() { composer.forceInputFocus() })
   }
@@ -53,6 +54,7 @@ Panel {
   function openFromHotkey() {
     openedFromHotkey = true
     viewMode = "chat"
+    Quickchat.QuickchatStore.latchDesktopContext()
     root.controller.show()
     Qt.callLater(function() {
       if (root.opened) root.setCenterHoverRevealSuppressed(true)
@@ -62,6 +64,7 @@ Panel {
 
   function openHistory() {
     viewMode = "history"
+    Quickchat.QuickchatStore.latchDesktopContext()
     root.controller.show()
     Quickchat.QuickchatStore.requestHistory()
   }
@@ -69,6 +72,7 @@ Panel {
   function close() {
     setCenterHoverRevealSuppressed(false)
     previewSource = ""
+    Quickchat.QuickchatStore.clearDesktopContextLatch()
     root.controller.hide()
     if (hostWidget) Qt.callLater(function() {
       if (typeof hostWidget.restoreFocus === "function") hostWidget.restoreFocus()
@@ -79,6 +83,7 @@ Panel {
   function closeForExternalHandoff() {
     setCenterHoverRevealSuppressed(false)
     previewSource = ""
+    Quickchat.QuickchatStore.clearDesktopContextLatch()
     root.controller.hide()
   }
 
@@ -97,10 +102,14 @@ Panel {
 
   onSettingsChanged: Quickchat.QuickchatStore.configure(settings)
   Component.onCompleted: Quickchat.QuickchatStore.configure(settings)
-  onOpenedChanged: if (opened) {
-    Quickchat.QuickchatStore.configure(settings)
-    if (viewMode === "history") Quickchat.QuickchatStore.requestHistory()
-    else Qt.callLater(function() { composer.forceInputFocus() })
+  onOpenedChanged: {
+    if (opened) {
+      Quickchat.QuickchatStore.configure(settings)
+      if (viewMode === "history") Quickchat.QuickchatStore.requestHistory()
+      else Qt.callLater(function() { composer.forceInputFocus() })
+    } else {
+      Quickchat.QuickchatStore.clearDesktopContextLatch()
+    }
   }
 
   Connections {

@@ -38,6 +38,18 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
 - The broker does not regex-classify prompts or implement action-specific
   shortcuts. Every ordinary question and action request follows the selected
   harness's same fixed policy and permission boundary.
+- Desktop context comes only from Quickshell's public Hyprland and MPRIS
+  objects. The active window is latched immediately before the panel takes
+  focus; the remaining snapshot is captured at submit. It is limited to one active window, 12 deduplicated app
+  records, 12 workspaces, and four playing-media records. Every string is
+  length-bounded and rejects control and bidirectional-display characters at
+  the broker boundary. Window
+  titles and media metadata remain semantically untrusted, are framed as data
+  rather than instructions, and never broaden a provider's tool authority.
+  Quickchat does not store the snapshot in its chat JSON, but the selected
+  provider receives it as part of the native session prompt and may retain it.
+  This framing cannot reduce Codex's existing host-read authority. Disable
+  Desktop context in widget settings to omit the snapshot entirely.
 - Permission prompts and raw tool input/output are ephemeral and are not copied
   to the completed chat record. The model's completed answer may contain
   tool-derived text and is retained normally. Provider stderr and raw tool

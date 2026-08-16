@@ -1,6 +1,6 @@
 # Omarchy Quickchat
 
-Quickchat is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget for fast, disposable AI answers. It uses the Codex, Claude, or OpenCode harness already authenticated on your machine, renders Markdown in a themed panel, remembers the latest 30 completed chats, and can hand an answer to Herdr when you want to keep working.
+Quickchat is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget for fast, disposable AI answers. It uses the Codex, Claude, or OpenCode harness already authenticated on your machine, can attach a small desktop snapshot when you submit, renders Markdown in a themed panel, remembers the latest 30 completed chats, and can hand an answer to Herdr when you want to keep working.
 
 > [!IMPORTANT]
 > Quickchat 0.1.1 is the current published release. Protocol-2 version `0.2.0`
@@ -50,6 +50,7 @@ Removal deletes the cloned plugin. Quickchat deliberately leaves user-owned hist
 
 ```text
 Omarchy BarWidget/Panel
+        │ submit-time Hyprland/MPRIS snapshot
         │ one JSON command/event per line
         ▼
 Quickchat broker
@@ -92,6 +93,32 @@ Questions and action requests follow the same provider path; the selected
 harness decides whether a tool is useful, and any broader device command still
 pauses on the exact request-bound approval described above.
 
+## Desktop context on submit
+
+Desktop context is **On** by default and can be disabled in the widget's
+Omarchy settings. Quickchat remembers the active app as its panel opens (before
+the panel takes keyboard focus), then reads the remaining public Quickshell
+objects when you send. It attaches:
+
+- the active window's app ID, title, workspace, and monitor;
+- up to 12 deduplicated open-app IDs with window counts and workspace IDs; and
+- player identity, track title, and artist for up to four currently playing MPRIS sources.
+
+Quickchat does not capture compositor window handles, inactive window titles,
+screenshots, clipboard contents, page bodies, hidden browser tabs, browser
+history, keystrokes, or file contents as desktop context. A browser's current
+tab may be recognizable only when the browser exposes it in the active window
+title.
+
+Window and media strings are length-bounded, stripped of control and
+bidirectional-display characters, and labeled as untrusted observational data
+before being sent to the harness. The selected harness still decides whether
+the context is relevant and whether a tool is needed. Quickchat stores the
+original question—not the snapshot—in its chat record, but the selected
+provider receives the combined prompt and may retain it in its native session.
+An answer derived from desktop context is retained like any other completed
+answer.
+
 ## Storage and privacy
 
 Quickchat persists only completed chats, capped at the newest 30. A chat contains the question, rendered answer source, timestamp, provider/model metadata, content references, and a resumable session identity when the harness supplies one. Draft text, authentication output, tokens, environment variables, and provider credentials are not persisted.
@@ -107,9 +134,36 @@ Remote Markdown images are not fetched automatically. Quickchat shows the origin
 ## Optional integrations
 
 - **Voxtype:** when `voxtype` is installed and ready, the microphone records directly to a file under `$XDG_RUNTIME_DIR/quickchat`; Quickchat reads that transcript after recording stops. It never simulates keyboard input or modifies Voxtype configuration.
-- **Herdr:** when `herdr` is installed, Continue in Herdr launches it when needed or raises its existing window, creates or reuses a dedicated `Quickchat` workspace, creates a labeled tab, closes the Quickchat panel, and focuses the resumed agent pane. It resumes the native harness session when possible, otherwise starts the matching agent with a compact transcript and labels the fallback. This is an explicit handoff from Quickchat's one-shot permission boundary to Herdr's normal native-agent permission model; Codex resumes read-only and asks before commands.
+- **Herdr:** when `herdr` is installed, Continue in Herdr launches it when needed or raises its existing window, creates or reuses a dedicated `Quickchat` workspace, creates a labeled tab, closes the Quickchat panel, and focuses the resumed agent pane. It resumes the native harness session when possible, otherwise starts the matching agent with a compact transcript and labels the fallback. A native resume retains whatever context the provider kept in that session; a transcript fallback receives only the stored question and answer, not the raw desktop snapshot. This is an explicit handoff from Quickchat's one-shot permission boundary to Herdr's normal native-agent permission model; Codex resumes read-only and asks before commands.
 
 Both integrations disappear or show a clear unavailable state when their required command is missing.
+
+## Future features: OmaAsk
+
+Quickchat is planned to become **OmaAsk**, the focused AI entry point for
+Omarchy. The larger name and repository/package migration will be handled as a
+separate compatibility-conscious release.
+
+The main future context feature is an optional **OmaAsk Browser Companion**.
+It would be a separately installed browser extension and local native-messaging
+bridge that can provide the active tab URL/title and, only with explicit site
+permission, selected text or bounded visible-page text. The intended rules are:
+
+- the Omarchy plugin remains fully useful without the extension;
+- context is visibly disclosed and captured only when a request is submitted;
+- page access is opt-in and scoped per site, with no browsing-history collection;
+- the bridge accepts a small versioned schema and does not expose a general command channel; and
+- the extension avoids Chrome's broad `debugger` permission and requests only the minimum tab/site/native-messaging permissions needed for enabled features.
+
+Because native messaging requires browser-host registration outside the
+Omarchy plugin directory, that companion would need its own explicit,
+reversible install and removal flow; the normal OmaAsk plugin install would not
+silently add it.
+
+Other roadmap candidates build on that same context contract: user-selectable
+context sources, richer app-specific adapters, and a preview of exactly what
+will be shared before submit. Browser actions would come later, only with their
+own inspectable per-action approval boundary for authenticated sites.
 
 ## Development
 

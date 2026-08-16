@@ -1,4 +1,5 @@
 singleton QuickchatStore 1.0 QuickchatStore.qml
+singleton DesktopContext 1.0 DesktopContext.qml
 Composer 1.0 Composer.qml
 HistoryView 1.0 HistoryView.qml
 MarkdownView 1.0 MarkdownView.qml

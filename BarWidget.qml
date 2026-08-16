@@ -91,6 +91,7 @@ BarWidget {
       root.close()
       return
     }
+    Quickchat.QuickchatStore.latchDesktopContext()
     if (root.canInline) {
       root.inlineExpanded = true
       Qt.callLater(function() { inlineComposer.forceInputFocus() })
@@ -169,6 +170,7 @@ BarWidget {
     }
     onEscapeRequested: {
       root.inlineExpanded = false
+      Quickchat.QuickchatStore.clearDesktopContextLatch()
       button.forceActiveFocus()
     }
   }

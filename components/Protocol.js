@@ -17,7 +17,7 @@ function command(type, values) {
   return result
 }
 
-function submitCommand(id, question, provider, model) {
+function submitCommand(id, question, provider, model, desktopContext) {
   var payload = command("submit", {
     id: String(id || ""),
     question: String(question || ""),
@@ -25,7 +25,140 @@ function submitCommand(id, question, provider, model) {
   })
   var selectedModel = String(model || "").trim()
   if (selectedModel !== "") payload.model = selectedModel
+  var context = normalizedDesktopContext(desktopContext)
+  if (context !== null) payload.desktopContext = context
   return payload
+}
+
+function safeContextText(value, limit) {
+  return String(value || "")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, limit)
+}
+
+function isShellAppId(value) {
+  var appId = safeContextText(value, 160).toLowerCase()
+  return appId.indexOf("quickshell") >= 0 || appId.indexOf("omarchy-shell") >= 0
+}
+
+function normalizedDesktopWindow(raw) {
+  var source = raw && typeof raw === "object" ? raw : {}
+  var result = {}
+  var appId = safeContextText(source.appId, 160)
+  var title = safeContextText(source.title, 240)
+  var monitor = safeContextText(source.monitor, 120)
+  var workspace = Number(source.workspace)
+  if (appId !== "") result.appId = appId
+  if (title !== "") result.title = title
+  if (Number.isFinite(workspace) && Math.floor(workspace) === workspace
+      && workspace >= -100000 && workspace <= 100000) result.workspace = workspace
+  if (monitor !== "") result.monitor = monitor
+  return Object.keys(result).length > 0 ? result : null
+}
+
+function normalizedDesktopApp(raw) {
+  var source = raw && typeof raw === "object" ? raw : {}
+  var appId = safeContextText(source.appId, 160)
+  if (appId === "") return null
+  var workspaces = []
+  var sourceWorkspaces = Array.isArray(source.workspaces) ? source.workspaces : []
+  for (var i = 0; i < sourceWorkspaces.length && workspaces.length < 12; i++) {
+    var workspace = Number(sourceWorkspaces[i])
+    if (!Number.isFinite(workspace) || Math.floor(workspace) !== workspace
+        || workspace < -100000 || workspace > 100000 || workspaces.indexOf(workspace) >= 0) continue
+    workspaces.push(workspace)
+  }
+  workspaces.sort(function(left, right) { return left - right })
+  var windowCount = Math.floor(Number(source.windowCount))
+  return {
+    appId: appId,
+    workspaces: workspaces,
+    windowCount: Number.isFinite(windowCount) && windowCount > 0 && windowCount <= 64 ? windowCount : 1
+  }
+}
+
+function normalizedDesktopMedia(raw) {
+  var source = raw && typeof raw === "object" ? raw : {}
+  var result = {}
+  var player = safeContextText(source.player, 160)
+  var title = safeContextText(source.title, 240)
+  var artist = safeContextText(source.artist, 200)
+  if (player !== "") result.player = player
+  if (title !== "") result.title = title
+  if (artist !== "") result.artist = artist
+  return Object.keys(result).length > 0 ? result : null
+}
+
+function normalizedDesktopContext(raw) {
+  var source = raw && typeof raw === "object" ? raw : {}
+  var activeWindow = normalizedDesktopWindow(source.activeWindow)
+  if (activeWindow !== null && activeWindow.appId && isShellAppId(activeWindow.appId)) activeWindow = null
+  var appMap = {}
+  var workspaceMap = {}
+  var sourceWindows = Array.isArray(source.windows) ? source.windows : []
+  for (var i = 0; i < sourceWindows.length; i++) {
+    var window = normalizedDesktopWindow(sourceWindows[i])
+    if (window === null) continue
+    if (window.appId && isShellAppId(window.appId)) continue
+    if (window.workspace !== undefined) workspaceMap[String(window.workspace)] = window.workspace
+    if (!window.appId) continue
+    var appKey = String(window.appId).toLowerCase()
+    if (!appMap[appKey]) appMap[appKey] = { appId: window.appId, workspaces: [], windowCount: 0 }
+    appMap[appKey].windowCount += 1
+    if (window.workspace !== undefined && appMap[appKey].workspaces.indexOf(window.workspace) < 0)
+      appMap[appKey].workspaces.push(window.workspace)
+  }
+  var sourceApps = Array.isArray(source.apps) ? source.apps : []
+  for (var a = 0; a < sourceApps.length; a++) {
+    var app = normalizedDesktopApp(sourceApps[a])
+    if (app === null) continue
+    if (isShellAppId(app.appId)) continue
+    var key = app.appId.toLowerCase()
+    if (!appMap[key]) appMap[key] = app
+    for (var aw = 0; aw < app.workspaces.length; aw++) workspaceMap[String(app.workspaces[aw])] = app.workspaces[aw]
+  }
+  var sourceWorkspaceIds = Array.isArray(source.workspaces) ? source.workspaces : []
+  for (var sw = 0; sw < sourceWorkspaceIds.length; sw++) {
+    var workspaceId = Number(sourceWorkspaceIds[sw])
+    if (Number.isFinite(workspaceId) && Math.floor(workspaceId) === workspaceId
+        && workspaceId >= -100000 && workspaceId <= 100000) workspaceMap[String(workspaceId)] = workspaceId
+  }
+  var apps = []
+  var appKeys = Object.keys(appMap).sort()
+  for (var k = 0; k < appKeys.length && apps.length < 12; k++) apps.push(normalizedDesktopApp(appMap[appKeys[k]]))
+  var workspaces = []
+  var workspaceKeys = Object.keys(workspaceMap)
+  for (var w = 0; w < workspaceKeys.length; w++) workspaces.push(workspaceMap[workspaceKeys[w]])
+  workspaces.sort(function(left, right) { return left - right })
+  workspaces = workspaces.slice(0, 12)
+  var media = []
+  var sourceMedia = Array.isArray(source.media) ? source.media : []
+  for (var j = 0; j < sourceMedia.length && media.length < 4; j++) {
+    var player = normalizedDesktopMedia(sourceMedia[j])
+    if (player !== null) media.push(player)
+  }
+  if (activeWindow === null && apps.length === 0 && workspaces.length === 0 && media.length === 0) return null
+  var result = { version: 1, apps: apps, workspaces: workspaces, media: media }
+  if (activeWindow !== null) result.activeWindow = activeWindow
+  return result
+}
+
+function desktopContextWithLatchedActive(raw, latchedActiveWindow) {
+  var context = normalizedDesktopContext(raw)
+  var latched = normalizedDesktopWindow(latchedActiveWindow)
+  if (context === null) {
+    if (latched === null) return null
+    context = { version: 1, apps: [], workspaces: [], media: [] }
+  }
+  if (!context.activeWindow && latched !== null) context.activeWindow = latched
+  return normalizedDesktopContext(context)
+}
+
+function hasFeature(features, feature) {
+  var values = Array.isArray(features) ? features : []
+  return values.indexOf(String(feature || "")) >= 0
 }
 
 function parseLine(line) {

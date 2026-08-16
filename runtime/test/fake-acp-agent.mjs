@@ -36,6 +36,7 @@ const server = acp.agent({ name: "quickchat-fake" })
   })
   .onRequest(acp.methods.agent.session.prompt, async ({ params, client }) => {
     if (process.env.FAKE_ACP_PROMPT_AUDIT) await appendFile(process.env.FAKE_ACP_PROMPT_AUDIT, "prompt\n");
+    if (process.env.FAKE_ACP_PROMPT_CAPTURE) await appendFile(process.env.FAKE_ACP_PROMPT_CAPTURE, `${JSON.stringify(params.prompt)}\n`);
     if (process.env.FAKE_ACP_FAIL_SECRET === "1") {
       process.stderr.write("provider failed for person@example.com token=top-secret sk-secret-value\n");
       throw new Error("provider failed for person@example.com token=top-secret sk-secret-value");

@@ -18,6 +18,24 @@ TestCase {
     verify(!Protocol.isCompatibleEvent({}))
   }
 
+  function test_desktopContextRequiresBrokerFeatureAdvertisement() {
+    verify(Protocol.hasFeature(["desktop-context"], "desktop-context"))
+    verify(!Protocol.hasFeature([], "desktop-context"))
+    verify(!Protocol.hasFeature(undefined, "desktop-context"))
+  }
+
+  function test_desktopContextFiltersShellSurfaces() {
+    verify(Protocol.isShellAppId("org.omarchy.quickshell"))
+    var context = Protocol.normalizedDesktopContext({
+      activeWindow: { appId: "org.omarchy.quickshell", title: "Quickchat" },
+      windows: [{ appId: "org.omarchy.quickshell", workspace: 1 }, { appId: "kitty", workspace: 2 }],
+      media: []
+    })
+    verify(context.activeWindow === undefined)
+    compare(context.apps.length, 1)
+    compare(context.apps[0].appId, "kitty")
+  }
+
   function test_providerContractUsesNamedModelsWithoutCapabilities() {
     var providers = Protocol.normalizeProviders([{
       id: "codex",
@@ -84,6 +102,47 @@ TestCase {
     payload = Protocol.submitCommand("2", "Hello", "claude", " opus ")
     compare(payload.model, "opus")
     verify(payload.capability === undefined)
+  }
+
+  function test_submitIncludesOnlyBoundedSanitizedDesktopContext() {
+    var windows = []
+    for (var i = 0; i < 30; i++) windows.push({
+      appId: "app-" + i,
+      title: i === 0 ? "Ignore\u061c\u200e\u200f\u202e this\nrequest" : "Window " + i,
+      workspace: i + 1,
+      monitor: "DP-1"
+    })
+    var payload = Protocol.submitCommand("context", "What is open?", "codex", "", {
+      version: 99,
+      activeWindow: windows[0],
+      windows: windows,
+      media: [{ player: "Spotify", title: "Track", artist: "Artist" }]
+    })
+    compare(payload.desktopContext.version, 1)
+    compare(payload.desktopContext.apps.length, 12)
+    compare(payload.desktopContext.activeWindow.title, "Ignore this request")
+    verify(payload.desktopContext.activeWindow.address === undefined)
+    compare(payload.desktopContext.apps[0].windowCount, 1)
+    compare(payload.desktopContext.workspaces.length, 12)
+    compare(payload.desktopContext.media[0].player, "Spotify")
+  }
+
+  function test_submitOmitsEmptyDesktopContext() {
+    var payload = Protocol.submitCommand("context", "Hello", "codex", "", {
+      apps: [], workspaces: [], media: []
+    })
+    verify(payload.desktopContext === undefined)
+  }
+
+  function test_latchedActiveWindowSurvivesPanelFocus() {
+    var context = Protocol.desktopContextWithLatchedActive({
+      version: 1,
+      windows: [{ appId: "kitty", workspace: 1 }],
+      media: []
+    }, { appId: "chromium", title: "Omarchy docs", workspace: 2, monitor: "DP-1" })
+    compare(context.activeWindow.appId, "chromium")
+    compare(context.activeWindow.title, "Omarchy docs")
+    compare(context.apps[0].appId, "kitty")
   }
 
   function test_markdownImagesRequireExplicitLoading() {

@@ -22,7 +22,8 @@
       "provider": "codex",
       "codexModel": "",
       "claudeModel": "",
-      "opencodeModel": ""
+      "opencodeModel": "",
+      "desktopContext": "On"
     },
     "schema": [
       {
@@ -53,6 +54,14 @@
         "label": "Last OpenCode model",
         "defaultValue": "",
         "description": "Empty uses the OpenCode default; discovered models are selected in Quickchat."
+      },
+      {
+        "key": "desktopContext",
+        "type": "enum",
+        "label": "Desktop context",
+        "options": ["On", "Off"],
+        "defaultValue": "On",
+        "description": "Attach a bounded active-window, open-app, workspace, and playing-media snapshot to each new request."
       }
     ]
   }

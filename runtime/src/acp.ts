@@ -7,6 +7,7 @@ import { createInterface } from "node:readline";
 import * as acp from "@agentclientprotocol/sdk";
 import type { ContentBlock, NewSessionRequest, RequestPermissionRequest, SessionConfigOption } from "@agentclientprotocol/sdk";
 import type { DiscoveredProvider } from "./providers.js";
+import type { AcpPrompt } from "./context.js";
 import type { BrokerEvent, ModelOption, StoredImage } from "./types.js";
 import { ImageStore } from "./images.js";
 import { presentImage } from "./history.js";
@@ -190,7 +191,7 @@ export async function deleteAcpSession(provider: DiscoveredProvider, sessionId: 
 export function runAcpQuestion(
   provider: DiscoveredProvider,
   requestId: string,
-  question: string,
+  question: AcpPrompt,
   model: string | undefined,
   emit: (event: BrokerEvent) => void,
   timeoutMs = 90_000,
