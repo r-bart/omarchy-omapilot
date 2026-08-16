@@ -74,7 +74,7 @@ if grep -Fqi 'local_action' "$repo_dir/Panel.qml" "$repo_dir/components/Protocol
 fi
 grep -Fq 'visible: !root.backend || root.backend.pendingPermission === null' \
   "$repo_dir/components/Composer.qml"
-if rg -n 'sandboxed|Device commands stay blocked|sandbox limits stay active' \
+if grep -Eq 'sandboxed|Device commands stay blocked|sandbox limits stay active' \
   "$repo_dir/Panel.qml" "$repo_dir/components/Protocol.js"; then
   printf 'QML permission copy must not retain unreachable legacy policy branches\n' >&2
   exit 1
