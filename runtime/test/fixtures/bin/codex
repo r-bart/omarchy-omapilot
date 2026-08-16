@@ -36,6 +36,7 @@ realtime_conversation under-development false
 remote_plugin stable false
 request_permissions_tool under-development false
 shell_tool stable false
+skill_search stable false
 skill_mcp_dependency_install stable false
 skill_env_var_dependency_prompt removed false
 search_tool removed false

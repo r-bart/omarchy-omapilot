@@ -63,7 +63,8 @@ Quickchat broker
 Codex and Claude use exact, source-pinned official ACP adapter packages bundled in the repository. OpenCode uses its native `opencode acp` command. The broker normalizes provider discovery, streamed text/images, cancellation, permissions, errors, and session identities; QML does not parse provider-specific output.
 
 There is no chat/web/tools mode. Select a harness and model, ask one question,
-and the broker supplies that harness's reviewed automatic policy:
+and the broker supplies that harness's reviewed automatic policy. Every harness
+can load relevant installed skills and decide whether a tool is needed:
 
 - **Codex** may use its read-only device tools and read files available to the
   current user without asking. Native web search stays disabled in the same
@@ -71,14 +72,17 @@ and the broker supplies that harness's reviewed automatic policy:
   requesting network or broader device authority pauses behind an exact
   **Allow once** or **Deny** card showing the adapter-normalized command and
   working directory.
-- **Claude** may search the web and run commands inside a disposable
+- **Claude** may load installed skills from a disposable, MCP-free plugin copy,
+  search the web, and run commands inside a disposable
   scratch workspace. Host paths and credential-bearing environment variables
   stay hidden, direct process network access is blocked, and writes remain
   confined to per-turn scratch. Commands inside that fixed boundary may run
-  automatically; any surfaced approval cannot weaken the sandbox.
-- **OpenCode** may answer and use its positively identified web search tool.
-  Direct fetches and device commands remain blocked until its ACP path can prove the same
-  inspectable, request-bound approval handshake.
+  automatically. A command that needs host/device authority pauses behind the
+  same exact **Allow once** or **Deny** card; approval applies only to that command.
+- **OpenCode** may load installed skills and use its positively identified web
+  search tool automatically. Its native `bash` permission is fixed to `ask`;
+  the broker accepts execution only after the exact command receives a
+  request-bound **Allow once** decision. Other OpenCode tools remain denied.
 
 Every supported permission decision is bound to the exact in-flight request.
 Oversized or visually ambiguous requests, persistent grants, arbitrary MCP,
@@ -92,6 +96,11 @@ The broker does not classify prompt phrases or hardcode individual use cases.
 Questions and action requests follow the same provider path; the selected
 harness decides whether a tool is useful, and any broader device command still
 pauses on the exact request-bound approval described above.
+
+Quickchat also gives every harness one shared action-integrity instruction:
+never claim an action succeeded unless the performing tool returned success in
+that turn. Denied, cancelled, timed-out, unavailable, or failed actions must be
+reported as not completed.
 
 ## Desktop context on submit
 

@@ -1,11 +1,11 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { parseCodexModelCatalog, probeAcpModels, providerPolicyEnvironment, providerSessionRequest, runAcpQuestion } from "../src/acp.js";
-import { codexToolLockdownFeatures, discoverProviders, type DiscoveredProvider } from "../src/providers.js";
+import { parseCodexModelCatalog, prepareClaudeSkills, probeAcpModels, providerPolicyEnvironment, providerSessionRequest, runAcpQuestion } from "../src/acp.js";
+import { codexToolLockdownFeatures, discoverProviders, openCodePolicyEnvironment, type DiscoveredProvider } from "../src/providers.js";
 import type { BrokerEvent } from "../src/types.js";
 
 describe("provider security profiles", () => {
@@ -30,7 +30,7 @@ describe("provider security profiles", () => {
     });
   });
 
-  it("enables only reviewed Codex execution features in the automatic profile", () => {
+  it("enables only reviewed Codex execution and skill features in the automatic profile", () => {
     const automatic: unknown = JSON.parse(providerPolicyEnvironment(provider("codex")).CODEX_CONFIG ?? "{}");
     expect(automatic).toMatchObject({
       approval_policy: "on-request",
@@ -39,15 +39,16 @@ describe("provider security profiles", () => {
       mcp_servers: {}
     });
     const automaticFeatures = featureRecord(automatic);
-    expect(automaticFeatures).toMatchObject({ shell_tool: true, unified_exec: true });
+    expect(automaticFeatures).toMatchObject({ shell_tool: true, unified_exec: true, skill_search: true });
+    expect(automatic).toMatchObject({ developer_instructions: expect.stringContaining("relevant installed skills") });
     for (const feature of provider("codex").lockdownFeatures ?? []) {
-      if (feature !== "shell_tool" && feature !== "unified_exec") expect(automaticFeatures[feature]).toBe(false);
+      if (feature !== "shell_tool" && feature !== "unified_exec" && feature !== "skill_search") expect(automaticFeatures[feature]).toBe(false);
     }
   });
 
   it("gives automatic Claude Bash and web tools inside disposable local scratch", () => {
     const request = providerSessionRequest({
-      id: "claude", name: "Claude", models: [], policy: { tools: "sandboxed", web: "search", hostReads: false },
+      id: "claude", name: "Claude", models: [], policy: { tools: "device-approval", web: "search", hostReads: false },
       harnessPath: "/test/claude",
       agent: {
         executable: "/test/claude-acp", args: [],
@@ -69,13 +70,14 @@ describe("provider security profiles", () => {
     };
     const options = serialized._meta.claudeCode.options;
     expect(request.mcpServers).toEqual([]);
-    expect(options.tools).toEqual(["Bash", "WebSearch"]);
+    expect(options.tools).toEqual(["Bash", "WebSearch", "Skill"]);
+    expect(serialized._meta.claudeCode.options).toMatchObject({ skills: "all" });
     expect(serialized._meta.claudeCode.options).toMatchObject({ disallowedTools: expect.arrayContaining(["WebFetch"]) });
     expect(options.sandbox).toMatchObject({
       enabled: true,
       failIfUnavailable: true,
       autoAllowBashIfSandboxed: true,
-      allowUnsandboxedCommands: false,
+      allowUnsandboxedCommands: true,
       network: { allowedDomains: [], strictAllowlist: true, allowLocalBinding: false, allowUnixSockets: [] },
       filesystem: {
         allowRead: ["/run/user/1000/quickchat/automatic-turn", "/dev/null", "/etc/ld.so.cache"],
@@ -94,9 +96,46 @@ describe("provider security profiles", () => {
     ]);
   });
 
-  it("automatically permits only OpenCode web search", () => {
+  it("copies installed Claude skills into disposable plugin scope and skips unsafe internal symlinks", async () => {
+    const root = await mkdtemp(join(tmpdir(), "quickchat-claude-skills-"));
+    try {
+      const home = join(root, "home");
+      const cwd = join(root, "turn");
+      const source = join(root, "source-skill");
+      await mkdir(join(home, ".agents", "skills"), { recursive: true });
+      await mkdir(source, { recursive: true });
+      await writeFile(join(source, "SKILL.md"), "# Safe skill\n");
+      await symlink(source, join(home, ".agents", "skills", "safe"));
+      const unsafe = join(home, ".agents", "skills", "unsafe");
+      await mkdir(unsafe, { recursive: true });
+      await writeFile(join(unsafe, "SKILL.md"), "# Unsafe skill\n");
+      await symlink("/etc/hostname", join(unsafe, "host-secret"));
+      await mkdir(cwd, { recursive: true });
+      const plugin = await prepareClaudeSkills(cwd, { HOME: home });
+      expect(plugin).toBeDefined();
+      if (plugin === undefined) return;
+      await expect(readFile(join(plugin, "skills", "safe", "SKILL.md"), "utf8")).resolves.toBe("# Safe skill\n");
+      await expect(readFile(join(plugin, "skills", "unsafe", "SKILL.md"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(readFile(join(plugin, ".claude-plugin", "plugin.json"), "utf8")).resolves.toContain("omarchy-quickchat-installed-skills");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("allows OpenCode skills and exact approved shell commands while denying other tools", () => {
     expect(JSON.parse(providerPolicyEnvironment(provider("opencode")).OPENCODE_PERMISSION ?? "{}"))
-      .toEqual({ "*": "deny", websearch: "allow" });
+      .toMatchObject({
+        "*": "deny", skill: "allow", websearch: "allow", external_directory: "allow", bash: "ask",
+        read: "deny", edit: "deny", task: "deny", webfetch: "deny"
+      });
+    const config = JSON.parse(providerPolicyEnvironment(provider("opencode")).OPENCODE_CONFIG_CONTENT ?? "{}");
+    expect(config).toMatchObject({
+      default_agent: "build",
+      instructions: [expect.stringMatching(/runtime\/policies\/automatic\.md$/u)],
+      skills: { urls: [] },
+      agent: { build: { permission: { bash: "ask", skill: "allow", task: "deny" } } }
+    });
+    expect(providerPolicyEnvironment(provider("opencode")).OPENCODE_DISABLE_PROJECT_CONFIG).toBe("1");
   });
 
   it.each(["other", "search"])("accepts exact OpenCode websearch identity with ACP kind %s", async (kind) => {
@@ -109,6 +148,56 @@ describe("provider security profiles", () => {
       });
       expect(result).toMatchObject({ answer: "safe" });
       expect(events).toContainEqual({ type: "content", id: `allowed-${kind}`, delta: "safe" });
+    } finally {
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it("accepts OpenCode's exact installed-skill tool without a device prompt", async () => {
+    const fixture = await openCodeToolUpdateFixture("other", "skill");
+    let permissions = 0;
+    try {
+      const result = await runAcpQuestion(
+        fixture.provider,
+        "allowed-skill",
+        "Load the relevant installed skill",
+        undefined,
+        () => undefined,
+        5_000,
+        undefined,
+        () => { permissions += 1; return Promise.resolve(undefined); }
+      ).result;
+      expect(result.answer).toBe("safe");
+      expect(permissions).toBe(0);
+    } finally {
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ["allow", "safe"],
+    ["deny", "not completed"]
+  ] as const)("mediates an exact OpenCode shell command with a one-time %s decision", async (decision, answer) => {
+    const fixture = await openCodeToolUpdateFixture("execute", "bash", "execute", true, false);
+    let permissions = 0;
+    try {
+      const result = await runAcpQuestion(
+        fixture.provider,
+        `opencode-shell-${decision}`,
+        "Run the harmless command",
+        undefined,
+        () => undefined,
+        5_000,
+        undefined,
+        (request) => {
+          permissions += 1;
+          expect(request.toolCall).toMatchObject({ kind: "execute", rawInput: { command: "printf quickchat" } });
+          const kind = decision === "allow" ? "allow_once" : "reject_once";
+          return Promise.resolve(request.options.find((option) => option.kind === kind)?.optionId);
+        }
+      ).result;
+      expect(result.answer).toBe(answer);
+      expect(permissions).toBe(1);
     } finally {
       await rm(fixture.root, { recursive: true, force: true });
     }
@@ -130,7 +219,8 @@ describe("provider security profiles", () => {
     const fixture = await openCodeToolUpdateFixture(kind);
     const events: BrokerEvent[] = [];
     try {
-      await expect(runAcpQuestion(fixture.provider, `blocked-${kind}`, "Attempt a blocked tool", undefined, events.push.bind(events), 5_000).result)
+      const timeout = kind === "execute" ? 200 : 5_000;
+      await expect(runAcpQuestion(fixture.provider, `blocked-${kind}`, "Attempt a blocked tool", undefined, events.push.bind(events), timeout).result)
         .rejects.toMatchObject({ code: "forbidden_tool_attempt" });
       expect(events.filter((event) => event.type === "content")).toEqual([]);
     } finally {
@@ -161,8 +251,8 @@ describe("provider security profiles", () => {
     expect(providers.every((provider) => !("capabilities" in provider))).toBe(true);
     expect(providers.map(({ id, policy }) => ({ id, policy }))).toEqual([
       { id: "codex", policy: { tools: "device-approval", web: "approved-command", hostReads: true } },
-      { id: "claude", policy: { tools: "sandboxed", web: "search", hostReads: false } },
-      { id: "opencode", policy: { tools: "blocked", web: "search", hostReads: false } }
+      { id: "claude", policy: { tools: "device-approval", web: "search", hostReads: false } },
+      { id: "opencode", policy: { tools: "device-approval", web: "search", hostReads: false } }
     ]);
   });
 });
@@ -177,14 +267,23 @@ function provider(id: "codex" | "opencode"): DiscoveredProvider {
     id, name: id, models: [],
     policy: id === "codex"
       ? { tools: "device-approval", web: "approved-command", hostReads: true }
-      : { tools: "blocked", web: "search", hostReads: false },
+      : { tools: "device-approval", web: "search", hostReads: false },
     harnessPath: `/test/${id}`,
-    agent: { executable: "/test/acp", args: [], env: { PATH: "/test" } },
-    ...(id === "codex" ? { lockdownFeatures: ["shell_tool", "unified_exec", "code_mode", "code_mode_host", "apps", "plugins", "browser_use", "in_app_browser", "computer_use", "js_repl", "view_image"] } : {})
+    agent: {
+      executable: "/test/acp", args: [],
+      env: id === "opencode" ? openCodePolicyEnvironment({ PATH: "/test" }) : { PATH: "/test" }
+    },
+      ...(id === "codex" ? { lockdownFeatures: ["shell_tool", "unified_exec", "skill_search", "code_mode", "code_mode_host", "apps", "plugins", "browser_use", "in_app_browser", "computer_use", "js_repl", "view_image"] } : {})
   };
 }
 
-async function openCodeToolUpdateFixture(kind: string, title = "Policy probe", updateKind = kind === "other" && title === "websearch" ? "other" : ""): Promise<{ root: string; audit: string; provider: DiscoveredProvider }> {
+async function openCodeToolUpdateFixture(
+  kind: string,
+  title = "Policy probe",
+  updateKind = kind === "other" && title === "websearch" ? "other" : "",
+  requestPermission = false,
+  initialInput = true
+): Promise<{ root: string; audit: string; provider: DiscoveredProvider }> {
   const root = await mkdtemp(join(tmpdir(), "quickchat-opencode-tool-update-"));
   const script = join(root, "agent.mjs");
   const audit = join(root, "audit.log");
@@ -213,15 +312,37 @@ const server = acp.agent({ name: "quickchat-opencode-tool-update" })
     pending = controller;
     await client.notify(acp.methods.client.session.update, {
       sessionId: params.sessionId,
-      update: { sessionUpdate: "tool_call", toolCallId: "tool-1", title: process.env.FAKE_TOOL_TITLE, kind: process.env.FAKE_TOOL_KIND, status: "in_progress" }
+      update: {
+        sessionUpdate: "tool_call", toolCallId: "tool-1", title: process.env.FAKE_TOOL_TITLE,
+        kind: process.env.FAKE_TOOL_KIND, status: "pending",
+        rawInput: process.env.FAKE_TOOL_INITIAL_INPUT === "1" ? { command: process.env.FAKE_TOOL_COMMAND } : undefined
+      }
+    });
+    let allowed = true;
+    if (process.env.FAKE_TOOL_REQUEST_PERMISSION === "1") {
+      const decision = await client.request(acp.methods.client.session.requestPermission, {
+        sessionId: params.sessionId,
+        toolCall: {
+          toolCallId: "tool-1", title: process.env.FAKE_TOOL_TITLE, kind: "execute",
+          rawInput: { command: process.env.FAKE_TOOL_COMMAND }
+        },
+        options: [
+          { optionId: "once", name: "Allow once", kind: "allow_once" },
+          { optionId: "reject", name: "Reject", kind: "reject_once" }
+        ]
+      });
+      allowed = decision.outcome.outcome === "selected" && decision.outcome.optionId === "once";
+    }
+    await client.notify(acp.methods.client.session.update, {
+      sessionId: params.sessionId,
+      update: {
+        sessionUpdate: "tool_call_update", toolCallId: "tool-1", title: "Tool progress",
+        kind: process.env.FAKE_TOOL_UPDATE_KIND || undefined, status: allowed ? "completed" : "failed"
+      }
     });
     await client.notify(acp.methods.client.session.update, {
       sessionId: params.sessionId,
-      update: { sessionUpdate: "tool_call_update", toolCallId: "tool-1", title: "Exa Web Search progress", kind: process.env.FAKE_TOOL_UPDATE_KIND || undefined, status: "completed" }
-    });
-    await client.notify(acp.methods.client.session.update, {
-      sessionId: params.sessionId,
-      update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "safe" } }
+      update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: allowed ? "safe" : "not completed" } }
     });
     return { stopReason: controller.signal.aborted ? "cancelled" : "end_turn" };
   })
@@ -235,7 +356,7 @@ server.connect(stream);
       id: "opencode",
       name: "OpenCode",
       models: [],
-      policy: { tools: "blocked", web: "search", hostReads: false },
+      policy: { tools: "device-approval", web: "search", hostReads: false },
       harnessPath: process.execPath,
       agent: {
         executable: process.execPath,
@@ -245,6 +366,9 @@ server.connect(stream);
           FAKE_TOOL_KIND: kind,
           FAKE_TOOL_TITLE: title,
           FAKE_TOOL_UPDATE_KIND: updateKind,
+          FAKE_TOOL_COMMAND: kind === "execute" ? "printf quickchat" : "",
+          FAKE_TOOL_REQUEST_PERMISSION: requestPermission ? "1" : "0",
+          FAKE_TOOL_INITIAL_INPUT: initialInput ? "1" : "0",
           FAKE_TOOL_AUDIT: audit,
           XDG_RUNTIME_DIR: join(root, "run"),
           XDG_STATE_HOME: join(root, "state"),

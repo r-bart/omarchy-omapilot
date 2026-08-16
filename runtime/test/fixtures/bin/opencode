@@ -11,6 +11,22 @@ if [ "$1" = "--pure" ] && [ "$2" = "models" ]; then
   printf 'fixture/default\n'
   exit 0
 fi
+if [ "$1" = "--pure" ] && [ "$2" = "debug" ] && [ "$3" = "config" ]; then
+  node -e '
+    const content = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT || "{}");
+    const permission = JSON.parse(process.env.OPENCODE_PERMISSION || "{}");
+    const mcp = { "fixture-user-mcp": { type: "local", command: ["false"] }, ...(content.mcp || {}) };
+    process.stdout.write(JSON.stringify({
+      permission,
+      default_agent: content.default_agent,
+      instructions: content.instructions || [],
+      skills: content.skills || { urls: [] },
+      agent: { build: { permission: content.agent?.build?.permission || {} } },
+      mcp
+    }));
+  '
+  exit $?
+fi
 if [ "$1" = "--pure" ] && [ "$2" = "acp" ]; then
   exec node "$(dirname "$0")/../../fake-acp-agent.mjs"
 fi

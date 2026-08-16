@@ -9,7 +9,7 @@ Security fixes are provided for the current Quickchat release.
 Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. Review Quickchat before enabling it. Quickchat minimizes that authority by delegating provider traffic to a separate broker process and starting each agent with one provider-specific, fail-closed automatic policy.
 
 - Codex starts in read-only, on-request mode with native web search disabled and only the
-  strictly validated shell/unified-exec features. It may read any file the current user can
+  strictly validated shell/unified-exec and skill-search features. It may read any file the current user can
   read without asking. Tool output is sent to Codex and may be retained in the
   saved answer. A request for broader access pauses behind the adapter-normalized
   command and working directory, and only its provider-native allow-once or
@@ -17,18 +17,23 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
   Approval can execute the command outside the read-only sandbox with the
   current user's authority, including host reads, state changes, and network
   access; the UI states this explicitly. Persistent grants are never exposed.
-- Claude runs inside a disposable workspace that denies
+- Claude loads installed skills through a per-turn plugin copy with MCP discovery
+  disabled. Internal symlinks, oversized trees, and non-regular entries are
+  skipped. It runs inside a disposable workspace that denies
   every existing top-level host path except system executable/library roots,
   hides credential-bearing environment variables, and confines writes to
   per-turn scratch. WebSearch is available, while WebFetch and direct process
   network access remains blocked. Commands inside that fixed boundary may run
-  automatically; a surfaced approval does not weaken the hard sandbox.
-- OpenCode may use only its positively identified websearch tool. Direct fetch
-  and device commands remain withheld because its current ACP path cannot prove an
-  inspectable allow-once handshake without raw tool-call markup.
+  automatically. A command that cannot run inside that boundary may proceed
+  only through the broker's exact allow-once device approval.
+- OpenCode may load its positively identified skill tool and use websearch
+  automatically. Its external-directory check is allowed only as a prerequisite
+  to a separately reviewed shell request; `bash` remains `ask`, and execution
+  updates must correlate with the exact approved ACP tool-call ID. Every other
+  OpenCode permission remains denied.
 - Oversized requests and control or bidirectional-display characters fail
   closed rather than being truncated.
-- Arbitrary MCP, browser/computer control, unclassified requests, and requests
+- Arbitrary MCP, browser/computer control, subagents, unclassified requests, and requests
   without an inspectable target are denied. Codex may edit, delete, move, or otherwise
   mutate user-accessible state only after exact allow-once command approval.
 - Provider authentication remains in the installed harness. Quickchat must not log, copy, or persist credential output.
@@ -38,6 +43,16 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
 - The broker does not regex-classify prompts or implement action-specific
   shortcuts. Every ordinary question and action request follows the selected
   harness's same fixed policy and permission boundary.
+- All providers receive the same action-integrity instruction: a device action
+  cannot be described as successful unless its performing tool returned success
+  in that turn. A denied, cancelled, timed-out, unavailable, or failed action
+  must be described as not completed. This instruction complements the broker's
+  structural fail-closed checks; it does not turn natural-language output into a
+  security boundary.
+- Installed skill content is trusted provider instruction, not observational
+  data. A skill can cause the harness to propose a command, but it cannot bypass
+  the exact allow-once card or enable a denied tool. Review locally installed
+  skills as part of the harness configuration.
 - Desktop context comes only from Quickshell's public Hyprland and MPRIS
   objects. The active window is latched immediately before the panel takes
   focus; the remaining snapshot is captured at submit. It is limited to one active window, 12 deduplicated app

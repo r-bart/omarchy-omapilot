@@ -45,11 +45,11 @@ TestCase {
     }, {
       id: "claude",
       ready: true,
-      policy: { tools: "sandboxed", web: "search", hostReads: false }
+      policy: { tools: "device-approval", web: "search", hostReads: false }
     }, {
       id: "opencode",
       ready: true,
-      policy: { tools: "blocked", web: "search", hostReads: false }
+      policy: { tools: "device-approval", web: "search", hostReads: false }
     }])
     compare(providers.length, 3)
     compare(providers[0].value, "codex")
@@ -57,10 +57,10 @@ TestCase {
     compare(providers[0].policy.tools, "device-approval")
     compare(providers[0].policy.web, "approved-command")
     verify(providers[0].policy.hostReads)
-    compare(providers[1].policy.tools, "sandboxed")
+    compare(providers[1].policy.tools, "device-approval")
     compare(providers[1].policy.web, "search")
     verify(!providers[1].policy.hostReads)
-    compare(providers[2].policy.tools, "blocked")
+    compare(providers[2].policy.tools, "device-approval")
     compare(providers[2].policy.web, "search")
     verify(!providers[2].policy.hostReads)
     verify(providers[0].capabilities === undefined)
@@ -76,8 +76,8 @@ TestCase {
     compare(missing.web, "blocked")
     verify(!missing.hostReads)
     compare(Protocol.providerPolicyDescription("opencode", missing), "OpenCode runs without web or device tools.")
-    verify(Protocol.providerPolicyDescription("opencode", { tools: "blocked", web: "search", hostReads: false }).indexOf("can search the web") >= 0)
-    verify(Protocol.providerPolicyDescription("claude", { tools: "sandboxed", web: "blocked", hostReads: false }).indexOf("search the web") < 0)
+    verify(Protocol.providerPolicyDescription("opencode", { tools: "device-approval", web: "search", hostReads: false }).indexOf("relevant installed skills") >= 0)
+    verify(Protocol.providerPolicyDescription("claude", { tools: "device-approval", web: "blocked", hostReads: false }).indexOf("web search") < 0)
   }
 
   function test_toolPermissionIsBoundToCurrentTurn() {

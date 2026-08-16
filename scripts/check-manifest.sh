@@ -35,6 +35,7 @@ jq -e '
 [[ -f "$repo_root/BarWidget.qml" ]] || fail "manifest entry point is missing: BarWidget.qml"
 [[ -x "$repo_root/runtime/bin/quickchat-broker" ]] || fail "bundled broker launcher is missing or not executable"
 [[ -s "$repo_root/runtime/dist/quickchat-broker.js" ]] || fail "bundled broker runtime is missing"
+[[ -s "$repo_root/runtime/policies/automatic.md" ]] || fail "automatic provider instructions are missing"
 
 while IFS= read -r path; do
   [[ $path != /* && $path != *..* ]] || fail "unsafe manifest entry point: $path"

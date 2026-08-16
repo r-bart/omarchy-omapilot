@@ -124,6 +124,66 @@ contract-test, and feature-type findings were fixed; the bounded re-review was
 focus, playing MPRIS metadata, focused-monitor routing, and one real context
 turn per provider.
 
+## Installed skills and generic provider tools (2026-08-16)
+
+- Goal: make every selected harness discover the user's relevant installed
+  skills and request ordinary tools when useful, with no Tools mode, prompt
+  classifier, or hardcoded app/action mappings.
+- Product contract: read-only skill loading is available automatically. Any
+  command that can affect the device crosses the existing exact-command,
+  request-bound **Allow once** boundary. Persistent grants, opaque commands,
+  arbitrary MCP servers, subagents, and unreviewable filesystem mutations stay
+  fail-closed. A completed answer must not claim an action succeeded unless the
+  harness returned a successful tool result.
+- Done criteria: Codex, Claude, and OpenCode each prove installed-skill
+  discovery; each provider can complete a harmless generic command through its
+  documented authority boundary; deny, timeout, cancellation, malformed input,
+  duplicate/stale decisions, and false-success behavior have regression tests;
+  full validation and deterministic bundles pass; an independent review is
+  clean; a PR targets `main` with green exact-head CI; the reviewed candidate is
+  installed locally only after those gates.
+- Branch/worktree: `provider-tools` at
+  `/home/sbull/worktrees/omarchy-quickchat-context`, based on merged `main`
+  `caa2439` with desktop context preserved as commit `271966f`. The orchestrator
+  owns implementation, integration, publication, and local installation.
+- Allowed: scoped source/docs/tests/build edits; local authenticated
+  non-destructive provider probes; commits; push; PR creation; CI inspection;
+  reviewed local plugin installation. Forbidden: merge, tag, release,
+  marketplace submission, provider credential/configuration changes, CUA,
+  secrets, billing, production/customer data, hardcoded app mappings, or edits
+  outside this repo and the installed Quickchat copy.
+- Architecture/review worker: visible Claude Herdr agent `qc_tools_arch`, pane
+  `wK:p2N`, same worktree/branch, read-only design and final-diff review. The
+  orchestrator owns follow-up and cleanup.
+- Architecture evidence: the worker identified OpenCode wildcard precedence,
+  inherited process cwd, non-composing timeouts, remote skill/MCP supply-chain
+  risks, and Claude skill-source isolation. The candidate now enumerates and
+  validates effective OpenCode permissions, starts providers at `/`, keeps the
+  60-second approval timeout inside a 180-second turn, disables remote skill
+  URLs/configured MCP, and supplies Claude skills without user settings.
+- [x] Approve one provider-neutral skill/tool and action-integrity contract.
+  One checked-in instruction drives skill selection and truthful action status;
+  structured ACP permissions, never prompt classification, own authority.
+- [x] Implement provider wiring and exact OpenCode/Claude device approval.
+  Codex enables only shell/unified-exec/skill-search; Claude uses a disposable
+  MCP-free installed-skill plugin plus sandbox/device escalation; OpenCode
+  proves its resolved deny table, disables project config/MCP, and correlates
+  bash approval by tool-call ID.
+- [x] Add focused policy, protocol, permission, and false-success regressions.
+  Source tests cover automatic skill identity, allow/deny, missing approval,
+  opaque/reclassified tools, unsafe Claude skill trees, and an empty-answer
+  truthful denial fallback; existing lifecycle suites cover timeout, cancel,
+  duplicate IDs, and stale permission decisions.
+- [x] Pass full validation plus authenticated non-GUI provider probes.
+  `./scripts/validate.sh` passed 127 tests with 11 opt-in skips and rebuilt
+  dist; the complete authenticated matrix passed 11/11: installed Omarchy
+  skill loading, harmless approved commands for all providers, Claude/OpenCode
+  web behavior, Claude scratch execution, and OpenCode denied-command integrity.
+  Two release archives were byte-identical (SHA-256
+  `357b6b72386543bc8a10c8c920af8bff5c34d8ca4944915cd9dd69703fe55b25`).
+- [ ] Receive a clean independent final review or fix every verified finding.
+- [ ] Push, open the PR, pass exact-head CI, and install the reviewed candidate.
+
 ## Allowed actions
 
 - Create, test, commit, and push scoped branches in this repository.

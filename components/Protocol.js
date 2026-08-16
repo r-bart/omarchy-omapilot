@@ -251,9 +251,14 @@ function providerPolicyDescription(provider, rawPolicy) {
       ? label + " can search the web. Device commands stay blocked until its harness can present an exact approval."
       : label + " runs without web or device tools."
   }
-  return policy.web === "approved-command"
-    ? label + " uses device tools when useful. It may read user-readable files; network access and broader commands require Allow once."
-    : label + " uses device tools when useful. It may read user-readable files; broader commands require Allow once."
+  var skillsClause = " It can load relevant installed skills automatically."
+  if (policy.hostReads) {
+    return policy.web === "approved-command"
+      ? label + " uses device tools when useful. It may read user-readable files; network access and broader commands require Allow once." + skillsClause
+      : label + " uses device tools when useful. It may read user-readable files; broader commands require Allow once." + skillsClause
+  }
+  return label + " can use safe local tools" + (policy.web === "search" ? " and web search" : "")
+    + ". Host files and device changes require Allow once." + skillsClause
 }
 
 function modelOptions(providers, provider) {

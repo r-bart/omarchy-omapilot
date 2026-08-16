@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import type { AcpRun } from "./acp.js";
+import type { AcpRun, PermissionDecision } from "./acp.js";
 import { BrokerAcpError, deleteAcpSession, probeAcpModels, runAcpQuestion } from "./acp.js";
 import { DictationService } from "./dictation.js";
 import { promptWithDesktopContext } from "./context.js";
@@ -18,7 +18,7 @@ type SessionCleaner = (provider: DiscoveredProvider, sessionId: string) => Promi
 type HerdrContinue = typeof continueInHerdr;
 type HerdrResult = Awaited<ReturnType<HerdrContinue>>;
 type PermissionWaiter = PendingToolPermission & {
-  resolve: (optionId: string | undefined) => void;
+  resolve: (decision: PermissionDecision) => void;
   timeout: NodeJS.Timeout;
 };
 
@@ -116,7 +116,7 @@ export class QuickchatBroker {
     this.#emit({ type: "state", id: command.id, state: "preparing", message: `Preparing ${provider.name}…` });
     const run = runAcpQuestion(
       provider, command.id, promptWithDesktopContext(command.question, command.desktopContext), command.model,
-      this.#emit, 90_000, this.#images,
+      this.#emit, 180_000, this.#images,
       (request) => this.#requestToolPermission(command.id, provider.id, request),
       () => this.#cancelPermissions(command.id)
     );
@@ -160,15 +160,15 @@ export class QuickchatBroker {
     }
   }
 
-  async #requestToolPermission(requestId: string, provider: ProviderId, request: RequestPermissionRequest): Promise<string | undefined> {
+  async #requestToolPermission(requestId: string, provider: ProviderId, request: RequestPermissionRequest): Promise<PermissionDecision> {
     const permissionId = randomUUID();
     const pending = normalizeToolPermission(requestId, permissionId, provider, request);
-    if (pending === undefined) return undefined;
-    return new Promise<string | undefined>((resolvePermission) => {
+    if (pending === undefined) return { invalid: true };
+    return new Promise<PermissionDecision>((resolvePermission) => {
       const timeout = setTimeout(() => {
         this.#permissions.delete(permissionId);
         this.#emit({ type: "permission_closed", id: requestId, permissionId, reason: "expired" });
-        resolvePermission(undefined);
+        resolvePermission({});
       }, this.#permissionTimeoutMs);
       timeout.unref();
       this.#permissions.set(permissionId, { ...pending, resolve: resolvePermission, timeout });
@@ -183,7 +183,7 @@ export class QuickchatBroker {
     clearTimeout(pending.timeout);
     this.#emit({ type: "permission_closed", id: command.id, permissionId: command.permissionId, reason: "decided" });
     const optionId = command.decision === "allow_once" ? pending.allowOptionId : pending.rejectOptionId;
-    pending.resolve(optionId);
+    pending.resolve(optionId === undefined ? {} : { optionId });
   }
 
   #cancelPermissions(requestId: string): void {
@@ -192,7 +192,7 @@ export class QuickchatBroker {
       this.#permissions.delete(permissionId);
       clearTimeout(pending.timeout);
       this.#emit({ type: "permission_closed", id: requestId, permissionId, reason: "cancelled" });
-      pending.resolve(undefined);
+      pending.resolve({});
     }
   }
 

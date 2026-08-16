@@ -92,7 +92,7 @@ describe("NDJSON protocol", () => {
     expect(ready.providers.find((provider) => provider.id === "codex")?.models).toContainEqual({ id: "test/default", name: "Default" });
     expect(ready.providers.map(({ id, policy }) => ({ id, policy }))).toEqual([
       { id: "codex", policy: { tools: "device-approval", web: "approved-command", hostReads: true } },
-      { id: "opencode", policy: { tools: "blocked", web: "search", hostReads: false } }
+      { id: "opencode", policy: { tools: "device-approval", web: "search", hostReads: false } }
     ]);
     expect(JSON.stringify(events.find((event) => event.type === "ready"))).not.toContain('"capabilities"');
     child.stdin.write(`${JSON.stringify({
@@ -207,8 +207,8 @@ describe("NDJSON protocol", () => {
     await new Promise((resolveExit) => child.once("close", resolveExit));
   }, 20_000);
 
-  it("fails closed when automatic OpenCode attempts a device tool", async () => {
-    const events = await forbiddenAttempt("opencode", { FAKE_ACP_PERMISSION_ATTEMPT: "1" });
+  it("fails closed when OpenCode requests an unclassifiable device tool", async () => {
+    const events = await forbiddenAttempt("opencode", { FAKE_ACP_PERMISSION_ATTEMPT: "1", FAKE_ACP_PERMISSION_KIND: "edit" });
     expect(events.find((event) => event.type === "error")).toMatchObject({
       code: "forbidden_tool_attempt",
       message: "The selected harness attempted a device tool that Quickchat cannot safely authorize",
@@ -218,7 +218,7 @@ describe("NDJSON protocol", () => {
     expect(events.some((event) => event.type === "content")).toBe(false);
   }, 20_000);
 
-  it.each(["codex", "claude"] as const)("round-trips a bounded allow-once tool decision for %s without exposing provider option IDs", async (provider) => {
+  it.each(["codex", "claude", "opencode"] as const)("round-trips a bounded allow-once tool decision for %s without exposing provider option IDs", async (provider) => {
     const state = await mkdtemp(join(tmpdir(), "quickchat-tool-permission-")); roots.push(state);
     const child = spawn(brokerExecutable(), [], {
       env: {

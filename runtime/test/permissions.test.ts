@@ -82,12 +82,12 @@ describe("tool permission presentation", () => {
     expect(permission?.view).toMatchObject({ authority: "device", allowOnce: true });
   });
 
-  it("marks Claude command approvals as sandboxed", () => {
+  it("marks surfaced Claude command approvals as device authority", () => {
     const permission = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "claude", {
       sessionId: "session",
       toolCall: { toolCallId: "tool", kind: "execute", rawInput: { command: "uname -s" } },
       options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }]
     });
-    expect(permission?.view.authority).toBe("sandboxed");
+    expect(permission?.view.authority).toBe("device");
   });
 });

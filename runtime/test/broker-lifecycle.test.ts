@@ -64,7 +64,7 @@ describe("broker lifecycle cleanup", () => {
     const audit = join(root, "session-audit.txt");
     const agentEnvironment = { ...process.env, FAKE_ACP_NO_DELETE: "1", OPENCODE_SESSION_AUDIT: audit };
     const provider: DiscoveredProvider = {
-      id: "opencode", name: "OpenCode", models: [], policy: { tools: "blocked", web: "search", hostReads: false },
+      id: "opencode", name: "OpenCode", models: [], policy: { tools: "device-approval", web: "search", hostReads: false },
       harnessPath: resolve("runtime/test/fixtures/session-bin/opencode"),
       agent: { executable: resolve("runtime/test/fake-acp-agent.mjs"), args: [], env: agentEnvironment }
     };

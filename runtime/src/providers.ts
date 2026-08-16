@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -9,6 +10,28 @@ import { resolveExecutable, runCommand, stripAnsi } from "./process.js";
 export type AgentCommand = { executable: string; args: string[]; env: NodeJS.ProcessEnv };
 export type DiscoveredProvider = ProviderInfo & { harnessPath: string; agent: AgentCommand; lockdownFeatures?: string[] };
 
+const OPEN_CODE_PERMISSION = {
+  "*": "deny",
+  skill: "allow",
+  websearch: "allow",
+  external_directory: "allow",
+  bash: "ask",
+  read: "deny",
+  glob: "deny",
+  grep: "deny",
+  edit: "deny",
+  write: "deny",
+  apply_patch: "deny",
+  task: "deny",
+  webfetch: "deny",
+  question: "deny",
+  plan_enter: "deny",
+  plan_exit: "deny",
+  todowrite: "deny",
+  todoread: "deny",
+  lsp: "deny"
+} as const;
+
 const providerNames: Record<ProviderId, string> = {
   codex: "Codex",
   claude: "Claude",
@@ -17,8 +40,8 @@ const providerNames: Record<ProviderId, string> = {
 
 const providerPolicies: Record<ProviderId, ProviderPolicyInfo> = {
   codex: { tools: "device-approval", web: "approved-command", hostReads: true },
-  claude: { tools: "sandboxed", web: "search", hostReads: false },
-  opencode: { tools: "blocked", web: "search", hostReads: false }
+  claude: { tools: "device-approval", web: "search", hostReads: false },
+  opencode: { tools: "device-approval", web: "search", hostReads: false }
 };
 
 async function isExecutable(path: string): Promise<boolean> {
@@ -32,6 +55,31 @@ async function isExecutable(path: string): Promise<boolean> {
 
 function repoRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+}
+
+export function automaticInstructionPath(): string {
+  return resolve(repoRoot(), "runtime/policies/automatic.md");
+}
+
+export function automaticInstructions(): string {
+  return readFileSync(automaticInstructionPath(), "utf8").trim();
+}
+
+export function openCodePolicyEnvironment(env: NodeJS.ProcessEnv, disabledMcp: string[] = []): NodeJS.ProcessEnv {
+  const permission = { ...OPEN_CODE_PERMISSION };
+  const config = {
+    default_agent: "build",
+    instructions: [automaticInstructionPath()],
+    skills: { urls: [] },
+    agent: { build: { permission } },
+    mcp: Object.fromEntries(disabledMcp.map((name) => [name, false]))
+  };
+  return {
+    ...env,
+    OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
+    OPENCODE_DISABLE_PROJECT_CONFIG: "1",
+    OPENCODE_PERMISSION: JSON.stringify(permission)
+  };
 }
 
 async function adapterExecutable(provider: "codex" | "claude", env: NodeJS.ProcessEnv): Promise<string | undefined> {
@@ -81,7 +129,7 @@ function agentEnvironment(provider: ProviderId, harnessPath: string, env: NodeJS
     return { ...env, CODEX_PATH: harnessPath, INITIAL_AGENT_MODE: "read-only", NO_BROWSER: "1" };
   }
   if (provider === "claude") return { ...env, CLAUDE_CODE_EXECUTABLE: harnessPath };
-  return { ...env, OPENCODE_PERMISSION: JSON.stringify({ "*": "deny" }) };
+  return openCodePolicyEnvironment(env);
 }
 
 export async function discoverProviders(env: NodeJS.ProcessEnv = process.env): Promise<DiscoveredProvider[]> {
@@ -101,13 +149,20 @@ export async function discoverProviders(env: NodeJS.ProcessEnv = process.env): P
     if (executable === undefined) continue;
     const lockdownFeatures = id === "codex" ? await codexToolLockdownFeatures(harnessPath, env) : undefined;
     if (id === "codex" && lockdownFeatures === undefined) continue;
-    // Automatic Codex requires the complete reviewed command boundary. Do not
+    // Automatic Codex requires the complete reviewed command and skill boundary. Do not
     // advertise a degraded text-only Codex provider if the installed harness
-    // cannot prove both execution features under strict configuration.
+    // cannot prove the reviewed execution and skill features under strict configuration.
     if (id === "codex" && (
       lockdownFeatures?.includes("shell_tool") !== true
       || !lockdownFeatures.includes("unified_exec")
+      || !lockdownFeatures.includes("skill_search")
     )) continue;
+    let agentEnv = agentEnvironment(id, harnessPath, env);
+    if (id === "opencode") {
+      const hardened = await validatedOpenCodeEnvironment(harnessPath, agentEnv);
+      if (hardened === undefined) continue;
+      agentEnv = hardened;
+    }
     const providerVersion = await version(harnessPath, env);
     found.push({
       id,
@@ -116,11 +171,71 @@ export async function discoverProviders(env: NodeJS.ProcessEnv = process.env): P
       models: [],
       policy: providerPolicies[id],
       harnessPath,
-      agent: { executable, args, env: agentEnvironment(id, harnessPath, env) },
+      agent: { executable, args, env: agentEnv },
       ...(lockdownFeatures === undefined ? {} : { lockdownFeatures })
     });
   }
   return found;
+}
+
+async function validatedOpenCodeEnvironment(path: string, baseEnv: NodeJS.ProcessEnv): Promise<NodeJS.ProcessEnv | undefined> {
+  const first = await resolvedOpenCodeConfig(path, baseEnv);
+  if (first === undefined) return undefined;
+  const disabledMcp = isObject(first.mcp) ? Object.keys(first.mcp) : [];
+  const env = openCodePolicyEnvironment(baseEnv, disabledMcp);
+  const resolved = await resolvedOpenCodeConfig(path, env);
+  return resolved !== undefined && openCodeConfigIsHardened(resolved) ? env : undefined;
+}
+
+async function resolvedOpenCodeConfig(path: string, env: NodeJS.ProcessEnv): Promise<Record<string, unknown> | undefined> {
+  const result = await runCommand(path, ["--pure", "debug", "config"], {
+    env,
+    timeoutMs: 15_000,
+    maxOutput: 5 * 1024 * 1024
+  });
+  if (result.code !== 0) return undefined;
+  const output = stripAnsi(result.stdout);
+  const start = output.indexOf("{");
+  if (start < 0) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(output.slice(start));
+    return isObject(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function openCodeConfigIsHardened(config: Record<string, unknown>): boolean {
+  if (config.default_agent !== "build") return false;
+  if (!permissionRecordIsHardened(config.permission)) return false;
+  const agent = isObject(config.agent) ? config.agent : undefined;
+  const build = agent !== undefined && isObject(agent.build) ? agent.build : undefined;
+  if (build === undefined || !permissionRecordIsHardened(build.permission)) return false;
+  if (isObject(config.mcp) && Object.values(config.mcp).some((value) => value !== false)) return false;
+  const skills = isObject(config.skills) ? config.skills : undefined;
+  if (skills !== undefined && (!Array.isArray(skills.urls) || skills.urls.length !== 0)) return false;
+  return Array.isArray(config.instructions) && config.instructions.includes(automaticInstructionPath());
+}
+
+function permissionRecordIsHardened(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  for (const [name, action] of Object.entries(value)) {
+    const reviewed = OPEN_CODE_PERMISSION[name as keyof typeof OPEN_CODE_PERMISSION];
+    if (reviewed !== undefined) {
+      if (action !== reviewed) return false;
+      continue;
+    }
+    if (typeof action === "string") {
+      if (action !== "deny") return false;
+      continue;
+    }
+    if (!isObject(action) || Object.values(action).some((nested) => nested !== "deny")) return false;
+  }
+  return Object.entries(OPEN_CODE_PERMISSION).every(([name, action]) => value[name] === action);
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export async function codexToolLockdownFeatures(path: string, env: NodeJS.ProcessEnv): Promise<string[] | undefined> {

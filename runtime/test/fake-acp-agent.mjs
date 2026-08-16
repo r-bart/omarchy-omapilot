@@ -44,9 +44,10 @@ const server = acp.agent({ name: "quickchat-fake" })
     const controller = new AbortController();
     pending = controller;
     if (process.env.FAKE_ACP_PERMISSION_ATTEMPT === "1") {
+      const permissionKind = process.env.FAKE_ACP_PERMISSION_KIND || "execute";
       const decision = await client.request(acp.methods.client.session.requestPermission, {
         sessionId: params.sessionId,
-        toolCall: { toolCallId: "permission-test", title: "Run a read-only command", kind: "execute", rawInput: { command: "uname -s" } },
+        toolCall: { toolCallId: "permission-test", title: "Run a read-only command", kind: permissionKind, rawInput: { command: "uname -s" } },
         options: [
           { optionId: "allow", name: "Allow once", kind: "allow_once" },
           { optionId: "deny", name: "Deny", kind: "reject_once" }
