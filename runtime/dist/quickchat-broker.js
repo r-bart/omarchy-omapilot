@@ -18477,7 +18477,7 @@ async function deleteAcpSession(provider, sessionId, timeoutMs = 15e3) {
     terminateProcessGroup(child.pid);
   }
 }
-function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs = 18e4, imageStore = new ImageStore(), requestPermission, cancelPermissions, observeTool) {
+function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs = 18e4, imageStore = new ImageStore(), requestPermission, cancelPermissions, observeTool, openCodePermissionWaitMs = 61e3) {
   const child = spawn2(provider.agent.executable, provider.agent.args, {
     cwd: "/",
     env: secureEnvironment(provider),
@@ -18600,7 +18600,7 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
               rejectedOpenCodeToolCalls,
               () => cancelled,
               () => forbiddenToolAttempt,
-              Math.min(61e3, Math.max(0, turnDeadline - Date.now() - 50))
+              Math.min(openCodePermissionWaitMs, Math.max(0, turnDeadline - Date.now() - 50))
             )) {
               forbiddenToolAttempt = true;
               await ctx.notify(methods.agent.session.cancel, { sessionId: session.sessionId });

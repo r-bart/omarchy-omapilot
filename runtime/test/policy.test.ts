@@ -265,8 +265,19 @@ describe("provider security profiles", () => {
     const fixture = await openCodeToolUpdateFixture(kind);
     const events: BrokerEvent[] = [];
     try {
-      const timeout = kind === "execute" ? 200 : 5_000;
-      await expect(runAcpQuestion(fixture.provider, `blocked-${kind}`, "Attempt a blocked tool", undefined, events.push.bind(events), timeout).result)
+      await expect(runAcpQuestion(
+        fixture.provider,
+        `blocked-${kind}`,
+        "Attempt a blocked tool",
+        undefined,
+        events.push.bind(events),
+        5_000,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        kind === "execute" ? 50 : 61_000
+      ).result)
         .rejects.toMatchObject({ code: "forbidden_tool_attempt" });
       expect(events.filter((event) => event.type === "content")).toEqual([]);
     } finally {

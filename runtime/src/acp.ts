@@ -207,7 +207,8 @@ export function runAcpQuestion(
   imageStore = new ImageStore(),
   requestPermission?: PermissionHandler,
   cancelPermissions?: () => void,
-  observeTool?: (update: ToolObservation) => void
+  observeTool?: (update: ToolObservation) => void,
+  openCodePermissionWaitMs = 61_000
 ): AcpRun {
   const child = spawn(provider.agent.executable, provider.agent.args, {
     cwd: "/",
@@ -329,7 +330,7 @@ export function runAcpQuestion(
               rejectedOpenCodeToolCalls,
               () => cancelled,
               () => forbiddenToolAttempt,
-              Math.min(61_000, Math.max(0, turnDeadline - Date.now() - 50))
+              Math.min(openCodePermissionWaitMs, Math.max(0, turnDeadline - Date.now() - 50))
             )) {
               forbiddenToolAttempt = true;
               await ctx.notify(acp.methods.agent.session.cancel, { sessionId: session.sessionId });
