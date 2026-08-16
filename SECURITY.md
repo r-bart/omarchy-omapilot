@@ -25,7 +25,10 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
   per-turn scratch. WebSearch is available, while WebFetch and direct process
   network access remains blocked. Commands inside that fixed boundary may run
   automatically. A command that cannot run inside that boundary may proceed
-  only through the broker's exact allow-once device approval.
+  only through the broker's exact allow-once device approval. Approving that
+  command explicitly lets it run outside the disposable sandbox with the
+  current user's full process environment and device authority, including host
+  reads, writes, credential-bearing environment variables, and network access.
 - OpenCode may load its positively identified skill tool and use websearch
   automatically. Its external-directory check is allowed only as a prerequisite
   to a separately reviewed shell request; `bash` remains `ask`, and execution

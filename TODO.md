@@ -155,6 +155,10 @@ turn per provider.
 - Architecture/review worker: visible Claude Herdr agent `qc_tools_arch`, pane
   `wK:p2N`, same worktree/branch, read-only design and final-diff review. The
   orchestrator owns follow-up and cleanup.
+- Independent release-gate worker: visible Claude Herdr agent
+  `qc_tools_review`, pane `wK:p2Q`, read-only review of the exact candidate.
+  Its first verdict found no blocker; documentation and the live Claude
+  no-approval host-boundary regression are being re-reviewed after remediation.
 - Architecture evidence: the worker identified OpenCode wildcard precedence,
   inherited process cwd, non-composing timeouts, remote skill/MCP supply-chain
   risks, and Claude skill-source isolation. The candidate now enumerates and
@@ -175,12 +179,13 @@ turn per provider.
   truthful denial fallback; existing lifecycle suites cover timeout, cancel,
   duplicate IDs, and stale permission decisions.
 - [x] Pass full validation plus authenticated non-GUI provider probes.
-  `./scripts/validate.sh` passed 127 tests with 11 opt-in skips and rebuilt
-  dist; the complete authenticated matrix passed 11/11: installed Omarchy
+  `./scripts/validate.sh` passed 130 tests with 12 opt-in skips and rebuilt
+  dist; the complete authenticated matrix passed 12/12: installed Omarchy
   skill loading, harmless approved commands for all providers, Claude/OpenCode
-  web behavior, Claude scratch execution, and OpenCode denied-command integrity.
+  web behavior, Claude scratch execution, Claude denied host-file isolation,
+  and OpenCode denied-command integrity.
   Two release archives were byte-identical (SHA-256
-  `357b6b72386543bc8a10c8c920af8bff5c34d8ca4944915cd9dd69703fe55b25`).
+  `063e269c520d7b1dd357b888a4e742fac6d0f581974d16ddef13b01419f3b5ae`).
 - [ ] Receive a clean independent final review or fix every verified finding.
 - [ ] Push, open the PR, pass exact-head CI, and install the reviewed candidate.
 

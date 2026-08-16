@@ -17771,7 +17771,7 @@ function openCodeConfigIsHardened(config2) {
   if (build === void 0 || !permissionRecordIsHardened(build.permission)) return false;
   if (isObject2(config2.mcp) && Object.values(config2.mcp).some((value) => value !== false)) return false;
   const skills = isObject2(config2.skills) ? config2.skills : void 0;
-  if (skills !== void 0 && (!Array.isArray(skills.urls) || skills.urls.length !== 0)) return false;
+  if (skills === void 0 || !Array.isArray(skills.urls) || skills.urls.length !== 0) return false;
   return Array.isArray(config2.instructions) && config2.instructions.includes(automaticInstructionPath());
 }
 function permissionRecordIsHardened(value) {

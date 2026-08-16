@@ -59,7 +59,9 @@ system executable/library roots, hides credential-bearing environment variables,
 blocks direct process network access and WebFetch, confines writes to per-turn
 scratch, and allows WebSearch. Commands inside that boundary may run
 automatically. An exact Claude command that needs device authority accepts a
-broker-bound allow-once or reject-once decision. OpenCode automatically permits
+broker-bound allow-once or reject-once decision. Allowing it runs that exact
+command outside the disposable sandbox with the current user's full device,
+network, host-file, and process-environment authority. OpenCode automatically permits
 only its exact skill and websearch identities. Its native bash permission is
 fixed to `ask`; the broker correlates the pending execution, permission request,
 decision, and subsequent updates by tool-call ID before allowing completion.

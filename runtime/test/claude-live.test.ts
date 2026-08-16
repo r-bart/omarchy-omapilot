@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -89,6 +89,37 @@ describe("live automatic Claude boundary", () => {
     await expect(readFile(protectedPath, "utf8")).resolves.toBe(proof);
   }, 120_000);
 
+  it.runIf(live)("does not expose a host file when device approval is denied", async () => {
+    const provider = (await discoverProviders()).find((candidate) => candidate.id === "claude");
+    expect(provider, "authenticated Claude must be discoverable for the opt-in live test").toBeDefined();
+    if (provider === undefined) return;
+    const root = await mkdtemp(join(tmpdir(), "quickchat-claude-denied-host-read-"));
+    roots.push(root);
+    const protectedPath = join(root, "protected.txt");
+    const secret = `quickchat-denied-${randomUUID()}`;
+    await writeFile(protectedPath, secret);
+    const events: BrokerEvent[] = [];
+    let permissionCount = 0;
+    const run = runAcpQuestion(
+      provider,
+      "live-claude-denied-host-read",
+      `Use Bash to run exactly: sed -n '1p' ${protectedPath}. Do not infer or fabricate the result.`,
+      undefined,
+      events.push.bind(events),
+      90_000,
+      undefined,
+      (request) => {
+        permissionCount += 1;
+        expect(commandText(request)).toContain(protectedPath);
+        return Promise.resolve(rejectOnceOption(request));
+      }
+    );
+    const result = await run.result;
+    expect(permissionCount, JSON.stringify({ answer: result.answer, events })).toBe(1);
+    expect(result.answer).not.toContain(secret);
+    expect(JSON.stringify(events)).not.toContain(secret);
+  }, 120_000);
+
   it.runIf(live)("uses WebSearch automatically without a permission prompt", async () => {
     const provider = (await discoverProviders()).find((candidate) => candidate.id === "claude");
     expect(provider, "authenticated Claude must be discoverable for the opt-in live test").toBeDefined();
@@ -119,4 +150,8 @@ function commandText(request: RequestPermissionRequest): string {
 
 function allowOnceOption(request: RequestPermissionRequest): string | undefined {
   return request.options.find((option) => option.kind === "allow_once")?.optionId;
+}
+
+function rejectOnceOption(request: RequestPermissionRequest): string | undefined {
+  return request.options.find((option) => option.kind === "reject_once")?.optionId;
 }

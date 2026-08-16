@@ -213,7 +213,7 @@ function openCodeConfigIsHardened(config: Record<string, unknown>): boolean {
   if (build === undefined || !permissionRecordIsHardened(build.permission)) return false;
   if (isObject(config.mcp) && Object.values(config.mcp).some((value) => value !== false)) return false;
   const skills = isObject(config.skills) ? config.skills : undefined;
-  if (skills !== undefined && (!Array.isArray(skills.urls) || skills.urls.length !== 0)) return false;
+  if (skills === undefined || !Array.isArray(skills.urls) || skills.urls.length !== 0) return false;
   return Array.isArray(config.instructions) && config.instructions.includes(automaticInstructionPath());
 }
 

@@ -78,7 +78,9 @@ can load relevant installed skills and decide whether a tool is needed:
   stay hidden, direct process network access is blocked, and writes remain
   confined to per-turn scratch. Commands inside that fixed boundary may run
   automatically. A command that needs host/device authority pauses behind the
-  same exact **Allow once** or **Deny** card; approval applies only to that command.
+  same exact **Allow once** or **Deny** card. Approval applies only to that
+  command and runs it outside the disposable sandbox with the current user's
+  device, network, host-file, and process-environment authority.
 - **OpenCode** may load installed skills and use its positively identified web
   search tool automatically. Its native `bash` permission is fixed to `ask`;
   the broker accepts execution only after the exact command receives a
