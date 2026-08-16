@@ -18517,7 +18517,7 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
       let defaultModel;
       let resumable = false;
       const openCodeToolCalls = /* @__PURE__ */ new Map();
-      const approvedOpenCodeToolCalls = /* @__PURE__ */ new Set();
+      const approvedOpenCodeToolCalls = /* @__PURE__ */ new Map();
       const rejectedOpenCodeToolCalls = /* @__PURE__ */ new Set();
       const text = new GuardedTextEmitter(requestId, emit2);
       activeText = text;
@@ -18535,8 +18535,11 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
         const optionKind = params.options.find((option) => option.optionId === optionId)?.kind;
         if (optionKind !== "allow_once") unapprovedToolAttempt = true;
         if (provider.id === "opencode") {
-          if (optionKind === "allow_once") approvedOpenCodeToolCalls.add(params.toolCall.toolCallId);
-          else rejectedOpenCodeToolCalls.add(params.toolCall.toolCallId);
+          if (optionKind === "allow_once") {
+            const command = openCodeCommand(params.toolCall.rawInput);
+            if (command === void 0) forbiddenToolAttempt = true;
+            else approvedOpenCodeToolCalls.set(params.toolCall.toolCallId, command);
+          } else rejectedOpenCodeToolCalls.add(params.toolCall.toolCallId);
         }
         return optionId === void 0 ? { outcome: { outcome: "cancelled" } } : { outcome: { outcome: "selected", optionId } };
       }).onRequest(methods.client.fs.readTextFile, () => {
@@ -19011,7 +19014,9 @@ async function openCodeToolUpdateAllowed(update, calls, approvedCalls, rejectedC
     if (cancelled()) return true;
     if (forbidden()) return false;
     if (rejectedCalls.has(toolCallId)) return update.status !== "completed";
-    if (!approvedCalls.has(toolCallId)) return false;
+    const approvedCommand = approvedCalls.get(toolCallId);
+    if (approvedCommand === void 0) return false;
+    if (update.rawInput !== void 0 && openCodeCommand(update.rawInput) !== approvedCommand) return false;
     return update.kind === void 0 || update.kind === null || update.kind === "execute";
   }
   if (update.kind !== void 0 && update.kind !== null && update.kind !== "search" && update.kind !== "other") return false;
@@ -19025,8 +19030,11 @@ function classifyOpenCodeTool(update) {
   return void 0;
 }
 function exactOpenCodeCommand(value) {
-  if (!isObject3(value)) return false;
-  return typeof value.command === "string" && value.command !== "";
+  return openCodeCommand(value) !== void 0;
+}
+function openCodeCommand(value) {
+  if (!isObject3(value)) return void 0;
+  return typeof value.command === "string" && value.command !== "" ? value.command : void 0;
 }
 function forbiddenToolError() {
   return new BrokerAcpError("forbidden_tool_attempt", "The selected harness attempted a device tool that Quickchat cannot safely authorize", false);

@@ -249,7 +249,7 @@ export function runAcpQuestion(
       let defaultModel: string | undefined;
       let resumable = false;
       const openCodeToolCalls = new Map<string, "automatic" | "device">();
-      const approvedOpenCodeToolCalls = new Set<string>();
+      const approvedOpenCodeToolCalls = new Map<string, string>();
       const rejectedOpenCodeToolCalls = new Set<string>();
 
       const text = new GuardedTextEmitter(requestId, emit);
@@ -269,7 +269,11 @@ export function runAcpQuestion(
           const optionKind = params.options.find((option) => option.optionId === optionId)?.kind;
           if (optionKind !== "allow_once") unapprovedToolAttempt = true;
           if (provider.id === "opencode") {
-            if (optionKind === "allow_once") approvedOpenCodeToolCalls.add(params.toolCall.toolCallId);
+            if (optionKind === "allow_once") {
+              const command = openCodeCommand(params.toolCall.rawInput);
+              if (command === undefined) forbiddenToolAttempt = true;
+              else approvedOpenCodeToolCalls.set(params.toolCall.toolCallId, command);
+            }
             else rejectedOpenCodeToolCalls.add(params.toolCall.toolCallId);
           }
           return optionId === undefined
@@ -775,7 +779,7 @@ async function openCodeToolUpdateAllowed(
     rawInput?: unknown;
   },
   calls: Map<string, "automatic" | "device">,
-  approvedCalls: Set<string>,
+  approvedCalls: Map<string, string>,
   rejectedCalls: Set<string>,
   cancelled: () => boolean,
   forbidden: () => boolean,
@@ -801,7 +805,9 @@ async function openCodeToolUpdateAllowed(
     if (cancelled()) return true;
     if (forbidden()) return false;
     if (rejectedCalls.has(toolCallId)) return update.status !== "completed";
-    if (!approvedCalls.has(toolCallId)) return false;
+    const approvedCommand = approvedCalls.get(toolCallId);
+    if (approvedCommand === undefined) return false;
+    if (update.rawInput !== undefined && openCodeCommand(update.rawInput) !== approvedCommand) return false;
     return update.kind === undefined || update.kind === null || update.kind === "execute";
   }
   // Updates may replace the human title with progress text. Keep the initial,
@@ -834,8 +840,12 @@ function classifyOpenCodeTool(update: {
 }
 
 function exactOpenCodeCommand(value: unknown): boolean {
-  if (!isObject(value)) return false;
-  return typeof value.command === "string" && value.command !== "";
+  return openCodeCommand(value) !== undefined;
+}
+
+function openCodeCommand(value: unknown): string | undefined {
+  if (!isObject(value)) return undefined;
+  return typeof value.command === "string" && value.command !== "" ? value.command : undefined;
 }
 
 function forbiddenToolError(): BrokerAcpError {

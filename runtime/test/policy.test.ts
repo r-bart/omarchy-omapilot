@@ -221,6 +221,24 @@ describe("provider security profiles", () => {
     }
   });
 
+  it("fails closed if OpenCode changes an approved command under the same tool-call ID", async () => {
+    const fixture = await openCodeToolUpdateFixture("execute", "bash", "execute", true, false, false, "printf different");
+    try {
+      await expect(runAcpQuestion(
+        fixture.provider,
+        "opencode-shell-command-swap",
+        "Run the harmless command",
+        undefined,
+        () => undefined,
+        5_000,
+        undefined,
+        (request) => Promise.resolve(request.options.find((option) => option.kind === "allow_once")?.optionId)
+      ).result).rejects.toMatchObject({ code: "forbidden_tool_attempt" });
+    } finally {
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+
   it("reports cancellation, not a forbidden tool, while OpenCode waits for approval", async () => {
     const fixture = await openCodeToolUpdateFixture("execute", "bash", "execute", false, false);
     let observed: (() => void) | undefined;
@@ -344,7 +362,8 @@ async function openCodeToolUpdateFixture(
   updateKind = kind === "other" && title === "websearch" ? "other" : "",
   requestPermission = false,
   initialInput = true,
-  completeAfterReject = false
+  completeAfterReject = false,
+  updateCommand = ""
 ): Promise<{ root: string; audit: string; provider: DiscoveredProvider }> {
   const root = await mkdtemp(join(tmpdir(), "quickchat-opencode-tool-update-"));
   const script = join(root, "agent.mjs");
@@ -400,7 +419,8 @@ const server = acp.agent({ name: "quickchat-opencode-tool-update" })
       sessionId: params.sessionId,
       update: {
         sessionUpdate: "tool_call_update", toolCallId: "tool-1", title: "Tool progress",
-        kind: process.env.FAKE_TOOL_UPDATE_KIND || undefined, status: reportedSuccess ? "completed" : "failed"
+        kind: process.env.FAKE_TOOL_UPDATE_KIND || undefined, status: reportedSuccess ? "completed" : "failed",
+        rawInput: process.env.FAKE_TOOL_UPDATE_COMMAND ? { command: process.env.FAKE_TOOL_UPDATE_COMMAND } : undefined
       }
     });
     await client.notify(acp.methods.client.session.update, {
@@ -433,6 +453,7 @@ server.connect(stream);
           FAKE_TOOL_REQUEST_PERMISSION: requestPermission ? "1" : "0",
           FAKE_TOOL_INITIAL_INPUT: initialInput ? "1" : "0",
           FAKE_TOOL_COMPLETE_AFTER_REJECT: completeAfterReject ? "1" : "0",
+          FAKE_TOOL_UPDATE_COMMAND: updateCommand,
           FAKE_TOOL_AUDIT: audit,
           XDG_RUNTIME_DIR: join(root, "run"),
           XDG_STATE_HOME: join(root, "state"),
