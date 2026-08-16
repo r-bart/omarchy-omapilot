@@ -203,6 +203,52 @@ describe("provider security profiles", () => {
     }
   });
 
+  it("fails closed if OpenCode reports completion after a rejected command", async () => {
+    const fixture = await openCodeToolUpdateFixture("execute", "bash", "execute", true, false, true);
+    try {
+      await expect(runAcpQuestion(
+        fixture.provider,
+        "opencode-shell-rejected-complete",
+        "Run the harmless command",
+        undefined,
+        () => undefined,
+        5_000,
+        undefined,
+        (request) => Promise.resolve(request.options.find((option) => option.kind === "reject_once")?.optionId)
+      ).result).rejects.toMatchObject({ code: "forbidden_tool_attempt" });
+    } finally {
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it("reports cancellation, not a forbidden tool, while OpenCode waits for approval", async () => {
+    const fixture = await openCodeToolUpdateFixture("execute", "bash", "execute", false, false);
+    let observed: (() => void) | undefined;
+    const pending = new Promise<void>((resolvePending) => { observed = resolvePending; });
+    try {
+      const run = runAcpQuestion(
+        fixture.provider,
+        "opencode-shell-cancel",
+        "Run the harmless command",
+        undefined,
+        () => undefined,
+        5_000,
+        undefined,
+        () => new Promise(() => undefined),
+        undefined,
+        (update) => {
+          if (update.sessionUpdate === "tool_call") observed?.();
+        }
+      );
+      const result = expect(run.result).rejects.toMatchObject({ code: "cancelled" });
+      await pending;
+      await run.cancel();
+      await result;
+    } finally {
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+
   it("rejects a tracked OpenCode websearch call reclassified as a device tool", async () => {
     const fixture = await openCodeToolUpdateFixture("other", "websearch", "execute");
     const events: BrokerEvent[] = [];
@@ -282,7 +328,8 @@ async function openCodeToolUpdateFixture(
   title = "Policy probe",
   updateKind = kind === "other" && title === "websearch" ? "other" : "",
   requestPermission = false,
-  initialInput = true
+  initialInput = true,
+  completeAfterReject = false
 ): Promise<{ root: string; audit: string; provider: DiscoveredProvider }> {
   const root = await mkdtemp(join(tmpdir(), "quickchat-opencode-tool-update-"));
   const script = join(root, "agent.mjs");
@@ -333,11 +380,12 @@ const server = acp.agent({ name: "quickchat-opencode-tool-update" })
       });
       allowed = decision.outcome.outcome === "selected" && decision.outcome.optionId === "once";
     }
+    const reportedSuccess = allowed || process.env.FAKE_TOOL_COMPLETE_AFTER_REJECT === "1";
     await client.notify(acp.methods.client.session.update, {
       sessionId: params.sessionId,
       update: {
         sessionUpdate: "tool_call_update", toolCallId: "tool-1", title: "Tool progress",
-        kind: process.env.FAKE_TOOL_UPDATE_KIND || undefined, status: allowed ? "completed" : "failed"
+        kind: process.env.FAKE_TOOL_UPDATE_KIND || undefined, status: reportedSuccess ? "completed" : "failed"
       }
     });
     await client.notify(acp.methods.client.session.update, {
@@ -369,6 +417,7 @@ server.connect(stream);
           FAKE_TOOL_COMMAND: kind === "execute" ? "printf quickchat" : "",
           FAKE_TOOL_REQUEST_PERMISSION: requestPermission ? "1" : "0",
           FAKE_TOOL_INITIAL_INPUT: initialInput ? "1" : "0",
+          FAKE_TOOL_COMPLETE_AFTER_REJECT: completeAfterReject ? "1" : "0",
           FAKE_TOOL_AUDIT: audit,
           XDG_RUNTIME_DIR: join(root, "run"),
           XDG_STATE_HOME: join(root, "state"),

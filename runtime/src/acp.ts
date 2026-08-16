@@ -235,6 +235,7 @@ export function runAcpQuestion(
     const paths = quickchatPaths(provider.agent.env);
     await mkdir(paths.runtime, { recursive: true, mode: 0o700 });
     const cwd = await mkdtemp(join(paths.runtime, "chat-"));
+    const turnDeadline = Date.now() + timeoutMs;
     const timeout = setTimeout(() => { void cancel(); }, timeoutMs);
     timeout.unref();
     try {
@@ -326,7 +327,9 @@ export function runAcpQuestion(
               openCodeToolCalls,
               approvedOpenCodeToolCalls,
               rejectedOpenCodeToolCalls,
-              () => cancelled || forbiddenToolAttempt
+              () => cancelled,
+              () => forbiddenToolAttempt,
+              Math.min(61_000, Math.max(0, turnDeadline - Date.now() - 50))
             )) {
               forbiddenToolAttempt = true;
               await ctx.notify(acp.methods.agent.session.cancel, { sessionId: session.sessionId });
@@ -773,7 +776,9 @@ async function openCodeToolUpdateAllowed(
   calls: Map<string, "automatic" | "device">,
   approvedCalls: Set<string>,
   rejectedCalls: Set<string>,
-  stopped: () => boolean
+  cancelled: () => boolean,
+  forbidden: () => boolean,
+  permissionWaitMs: number
 ): Promise<boolean> {
   if (update.sessionUpdate !== "tool_call" && update.sessionUpdate !== "tool_call_update") return true;
   const toolCallId = typeof update.toolCallId === "string" ? update.toolCallId : "";
@@ -787,10 +792,13 @@ async function openCodeToolUpdateAllowed(
   const classification = calls.get(toolCallId);
   if (classification === undefined) return false;
   if (classification === "device") {
-    const deadline = Date.now() + 61_000;
-    while (!approvedCalls.has(toolCallId) && !rejectedCalls.has(toolCallId) && !stopped() && Date.now() < deadline) {
+    const deadline = Date.now() + permissionWaitMs;
+    while (!approvedCalls.has(toolCallId) && !rejectedCalls.has(toolCallId)
+        && !cancelled() && !forbidden() && Date.now() < deadline) {
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
     }
+    if (cancelled()) return true;
+    if (forbidden()) return false;
     if (rejectedCalls.has(toolCallId)) return update.status !== "completed";
     if (!approvedCalls.has(toolCallId)) return false;
     return update.kind === undefined || update.kind === null || update.kind === "execute";

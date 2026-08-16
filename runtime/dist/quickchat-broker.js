@@ -18502,6 +18502,7 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
     const paths = quickchatPaths(provider.agent.env);
     await mkdir3(paths.runtime, { recursive: true, mode: 448 });
     const cwd = await mkdtemp2(join4(paths.runtime, "chat-"));
+    const turnDeadline = Date.now() + timeoutMs;
     const timeout = setTimeout(() => {
       void cancel();
     }, timeoutMs);
@@ -18597,7 +18598,9 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
               openCodeToolCalls,
               approvedOpenCodeToolCalls,
               rejectedOpenCodeToolCalls,
-              () => cancelled || forbiddenToolAttempt
+              () => cancelled,
+              () => forbiddenToolAttempt,
+              Math.min(61e3, Math.max(0, turnDeadline - Date.now() - 50))
             )) {
               forbiddenToolAttempt = true;
               await ctx.notify(methods.agent.session.cancel, { sessionId: session.sessionId });
@@ -18988,7 +18991,7 @@ function isMarkupPipe(value) {
 function containsToolMarkup(value) {
   return /<\/?(?:[|｜]{1,2}\s*DSML\s*[|｜]{1,2}\s*)?(?:tool[_ -]?calls?|function[_ -]?calls?|invoke|parameter)\b/iu.test(value);
 }
-async function openCodeToolUpdateAllowed(update, calls, approvedCalls, rejectedCalls, stopped) {
+async function openCodeToolUpdateAllowed(update, calls, approvedCalls, rejectedCalls, cancelled, forbidden, permissionWaitMs) {
   if (update.sessionUpdate !== "tool_call" && update.sessionUpdate !== "tool_call_update") return true;
   const toolCallId = typeof update.toolCallId === "string" ? update.toolCallId : "";
   if (toolCallId === "") return false;
@@ -19001,10 +19004,12 @@ async function openCodeToolUpdateAllowed(update, calls, approvedCalls, rejectedC
   const classification = calls.get(toolCallId);
   if (classification === void 0) return false;
   if (classification === "device") {
-    const deadline = Date.now() + 61e3;
-    while (!approvedCalls.has(toolCallId) && !rejectedCalls.has(toolCallId) && !stopped() && Date.now() < deadline) {
+    const deadline = Date.now() + permissionWaitMs;
+    while (!approvedCalls.has(toolCallId) && !rejectedCalls.has(toolCallId) && !cancelled() && !forbidden() && Date.now() < deadline) {
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
     }
+    if (cancelled()) return true;
+    if (forbidden()) return false;
     if (rejectedCalls.has(toolCallId)) return update.status !== "completed";
     if (!approvedCalls.has(toolCallId)) return false;
     return update.kind === void 0 || update.kind === null || update.kind === "execute";
