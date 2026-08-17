@@ -929,7 +929,7 @@ turn per provider.
   - [x] Pass QML lint/UI contracts, headless motion and visual renders, full
     repository validation, deterministic build/package checks, and Git
     whitespace checks.
-  - [ ] Commit and push the branch, open a draft PR to main, and leave installed
+  - [x] Commit and push the branch at `fc398cf`, open draft PR 5 to main, and leave installed
     and live shell state unchanged for owner validation.
 - Current checkpoint: the presentation-only implementation is complete. The
   fixed route now transfers node energy with identical resting endpoints;
@@ -944,5 +944,5 @@ turn per provider.
   whitespace. Shellcheck remains unavailable. `npm ci` also reports unchanged
   development-server advisories in direct esbuild (low) and Vitest (critical)
   dependencies; this presentation-only diff neither invokes their servers nor
-  changes the lockfile. Commit and PR publication remain; installed and live
-  shell state are unchanged.
+  changes the lockfile. Draft PR 5 is open against main from
+  `omapilot-motion-revamp`; installed and live shell state are unchanged.
