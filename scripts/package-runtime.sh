@@ -50,6 +50,7 @@ required=(
   runtime/bin/codex-acp
   runtime/bin/claude-agent-acp
   runtime/adapters.release.json
+  runtime/policies/automatic.md
   THIRD_PARTY_NOTICES.md
   LICENSE
 )
@@ -115,6 +116,7 @@ cp "$repo_root/runtime/policies/automatic.md" "$stage/runtime/policies/"
 cp "$repo_root/runtime/bin/quickchat-broker" "$repo_root/runtime/bin/codex-acp" \
   "$repo_root/runtime/bin/claude-agent-acp" "$stage/runtime/bin/"
 cp "$repo_root/runtime/adapters.release.json" "$stage/runtime/"
+cp "$repo_root/runtime/policies/automatic.md" "$stage/runtime/policies/"
 cp "$repo_root/THIRD_PARTY_NOTICES.md" "$repo_root/LICENSE" "$stage/"
 chmod 0755 "$stage/runtime/bin/quickchat-broker" "$stage/runtime/bin/codex-acp" \
   "$stage/runtime/bin/claude-agent-acp"

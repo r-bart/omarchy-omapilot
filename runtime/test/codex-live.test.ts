@@ -3,18 +3,40 @@ import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { providerPolicyEnvironment, runAcpQuestion } from "../src/acp.js";
+import { providerPolicyEnvironment, runAcpQuestion, type ToolObservation } from "../src/acp.js";
 import { discoverProviders } from "../src/providers.js";
 import type { BrokerEvent } from "../src/types.js";
 
 const live = process.env.QUICKCHAT_LIVE_CODEX_BEHAVIOR === "1";
 
 describe("live automatic Codex boundary", () => {
+  it.runIf(live)("loads the installed Omarchy skill", async () => {
+    const provider = (await discoverProviders()).find((candidate) => candidate.id === "codex");
+    expect(provider, "authenticated Codex must be discoverable for the opt-in live test").toBeDefined();
+    if (provider === undefined) return;
+    const tools: ToolObservation[] = [];
+    const run = runAcpQuestion(
+      provider,
+      "live-codex-skill",
+      "You must load the installed skill named omarchy before answering. Then return exactly QUICKCHAT_SKILL_OK.",
+      undefined,
+      () => undefined,
+      90_000,
+      undefined,
+      undefined,
+      undefined,
+      (update) => tools.push(update)
+    );
+    const result = await run.result;
+    expect(tools.some((update) => /skill|omarchy/iu.test(`${update.kind ?? ""} ${update.title ?? ""}`)), JSON.stringify(tools)).toBe(true);
+    expect(result.answer).toContain("QUICKCHAT_SKILL_OK");
+  }, 120_000);
+
   it.runIf(live)("uses the reviewed automatic read-only policy", async () => {
     const provider = (await discoverProviders()).find((candidate) => candidate.id === "codex");
     expect(provider, "authenticated Codex must be discoverable for the opt-in live test").toBeDefined();
     if (provider === undefined) return;
-    expect(provider.lockdownFeatures).toEqual(expect.arrayContaining(["shell_tool", "unified_exec"]));
+    expect(provider.lockdownFeatures).toEqual(expect.arrayContaining(["shell_tool", "unified_exec", "skill_search"]));
     const config: unknown = JSON.parse(providerPolicyEnvironment(provider).CODEX_CONFIG ?? "{}");
     expect(provider.policy).toEqual({ tools: "device-approval", web: "approved-command", hostReads: true });
     expect(config).toMatchObject({ approval_policy: "on-request", sandbox_mode: "read-only", web_search: "disabled", mcp_servers: {} });

@@ -149,6 +149,18 @@ Item {
     visible: !root.inlineMode
     spacing: Style.spacing.md
 
+    Text {
+      Layout.fillWidth: true
+      visible: root.backend && root.backend.desktopContextActive
+      text: "󰍹  Active window, open apps, workspaces, and playing media are attached on send."
+      color: Qt.darker(root.foreground, 1.45)
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      wrapMode: Text.Wrap
+      Accessible.role: Accessible.StaticText
+      Accessible.name: "Desktop context is attached on send"
+    }
+
     BorderSurface {
       Layout.fillWidth: true
       Layout.preferredHeight: Style.space(126)

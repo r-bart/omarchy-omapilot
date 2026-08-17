@@ -10,7 +10,7 @@ export type PendingToolPermission = {
 export function normalizeToolPermission(
   requestId: string,
   permissionId: string,
-  provider: ProviderId,
+  _provider: ProviderId,
   request: RequestPermissionRequest
 ): PendingToolPermission | undefined {
   const kind = request.toolCall.kind ?? "other";
@@ -30,7 +30,7 @@ export function normalizeToolPermission(
       requestId,
       title: reviewable ? (title === "" ? `${kind} tool` : title) : "Command blocked",
       kind,
-      authority: provider === "claude" ? "sandboxed" : "device",
+      authority: "device",
       detail: detail ?? "Quickchat blocked this command because its complete contents cannot be displayed safely.",
       allowOnce: allowOptionId !== undefined
     },

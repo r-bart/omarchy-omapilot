@@ -1,12 +1,13 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { readdirSync } from "node:fs";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { cp, lstat, mkdir, mkdtemp, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import * as acp from "@agentclientprotocol/sdk";
 import type { ContentBlock, NewSessionRequest, RequestPermissionRequest, SessionConfigOption } from "@agentclientprotocol/sdk";
-import { automaticInstructionPath, automaticInstructions, type DiscoveredProvider } from "./providers.js";
+import { automaticInstructions, type DiscoveredProvider } from "./providers.js";
+import type { AcpPrompt } from "./context.js";
 import type { BrokerEvent, ModelOption, StoredImage } from "./types.js";
 import { ImageStore } from "./images.js";
 import { presentImage } from "./history.js";
@@ -23,7 +24,15 @@ export type AcpResult = {
 };
 
 export type AcpRun = { result: Promise<AcpResult>; cancel: () => Promise<void> };
-export type PermissionHandler = (request: RequestPermissionRequest) => Promise<string | undefined>;
+export type PermissionDecision = { optionId?: string; invalid?: true };
+export type PermissionHandler = (request: RequestPermissionRequest) => Promise<string | undefined | PermissionDecision>;
+export type ToolObservation = {
+  sessionUpdate: "tool_call" | "tool_call_update";
+  toolCallId: string;
+  kind?: string | null;
+  title?: string | null;
+  status?: string | null;
+};
 const QUICKCHAT_CLIENT_VERSION = "0.2.0";
 
 export function providerPolicyEnvironment(provider: DiscoveredProvider): NodeJS.ProcessEnv {
@@ -33,7 +42,7 @@ export function providerPolicyEnvironment(provider: DiscoveredProvider): NodeJS.
 export async function probeAcpModels(provider: DiscoveredProvider, timeoutMs = 15_000): Promise<{ models: ModelOption[]; defaultModel?: string }> {
   if (provider.id === "codex") return probeCodexModels(provider, timeoutMs);
   const child = spawn(provider.agent.executable, provider.agent.args, {
-    env: secureEnvironment(provider), stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32"
+    cwd: "/", env: secureEnvironment(provider), stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32"
   });
   const paths = quickchatPaths(provider.agent.env);
   await mkdir(paths.runtime, { recursive: true, mode: 0o700 });
@@ -56,7 +65,8 @@ export async function probeAcpModels(provider: DiscoveredProvider, timeoutMs = 1
         });
         const ephemeral = provider.id === "claude";
         if (!ephemeral && !canRemoveSession(initialized.agentCapabilities)) return { models: [] };
-        const session = await ctx.buildSession(providerSessionRequest(provider, cwd, ephemeral)).start();
+        const claudePlugin = provider.id === "claude" ? await prepareClaudeSkills(cwd, provider.agent.env) : undefined;
+        const session = await ctx.buildSession(providerSessionRequest(provider, cwd, ephemeral, claudePlugin)).start();
         const config = modelConfiguration(session.newSessionResponse.configOptions ?? []);
         session.dispose();
         if (!ephemeral) await removeSession(ctx, initialized.agentCapabilities, session.sessionId);
@@ -82,7 +92,7 @@ async function probeCodexModels(provider: DiscoveredProvider, timeoutMs: number)
     "-c", "mcp_servers={}",
     ...featureArgs,
     "--listen", "stdio://"
-  ], { env: provider.agent.env, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });
+  ], { cwd: "/", env: provider.agent.env, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });
   child.stderr?.resume();
   try {
     if (child.stdin === null || child.stdout === null) return { models: [] };
@@ -153,7 +163,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 export async function deleteAcpSession(provider: DiscoveredProvider, sessionId: string, timeoutMs = 15_000): Promise<boolean> {
   const child = spawn(provider.agent.executable, provider.agent.args, {
-    env: secureEnvironment(provider), stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32"
+    cwd: "/", env: secureEnvironment(provider), stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32"
   });
   const timeout = setTimeout(() => terminateProcessGroup(child.pid), timeoutMs);
   timeout.unref();
@@ -190,15 +200,18 @@ export async function deleteAcpSession(provider: DiscoveredProvider, sessionId: 
 export function runAcpQuestion(
   provider: DiscoveredProvider,
   requestId: string,
-  question: string,
+  question: AcpPrompt,
   model: string | undefined,
   emit: (event: BrokerEvent) => void,
-  timeoutMs = 90_000,
+  timeoutMs = 180_000,
   imageStore = new ImageStore(),
   requestPermission?: PermissionHandler,
-  cancelPermissions?: () => void
+  cancelPermissions?: () => void,
+  observeTool?: (update: ToolObservation) => void,
+  openCodePermissionWaitMs = 61_000
 ): AcpRun {
   const child = spawn(provider.agent.executable, provider.agent.args, {
+    cwd: "/",
     env: secureEnvironment(provider),
     stdio: ["pipe", "pipe", "pipe"],
     detached: process.platform !== "win32"
@@ -207,6 +220,7 @@ export function runAcpQuestion(
   let activeText: GuardedTextEmitter | undefined;
   let cancelled = false;
   let forbiddenToolAttempt = false;
+  let unapprovedToolAttempt = false;
   child.stderr?.resume();
 
   const cancel = async (): Promise<void> => {
@@ -222,6 +236,7 @@ export function runAcpQuestion(
     const paths = quickchatPaths(provider.agent.env);
     await mkdir(paths.runtime, { recursive: true, mode: 0o700 });
     const cwd = await mkdtemp(join(paths.runtime, "chat-"));
+    const turnDeadline = Date.now() + timeoutMs;
     const timeout = setTimeout(() => { void cancel(); }, timeoutMs);
     timeout.unref();
     try {
@@ -233,17 +248,34 @@ export function runAcpQuestion(
       let modelOptions: ModelOption[] = [];
       let defaultModel: string | undefined;
       let resumable = false;
-      const allowedOpenCodeToolCalls = new Set<string>();
+      const openCodeToolCalls = new Map<string, "automatic" | "device">();
+      const approvedOpenCodeToolCalls = new Map<string, string>();
+      const rejectedOpenCodeToolCalls = new Set<string>();
 
       const text = new GuardedTextEmitter(requestId, emit);
       activeText = text;
       const app = acp.client({ name: "omarchy-quickchat" })
         .onRequest(acp.methods.client.session.requestPermission, async ({ params }) => {
-          if (provider.id === "opencode" || requestPermission === undefined) {
+          if (requestPermission === undefined) {
             forbiddenToolAttempt = true;
             return { outcome: { outcome: "cancelled" } };
           }
-          const optionId = await requestPermission(params);
+          const decision = await requestPermission(params);
+          if (typeof decision === "object" && decision.invalid === true) {
+            forbiddenToolAttempt = true;
+            return { outcome: { outcome: "cancelled" } };
+          }
+          const optionId = typeof decision === "string" ? decision : decision?.optionId;
+          const optionKind = params.options.find((option) => option.optionId === optionId)?.kind;
+          if (optionKind !== "allow_once") unapprovedToolAttempt = true;
+          if (provider.id === "opencode") {
+            if (optionKind === "allow_once") {
+              const command = openCodeCommand(params.toolCall.rawInput);
+              if (command === undefined) forbiddenToolAttempt = true;
+              else approvedOpenCodeToolCalls.set(params.toolCall.toolCallId, command);
+            }
+            else rejectedOpenCodeToolCalls.add(params.toolCall.toolCallId);
+          }
           return optionId === undefined
             ? { outcome: { outcome: "cancelled" } }
             : { outcome: { outcome: "selected", optionId } };
@@ -264,7 +296,8 @@ export function runAcpQuestion(
         });
         if (initialized.protocolVersion !== acp.PROTOCOL_VERSION) throw new Error("ACP protocol version is unsupported");
         resumable = initialized.agentCapabilities?.loadSession === true;
-        const newRequest = providerSessionRequest(provider, cwd);
+        const claudePlugin = provider.id === "claude" ? await prepareClaudeSkills(cwd, provider.agent.env) : undefined;
+        const newRequest = providerSessionRequest(provider, cwd, false, claudePlugin);
         const session = await ctx.buildSession(newRequest).start();
         sessionIdentifier = session.sessionId;
         cancelSession = async () => {
@@ -293,7 +326,16 @@ export function runAcpQuestion(
               break;
             }
             if (update.kind === "stop") break;
-            if (provider.id === "opencode" && !openCodeToolUpdateAllowed(update.update, allowedOpenCodeToolCalls)) {
+            observeToolUpdate(update.update, observeTool);
+            if (provider.id === "opencode" && !await openCodeToolUpdateAllowed(
+              update.update,
+              openCodeToolCalls,
+              approvedOpenCodeToolCalls,
+              rejectedOpenCodeToolCalls,
+              () => cancelled,
+              () => forbiddenToolAttempt,
+              Math.min(openCodePermissionWaitMs, Math.max(0, turnDeadline - Date.now() - 50))
+            )) {
               forbiddenToolAttempt = true;
               await ctx.notify(acp.methods.agent.session.cancel, { sessionId: session.sessionId });
               break;
@@ -307,7 +349,14 @@ export function runAcpQuestion(
           await promptPromise;
           if (forbiddenToolAttempt) throw forbiddenToolError();
           if (cancelled) text.discard();
-          else text.finish();
+          else {
+            if (unapprovedToolAttempt && answer.trim() === "") {
+              const notCompleted = "The action was not completed because its tool request was not approved.";
+              text.write(notCompleted);
+              answer = notCompleted;
+            }
+            text.finish();
+          }
         } catch (error) {
           text.discard();
           await ctx.notify(acp.methods.agent.session.cancel, { sessionId: session.sessionId }).catch(() => undefined);
@@ -346,10 +395,25 @@ export function runAcpQuestion(
   return { result, cancel };
 }
 
+function observeToolUpdate(
+  update: { sessionUpdate: string; toolCallId?: string; kind?: string | null; title?: string | null; status?: string | null },
+  observer: ((update: ToolObservation) => void) | undefined
+): void {
+  if (observer === undefined || (update.sessionUpdate !== "tool_call" && update.sessionUpdate !== "tool_call_update")) return;
+  if (typeof update.toolCallId !== "string" || update.toolCallId === "") return;
+  observer({
+    sessionUpdate: update.sessionUpdate,
+    toolCallId: update.toolCallId,
+    ...(update.kind === undefined ? {} : { kind: update.kind }),
+    ...(update.title === undefined ? {} : { title: update.title }),
+    ...(update.status === undefined ? {} : { status: update.status })
+  });
+}
+
 function secureEnvironment(provider: DiscoveredProvider): NodeJS.ProcessEnv {
   if (provider.id === "codex") {
     const features = Object.fromEntries((provider.lockdownFeatures ?? [])
-      .map((feature) => [feature, feature === "shell_tool" || feature === "unified_exec"]));
+      .map((feature) => [feature, feature === "shell_tool" || feature === "unified_exec" || feature === "skill_search"]));
     const config = {
       // Codex read-only still permits host reads. Keep native web search off so
       // those unapproved reads cannot be exfiltrated through a model-controlled
@@ -365,12 +429,7 @@ function secureEnvironment(provider: DiscoveredProvider): NodeJS.ProcessEnv {
     return { ...provider.agent.env, CODEX_CONFIG: JSON.stringify(config), INITIAL_AGENT_MODE: "read-only" };
   }
   if (provider.id === "opencode") {
-    const permission = { "*": "deny", websearch: "allow" };
-    return {
-      ...provider.agent.env,
-      OPENCODE_CONFIG_CONTENT: JSON.stringify({ instructions: [automaticInstructionPath()] }),
-      OPENCODE_PERMISSION: JSON.stringify(permission)
-    };
+    return provider.agent.env;
   }
   return provider.agent.env;
 }
@@ -391,10 +450,15 @@ async function removeSession(
   return false;
 }
 
-export function providerSessionRequest(provider: DiscoveredProvider, cwd: string, ephemeral = false): NewSessionRequest {
+export function providerSessionRequest(
+  provider: DiscoveredProvider,
+  cwd: string,
+  ephemeral = false,
+  claudePlugin?: string
+): NewSessionRequest {
   const base: NewSessionRequest = { cwd, mcpServers: [] };
   if (provider.id !== "claude") return base;
-  const tools = ["Bash", "WebSearch"];
+  const tools = ["Bash", "WebSearch", "Skill"];
   const systemPrompt = automaticInstructions();
   return {
     ...base,
@@ -403,6 +467,8 @@ export function providerSessionRequest(provider: DiscoveredProvider, cwd: string
       claudeCode: {
         options: {
           tools,
+          skills: "all",
+          ...(claudePlugin === undefined ? {} : { plugins: [{ type: "local", path: claudePlugin, skipMcpDiscovery: true }] }),
           ...(ephemeral ? { persistSession: false } : {}),
           disallowedTools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "NotebookEdit", "Task", "Agent", "WebSearch", "WebFetch"].filter((tool) => !tools.includes(tool)),
           settingSources: [],
@@ -417,7 +483,7 @@ export function providerSessionRequest(provider: DiscoveredProvider, cwd: string
             enabled: true,
             failIfUnavailable: true,
             autoAllowBashIfSandboxed: true,
-            allowUnsandboxedCommands: false,
+            allowUnsandboxedCommands: true,
             network: { allowedDomains: [], strictAllowlist: true, allowLocalBinding: false, allowUnixSockets: [] },
             filesystem: {
               denyRead: sandboxDeniedReadPaths(),
@@ -433,6 +499,70 @@ export function providerSessionRequest(provider: DiscoveredProvider, cwd: string
       }
     }
   };
+}
+
+export async function prepareClaudeSkills(cwd: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {
+  const home = env.HOME;
+  if (home === undefined || home === "") return undefined;
+  const roots = [join(home, ".agents", "skills"), join(home, ".claude", "skills")];
+  const plugin = join(cwd, ".quickchat-claude-skills");
+  const skills = join(plugin, "skills");
+  const names = new Set<string>();
+  let files = 0;
+  let bytes = 0;
+  for (const root of roots) {
+    const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/u.test(entry.name) || names.has(entry.name)) continue;
+      const source = await realpath(join(root, entry.name)).catch(() => undefined);
+      if (source === undefined || !(await stat(source).catch(() => undefined))?.isDirectory()) continue;
+      if (!(await stat(join(source, "SKILL.md")).catch(() => undefined))?.isFile()) continue;
+      const measured = await measureSafeSkill(source, files, bytes);
+      if (measured === undefined) continue;
+      files = measured.files;
+      bytes = measured.bytes;
+      await mkdir(skills, { recursive: true, mode: 0o700 });
+      await cp(source, join(skills, entry.name), { recursive: true, errorOnExist: true, force: false });
+      names.add(entry.name);
+    }
+  }
+  if (names.size === 0) return undefined;
+  const manifest = join(plugin, ".claude-plugin", "plugin.json");
+  await mkdir(join(plugin, ".claude-plugin"), { recursive: true, mode: 0o700 });
+  await writeFile(manifest, `${JSON.stringify({
+    name: "omarchy-quickchat-installed-skills",
+    version: "0.0.0",
+    description: "Disposable view of locally installed skills for Quickchat"
+  }, null, 2)}\n`, { mode: 0o600 });
+  return plugin;
+}
+
+async function measureSafeSkill(
+  root: string,
+  initialFiles: number,
+  initialBytes: number
+): Promise<{ files: number; bytes: number } | undefined> {
+  const queue = [root];
+  let files = initialFiles;
+  let bytes = initialBytes;
+  while (queue.length > 0) {
+    const directory = queue.pop();
+    if (directory === undefined) break;
+    const entries = await readdir(directory, { withFileTypes: true }).catch(() => undefined);
+    if (entries === undefined) return undefined;
+    for (const entry of entries) {
+      const path = join(directory, entry.name);
+      const info = await lstat(path).catch(() => undefined);
+      if (info === undefined || info.isSymbolicLink()) return undefined;
+      if (info.isDirectory()) queue.push(path);
+      else if (info.isFile()) {
+        files += 1;
+        bytes += info.size;
+        if (files > 1_000 || bytes > 5 * 1024 * 1024) return undefined;
+      } else return undefined;
+    }
+  }
+  return { files, bytes };
 }
 
 const SANDBOX_SYSTEM_ROOTS = new Set(["bin", "sbin", "lib", "lib64", "usr"]);
@@ -638,36 +768,84 @@ function containsToolMarkup(value: string): boolean {
   return /<\/?(?:[|｜]{1,2}\s*DSML\s*[|｜]{1,2}\s*)?(?:tool[_ -]?calls?|function[_ -]?calls?|invoke|parameter)\b/iu.test(value);
 }
 
-function openCodeToolUpdateAllowed(
-  update: { sessionUpdate: string; toolCallId?: string; kind?: string | null; name?: string | null; title?: string | null },
-  allowedCalls: Set<string>
-): boolean {
+async function openCodeToolUpdateAllowed(
+  update: {
+    sessionUpdate: string;
+    toolCallId?: string;
+    kind?: string | null;
+    name?: string | null;
+    title?: string | null;
+    status?: string | null;
+    rawInput?: unknown;
+  },
+  calls: Map<string, "automatic" | "device">,
+  approvedCalls: Map<string, string>,
+  rejectedCalls: Set<string>,
+  cancelled: () => boolean,
+  forbidden: () => boolean,
+  permissionWaitMs: number
+): Promise<boolean> {
   if (update.sessionUpdate !== "tool_call" && update.sessionUpdate !== "tool_call_update") return true;
   const toolCallId = typeof update.toolCallId === "string" ? update.toolCallId : "";
   if (toolCallId === "") return false;
   if (update.sessionUpdate === "tool_call") {
-    if (!isAllowedOpenCodeTool(update)) return false;
-    allowedCalls.add(toolCallId);
+    const classification = classifyOpenCodeTool(update);
+    if (classification === undefined || update.status !== "pending") return false;
+    calls.set(toolCallId, classification);
     return true;
   }
-  if (!allowedCalls.has(toolCallId)) return false;
+  const classification = calls.get(toolCallId);
+  if (classification === undefined) return false;
+  if (classification === "device") {
+    const deadline = Date.now() + permissionWaitMs;
+    while (!approvedCalls.has(toolCallId) && !rejectedCalls.has(toolCallId)
+        && !cancelled() && !forbidden() && Date.now() < deadline) {
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
+    }
+    if (cancelled()) return true;
+    if (forbidden()) return false;
+    if (rejectedCalls.has(toolCallId)) return update.status !== "completed";
+    const approvedCommand = approvedCalls.get(toolCallId);
+    if (approvedCommand === undefined) return false;
+    if (update.rawInput !== undefined && openCodeCommand(update.rawInput) !== approvedCommand) return false;
+    return update.kind === undefined || update.kind === null || update.kind === "execute";
+  }
   // Updates may replace the human title with progress text. Keep the initial,
   // exact tool identity authoritative, but reject a later structural
   // reclassification to a device/fetch kind or a different programmatic name.
   if (update.kind !== undefined && update.kind !== null
       && update.kind !== "search" && update.kind !== "other") return false;
-  if (update.name !== undefined && update.name !== null && update.name !== "websearch") return false;
+  if (update.name !== undefined && update.name !== null
+      && update.name !== "websearch" && update.name !== "skill") return false;
   return true;
 }
 
-function isAllowedOpenCodeTool(update: { kind?: string | null; name?: string | null; title?: string | null }): boolean {
+function classifyOpenCodeTool(update: {
+  kind?: string | null;
+  name?: string | null;
+  title?: string | null;
+  rawInput?: unknown;
+}): "automatic" | "device" | undefined {
   // OpenCode 1.18 reports its permission-keyed `websearch` tool as ACP kind
   // `other`, with the exact tool key in the title. `search` also covers host
   // grep/glob and `think` covers task, so kind alone is never authority.
   // Require the exact tool identity in addition to OPENCODE_PERMISSION's
   // deny-all rule, and reject every device/subagent kind even if mislabeled.
-  return (update.kind === "other" || update.kind === "search")
-    && (update.name === "websearch" || update.title === "websearch");
+  if ((update.kind === "other" || update.kind === "search")
+      && (update.name === "websearch" || update.title === "websearch")) return "automatic";
+  if (update.kind === "other" && (update.name === "skill" || update.title === "skill")) return "automatic";
+  if (update.kind === "execute"
+      && (update.title === "bash" || update.title === "shell" || exactOpenCodeCommand(update.rawInput))) return "device";
+  return undefined;
+}
+
+function exactOpenCodeCommand(value: unknown): boolean {
+  return openCodeCommand(value) !== undefined;
+}
+
+function openCodeCommand(value: unknown): string | undefined {
+  if (!isObject(value)) return undefined;
+  return typeof value.command === "string" && value.command !== "" ? value.command : undefined;
 }
 
 function forbiddenToolError(): BrokerAcpError {

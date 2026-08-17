@@ -1,6 +1,6 @@
 # OmaPilot for Omarchy
 
-OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget for asking questions and working on your desktop through an authenticated AI harness. Device actions stay behind an exact, inspectable approval unless you explicitly enable **Dangerous auto-approve** in settings. OmaPilot renders Markdown in a themed panel, remembers the latest 30 completed chats, and can hand an answer to Herdr when you want to keep working.
+OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget for asking questions and working on your desktop through an authenticated AI harness. Device actions stay behind an exact, inspectable approval unless you explicitly enable **Dangerous auto-approve** in settings. OmaPilot can attach a bounded desktop snapshot when you submit, renders Markdown in a themed panel, remembers the latest 30 completed chats, and can hand an answer to Herdr when you want to keep working.
 
 The public project and product name is now OmaPilot. The existing plugin ID, IPC target, package/runtime identifiers, and local `quickchat` data paths remain unchanged so current installations and user data continue to work.
 
@@ -55,6 +55,7 @@ Removal deletes the cloned plugin. OmaPilot deliberately leaves user-owned histo
 
 ```text
 Omarchy BarWidget/Panel
+        │ submit-time Hyprland/MPRIS snapshot
         │ one JSON command/event per line
         ▼
 OmaPilot broker
@@ -68,7 +69,9 @@ Codex and Claude use exact, source-pinned official ACP adapter packages bundled 
 
 Every request uses the selected harness and its reviewed automatic policy.
 OmaPilot displays each exact device approval, or auto-selects its allow-once
-option when the dangerous setting is enabled:
+option when the dangerous setting is enabled.
+Every harness can load relevant installed skills and decide whether a tool is
+needed:
 
 - **Codex** may use its read-only device tools and read files available to the
   current user without asking. Native web search stays disabled in the same
@@ -76,14 +79,19 @@ option when the dangerous setting is enabled:
   requesting network or broader device authority pauses behind an exact
   **Allow once** or **Deny** card showing the adapter-normalized command and
   working directory.
-- **Claude** may search the web and run commands inside a disposable
+- **Claude** may load installed skills from a disposable, MCP-free plugin copy,
+  search the web, and run commands inside a disposable
   scratch workspace. Host paths and credential-bearing environment variables
   stay hidden, direct process network access is blocked, and writes remain
   confined to per-turn scratch. Commands inside that fixed boundary may run
-  automatically; any surfaced approval cannot weaken the sandbox.
-- **OpenCode** may answer and use its positively identified web search tool.
-  Direct fetches and device commands remain blocked until its ACP path can prove the same
-  inspectable, request-bound approval handshake.
+  automatically. A command that needs host/device authority pauses behind the
+  same exact **Allow once** or **Deny** card. Approval applies only to that
+  command and runs it outside the disposable sandbox with the current user's
+  device, network, host-file, and process-environment authority.
+- **OpenCode** may load installed skills and use its positively identified web
+  search tool automatically. Its native `bash` permission is fixed to `ask`;
+  the broker accepts execution only after the exact command receives a
+  request-bound **Allow once** decision. Other OpenCode tools remain denied.
 
 Every supported permission decision is bound to the exact in-flight request.
 Oversized or visually ambiguous requests, persistent grants, arbitrary MCP,
@@ -113,6 +121,32 @@ web search for current or otherwise unknown information. These instructions
 shape how a harness chooses among capabilities but cannot enable a capability
 or bypass the provider policy and approval boundary above.
 
+## Desktop context on submit
+
+Desktop context is **On** by default and can be disabled in the widget's
+Omarchy settings. OmaPilot remembers the active app as its panel opens (before
+the panel takes keyboard focus), then reads the remaining public Quickshell
+objects when you send. It attaches:
+
+- the active window's app ID, title, workspace, and monitor;
+- up to 12 deduplicated open-app IDs with window counts and workspace IDs; and
+- player identity, track title, and artist for up to four currently playing MPRIS sources.
+
+OmaPilot does not capture compositor window handles, inactive window titles,
+screenshots, clipboard contents, page bodies, hidden browser tabs, browser
+history, keystrokes, or file contents as desktop context. A browser's current
+tab may be recognizable only when the browser exposes it in the active window
+title.
+
+Window and media strings are length-bounded, stripped of control and
+bidirectional-display characters, and labeled as untrusted observational data
+before being sent to the harness. The selected harness still decides whether
+the context is relevant and whether a tool is needed. OmaPilot stores the
+original question—not the snapshot—in its chat record, but the selected
+provider receives the combined prompt and may retain it in its native session.
+An answer derived from desktop context is retained like any other completed
+answer.
+
 ## Storage and privacy
 
 OmaPilot persists only completed chats, capped at the newest 30. A chat contains the question, rendered answer source, timestamp, provider/model metadata, content references, and a resumable session identity when the harness supplies one. Draft text, authentication output, tokens, environment variables, and provider credentials are not persisted.
@@ -132,9 +166,32 @@ Remote Markdown images are not fetched automatically. OmaPilot shows the origin 
 ## Optional integrations
 
 - **Voxtype:** when `voxtype` is installed and ready, the microphone records directly to a file under `$XDG_RUNTIME_DIR/quickchat`; OmaPilot reads that transcript after recording stops. It never simulates keyboard input or modifies Voxtype configuration.
-- **Herdr:** when `herdr` is installed, Continue in Herdr launches it when needed or raises its existing window, creates or reuses the compatibility-named `Quickchat` workspace, creates a labeled tab, closes the OmaPilot panel, and focuses the resumed agent pane. It resumes the native harness session when possible, otherwise starts the matching agent with a compact transcript and labels the fallback. This is an explicit handoff from OmaPilot's one-shot permission boundary to Herdr's normal native-agent permission model; Codex resumes read-only and asks before commands.
+- **Herdr:** when `herdr` is installed, Continue in Herdr launches it when needed or raises its existing window, creates or reuses the compatibility-named `Quickchat` workspace, creates a labeled tab, closes the OmaPilot panel, and focuses the resumed agent pane. It resumes the native harness session when possible, otherwise starts the matching agent with a compact transcript and labels the fallback. A native resume retains whatever context the provider kept in that session; a transcript fallback receives only the stored question and answer, not the raw desktop snapshot. This is an explicit handoff from OmaPilot's one-shot permission boundary to Herdr's normal native-agent permission model; Codex resumes read-only and asks before commands.
 
 Both integrations disappear or show a clear unavailable state when their required command is missing.
+
+## Future browser context
+
+The main future context feature is an optional **OmaPilot Browser Companion**.
+It would be a separately installed browser extension and local native-messaging
+bridge that can provide the active tab URL/title and, only with explicit site
+permission, selected text or bounded visible-page text. The intended rules are:
+
+- the Omarchy plugin remains fully useful without the extension;
+- context is visibly disclosed and captured only when a request is submitted;
+- page access is opt-in and scoped per site, with no browsing-history collection;
+- the bridge accepts a small versioned schema and does not expose a general command channel; and
+- the extension avoids Chrome's broad `debugger` permission and requests only the minimum tab/site/native-messaging permissions needed for enabled features.
+
+Because native messaging requires browser-host registration outside the
+Omarchy plugin directory, that companion would need its own explicit,
+reversible install and removal flow; the normal OmaPilot plugin install would not
+silently add it.
+
+Other roadmap candidates build on that same context contract: user-selectable
+context sources, richer app-specific adapters, and a preview of exactly what
+will be shared before submit. Browser actions would come later, only with their
+own inspectable per-action approval boundary for authenticated sites.
 
 ## Development
 

@@ -24,6 +24,7 @@
       "claudeModel": "",
       "opencodeModel": "",
       "quickActionsJson": "",
+      "desktopContext": "On",
       "dangerousAutoApprove": false
     },
     "schema": [
@@ -55,6 +56,14 @@
         "label": "Last OpenCode model",
         "defaultValue": "",
         "description": "Empty uses the OpenCode default; discovered models are selected in OmaPilot."
+      },
+      {
+        "key": "desktopContext",
+        "type": "enum",
+        "label": "Desktop context",
+        "options": ["On", "Off"],
+        "defaultValue": "On",
+        "description": "Attach a bounded active-window, open-app, workspace, and playing-media snapshot to each new request."
       },
       {
         "key": "dangerousAutoApprove",

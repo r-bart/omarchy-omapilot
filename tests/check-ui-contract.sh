@@ -28,6 +28,7 @@ qml_files=(
   "$repo_dir/components/WaitingIndicator.qml"
   "$repo_dir/components/internal/PermissionFocusGuard.qml"
   "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/DesktopContext.qml"
   "$repo_dir/components/Protocol.js"
   "$repo_dir/components/Presentation.js"
   "$repo_dir/components/QuickActions.js"
@@ -40,6 +41,32 @@ grep -Fq 'Qt.resolvedUrl("../runtime/bin/quickchat-broker")' \
 grep -Fq 'Quickshell.env("QUICKCHAT_BROKER_PATH") || bundledBrokerPath' \
   "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'property string configuredProvider: "codex"' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'property bool desktopContextEnabled: true' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'DesktopContext.snapshot()' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'Protocol.hasFeature(event.features, "desktop-context")' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'import Quickshell.Hyprland' "$repo_dir/components/DesktopContext.qml"
+grep -Fq 'import Quickshell.Services.Mpris' "$repo_dir/components/DesktopContext.qml"
+awk '
+  /^[[:space:]]*function / { latched = 0 }
+  /Quickchat\.QuickchatStore\.latchDesktopContext\(\)/ { latched = 1 }
+  /root\.controller\.show\(\)/ { if (!latched) exit 1; shows += 1 }
+  END { if (shows < 3) exit 1 }
+' "$repo_dir/Panel.qml"
+awk '
+  /^[[:space:]]*function / { cleared = 0 }
+  /Quickchat\.QuickchatStore\.clearDesktopContextLatch\(\)/ { cleared = 1 }
+  /root\.controller\.hide\(\)/ { if (!cleared) exit 1; hides += 1 }
+  END { if (hides < 2) exit 1 }
+' "$repo_dir/Panel.qml"
+awk '
+  /function desktopContextForSubmit\(\)/ { inside = 1; gated = 0 }
+  inside && /if \(!desktopContextActive\) return null/ { gated = 1 }
+  inside && /DesktopContext\.snapshot\(\)/ { if (!gated) exit 1; found = 1; exit }
+  END { if (!found) exit 1 }
+' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'latchedActiveWindow = context && context.activeWindow ? context.activeWindow : null' \
   "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'if (!changed) return' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'model = desiredModel' "$repo_dir/components/QuickchatStore.qml"
@@ -65,8 +92,11 @@ if grep -Fqi 'local_action' "$repo_dir/Panel.qml" "$repo_dir/components/Protocol
 fi
 grep -Fq 'visible: !root.backend || root.backend.pendingPermission === null' \
   "$repo_dir/components/Composer.qml"
-grep -Fq 'QuickchatStore.pendingPermission.authority === "sandboxed"' \
-  "$repo_dir/Panel.qml"
+if grep -Eq 'sandboxed|Device commands stay blocked|sandbox limits stay active' \
+  "$repo_dir/Panel.qml" "$repo_dir/components/Protocol.js"; then
+  printf 'QML permission copy must not retain unreachable legacy policy branches\n' >&2
+  exit 1
+fi
 grep -Fq 'Allow once may read or change device data and access the network' \
   "$repo_dir/Panel.qml"
 grep -Fq 'readonly property bool popupOpen:' "$repo_dir/components/Composer.qml"
@@ -140,7 +170,7 @@ grep -Fq 'developer_instructions: automaticInstructions()' \
 grep -Fq 'const systemPrompt = automaticInstructions()' \
   "$repo_dir/runtime/src/acp.ts"
 grep -Fq 'instructions: [automaticInstructionPath()]' \
-  "$repo_dir/runtime/src/acp.ts"
+  "$repo_dir/runtime/src/providers.ts"
 grep -Fq 'runtime/policies/automatic.md' "$repo_dir/scripts/package-runtime.sh"
 if grep -Fq 'Animation.Infinite' "$repo_dir/Panel.qml" "$repo_dir/components/WaitingIndicator.qml"; then
   printf 'Quickchat response motion must remain finite\n' >&2

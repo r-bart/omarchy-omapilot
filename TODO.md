@@ -86,6 +86,121 @@ validate/package workflow is required green on the final PR head. No CUA,
 installed plugin, desktop configuration, release, or marketplace state was
 changed.
 
+## Submit-time desktop context (2026-08-15)
+
+- Goal: attach the useful context Omarchy already exposes—active window, open
+  windows/workspaces, and playing media—to each new request without adding a
+  mode, prompt classifier, polling daemon, or browser-control dependency.
+- Done criteria: the snapshot uses public Quickshell APIs, is visibly disclosed
+  and default-on with an Omarchy setting, is bounded/sanitized/strictly
+  validated, reaches the ACP prompt, never replaces the stored original
+  question, and does not change provider tool authority. README/security docs
+  describe provider retention honestly and record the optional OmaAsk Browser
+  Companion as future work. Focused/full suites, deterministic bundle checks,
+  and independent review must pass.
+- Branch/worktree: `desktop-context` at
+  `/home/sbull/worktrees/omarchy-quickchat-context`, based on merged `main`
+  commit `caa2439`. The orchestrator owns implementation and integration.
+- Allowed: scoped source/docs/tests/build-artifact edits and local validation.
+  Forbidden: merge, tag, release, installed-plugin mutation, browser extension
+  installation, desktop control, provider configuration, or credential access.
+- Reviewer: visible Claude Herdr agent `qc_context_review`, pane `wK:p2F`,
+  read-only design and final diff review; the orchestrator owns cleanup.
+- [x] Define the bounded versioned context contract and privacy boundary.
+- [x] Capture submit-time Hyprland/MPRIS context with no polling.
+- [x] Add a default-on Omarchy setting and in-composer disclosure.
+- [x] Document current behavior and the future OmaAsk browser companion.
+- [x] Pass focused QML/runtime tests and full repository validation.
+- [x] Receive an independent clean review or fix every verified finding.
+
+Current evidence: QML contract passes 22 protocol and three permission-focus
+tests plus a real Wayland smoke load. `./scripts/validate.sh` passes 122 runtime
+tests with six explicit live-provider skips; production dependency audit has
+zero vulnerabilities; two consecutive broker builds are byte-identical.
+Claude reviewer `qc_context_review` fuzzed 60,000 QML-to-broker snapshots and
+found no validation mismatch or question mutation. Its BiDi, stale-latch,
+contract-test, and feature-type findings were fixed; the bounded re-review was
+`CLEAN`. Remaining live-only checks are active-window latching under real panel
+focus, playing MPRIS metadata, focused-monitor routing, and one real context
+turn per provider.
+
+## Installed skills and generic provider tools (2026-08-16)
+
+- Goal: make every selected harness discover the user's relevant installed
+  skills and request ordinary tools when useful, with no Tools mode, prompt
+  classifier, or hardcoded app/action mappings.
+- Product contract: read-only skill loading is available automatically. Any
+  command that can affect the device crosses the existing exact-command,
+  request-bound **Allow once** boundary. Persistent grants, opaque commands,
+  arbitrary MCP servers, subagents, and unreviewable filesystem mutations stay
+  fail-closed. A completed answer must not claim an action succeeded unless the
+  harness returned a successful tool result.
+- Done criteria: Codex, Claude, and OpenCode each prove installed-skill
+  discovery; each provider can complete a harmless generic command through its
+  documented authority boundary; deny, timeout, cancellation, malformed input,
+  duplicate/stale decisions, and false-success behavior have regression tests;
+  full validation and deterministic bundles pass; an independent review is
+  clean; a PR targets `main` with green exact-head CI; the reviewed candidate is
+  installed locally only after those gates.
+- Branch/worktree: `provider-tools` at
+  `/home/sbull/worktrees/omarchy-quickchat-context`, based on merged `main`
+  `caa2439` with desktop context preserved as commit `271966f`. The orchestrator
+  owns implementation, integration, publication, and local installation.
+- Allowed: scoped source/docs/tests/build edits; local authenticated
+  non-destructive provider probes; commits; push; PR creation; CI inspection;
+  reviewed local plugin installation. Forbidden: merge, tag, release,
+  marketplace submission, provider credential/configuration changes, CUA,
+  secrets, billing, production/customer data, hardcoded app mappings, or edits
+  outside this repo and the installed Quickchat copy.
+- Architecture/review worker: visible Claude Herdr agent `qc_tools_arch`, pane
+  `wK:p2N`, same worktree/branch, read-only design and final-diff review. The
+  orchestrator owns follow-up and cleanup.
+- Independent release-gate worker: visible Claude Herdr agent
+  `qc_tools_review`, pane `wK:p2Q`, read-only review of the exact candidate.
+  Its first verdict found no blocker; documentation and the live Claude
+  no-approval host-boundary regression are being re-reviewed after remediation.
+- Architecture evidence: the worker identified OpenCode wildcard precedence,
+  inherited process cwd, non-composing timeouts, remote skill/MCP supply-chain
+  risks, and Claude skill-source isolation. The candidate now enumerates and
+  validates effective OpenCode permissions, starts providers at `/`, keeps the
+  60-second approval timeout inside a 180-second turn, disables remote skill
+  URLs/configured MCP, and supplies Claude skills without user settings.
+- [x] Approve one provider-neutral skill/tool and action-integrity contract.
+  One checked-in instruction drives skill selection and truthful action status;
+  structured ACP permissions, never prompt classification, own authority.
+- [x] Implement provider wiring and exact OpenCode/Claude device approval.
+  Codex enables only shell/unified-exec/skill-search; Claude uses a disposable
+  MCP-free installed-skill plugin plus sandbox/device escalation; OpenCode
+  proves its resolved deny table, disables project config/MCP, and correlates
+  bash approval by tool-call ID.
+- [x] Add focused policy, protocol, permission, and false-success regressions.
+  Source tests cover automatic skill identity, allow/deny, missing approval,
+  opaque/reclassified tools, unsafe Claude skill trees, and an empty-answer
+  truthful denial fallback; existing lifecycle suites cover timeout, cancel,
+  duplicate IDs, and stale permission decisions.
+- [x] Pass full validation plus authenticated non-GUI provider probes.
+  `./scripts/validate.sh` passed 130 tests with 12 opt-in skips and rebuilt
+  dist; the complete authenticated matrix passed 12/12: installed Omarchy
+  skill loading, harmless approved commands for all providers, Claude/OpenCode
+  web behavior, Claude scratch execution, Claude denied host-file isolation,
+  and OpenCode denied-command integrity.
+  Two release archives from the same tree were byte-identical. Their SHA-256
+  stays out-of-band because the archive provenance embeds the commit and Node
+  version; a hash committed into this ledger would necessarily describe its
+  parent tree rather than the commit containing it.
+- [x] Receive a clean independent final review or fix every verified finding.
+  `qc_tools_review` returned CLEAN for `271966f..a773559`; its medium findings
+  were resolved and the exact remediation tree passed source/dist and package
+  parity checks.
+- [x] Push, open the PR, pass exact-head CI, and install the reviewed candidate.
+  PR #3 targets `main`; GitHub Actions run 34 passed validation and packaging at
+  reviewed code SHA `a72436c`. That payload is installed at
+  `~/.config/omarchy/plugins/io.github.spencerbull.quickchat`; the installed
+  broker returned protocol 2, three providers, and `desktop-context` before a
+  lock-guarded shell restart. `shell.json` remained byte-identical, preserving
+  the center placement and provider/model settings. Rollback snapshot:
+  `~/.local/state/omarchy-quickchat-backups/20260816-1428-before-a72436c`.
+
 ## Allowed actions
 
 - Create, test, commit, and push scoped branches in this repository.
@@ -736,3 +851,44 @@ changed.
 - Current checkpoint: the public rename, branch push, merged local install, and
   startup verification are complete. Static and startup evidence is green;
   installed interaction and real-harness behavior remain owner validation.
+
+## OmaPilot consolidated pull request checkpoint 8 (2026-08-17)
+
+- Goal: combine the presentation/rebrand stream and the provider-tools stream
+  into one reviewable pull request against `main`.
+- Done criteria: `origin/provider-tools` is integrated without dropping either
+  stream's behavior; overlapping UI, policy, documentation, and generated
+  runtime files are resolved deliberately; combined static and packaging gates
+  pass; `quickchat-style-revamp` is pushed; one draft PR targets `main`; and the
+  provider-only PR is closed as superseded after the consolidated PR exists.
+- Branch/worktree: `quickchat-style-revamp` at
+  `/home/sbull/worktrees/omarchy-quickchat-style-revamp`; the provider-tools
+  branch is consumed read-only from `origin/provider-tools` and its separate
+  worktree remains untouched.
+- Allowed: merge the remote provider-tools branch here, resolve conflicts,
+  update combined regression coverage and this ledger, run static/package
+  checks, commit, push, open the consolidated draft PR, and close the older
+  provider-only PR with a supersession note.
+- Forbidden: edit another worktree or branch, merge into `main`, reinstall or
+  restart the shell, change live desktop state, publish a release, delete the
+  provider branch, or migrate the stable plugin ID, IPC, and data paths.
+- Verification gates:
+  - [x] Merge both streams and resolve all conflicts with no unmerged paths or
+    conflict markers.
+  - [x] Preserve the shared capability-aware OmaPilot prompt, bounded desktop
+    context, provider-native tool integrations, exact request-bound approvals,
+    compact UI, settings, quick actions, transcript behavior, and finite motion.
+  - [x] Pass manifest/release checks, typecheck, lint, build, and the combined
+    runtime suite: 136 passed with 12 live-provider tests skipped.
+  - [x] Pass the combined QML/UI contract suite (23 protocol/context, three
+    permission-focus, eight presentation, and seven quick-action checks),
+    deterministic bundle builds, package dry-run, and Git whitespace checks.
+  - [ ] Commit and push the combined branch, open one draft PR to `main`, then
+    close provider-only PR 3 as superseded.
+  - [ ] Owner-run installed pointer, keyboard, real-harness, permission,
+    streaming, and error-detail validation remains a separate live gate.
+- Current checkpoint: both code streams are combined and all source/static
+  gates are green: 136 runtime tests pass with 12 live-provider skips, the QML
+  contract totals above pass, two broker builds are byte-identical, and the
+  release package dry-run succeeds. Publication and PR consolidation remain in
+  progress; no live desktop state is being changed.

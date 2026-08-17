@@ -18,7 +18,7 @@ The packaging workflow builds artifacts for review; it does not create or publis
 
 - Add a verified screenshot from the live Quattro shell using the active
   Omarchy theme and update the README preview section.
-- Verify open, compose, provider/model selection, automatic web/tool use and permission enforcement, stream/stop, Markdown, safe links, images, history/clear, dictation, Herdr continuation, keyboard navigation, narrow geometry, theme reload, shell reload, and all missing/error states.
+- Verify open, compose, provider/model selection, desktop context On/Off and active-app latching, automatic web/tool use and permission enforcement, stream/stop, Markdown, safe links, images, history/clear, dictation, Herdr continuation, keyboard navigation, narrow geometry, theme reload, shell reload, and all missing/error states.
 - Record the exact Omarchy Quattro commit used for validation.
 - Complete independent security, implementation, and design review with no unresolved actionable findings.
 - Run `bash tests/check-ui-contract.sh` on a workstation with the pinned Quattro QML imports, Qt 6 tools, Quickshell, and a Wayland compositor. Hosted CI cannot substitute for this required environment gate.

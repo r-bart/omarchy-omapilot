@@ -85,6 +85,7 @@ Panel {
     openedFromHotkey = false
     showChat(false)
     setCenterHoverRevealSuppressed(false)
+    Quickchat.QuickchatStore.latchDesktopContext()
     root.controller.show()
     Qt.callLater(function() { composer.forceInputFocus() })
   }
@@ -92,6 +93,7 @@ Panel {
   function openFromHotkey() {
     openedFromHotkey = true
     showChat(false)
+    Quickchat.QuickchatStore.latchDesktopContext()
     root.controller.show()
     Qt.callLater(function() {
       if (root.opened) root.setCenterHoverRevealSuppressed(true)
@@ -102,6 +104,7 @@ Panel {
   function openHistory() {
     settingsView.closePopups(false)
     viewMode = "history"
+    Quickchat.QuickchatStore.latchDesktopContext()
     root.controller.show()
     Quickchat.QuickchatStore.requestHistory()
     Qt.callLater(function() { historyView.forceInitialFocus() })
@@ -126,6 +129,7 @@ Panel {
   function close() {
     setCenterHoverRevealSuppressed(false)
     previewSource = ""
+    Quickchat.QuickchatStore.clearDesktopContextLatch()
     root.controller.hide()
     if (hostWidget) Qt.callLater(function() {
       if (typeof hostWidget.restoreFocus === "function") hostWidget.restoreFocus()
@@ -136,6 +140,7 @@ Panel {
   function closeForExternalHandoff() {
     setCenterHoverRevealSuppressed(false)
     previewSource = ""
+    Quickchat.QuickchatStore.clearDesktopContextLatch()
     root.controller.hide()
   }
 
@@ -154,16 +159,20 @@ Panel {
 
   onSettingsChanged: Quickchat.QuickchatStore.configure(settings)
   Component.onCompleted: Quickchat.QuickchatStore.configure(settings)
-  onOpenedChanged: if (opened) {
-    Quickchat.QuickchatStore.configure(settings)
-    if (viewMode === "history") {
-      Quickchat.QuickchatStore.requestHistory()
-      Qt.callLater(function() { historyView.forceInitialFocus() })
-    } else if (viewMode === "settings") {
-      Qt.callLater(function() { settingsView.forceInitialFocus() })
-    } else if (viewMode === "error") {
-      Qt.callLater(function() { errorView.forceInitialFocus() })
-    } else Qt.callLater(function() { composer.forceInputFocus() })
+  onOpenedChanged: {
+    if (opened) {
+      Quickchat.QuickchatStore.configure(settings)
+      if (viewMode === "history") {
+        Quickchat.QuickchatStore.requestHistory()
+        Qt.callLater(function() { historyView.forceInitialFocus() })
+      } else if (viewMode === "settings") {
+        Qt.callLater(function() { settingsView.forceInitialFocus() })
+      } else if (viewMode === "error") {
+        Qt.callLater(function() { errorView.forceInitialFocus() })
+      } else Qt.callLater(function() { composer.forceInputFocus() })
+    } else {
+      Quickchat.QuickchatStore.clearDesktopContextLatch()
+    }
   }
 
   Connections {
@@ -366,10 +375,7 @@ Panel {
 
                 Text {
                   Layout.fillWidth: true
-                  text: Quickchat.QuickchatStore.pendingPermission
-                    && Quickchat.QuickchatStore.pendingPermission.authority === "sandboxed"
-                      ? "This approval applies only to this call; sandbox limits stay active."
-                      : "Review the command and working directory. Allow once may read or change device data and access the network."
+                  text: "Review the command and working directory. Allow once may read or change device data and access the network."
                   color: Qt.darker(root.foreground, 1.45)
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption

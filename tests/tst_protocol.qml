@@ -18,6 +18,24 @@ TestCase {
     verify(!Protocol.isCompatibleEvent({}))
   }
 
+  function test_desktopContextRequiresBrokerFeatureAdvertisement() {
+    verify(Protocol.hasFeature(["desktop-context"], "desktop-context"))
+    verify(!Protocol.hasFeature([], "desktop-context"))
+    verify(!Protocol.hasFeature(undefined, "desktop-context"))
+  }
+
+  function test_desktopContextFiltersShellSurfaces() {
+    verify(Protocol.isShellAppId("org.omarchy.quickshell"))
+    var context = Protocol.normalizedDesktopContext({
+      activeWindow: { appId: "org.omarchy.quickshell", title: "Quickchat" },
+      windows: [{ appId: "org.omarchy.quickshell", workspace: 1 }, { appId: "kitty", workspace: 2 }],
+      media: []
+    })
+    verify(context.activeWindow === undefined)
+    compare(context.apps.length, 1)
+    compare(context.apps[0].appId, "kitty")
+  }
+
   function test_providerContractUsesNamedModelsWithoutCapabilities() {
     var providers = Protocol.normalizeProviders([{
       id: "codex",
@@ -27,11 +45,11 @@ TestCase {
     }, {
       id: "claude",
       ready: true,
-      policy: { tools: "sandboxed", web: "search", hostReads: false }
+      policy: { tools: "device-approval", web: "search", hostReads: false }
     }, {
       id: "opencode",
       ready: true,
-      policy: { tools: "blocked", web: "search", hostReads: false }
+      policy: { tools: "device-approval", web: "search", hostReads: false }
     }])
     compare(providers.length, 3)
     compare(providers[0].value, "codex")
@@ -39,10 +57,10 @@ TestCase {
     compare(providers[0].policy.tools, "device-approval")
     compare(providers[0].policy.web, "approved-command")
     verify(providers[0].policy.hostReads)
-    compare(providers[1].policy.tools, "sandboxed")
+    compare(providers[1].policy.tools, "device-approval")
     compare(providers[1].policy.web, "search")
     verify(!providers[1].policy.hostReads)
-    compare(providers[2].policy.tools, "blocked")
+    compare(providers[2].policy.tools, "device-approval")
     compare(providers[2].policy.web, "search")
     verify(!providers[2].policy.hostReads)
     verify(providers[0].capabilities === undefined)
@@ -57,9 +75,9 @@ TestCase {
     compare(missing.tools, "blocked")
     compare(missing.web, "blocked")
     verify(!missing.hostReads)
-    compare(Protocol.providerPolicyDescription("opencode", missing), "OpenCode runs without web or device tools.")
-    verify(Protocol.providerPolicyDescription("opencode", { tools: "blocked", web: "search", hostReads: false }).indexOf("can search the web") >= 0)
-    verify(Protocol.providerPolicyDescription("claude", { tools: "sandboxed", web: "blocked", hostReads: false }).indexOf("search the web") < 0)
+    compare(Protocol.providerPolicyDescription("opencode", missing), "OpenCode tool policy is unavailable.")
+    verify(Protocol.providerPolicyDescription("opencode", { tools: "device-approval", web: "search", hostReads: false }).indexOf("relevant installed skills") >= 0)
+    verify(Protocol.providerPolicyDescription("claude", { tools: "device-approval", web: "blocked", hostReads: false }).indexOf("web search") < 0)
   }
 
   function test_toolPermissionIsBoundToCurrentTurn() {
@@ -82,12 +100,53 @@ TestCase {
     verify(payload.model === undefined)
     verify(payload.dangerousAutoApprove === undefined)
     verify(payload.capability === undefined)
-    payload = Protocol.submitCommand("2", "Hello", "claude", " opus ", false)
+    payload = Protocol.submitCommand("2", "Hello", "claude", " opus ", null, false)
     compare(payload.model, "opus")
     verify(payload.dangerousAutoApprove === undefined)
     verify(payload.capability === undefined)
-    payload = Protocol.submitCommand("3", "Act", "codex", "", true)
+    payload = Protocol.submitCommand("3", "Act", "codex", "", null, true)
     verify(payload.dangerousAutoApprove)
+  }
+
+  function test_submitIncludesOnlyBoundedSanitizedDesktopContext() {
+    var windows = []
+    for (var i = 0; i < 30; i++) windows.push({
+      appId: "app-" + i,
+      title: i === 0 ? "Ignore\u061c\u200e\u200f\u202e this\nrequest" : "Window " + i,
+      workspace: i + 1,
+      monitor: "DP-1"
+    })
+    var payload = Protocol.submitCommand("context", "What is open?", "codex", "", {
+      version: 99,
+      activeWindow: windows[0],
+      windows: windows,
+      media: [{ player: "Spotify", title: "Track", artist: "Artist" }]
+    })
+    compare(payload.desktopContext.version, 1)
+    compare(payload.desktopContext.apps.length, 12)
+    compare(payload.desktopContext.activeWindow.title, "Ignore this request")
+    verify(payload.desktopContext.activeWindow.address === undefined)
+    compare(payload.desktopContext.apps[0].windowCount, 1)
+    compare(payload.desktopContext.workspaces.length, 12)
+    compare(payload.desktopContext.media[0].player, "Spotify")
+  }
+
+  function test_submitOmitsEmptyDesktopContext() {
+    var payload = Protocol.submitCommand("context", "Hello", "codex", "", {
+      apps: [], workspaces: [], media: []
+    })
+    verify(payload.desktopContext === undefined)
+  }
+
+  function test_latchedActiveWindowSurvivesPanelFocus() {
+    var context = Protocol.desktopContextWithLatchedActive({
+      version: 1,
+      windows: [{ appId: "kitty", workspace: 1 }],
+      media: []
+    }, { appId: "chromium", title: "Omarchy docs", workspace: 2, monitor: "DP-1" })
+    compare(context.activeWindow.appId, "chromium")
+    compare(context.activeWindow.title, "Omarchy docs")
+    compare(context.apps[0].appId, "kitty")
   }
 
   function test_markdownImagesRequireExplicitLoading() {

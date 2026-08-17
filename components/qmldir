@@ -1,4 +1,5 @@
 singleton QuickchatStore 1.0 QuickchatStore.qml
+singleton DesktopContext 1.0 DesktopContext.qml
 Composer 1.0 Composer.qml
 ErrorDetailsView 1.0 ErrorDetailsView.qml
 ErrorNotice 1.0 ErrorNotice.qml

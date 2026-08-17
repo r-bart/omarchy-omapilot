@@ -32,9 +32,10 @@ jq -e '
     "claudeModel":"",
     "opencodeModel":"",
     "quickActionsJson":"",
+    "desktopContext":"On",
     "dangerousAutoApprove":false
   }
-  and ([.barWidget.schema[].key] | sort) == (["claudeModel", "codexModel", "dangerousAutoApprove", "opencodeModel", "provider"] | sort)
+  and ([.barWidget.schema[].key] | sort) == (["claudeModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "provider"] | sort)
   and (.barWidget.schema[] | select(.key == "dangerousAutoApprove")) == {
     "key":"dangerousAutoApprove",
     "type":"boolean",

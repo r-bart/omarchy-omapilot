@@ -48,12 +48,16 @@ Scope {
   property string configuredClaudeModel: ""
   property string configuredOpencodeModel: ""
   property bool configuredDangerousAutoApprove: false
+  property bool desktopContextEnabled: true
+  property bool brokerDesktopContextSupported: false
+  property var latchedActiveWindow: null
 
   readonly property bool busy: state === "preparing" || state === "dictating" || state === "streaming" || state === "stopping"
   readonly property bool canSubmit: initialized && providers.length > 0 && !busy
   readonly property bool canRetry: !processStarted && !broker.running && state === "unavailable"
   readonly property var modelOptions: Protocol.modelOptions(providers, provider)
   readonly property var providerPolicy: Protocol.providerPolicy(providers, provider)
+  readonly property bool desktopContextActive: desktopContextEnabled && brokerDesktopContextSupported
 
   signal answerChanged()
   signal focusComposerRequested()
@@ -79,17 +83,21 @@ Scope {
     var desiredClaudeModel = String(source.claudeModel || "")
     var desiredOpencodeModel = String(source.opencodeModel || "")
     var desiredDangerousAutoApprove = source.dangerousAutoApprove === true
+    var desiredDesktopContext = String(source.desktopContext || "On") !== "Off"
     var changed = desiredProvider !== configuredProvider
       || desiredCodexModel !== configuredCodexModel
       || desiredClaudeModel !== configuredClaudeModel
       || desiredOpencodeModel !== configuredOpencodeModel
       || desiredDangerousAutoApprove !== configuredDangerousAutoApprove
+      || desiredDesktopContext !== desktopContextEnabled
     if (!changed) return
     configuredProvider = desiredProvider
     configuredCodexModel = desiredCodexModel
     configuredClaudeModel = desiredClaudeModel
     configuredOpencodeModel = desiredOpencodeModel
     configuredDangerousAutoApprove = desiredDangerousAutoApprove
+    desktopContextEnabled = desiredDesktopContext
+    if (!desktopContextEnabled) latchedActiveWindow = null
     if (providers.length === 0 || providerAvailable(desiredProvider)) provider = desiredProvider
     var desiredModel = desiredProvider === "claude" ? desiredClaudeModel
       : desiredProvider === "opencode" ? desiredOpencodeModel : desiredCodexModel
@@ -142,6 +150,22 @@ Scope {
     }))
   }
 
+  function latchDesktopContext() {
+    if (!desktopContextEnabled) return
+    var context = DesktopContext.snapshot()
+    latchedActiveWindow = context && context.activeWindow ? context.activeWindow : null
+  }
+
+  function clearDesktopContextLatch() {
+    latchedActiveWindow = null
+  }
+
+  function desktopContextForSubmit() {
+    if (!desktopContextActive) return null
+    var context = DesktopContext.snapshot()
+    return Protocol.desktopContextWithLatchedActive(context, latchedActiveWindow)
+  }
+
   function submit(text) {
     var prompt = String(text || "").trim()
     if (!prompt || !canSubmit) return false
@@ -156,8 +180,10 @@ Scope {
     permissionQueue = []
     state = "preparing"
     statusMessage = "Preparing " + Protocol.providerLabel(provider) + "…"
+    var context = desktopContextForSubmit()
     var autoApprove = configuredDangerousAutoApprove
-    sendCommand(Protocol.submitCommand(currentId, prompt, provider, model, autoApprove))
+    sendCommand(Protocol.submitCommand(
+      currentId, prompt, provider, model, context, autoApprove))
     answerChanged()
     return true
   }
@@ -315,6 +341,7 @@ Scope {
         return
       }
       initialized = true
+      brokerDesktopContextSupported = Protocol.hasFeature(event.features, "desktop-context")
       applyProviders(event.providers || [])
       history = Protocol.normalizedHistory(event.history || [])
       if (providers.length > 0 && (state === "preparing" || state === "unavailable")) {

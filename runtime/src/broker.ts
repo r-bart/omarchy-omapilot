@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import type { AcpRun } from "./acp.js";
+import type { AcpRun, PermissionDecision } from "./acp.js";
 import { BrokerAcpError, deleteAcpSession, probeAcpModels, runAcpQuestion } from "./acp.js";
 import { DictationService } from "./dictation.js";
+import { promptWithDesktopContext } from "./context.js";
 import { HistoryStore, presentChat, presentImage } from "./history.js";
 import { continueInHerdr, describeHerdrError } from "./herdr.js";
 import { ImagePolicyError, ImageStore, isAllowedExternalLink } from "./images.js";
@@ -17,7 +18,7 @@ type SessionCleaner = (provider: DiscoveredProvider, sessionId: string) => Promi
 type HerdrContinue = typeof continueInHerdr;
 type HerdrResult = Awaited<ReturnType<HerdrContinue>>;
 type PermissionWaiter = PendingToolPermission & {
-  resolve: (optionId: string | undefined) => void;
+  resolve: (decision: PermissionDecision) => void;
   timeout: NodeJS.Timeout;
 };
 
@@ -96,7 +97,7 @@ export class QuickchatBroker {
     }));
     this.#providers = new Map(discovered.map((provider) => [provider.id, provider]));
     const history = (await this.#history.list()).map((chat) => presentChat(chat));
-    this.#emit({ type: "ready", protocolVersion: 2, providers: discovered.map(publicProvider), history });
+    this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context"], providers: discovered.map(publicProvider), history });
   }
 
   async #submit(command: Extract<BrokerCommand, { type: "submit" }>): Promise<void> {
@@ -116,8 +117,8 @@ export class QuickchatBroker {
       && provider.policy.tools === "device-approval";
     this.#emit({ type: "state", id: command.id, state: "preparing", message: `Preparing ${provider.name}…` });
     const run = runAcpQuestion(
-      provider, command.id, command.question, command.model,
-      this.#emit, 90_000, this.#images,
+      provider, command.id, promptWithDesktopContext(command.question, command.desktopContext), command.model,
+      this.#emit, 180_000, this.#images,
       (request) => this.#requestToolPermission(
         command.id, provider.id, request, dangerousAutoApprove),
       () => this.#cancelPermissions(command.id)
@@ -167,16 +168,19 @@ export class QuickchatBroker {
     provider: ProviderId,
     request: RequestPermissionRequest,
     dangerousAutoApprove: boolean
-  ): Promise<string | undefined> {
+  ): Promise<PermissionDecision> {
     const permissionId = randomUUID();
     const pending = normalizeToolPermission(requestId, permissionId, provider, request);
-    if (pending === undefined) return undefined;
-    if (dangerousAutoApprove) return pending.allowOptionId;
-    return new Promise<string | undefined>((resolvePermission) => {
+    if (pending === undefined) return { invalid: true };
+    if (dangerousAutoApprove)
+      return pending.allowOptionId === undefined
+        ? { invalid: true }
+        : { optionId: pending.allowOptionId };
+    return new Promise<PermissionDecision>((resolvePermission) => {
       const timeout = setTimeout(() => {
         this.#permissions.delete(permissionId);
         this.#emit({ type: "permission_closed", id: requestId, permissionId, reason: "expired" });
-        resolvePermission(undefined);
+        resolvePermission({});
       }, this.#permissionTimeoutMs);
       timeout.unref();
       this.#permissions.set(permissionId, { ...pending, resolve: resolvePermission, timeout });
@@ -191,7 +195,7 @@ export class QuickchatBroker {
     clearTimeout(pending.timeout);
     this.#emit({ type: "permission_closed", id: command.id, permissionId: command.permissionId, reason: "decided" });
     const optionId = command.decision === "allow_once" ? pending.allowOptionId : pending.rejectOptionId;
-    pending.resolve(optionId);
+    pending.resolve(optionId === undefined ? {} : { optionId });
   }
 
   #cancelPermissions(requestId: string): void {
@@ -200,7 +204,7 @@ export class QuickchatBroker {
       this.#permissions.delete(permissionId);
       clearTimeout(pending.timeout);
       this.#emit({ type: "permission_closed", id: requestId, permissionId, reason: "cancelled" });
-      pending.resolve(undefined);
+      pending.resolve({});
     }
   }
 
