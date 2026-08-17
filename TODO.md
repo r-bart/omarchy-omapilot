@@ -883,12 +883,14 @@ turn per provider.
   - [x] Pass the combined QML/UI contract suite (23 protocol/context, three
     permission-focus, eight presentation, and seven quick-action checks),
     deterministic bundle builds, package dry-run, and Git whitespace checks.
-  - [ ] Commit and push the combined branch, open one draft PR to `main`, then
-    close provider-only PR 3 as superseded.
+  - [x] Commit and push the combined branch at merge commit `29f124b`, open
+    draft PR 4 to `main`, then close provider-only PR 3 as superseded while
+    retaining its branch for history.
   - [ ] Owner-run installed pointer, keyboard, real-harness, permission,
     streaming, and error-detail validation remains a separate live gate.
 - Current checkpoint: both code streams are combined and all source/static
   gates are green: 136 runtime tests pass with 12 live-provider skips, the QML
   contract totals above pass, two broker builds are byte-identical, and the
-  release package dry-run succeeds. Publication and PR consolidation remain in
-  progress; no live desktop state is being changed.
+  release package dry-run succeeds. Draft PR 4 is the single open consolidated
+  review surface and provider-only PR 3 is closed as superseded. Owner-run live
+  interaction remains the next gate; no live desktop state was changed here.
