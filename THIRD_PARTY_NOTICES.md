@@ -1,6 +1,6 @@
 # Third-party notices
 
-Quickchat's source is MIT licensed. Release bundles include third-party software governed by its own license.
+OmaPilot's source is MIT licensed. Release bundles include third-party software governed by its own license.
 
 | Component | Pinned release | License | Source |
 | --- | --- | --- | --- |

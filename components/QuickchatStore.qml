@@ -23,11 +23,13 @@ Scope {
   readonly property string brokerPath: Quickshell.env("QUICKCHAT_BROKER_PATH") || bundledBrokerPath
 
   property string state: "preparing"
-  property string statusMessage: "Starting Quickchat…"
+  property string statusMessage: "Starting OmaPilot…"
   property string currentId: ""
   property string currentChatId: ""
   property string question: ""
   property string answerMarkdown: ""
+  property int activityRevision: 0
+  property var errorDetails: null
   property var images: []
   property var providers: []
   property var history: []
@@ -45,12 +47,17 @@ Scope {
   property string configuredCodexModel: ""
   property string configuredClaudeModel: ""
   property string configuredOpencodeModel: ""
+  property bool configuredDangerousAutoApprove: false
+  property bool desktopContextEnabled: true
+  property bool brokerDesktopContextSupported: false
+  property var latchedActiveWindow: null
 
   readonly property bool busy: state === "preparing" || state === "dictating" || state === "streaming" || state === "stopping"
   readonly property bool canSubmit: initialized && providers.length > 0 && !busy
   readonly property bool canRetry: !processStarted && !broker.running && state === "unavailable"
   readonly property var modelOptions: Protocol.modelOptions(providers, provider)
   readonly property var providerPolicy: Protocol.providerPolicy(providers, provider)
+  readonly property bool desktopContextActive: desktopContextEnabled && brokerDesktopContextSupported
 
   signal answerChanged()
   signal focusComposerRequested()
@@ -75,15 +82,22 @@ Scope {
     var desiredCodexModel = String(source.codexModel || "")
     var desiredClaudeModel = String(source.claudeModel || "")
     var desiredOpencodeModel = String(source.opencodeModel || "")
+    var desiredDangerousAutoApprove = source.dangerousAutoApprove === true
+    var desiredDesktopContext = String(source.desktopContext || "On") !== "Off"
     var changed = desiredProvider !== configuredProvider
       || desiredCodexModel !== configuredCodexModel
       || desiredClaudeModel !== configuredClaudeModel
       || desiredOpencodeModel !== configuredOpencodeModel
+      || desiredDangerousAutoApprove !== configuredDangerousAutoApprove
+      || desiredDesktopContext !== desktopContextEnabled
     if (!changed) return
     configuredProvider = desiredProvider
     configuredCodexModel = desiredCodexModel
     configuredClaudeModel = desiredClaudeModel
     configuredOpencodeModel = desiredOpencodeModel
+    configuredDangerousAutoApprove = desiredDangerousAutoApprove
+    desktopContextEnabled = desiredDesktopContext
+    if (!desktopContextEnabled) latchedActiveWindow = null
     if (providers.length === 0 || providerAvailable(desiredProvider)) provider = desiredProvider
     var desiredModel = desiredProvider === "claude" ? desiredClaudeModel
       : desiredProvider === "opencode" ? desiredOpencodeModel : desiredCodexModel
@@ -136,6 +150,22 @@ Scope {
     }))
   }
 
+  function latchDesktopContext() {
+    if (!desktopContextEnabled) return
+    var context = DesktopContext.snapshot()
+    latchedActiveWindow = context && context.activeWindow ? context.activeWindow : null
+  }
+
+  function clearDesktopContextLatch() {
+    latchedActiveWindow = null
+  }
+
+  function desktopContextForSubmit() {
+    if (!desktopContextActive) return null
+    var context = DesktopContext.snapshot()
+    return Protocol.desktopContextWithLatchedActive(context, latchedActiveWindow)
+  }
+
   function submit(text) {
     var prompt = String(text || "").trim()
     if (!prompt || !canSubmit) return false
@@ -143,12 +173,17 @@ Scope {
     currentChatId = ""
     question = prompt
     answerMarkdown = ""
+    activityRevision = 0
+    errorDetails = null
     images = []
     pendingPermission = null
     permissionQueue = []
     state = "preparing"
     statusMessage = "Preparing " + Protocol.providerLabel(provider) + "…"
-    sendCommand(Protocol.submitCommand(currentId, prompt, provider, model))
+    var context = desktopContextForSubmit()
+    var autoApprove = configuredDangerousAutoApprove
+    sendCommand(Protocol.submitCommand(
+      currentId, prompt, provider, model, context, autoApprove))
     answerChanged()
     return true
   }
@@ -187,12 +222,14 @@ Scope {
     currentChatId = ""
     question = ""
     answerMarkdown = ""
+    activityRevision = 0
+    errorDetails = null
     images = []
     pendingPermission = null
     permissionQueue = []
     transcript = ""
     state = initialized ? "composing" : "preparing"
-    statusMessage = initialized ? "" : "Starting Quickchat…"
+    statusMessage = initialized ? "" : "Starting OmaPilot…"
     focusComposerRequested()
     answerChanged()
   }
@@ -215,7 +252,8 @@ Scope {
   function retryBroker() {
     if (!canRetry) return
     state = "preparing"
-    statusMessage = "Restarting Quickchat…"
+    statusMessage = "Restarting OmaPilot…"
+    errorDetails = null
     stderrTail = ""
     broker.running = true
   }
@@ -249,6 +287,8 @@ Scope {
     currentId = ""
     question = String(chat.question || "")
     answerMarkdown = String(chat.answer || chat.markdown || "")
+    activityRevision = 0
+    errorDetails = null
     images = Array.isArray(chat.images) ? chat.images : []
     provider = Protocol.normalizedProvider(chat.provider) || provider
     model = String(chat.model || "")
@@ -263,6 +303,12 @@ Scope {
     if (providers.length === 0) {
       state = "unavailable"
       statusMessage = "Sign in to Codex, Claude, or OpenCode to begin."
+      errorDetails = Protocol.normalizedError({
+        unavailable: true,
+        code: "provider_unavailable",
+        message: statusMessage,
+        retryable: false
+      })
       return
     }
     if (!providerAvailable(provider)) provider = providers[0].value
@@ -285,15 +331,23 @@ Scope {
       if (!Protocol.isCompatibleEvent(event)) {
         initialized = false
         state = "unavailable"
-        statusMessage = "Quickchat protocol mismatch. Update the plugin and try again."
+        statusMessage = "OmaPilot protocol mismatch. Update the plugin and try again."
+        errorDetails = Protocol.normalizedError({
+          unavailable: true,
+          code: "protocol_mismatch",
+          message: statusMessage,
+          retryable: false
+        })
         return
       }
       initialized = true
+      brokerDesktopContextSupported = Protocol.hasFeature(event.features, "desktop-context")
       applyProviders(event.providers || [])
       history = Protocol.normalizedHistory(event.history || [])
       if (providers.length > 0 && (state === "preparing" || state === "unavailable")) {
         state = "composing"
         statusMessage = ""
+        errorDetails = null
       }
       return
     }
@@ -310,11 +364,19 @@ Scope {
       }
       state = String(event.state || "") === "stopping" ? "stopping" : Protocol.normalizedState(event.state, state)
       statusMessage = String(event.message || "")
+      if (state === "error" || state === "unavailable") errorDetails = Protocol.normalizedError({
+        unavailable: state === "unavailable",
+        code: String(event.code || "state_" + state),
+        message: statusMessage,
+        retryable: event.retryable === true
+      })
       return
     }
     if (type === "content") {
       if (event.id && currentId && String(event.id) !== currentId) return
       answerMarkdown += String(event.delta || event.text || "")
+      activityRevision++
+      errorDetails = null
       state = "streaming"
       statusMessage = ""
       answerChanged()
@@ -361,6 +423,7 @@ Scope {
       } else if (event.chatId) currentChatId = String(event.chatId)
       if (event.history) history = Protocol.normalizedHistory(event.history)
       state = "complete"
+      errorDetails = null
       pendingPermission = null
       permissionQueue = []
       statusMessage = ""
@@ -378,13 +441,15 @@ Scope {
         pendingPermission = null
         permissionQueue = []
         statusMessage = String(event.message || "Stopped")
+        errorDetails = null
         answerChanged()
         return
       }
       state = event.unavailable === true ? "unavailable" : "error"
       pendingPermission = null
       permissionQueue = []
-      statusMessage = String(event.message || "Quickchat could not complete that request.")
+      statusMessage = String(event.message || "OmaPilot could not complete that request.")
+      errorDetails = Protocol.normalizedError(event, statusMessage)
       return
     }
     if (type === "dictation") {
@@ -406,6 +471,12 @@ Scope {
         dictationPhase = ""
         state = "error"
         statusMessage = String(event.message || "Dictation is unavailable.")
+        errorDetails = Protocol.normalizedError({
+          code: "dictation_" + dictationState,
+          message: statusMessage,
+          retryable: dictationState === "unavailable",
+          unavailable: dictationState === "unavailable"
+        })
       }
       return
     }
@@ -418,6 +489,11 @@ Scope {
       if (!outcome) { console.warn("quickchat: unknown Herdr state " + String(event.state || "")); return }
       state = outcome.state
       statusMessage = outcome.message
+      if (outcome.state === "error") errorDetails = Protocol.normalizedError({
+        code: String(event.errorCode || "herdr_" + String(event.state || "failed")),
+        message: statusMessage,
+        retryable: true
+      })
       if (outcome.toast) toastRequested(statusMessage)
       if (String(event.state || "") === "continued") herdrContinued()
       return
@@ -463,7 +539,13 @@ Scope {
       root.pendingPermission = null
       root.permissionQueue = []
       if (root.state !== "canceled") root.state = "unavailable"
-      root.statusMessage = root.stderrTail || "Quickchat broker is unavailable."
+      root.statusMessage = root.stderrTail || "OmaPilot is unavailable."
+      root.errorDetails = Protocol.normalizedError({
+        unavailable: true,
+        code: "broker_unavailable",
+        message: root.statusMessage,
+        retryable: true
+      })
     }
 
     stdout: SplitParser {

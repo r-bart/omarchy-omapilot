@@ -36,6 +36,7 @@ const server = acp.agent({ name: "quickchat-fake" })
   })
   .onRequest(acp.methods.agent.session.prompt, async ({ params, client }) => {
     if (process.env.FAKE_ACP_PROMPT_AUDIT) await appendFile(process.env.FAKE_ACP_PROMPT_AUDIT, "prompt\n");
+    if (process.env.FAKE_ACP_PROMPT_CAPTURE) await appendFile(process.env.FAKE_ACP_PROMPT_CAPTURE, `${JSON.stringify(params.prompt)}\n`);
     if (process.env.FAKE_ACP_FAIL_SECRET === "1") {
       process.stderr.write("provider failed for person@example.com token=top-secret sk-secret-value\n");
       throw new Error("provider failed for person@example.com token=top-secret sk-secret-value");
@@ -43,13 +44,23 @@ const server = acp.agent({ name: "quickchat-fake" })
     const controller = new AbortController();
     pending = controller;
     if (process.env.FAKE_ACP_PERMISSION_ATTEMPT === "1") {
+      const permissionKind = process.env.FAKE_ACP_PERMISSION_KIND || "execute";
+      const permissionOptions = process.env.FAKE_ACP_PERMISSION_NO_ALLOW === "1"
+        ? [{ optionId: "deny", name: "Deny", kind: "reject_once" }]
+        : [
+            { optionId: "allow", name: "Allow once", kind: "allow_once" },
+            { optionId: "deny", name: "Deny", kind: "reject_once" }
+          ];
       const decision = await client.request(acp.methods.client.session.requestPermission, {
         sessionId: params.sessionId,
-        toolCall: { toolCallId: "permission-test", title: "Run a read-only command", kind: "execute", rawInput: { command: "uname -s" } },
-        options: [
-          { optionId: "allow", name: "Allow once", kind: "allow_once" },
-          { optionId: "deny", name: "Deny", kind: "reject_once" }
-        ]
+        toolCall: {
+          toolCallId: "permission-test",
+          title: "Run a read-only command",
+          kind: permissionKind,
+          rawInput: process.env.FAKE_ACP_PERMISSION_UNREVIEWABLE === "1"
+            ? { opaque: "hidden" } : { command: "uname -s" }
+        },
+        options: permissionOptions
       });
       const allowed = decision.outcome.outcome === "selected" && decision.outcome.optionId === "allow";
       if ((process.env.FAKE_ACP_EXPECT_ALLOW === "1") !== allowed) throw new Error("permission decision did not match the fixture");

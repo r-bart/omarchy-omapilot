@@ -19,6 +19,11 @@ Item {
   signal clearRequested()
   signal closeRequested()
 
+  function forceInitialFocus() {
+    if (list.visible && list.count > 0) list.forceActiveFocus()
+    else closeHistory.forceActiveFocus()
+  }
+
   ColumnLayout {
     anchors.fill: parent
     spacing: Style.spacing.lg
@@ -51,8 +56,9 @@ Item {
       }
 
       PanelActionButton {
-        iconText: "󰅙"
-        tooltipText: "Close history"
+        id: closeHistory
+        iconText: "󰁍"
+        tooltipText: "Back to conversation"
         foreground: root.foreground
         focusable: true
         Accessible.name: tooltipText
@@ -167,4 +173,3 @@ Item {
     }
   }
 }
-

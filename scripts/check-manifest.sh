@@ -15,20 +15,34 @@ jq -e . "$manifest" >/dev/null || fail "manifest.json is not valid JSON"
 jq -e '
   .schemaVersion == 1
   and .id == "io.github.spencerbull.quickchat"
+  and .name == "OmaPilot"
   and (.version | type == "string" and test("^[0-9]+\\.[0-9]+\\.[0-9]+([.-][A-Za-z0-9.-]+)?$"))
   and .license == "MIT"
   and .kinds == ["bar-widget"]
   and .entryPoints == {"barWidget":"BarWidget.qml"}
   and .barWidget.category == "AI"
+  and .barWidget.displayName == "OmaPilot"
+  and (.barWidget.aliases | index("omapilot") != null)
+  and (.barWidget.aliases | index("quickchat") != null)
   and .barWidget.allowMultiple == false
   and .barWidget.defaultSection == "right"
   and .barWidget.defaults == {
     "provider":"codex",
     "codexModel":"",
     "claudeModel":"",
-    "opencodeModel":""
+    "opencodeModel":"",
+    "quickActionsJson":"",
+    "desktopContext":"On",
+    "dangerousAutoApprove":false
   }
-  and ([.barWidget.schema[].key] | sort) == (["claudeModel", "codexModel", "opencodeModel", "provider"] | sort)
+  and ([.barWidget.schema[].key] | sort) == (["claudeModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "provider"] | sort)
+  and (.barWidget.schema[] | select(.key == "dangerousAutoApprove")) == {
+    "key":"dangerousAutoApprove",
+    "type":"boolean",
+    "label":"Dangerous auto-approve",
+    "defaultValue":false,
+    "description":"Automatically select each exact ACP request\u0027s Allow once option instead of prompting."
+  }
 ' "$manifest" >/dev/null || fail "manifest contract drifted from the Quickchat v0.1 schema"
 
 [[ -f "$repo_root/BarWidget.qml" ]] || fail "manifest entry point is missing: BarWidget.qml"

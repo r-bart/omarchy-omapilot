@@ -91,6 +91,7 @@ BarWidget {
       root.close()
       return
     }
+    Quickchat.QuickchatStore.latchDesktopContext()
     if (root.canInline) {
       root.inlineExpanded = true
       Qt.callLater(function() { inlineComposer.forceInputFocus() })
@@ -137,9 +138,18 @@ BarWidget {
     anchors.fill: parent
     visible: !root.inlineActive
     bar: root.bar
-    text: "󰭹"
+    text: ""
+    iconComponent: Component {
+      Quickchat.OmaPilotMark {
+        anchors.fill: parent
+        size: Math.min(width, height)
+        accent: button.active && button.useActiveColor
+          ? button.activeColor : button.foreground
+        active: Quickchat.QuickchatStore.busy
+      }
+    }
     active: root.opened || Quickchat.QuickchatStore.busy
-    tooltipText: Quickchat.QuickchatStore.busy ? "Quickchat is answering" : "Quickchat"
+    tooltipText: Quickchat.QuickchatStore.busy ? "OmaPilot is working" : "OmaPilot"
     Accessible.name: tooltipText
 
     onPressed: function(b) {
@@ -169,6 +179,7 @@ BarWidget {
     }
     onEscapeRequested: {
       root.inlineExpanded = false
+      Quickchat.QuickchatStore.clearDesktopContextLatch()
       button.forceActiveFocus()
     }
   }

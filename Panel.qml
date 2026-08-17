@@ -7,6 +7,9 @@ import qs.Commons
 import qs.Ui
 import "components" as Quickchat
 import "components/internal" as QuickchatInternal
+import "components/Presentation.js" as Presentation
+import "components/Protocol.js" as Protocol
+import "components/QuickActions.js" as ActionCatalog
 
 Panel {
   id: root
@@ -21,11 +24,36 @@ Panel {
   property string viewMode: "chat"
   property string previewSource: ""
   property string previewAlt: ""
+  // Quattro and Qt 6.11 currently expose no system reduced-motion preference.
+  // Keep motion injectable and limit every local transition to a finite reveal.
+  property bool motionEnabled: true
 
   readonly property color foreground: bar ? bar.foreground : Color.popups.text
   readonly property color surface: Color.popups.background
   readonly property color accent: Color.accent
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
+  readonly property bool dangerousAutoApprove: settings
+    && settings.dangerousAutoApprove === true
+  readonly property string quickActionsJson: settings
+    && typeof settings.quickActionsJson === "string" ? settings.quickActionsJson : ""
+  readonly property var quickActionItems: ActionCatalog.actionsFromSettings(
+    quickActionsJson,
+    !settings || settings.showSummarizeAction !== false,
+    !settings || settings.showWorkInAppAction !== false)
+  readonly property real minimumContentHeight: Style.space(280)
+  readonly property real comfortableCardHeight: popup.availableCardHeight > 0
+    ? Math.min(Style.space(720), Math.max(Style.space(320), popup.availableCardHeight * 0.82))
+    : Style.space(720)
+  readonly property real activeNaturalHeight: viewMode === "settings" ? settingsView.implicitHeight
+    : (viewMode === "history"
+      ? Math.max(minimumContentHeight, comfortableCardHeight - popup.verticalContentInset)
+      : (viewMode === "error" ? errorView.implicitHeight : chatView.implicitHeight))
+  readonly property var responsePhase: Presentation.responsePhase(
+    Quickchat.QuickchatStore.state,
+    Quickchat.QuickchatStore.answerMarkdown !== "" || Quickchat.QuickchatStore.images.length > 0)
+  readonly property bool responseActivityActive:
+    Quickchat.QuickchatStore.state === "preparing"
+    || Quickchat.QuickchatStore.state === "streaming"
 
   function persistSettings(values) {
     var entry = { id: root.moduleName }
@@ -42,17 +70,30 @@ Panel {
       root.bar.centerHoverRevealSuppressed = value
   }
 
+  function selectProvider(provider) {
+    var selected = String(provider || "")
+    if (selected === "") return
+    Quickchat.QuickchatStore.selectProvider(selected)
+    persistSettings({ provider: selected })
+  }
+
+  function setQuickActions(actions) {
+    persistSettings({ quickActionsJson: ActionCatalog.serializedActions(actions) })
+  }
+
   function open() {
     openedFromHotkey = false
-    viewMode = "chat"
+    showChat(false)
     setCenterHoverRevealSuppressed(false)
+    Quickchat.QuickchatStore.latchDesktopContext()
     root.controller.show()
     Qt.callLater(function() { composer.forceInputFocus() })
   }
 
   function openFromHotkey() {
     openedFromHotkey = true
-    viewMode = "chat"
+    showChat(false)
+    Quickchat.QuickchatStore.latchDesktopContext()
     root.controller.show()
     Qt.callLater(function() {
       if (root.opened) root.setCenterHoverRevealSuppressed(true)
@@ -61,14 +102,34 @@ Panel {
   }
 
   function openHistory() {
+    settingsView.closePopups(false)
     viewMode = "history"
+    Quickchat.QuickchatStore.latchDesktopContext()
     root.controller.show()
     Quickchat.QuickchatStore.requestHistory()
+    Qt.callLater(function() { historyView.forceInitialFocus() })
+  }
+
+  function openSettings() {
+    viewMode = "settings"
+    Qt.callLater(function() { settingsView.forceInitialFocus() })
+  }
+
+  function openErrorDetails() {
+    viewMode = "error"
+    Qt.callLater(function() { errorView.forceInitialFocus() })
+  }
+
+  function showChat(restoreFocus) {
+    settingsView.closePopups(false)
+    viewMode = "chat"
+    if (restoreFocus !== false) Qt.callLater(function() { composer.forceInputFocus() })
   }
 
   function close() {
     setCenterHoverRevealSuppressed(false)
     previewSource = ""
+    Quickchat.QuickchatStore.clearDesktopContextLatch()
     root.controller.hide()
     if (hostWidget) Qt.callLater(function() {
       if (typeof hostWidget.restoreFocus === "function") hostWidget.restoreFocus()
@@ -79,6 +140,7 @@ Panel {
   function closeForExternalHandoff() {
     setCenterHoverRevealSuppressed(false)
     previewSource = ""
+    Quickchat.QuickchatStore.clearDesktopContextLatch()
     root.controller.hide()
   }
 
@@ -97,10 +159,20 @@ Panel {
 
   onSettingsChanged: Quickchat.QuickchatStore.configure(settings)
   Component.onCompleted: Quickchat.QuickchatStore.configure(settings)
-  onOpenedChanged: if (opened) {
-    Quickchat.QuickchatStore.configure(settings)
-    if (viewMode === "history") Quickchat.QuickchatStore.requestHistory()
-    else Qt.callLater(function() { composer.forceInputFocus() })
+  onOpenedChanged: {
+    if (opened) {
+      Quickchat.QuickchatStore.configure(settings)
+      if (viewMode === "history") {
+        Quickchat.QuickchatStore.requestHistory()
+        Qt.callLater(function() { historyView.forceInitialFocus() })
+      } else if (viewMode === "settings") {
+        Qt.callLater(function() { settingsView.forceInitialFocus() })
+      } else if (viewMode === "error") {
+        Qt.callLater(function() { errorView.forceInitialFocus() })
+      } else Qt.callLater(function() { composer.forceInputFocus() })
+    } else {
+      Quickchat.QuickchatStore.clearDesktopContextLatch()
+    }
   }
 
   Connections {
@@ -112,9 +184,13 @@ Panel {
     enabled: root.opened
     sequence: "Escape"
     onActivated: {
-      if (composer.popupOpen) composer.closePopups()
-      else if (root.previewSource !== "") root.previewSource = ""
-      else if (Quickchat.QuickchatStore.busy) Quickchat.QuickchatStore.cancel()
+      var action = Presentation.escapeAction(root.viewMode, composer.popupOpen,
+        settingsView.popupOpen, root.previewSource !== "", Quickchat.QuickchatStore.busy)
+      if (action === "close-composer-popup") composer.closePopups()
+      else if (action === "close-settings-popup") settingsView.closePopups()
+      else if (action === "close-preview") root.previewSource = ""
+      else if (action === "show-chat") root.showChat()
+      else if (action === "cancel") Quickchat.QuickchatStore.cancel()
       else root.close()
     }
   }
@@ -126,11 +202,15 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: panelFocus
-    contentWidth: popup.fittedContentWidth(Style.space(560))
-    // Keep the popout compact enough to feel like a quick answer surface, not
-    // a second chat application. Long answers and history already scroll
-    // inside their own views.
-    contentHeight: popup.fittedContentHeight(Style.space(420))
+    contentWidth: popup.fittedContentWidth(Style.space(640))
+    contentHeight: Presentation.boundedPanelHeight(root.activeNaturalHeight,
+      root.minimumContentHeight, root.comfortableCardHeight,
+      popup.availableCardHeight, popup.verticalContentInset)
+
+    Behavior on contentHeight {
+      enabled: root.motionEnabled
+      NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    }
 
     Item {
       id: panelFocus
@@ -141,72 +221,29 @@ Panel {
         id: chatView
         anchors.fill: parent
         visible: root.viewMode === "chat"
-        spacing: Style.spacing.xxl
+        spacing: Style.spacing.lg
 
-        RowLayout {
-          Layout.fillWidth: true
-          spacing: Style.spacing.md
-
-          ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 0
-
-            Text {
-              text: "Quickchat"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.heading
-              font.bold: true
-            }
-
-            Text {
-              text: Quickchat.QuickchatStore.state === "streaming" ? "Answering with " + Quickchat.QuickchatStore.provider
-                : "One question, right when you need it"
-              color: Qt.darker(root.foreground, 1.45)
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-          }
-
-          PanelActionButton {
-            iconText: "󰋚"
-            tooltipText: "Recent chats"
-            foreground: root.foreground
-            focusable: true
-            Accessible.name: tooltipText
-            onClicked: root.openHistory()
-          }
-
-          PanelActionButton {
-            iconText: "󰅙"
-            tooltipText: "Close Quickchat"
-            foreground: root.foreground
-            focusable: true
-            Accessible.name: tooltipText
-            onClicked: root.close()
-          }
-        }
-
-        Quickchat.Composer {
-          id: composer
+        Quickchat.OmaPilotHeader {
+          id: chatHeader
           Layout.fillWidth: true
           backend: Quickchat.QuickchatStore
+          dangerousAutoApprove: root.dangerousAutoApprove
+          motionEnabled: root.motionEnabled
           foreground: root.foreground
           background: root.surface
           accent: root.accent
           fontFamily: root.fontFamily
-          onProviderChanged: function(provider) { root.persistSettings({ provider: provider }) }
-          onModelChanged: function(provider, model) {
-            var values = {}; values[root.providerModelKey(provider)] = model; root.persistSettings(values)
-          }
-          onSubmitted: answerScroll.contentY = 0
-          onEscapeRequested: root.close()
+          onSettingsRequested: root.openSettings()
         }
 
         BorderSurface {
           id: answerCard
           Layout.fillWidth: true
           Layout.fillHeight: true
+          Layout.minimumHeight: visible ? Style.space(120) : 0
+          Layout.preferredHeight: implicitHeight
+          implicitHeight: answerLayout.implicitHeight + contentTopInset + contentBottomInset
+            + Style.spacing.xl + Style.spacing.lg
           color: Style.normalFillFor(root.foreground, root.accent)
           borderSpec: Border.controlSpec("normal", root.foreground, root.accent)
           radius: Style.cornerRadius
@@ -216,6 +253,7 @@ Panel {
             || Quickchat.QuickchatStore.state === "unavailable"
 
           ColumnLayout {
+            id: answerLayout
             anchors.fill: parent
             anchors.leftMargin: parent.contentLeftInset + Style.spacing.xxl
             anchors.rightMargin: parent.contentRightInset + Style.spacing.xxl
@@ -225,7 +263,7 @@ Panel {
 
             RowLayout {
               Layout.fillWidth: true
-              visible: Quickchat.QuickchatStore.question !== ""
+              visible: Quickchat.QuickchatStore.question !== "" || root.responsePhase.label !== ""
 
               Text {
                 Layout.fillWidth: true
@@ -234,186 +272,324 @@ Panel {
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall
                 elide: Text.ElideRight
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
               }
 
-              Text {
-                text: Quickchat.QuickchatStore.state === "streaming" ? "STREAMING"
-                  : Quickchat.QuickchatStore.state === "canceled" ? "CANCELED"
-                  : Quickchat.QuickchatStore.state === "complete" ? "ANSWER" : ""
-                color: Quickchat.QuickchatStore.state === "canceled" ? Color.urgent : root.accent
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                font.letterSpacing: 1
-              }
-            }
+              Item {
+                id: responseStatusSlot
+                Layout.alignment: Qt.AlignVCenter
+                Layout.minimumWidth: Style.space(140)
+                Layout.preferredWidth: Math.min(Style.space(220),
+                  Math.max(Layout.minimumWidth, answerLayout.width * 0.38))
+                Layout.maximumWidth: Style.space(220)
+                Layout.preferredHeight: Math.max(activityIndicator.implicitHeight,
+                  responseState.implicitHeight)
 
-            Flickable {
-              id: answerScroll
-              Layout.fillWidth: true
-              Layout.fillHeight: true
-              contentWidth: width
-              contentHeight: answerContent.implicitHeight
-              clip: true
-              boundsBehavior: Flickable.StopAtBounds
-              interactive: contentHeight > height
-
-              Column {
-                id: answerContent
-                width: answerScroll.width
-                spacing: Style.spacing.xl
-
-                BorderSurface {
-                  id: permissionCard
-                  width: parent.width
-                  height: permissionContent.implicitHeight + contentTopInset + contentBottomInset + Style.spacing.xl * 2
-                  visible: Quickchat.QuickchatStore.pendingPermission !== null
-                  color: Style.normalFillFor(root.foreground, root.accent)
-                  borderSpec: Border.controlSpec("focus", root.foreground, root.accent)
-                  radius: Style.cornerRadius
-
-                  QuickchatInternal.PermissionFocusGuard {
-                    permissionId: Quickchat.QuickchatStore.pendingPermission
-                      ? String(Quickchat.QuickchatStore.pendingPermission.id || "") : ""
-                    defaultTarget: denyPermission
-                  }
-
-                  ColumnLayout {
-                    id: permissionContent
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.margins: Style.spacing.xl
-                    spacing: Style.spacing.md
-
-                    Text {
-                      Layout.fillWidth: true
-                      text: Quickchat.QuickchatStore.pendingPermission
-                        ? (Quickchat.QuickchatStore.pendingPermission.allowOnce ? "Allow once: " : "Blocked: ")
-                          + Quickchat.QuickchatStore.pendingPermission.title : ""
-                      color: root.foreground
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.body
-                      font.bold: true
-                      wrapMode: Text.Wrap
-                    }
-
-                    Text {
-                      Layout.fillWidth: true
-                      text: Quickchat.QuickchatStore.pendingPermission
-                        && Quickchat.QuickchatStore.pendingPermission.authority === "sandboxed"
-                          ? "This approval applies only to this call; sandbox limits stay active."
-                          : "Review the command and working directory. Allow once may read or change device data and access the network."
-                      color: Qt.darker(root.foreground, 1.45)
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
-                      wrapMode: Text.Wrap
-                    }
-
-                    Flickable {
-                      Layout.fillWidth: true
-                      Layout.preferredHeight: Math.min(permissionDetail.implicitHeight, Style.space(140))
-                      contentWidth: width
-                      contentHeight: permissionDetail.implicitHeight
-                      clip: true
-                      boundsBehavior: Flickable.StopAtBounds
-                      interactive: contentHeight > height
-
-                      TextEdit {
-                        id: permissionDetail
-                        width: parent.width
-                        text: Quickchat.QuickchatStore.pendingPermission
-                          ? Quickchat.QuickchatStore.pendingPermission.detail : ""
-                        color: Qt.darker(root.foreground, 1.25)
-                        font.family: root.fontFamily
-                        font.pixelSize: Style.font.bodySmall
-                        wrapMode: Text.WrapAnywhere
-                        textFormat: Text.PlainText
-                        readOnly: true
-                        selectByMouse: true
-                      }
-                    }
-
-                    RowLayout {
-                      Layout.fillWidth: true
-                      spacing: Style.spacing.md
-
-                      Item { Layout.fillWidth: true }
-
-                      Button {
-                        id: denyPermission
-                        text: "Deny"
-                        foreground: root.foreground
-                        background: root.surface
-                        bordered: true
-                        focusable: true
-                        onClicked: Quickchat.QuickchatStore.respondPermission("reject_once")
-                      }
-
-                      Button {
-                        text: "Allow once"
-                        foreground: root.foreground
-                        background: root.surface
-                        accent: root.accent
-                        active: true
-                        bordered: true
-                        focusable: true
-                        enabled: Quickchat.QuickchatStore.pendingPermission
-                          && Quickchat.QuickchatStore.pendingPermission.allowOnce
-                        onClicked: Quickchat.QuickchatStore.respondPermission("allow_once")
-                      }
-                    }
-
-                  }
+                // Keep one screen-aware status slot for every response phase.
+                // Status copy and phase changes can no longer resize the
+                // question column while a response is arriving.
+                Quickchat.WaitingIndicator {
+                  id: activityIndicator
+                  anchors.fill: parent
+                  active: root.responseActivityActive
+                  streaming: Quickchat.QuickchatStore.state === "streaming"
+                  activityRevision: Quickchat.QuickchatStore.activityRevision
+                  motionEnabled: root.motionEnabled
+                  message: Quickchat.QuickchatStore.statusMessage !== ""
+                    ? Quickchat.QuickchatStore.statusMessage
+                    : (streaming ? "Receiving response…"
+                      : "Waiting for " + Protocol.providerLabel(Quickchat.QuickchatStore.provider) + "…")
+                  foreground: root.foreground
+                  accent: root.accent
+                  fontFamily: root.fontFamily
                 }
 
                 Text {
-                  visible: Quickchat.QuickchatStore.answerMarkdown === ""
-                    && Quickchat.QuickchatStore.statusMessage !== ""
-                  width: parent.width
-                  text: Quickchat.QuickchatStore.statusMessage
-                  color: Quickchat.QuickchatStore.state === "error" || Quickchat.QuickchatStore.state === "unavailable"
-                    ? Color.urgent : Qt.darker(root.foreground, 1.35)
+                  id: responseState
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: root.responsePhase.label
+                  visible: text !== "" && !root.responseActivityActive
+                  color: root.responsePhase.tone === "urgent" ? Color.urgent
+                    : (root.responsePhase.tone === "muted" ? Color.muted : root.accent)
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
-                  wrapMode: Text.Wrap
+                  font.pixelSize: Style.font.caption
+                  font.bold: true
+                  font.letterSpacing: 1
                   Accessible.role: Accessible.StaticText
                   Accessible.name: text
+
+                  onTextChanged: {
+                    responseStateReveal.stop()
+                    opacity = root.motionEnabled ? 0.45 : 1
+                    if (root.motionEnabled) responseStateReveal.restart()
+                  }
+
+                  NumberAnimation {
+                    id: responseStateReveal
+                    target: responseState
+                    property: "opacity"
+                    to: 1
+                    duration: 150
+                    easing.type: Easing.OutCubic
+                  }
+                }
+              }
+            }
+
+            BorderSurface {
+              id: permissionCard
+              Layout.fillWidth: true
+              implicitHeight: permissionContent.implicitHeight + contentTopInset + contentBottomInset + Style.spacing.xl * 2
+              visible: Quickchat.QuickchatStore.pendingPermission !== null
+              color: Style.normalFillFor(root.foreground, root.accent)
+              borderSpec: Border.controlSpec("focus", root.foreground, root.accent)
+              radius: Style.cornerRadius
+
+              QuickchatInternal.PermissionFocusGuard {
+                permissionId: Quickchat.QuickchatStore.pendingPermission
+                  ? String(Quickchat.QuickchatStore.pendingPermission.id || "") : ""
+                defaultTarget: denyPermission
+              }
+
+              ColumnLayout {
+                id: permissionContent
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Style.spacing.xl
+                spacing: Style.spacing.md
+
+                Text {
+                  Layout.fillWidth: true
+                  text: Quickchat.QuickchatStore.pendingPermission
+                    ? (Quickchat.QuickchatStore.pendingPermission.allowOnce ? "Allow once: " : "Blocked: ")
+                      + Quickchat.QuickchatStore.pendingPermission.title : ""
+                  color: root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+                  font.bold: true
+                  wrapMode: Text.Wrap
                 }
 
-                Quickchat.MarkdownView {
-                  width: parent.width
-                  visible: Quickchat.QuickchatStore.answerMarkdown !== "" || Quickchat.QuickchatStore.images.length > 0
-                  markdown: Quickchat.QuickchatStore.answerMarkdown
-                  images: Quickchat.QuickchatStore.images
-                  foreground: root.foreground
-                  background: root.surface
-                  accent: root.accent
-                  fontFamily: root.fontFamily
-                  onLinkActivated: function(url) { Quickchat.QuickchatStore.activateLink(url) }
-                  onImageLoadRequested: function(image) { Quickchat.QuickchatStore.requestImage(image) }
-                  onImagePreviewRequested: function(source, alt) {
-                    root.previewSource = source
-                    root.previewAlt = alt
-                  }
-                  onCopyRequested: function(text) { Quickchat.QuickchatStore.copyText(text) }
+                Text {
+                  Layout.fillWidth: true
+                  text: "Review the command and working directory. Allow once may read or change device data and access the network."
+                  color: Qt.darker(root.foreground, 1.45)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  wrapMode: Text.Wrap
                 }
+
+                Flickable {
+                  Layout.fillWidth: true
+                  Layout.preferredHeight: Math.min(permissionDetail.implicitHeight, Style.space(140))
+                  contentWidth: width
+                  contentHeight: permissionDetail.implicitHeight
+                  clip: true
+                  boundsBehavior: Flickable.StopAtBounds
+                  interactive: contentHeight > height
+
+                  TextEdit {
+                    id: permissionDetail
+                    width: parent.width
+                    text: Quickchat.QuickchatStore.pendingPermission
+                      ? Quickchat.QuickchatStore.pendingPermission.detail : ""
+                    color: Qt.darker(root.foreground, 1.25)
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    wrapMode: Text.WrapAnywhere
+                    textFormat: Text.PlainText
+                    readOnly: true
+                    selectByMouse: true
+                  }
+                }
+
+                RowLayout {
+                  Layout.fillWidth: true
+                  spacing: Style.spacing.md
+
+                  Item { Layout.fillWidth: true }
+
+                  Button {
+                    id: denyPermission
+                    text: "Deny"
+                    foreground: root.foreground
+                    background: root.surface
+                    bordered: true
+                    focusable: true
+                    onClicked: Quickchat.QuickchatStore.respondPermission("reject_once")
+                  }
+
+                  Button {
+                    text: "Allow once"
+                    foreground: root.foreground
+                    background: root.surface
+                    accent: root.accent
+                    active: true
+                    bordered: true
+                    focusable: true
+                    enabled: Quickchat.QuickchatStore.pendingPermission
+                      && Quickchat.QuickchatStore.pendingPermission.allowOnce
+                    onClicked: Quickchat.QuickchatStore.respondPermission("allow_once")
+                  }
+                }
+              }
+            }
+
+            Item {
+              id: responseViewport
+              Layout.fillWidth: true
+              Layout.fillHeight: true
+              Layout.minimumHeight: Style.space(88)
+              Layout.preferredHeight: Presentation.responseViewportHeight(
+                answerContent.implicitHeight, Style.space(88), Style.space(420))
+
+              Flickable {
+                id: answerScroll
+                anchors.fill: parent
+                contentWidth: width
+                contentHeight: answerContent.implicitHeight
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                interactive: contentHeight > height
+                property bool followLatest: true
+                readonly property real bottomThreshold: Style.space(56)
+                readonly property bool latestAvailable: contentHeight > height && !followLatest
+
+                function maximumContentY() {
+                  return Math.max(0, contentHeight - height)
+                }
+
+                function scrollToLatest() {
+                  followLatest = true
+                  contentY = maximumContentY()
+                }
+
+                function resetForNewTurn() {
+                  followLatest = true
+                  contentY = 0
+                }
+
+                function showFromStart() {
+                  followLatest = false
+                  contentY = 0
+                }
+
+                function followContentIfNeeded() {
+                  if (!followLatest) return
+                  Qt.callLater(function() {
+                    if (answerScroll.followLatest) answerScroll.contentY = answerScroll.maximumContentY()
+                  })
+                }
+
+                onContentHeightChanged: followContentIfNeeded()
+                onHeightChanged: followContentIfNeeded()
+                onContentYChanged: if (moving)
+                  followLatest = Presentation.isNearBottom(contentY, contentHeight, height, bottomThreshold)
+                onMovementEnded: followLatest = Presentation.isNearBottom(
+                  contentY, contentHeight, height, bottomThreshold)
+
+                Column {
+                  id: answerContent
+                  width: answerScroll.width
+                  spacing: Style.spacing.xl
+
+                  Quickchat.ErrorNotice {
+                    width: parent.width
+                    visible: Quickchat.QuickchatStore.state === "error"
+                      || Quickchat.QuickchatStore.state === "unavailable"
+                    message: Quickchat.QuickchatStore.statusMessage
+                    foreground: root.foreground
+                    background: root.surface
+                    accent: root.accent
+                    fontFamily: root.fontFamily
+                    onDetailsRequested: root.openErrorDetails()
+                  }
+
+                  Text {
+                    visible: Quickchat.QuickchatStore.statusMessage !== ""
+                      && !root.responseActivityActive
+                      && Quickchat.QuickchatStore.state !== "error"
+                      && Quickchat.QuickchatStore.state !== "unavailable"
+                    width: parent.width
+                    text: Quickchat.QuickchatStore.statusMessage
+                    color: root.responsePhase.tone === "urgent"
+                      ? Color.urgent : Qt.darker(root.foreground, 1.35)
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    wrapMode: Text.Wrap
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: text
+                  }
+
+                  Quickchat.MarkdownView {
+                    id: markdownAnswer
+                    width: parent.width
+                    visible: Quickchat.QuickchatStore.answerMarkdown !== "" || Quickchat.QuickchatStore.images.length > 0
+                    markdown: Quickchat.QuickchatStore.answerMarkdown
+                    images: Quickchat.QuickchatStore.images
+                    foreground: root.foreground
+                    background: root.surface
+                    accent: root.accent
+                    fontFamily: root.fontFamily
+                    onVisibleChanged: {
+                      firstTokenReveal.stop()
+                      opacity = visible && root.motionEnabled ? 0 : 1
+                      if (visible && root.motionEnabled) firstTokenReveal.restart()
+                    }
+                    onLinkActivated: function(url) { Quickchat.QuickchatStore.activateLink(url) }
+                    onImageLoadRequested: function(image) { Quickchat.QuickchatStore.requestImage(image) }
+                    onImagePreviewRequested: function(source, alt) {
+                      root.previewSource = source
+                      root.previewAlt = alt
+                    }
+                    onCopyRequested: function(text) { Quickchat.QuickchatStore.copyText(text) }
+
+                    NumberAnimation {
+                      id: firstTokenReveal
+                      target: markdownAnswer
+                      property: "opacity"
+                      to: 1
+                      duration: 180
+                      easing.type: Easing.OutCubic
+                    }
+                  }
+                }
+              }
+
+              Button {
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: Style.spacing.sm
+                visible: answerScroll.latestAvailable
+                text: "Latest"
+                tooltipText: "Jump to the newest response"
+                foreground: root.foreground
+                background: root.surface
+                accent: root.accent
+                active: true
+                bordered: true
+                focusable: true
+                Accessible.name: tooltipText
+                onClicked: answerScroll.scrollToLatest()
               }
             }
 
             RowLayout {
               Layout.fillWidth: true
               visible: Quickchat.QuickchatStore.answerMarkdown !== ""
+                || Quickchat.QuickchatStore.currentChatId !== ""
               spacing: Style.spacing.md
 
-              Button {
+              PanelActionButton {
                 iconText: "󰆏"
-                text: "Copy"
                 tooltipText: "Copy answer"
                 foreground: root.foreground
-                background: root.surface
-                bordered: true
                 focusable: true
+                enabled: Quickchat.QuickchatStore.answerMarkdown !== ""
+                Accessible.name: tooltipText
                 onClicked: Quickchat.QuickchatStore.copyText(Quickchat.QuickchatStore.answerMarkdown)
               }
 
@@ -445,13 +621,72 @@ Panel {
           }
         }
 
-        Item {
-          Layout.fillHeight: true
-          visible: !answerCard.visible
+        Quickchat.Composer {
+          id: composer
+          Layout.fillWidth: true
+          backend: Quickchat.QuickchatStore
+          foreground: root.foreground
+          background: root.surface
+          accent: root.accent
+          fontFamily: root.fontFamily
+          onSubmitted: answerScroll.resetForNewTurn()
+          onEscapeRequested: root.close()
+        }
+
+        Quickchat.QuickActions {
+          id: quickActions
+          Layout.fillWidth: true
+          visible: Quickchat.QuickchatStore.question === ""
+            && Quickchat.QuickchatStore.answerMarkdown === ""
+            && !Quickchat.QuickchatStore.busy
+            && quickActions.actions.length > 0
+          actions: root.quickActionItems
+          foreground: root.foreground
+          background: root.surface
+          accent: root.accent
+          fontFamily: root.fontFamily
+          onActionRequested: function(actionId, prompt) { composer.setDraft(prompt) }
         }
       }
 
+      Quickchat.SettingsView {
+        id: settingsView
+        anchors.fill: parent
+        visible: root.viewMode === "settings"
+        backend: Quickchat.QuickchatStore
+        dangerousAutoApprove: root.dangerousAutoApprove
+        quickActions: root.quickActionItems
+        foreground: root.foreground
+        background: root.surface
+        accent: root.accent
+        fontFamily: root.fontFamily
+        onDangerousAutoApproveRequested: function(enabled) {
+          root.persistSettings({ dangerousAutoApprove: enabled === true })
+        }
+        onProviderChanged: function(provider) { root.selectProvider(provider) }
+        onModelChanged: function(provider, model) {
+          var values = {}; values[root.providerModelKey(provider)] = model; root.persistSettings(values)
+        }
+        onQuickActionsEdited: function(actions) { root.setQuickActions(actions) }
+        onRecentChatsRequested: root.openHistory()
+        onDismissed: root.showChat()
+      }
+
+      Quickchat.ErrorDetailsView {
+        id: errorView
+        anchors.fill: parent
+        visible: root.viewMode === "error"
+        backend: Quickchat.QuickchatStore
+        details: Quickchat.QuickchatStore.errorDetails
+        foreground: root.foreground
+        background: root.surface
+        accent: root.accent
+        fontFamily: root.fontFamily
+        onDismissed: root.showChat()
+      }
+
       Quickchat.HistoryView {
+        id: historyView
         anchors.fill: parent
         visible: root.viewMode === "history"
         history: Quickchat.QuickchatStore.history
@@ -461,13 +696,13 @@ Panel {
         fontFamily: root.fontFamily
         onChatSelected: function(chat) {
           Quickchat.QuickchatStore.loadChat(chat)
-          root.viewMode = "chat"
+          answerScroll.showFromStart()
+          root.showChat()
         }
         onDeleteRequested: function(chatId) { Quickchat.QuickchatStore.deleteHistory(chatId) }
         onClearRequested: Quickchat.QuickchatStore.clearHistory()
         onCloseRequested: {
-          root.viewMode = "chat"
-          Qt.callLater(function() { composer.forceInputFocus() })
+          root.showChat()
         }
       }
 

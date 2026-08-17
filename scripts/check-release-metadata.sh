@@ -9,6 +9,7 @@ fail() {
 }
 
 for relative in manifest.json package.json package-lock.json runtime/adapters.release.json \
+  runtime/policies/automatic.md \
   runtime/dist/adapters/Apache-2.0.txt runtime/dist/adapters/claude-agent-acp.js.LEGAL.txt \
   THIRD_PARTY_NOTICES.md; do
   [[ -f "$repo_root/$relative" ]] || fail "missing $relative"
