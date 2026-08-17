@@ -894,3 +894,55 @@ turn per provider.
   release package dry-run succeeds. Draft PR 4 is the single open consolidated
   review surface and provider-only PR 3 is closed as superseded. Owner-run live
   interaction remains the next gate; no live desktop state was changed here.
+
+## OmaPilot motion-quality revamp checkpoint 9 (2026-08-17)
+
+- Goal: replace the rough waiting/streaming motion with a calm, native Quattro
+  activity language that stays smooth under bursty token delivery and makes
+  each response phase legible without fake progress or layout jitter.
+- Done criteria: no moving marker teleports or repeated animation restarts;
+  waiting remains visibly alive with restrained cadence; first-token and
+  streaming feedback transition without snapping; bursty chunks coalesce;
+  completion/cancellation/error crossfade cleanly in the stable status slot;
+  panel growth and follow-latest scrolling tolerate continuously changing
+  targets; reduced motion settles immediately; focused state-machine, render,
+  and repository gates pass; the branch is pushed and a draft PR targets main.
+- Branch/worktree: `omapilot-motion-revamp` at
+  `/home/sbull/worktrees/omarchy-omapilot-motion-revamp`, based on merged
+  `origin/main` commit `da25c94`.
+- Allowed: presentation-only QML motion and layout ownership, focused QML test
+  harnesses, ignored headless render evidence, design documentation, this
+  ledger, dependency installation inside this worktree, commit/push, and a
+  draft pull request.
+- Forbidden: installed-plugin changes, shell restart or live desktop control,
+  edits to any other worktree, broker/provider/policy/permission/protocol
+  changes, stable ID or persistence migrations, releases, and merging to main.
+- Verification gates:
+  - [x] Inventory current animation ownership, Quickshell 0.3.0, and active
+    Quattro timing/easing conventions.
+  - [x] Capture baseline waiting/streaming renders and identify the concrete
+    sources of discontinuity.
+  - [x] Implement a cohesive activity/status/first-token/follow-motion pass
+    with no authority or interaction-contract changes.
+  - [x] Add focused real-component regressions for endpoint continuity,
+    waiting cadence, burst coalescing, phase handoff, and reduced motion.
+  - [x] Pass QML lint/UI contracts, headless motion and visual renders, full
+    repository validation, deterministic build/package checks, and Git
+    whitespace checks.
+  - [ ] Commit and push the branch, open a draft PR to main, and leave installed
+    and live shell state unchanged for owner validation.
+- Current checkpoint: the presentation-only implementation is complete. The
+  fixed route now transfers node energy with identical resting endpoints;
+  waiting uses a 760 ms wave plus 1320 ms rest, streaming uses coalesced 460 ms
+  content-driven waves, phase copy crossfades, the header no longer overshoots,
+  and moving height/scroll targets use smoothing. The real-component cadence
+  probe, ten-frame renderer, QML/UI contract, and full 136-test runtime suite
+  pass. Final evidence is 23 protocol/context, three permission-focus, eight
+  presentation, and seven quick-action QML checks; the cadence probe and all ten
+  motion frames; 136 runtime tests with 12 opt-in live-provider skips; two
+  byte-identical broker builds; successful package dry-run; and clean Git
+  whitespace. Shellcheck remains unavailable. `npm ci` also reports unchanged
+  development-server advisories in direct esbuild (low) and Vitest (critical)
+  dependencies; this presentation-only diff neither invokes their servers nor
+  changes the lockfile. Commit and PR publication remain; installed and live
+  shell state are unchanged.

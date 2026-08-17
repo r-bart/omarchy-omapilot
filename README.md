@@ -17,8 +17,11 @@ The compact composer expands from the right side of the bar. Its result panel
 supports selectable Markdown, code blocks, tables, safe clickable links,
 bounded images, Copy, New chat, History, and Continue in Herdr. The in-panel
 settings pane can add, edit, remove, and reorder up to five quick actions.
-Waiting uses a finite route reveal, streamed content drives its own activity
-pulse, and a compact error notice opens an inspectable details pane.
+Waiting uses a restrained fixed-route energy wave with a long resting cadence;
+real streamed content drives coalesced follow-up waves without moving-marker
+resets. Phase copy, first-token content, panel growth, and follow-latest scrolling
+transition smoothly, while a compact error notice opens an inspectable details
+pane.
 
 ## Requirements
 

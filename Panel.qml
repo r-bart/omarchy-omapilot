@@ -209,7 +209,13 @@ Panel {
 
     Behavior on contentHeight {
       enabled: root.motionEnabled
-      NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+      // Streaming repeatedly retargets the natural height. SmoothedAnimation
+      // follows that moving target without restarting a fixed timeline for
+      // every wrapped line.
+      SmoothedAnimation {
+        velocity: Style.spaceReal(900)
+        maximumEasingTime: 120
+      }
     }
 
     Item {
@@ -307,10 +313,12 @@ Panel {
 
                 Text {
                   id: responseState
+                  readonly property bool phaseVisible: text !== "" && !root.responseActivityActive
                   anchors.right: parent.right
                   anchors.verticalCenter: parent.verticalCenter
                   text: root.responsePhase.label
-                  visible: text !== "" && !root.responseActivityActive
+                  visible: phaseVisible || opacity > 0
+                  opacity: phaseVisible ? 1 : 0
                   color: root.responsePhase.tone === "urgent" ? Color.urgent
                     : (root.responsePhase.tone === "muted" ? Color.muted : root.accent)
                   font.family: root.fontFamily
@@ -320,19 +328,9 @@ Panel {
                   Accessible.role: Accessible.StaticText
                   Accessible.name: text
 
-                  onTextChanged: {
-                    responseStateReveal.stop()
-                    opacity = root.motionEnabled ? 0.45 : 1
-                    if (root.motionEnabled) responseStateReveal.restart()
-                  }
-
-                  NumberAnimation {
-                    id: responseStateReveal
-                    target: responseState
-                    property: "opacity"
-                    to: 1
-                    duration: 150
-                    easing.type: Easing.OutCubic
+                  Behavior on opacity {
+                    enabled: root.motionEnabled
+                    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
                   }
                 }
               }
@@ -455,8 +453,19 @@ Panel {
                 boundsBehavior: Flickable.StopAtBounds
                 interactive: contentHeight > height
                 property bool followLatest: true
+                property bool followMotionEnabled: true
                 readonly property real bottomThreshold: Style.space(56)
                 readonly property bool latestAvailable: contentHeight > height && !followLatest
+
+                Behavior on contentY {
+                  enabled: root.motionEnabled && answerScroll.followLatest
+                    && answerScroll.followMotionEnabled
+                    && !answerScroll.dragging && !answerScroll.flicking
+                  SmoothedAnimation {
+                    velocity: Style.spaceReal(820)
+                    maximumEasingTime: 110
+                  }
+                }
 
                 function maximumContentY() {
                   return Math.max(0, contentHeight - height)
@@ -469,12 +478,16 @@ Panel {
 
                 function resetForNewTurn() {
                   followLatest = true
+                  followMotionEnabled = false
                   contentY = 0
+                  Qt.callLater(function() { answerScroll.followMotionEnabled = true })
                 }
 
                 function showFromStart() {
                   followLatest = false
+                  followMotionEnabled = false
                   contentY = 0
+                  Qt.callLater(function() { answerScroll.followMotionEnabled = true })
                 }
 
                 function followContentIfNeeded() {
@@ -486,7 +499,7 @@ Panel {
 
                 onContentHeightChanged: followContentIfNeeded()
                 onHeightChanged: followContentIfNeeded()
-                onContentYChanged: if (moving)
+                onContentYChanged: if (dragging || flicking)
                   followLatest = Presentation.isNearBottom(contentY, contentHeight, height, bottomThreshold)
                 onMovementEnded: followLatest = Presentation.isNearBottom(
                   contentY, contentHeight, height, bottomThreshold)
@@ -537,6 +550,7 @@ Panel {
                     onVisibleChanged: {
                       firstTokenReveal.stop()
                       opacity = visible && root.motionEnabled ? 0 : 1
+                      answerRevealTranslate.y = visible && root.motionEnabled ? Style.spacing.sm : 0
                       if (visible && root.motionEnabled) firstTokenReveal.restart()
                     }
                     onLinkActivated: function(url) { Quickchat.QuickchatStore.activateLink(url) }
@@ -547,13 +561,26 @@ Panel {
                     }
                     onCopyRequested: function(text) { Quickchat.QuickchatStore.copyText(text) }
 
-                    NumberAnimation {
+                    transform: Translate {
+                      id: answerRevealTranslate
+                    }
+
+                    ParallelAnimation {
                       id: firstTokenReveal
-                      target: markdownAnswer
-                      property: "opacity"
-                      to: 1
-                      duration: 180
-                      easing.type: Easing.OutCubic
+                      NumberAnimation {
+                        target: markdownAnswer
+                        property: "opacity"
+                        to: 1
+                        duration: 160
+                        easing.type: Easing.OutCubic
+                      }
+                      NumberAnimation {
+                        target: answerRevealTranslate
+                        property: "y"
+                        to: 0
+                        duration: 180
+                        easing.type: Easing.OutCubic
+                      }
                     }
                   }
                 }

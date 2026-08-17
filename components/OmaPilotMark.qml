@@ -16,20 +16,26 @@ Item {
   implicitWidth: size
   implicitHeight: size
   transformOrigin: Item.Center
+  scale: active ? 0.975 : 1
 
-  function beginActivityReveal() {
-    activityReveal.stop()
-    scale = 1
-    mark.opacity = 1
-    if (active && motionEnabled) {
-      scale = 0.94
-      mark.opacity = 0.58
-      activityReveal.restart()
-    }
+  Behavior on scale {
+    enabled: root.motionEnabled
+    NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
   }
 
-  onActiveChanged: beginActivityReveal()
-  onMotionEnabledChanged: beginActivityReveal()
+  Rectangle {
+    anchors.centerIn: parent
+    width: root.size
+    height: root.size
+    radius: Style.cornerRadius
+    color: root.accent
+    opacity: root.active ? 0.10 : 0
+
+    Behavior on opacity {
+      enabled: root.motionEnabled
+      NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+    }
+  }
 
   QQC.Button {
     id: mark
@@ -44,24 +50,5 @@ Item {
     icon.width: Math.round(root.size)
     icon.height: Math.round(root.size)
     icon.color: root.accent
-  }
-
-  ParallelAnimation {
-    id: activityReveal
-    loops: 1
-    NumberAnimation {
-      target: root
-      property: "scale"
-      to: 1
-      duration: 240
-      easing.type: Easing.OutBack
-    }
-    NumberAnimation {
-      target: mark
-      property: "opacity"
-      to: 1
-      duration: 180
-      easing.type: Easing.OutCubic
-    }
   }
 }

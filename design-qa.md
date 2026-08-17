@@ -61,12 +61,14 @@ for editing, removal, and directional reordering; the list remains inside the
 same capped settings scroll owner.
 
 The response captures verify three distinct states without changing transcript
-ownership: a finite route reveal while waiting, a real-content-driven route
-pulse while streaming, and an urgent but compact error notice. Waiting and
-streaming now share one fixed, screen-aware status slot, so label changes do not
-resize the adjacent question. The error notice opens a separate selectable
-details pane with the normalized message, code, retryability, and Copy action.
-No animation claims completion percentage.
+ownership: a fixed-route energy wave while waiting, real-content-driven node
+energy while streaming, and an urgent but compact error notice. Waiting and
+streaming share one fixed, screen-aware status slot, and their copy crossfades,
+so phase changes do not resize the adjacent question. The route has no moving
+marker: both ends of each wave render the same resting geometry, eliminating
+the visible teleport that made the earlier treatment feel rough. The error
+notice opens a separate selectable details pane with the normalized message,
+code, retryability, and Copy action. No animation claims completion percentage.
 
 Copy, icon weight, border contrast, and control density are internally
 consistent. The implementation title and mark are intentionally smaller than
@@ -103,6 +105,15 @@ conversation content.
    rather than resets the active sweep, bursty chunks coalesce into one pending
    pulse, opacity and travel durations match, and one stable status slot owns
    waiting, streaming, and completion copy.
+10. A second hands-on review found that non-layout movement still looked rough:
+    the marker necessarily teleported home between pulses, fixed-duration panel
+    and transcript animations repeatedly restarted under streaming updates, and
+    the header mark overshot on every busy-state change. The production pass now
+    keeps route geometry fixed and transfers only node energy, latches each
+    in-flight wave's duration across the first-token handoff, inserts a long rest
+    between waiting waves, coalesces streaming bursts, crossfades phase copy,
+    uses `SmoothedAnimation` for moving height/scroll targets, and replaces the
+    header bounce with a quiet accent state.
 
 ## State and interaction evidence
 
@@ -119,8 +130,13 @@ conversation content.
   flag's no-prompt behavior separately from this rendering evidence.
 - The headless preview fails on QML load errors and rejects TypeError output.
 - A Quickshell motion probe exercises the real component timeline and fails if
-  first-token streaming stops or resets the active sweep, if a content event is
-  discarded while it runs, or if reduced motion leaves animation queued.
+  first-token streaming stops, resets, or changes the duration of an in-flight
+  wave; if a content event is discarded while it runs; if waiting skips its
+  resting cadence; or if reduced motion leaves animation queued.
+- A separate real-component renderer captures ten consecutive waiting-to-
+  streaming frames. The UI contract requires every frame and successful harness
+  completion, making temporal load failures visible instead of relying on one
+  static screenshot or source grep.
 - The merged installed path passes the same QML/UI contracts, its shell-owned
   broker was relaunched from the new deterministic bundle, and the recovered
   shell log contains no OmaPilot/Quickchat-specific load error.

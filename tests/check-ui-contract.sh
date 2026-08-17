@@ -32,6 +32,7 @@ qml_files=(
   "$repo_dir/components/Protocol.js"
   "$repo_dir/components/Presentation.js"
   "$repo_dir/components/QuickActions.js"
+  "$repo_dir/tests/motion-preview.qml"
 )
 
 /usr/lib/qt6/bin/qmllint -I "$omarchy_shell" -I "$repo_dir" "${qml_files[@]}" >/dev/null 2>&1
@@ -151,13 +152,28 @@ grep -Fq 'tooltipText: "Jump to the newest response"' "$repo_dir/Panel.qml"
 grep -Fq 'Quickchat.WaitingIndicator {' "$repo_dir/Panel.qml"
 grep -Fq 'id: responseStatusSlot' "$repo_dir/Panel.qml"
 grep -Fq 'Layout.minimumWidth: Style.space(140)' "$repo_dir/Panel.qml"
-grep -Fq 'loops: 1' "$repo_dir/components/WaitingIndicator.qml"
 grep -Fq 'property bool pulseQueued: false' "$repo_dir/components/WaitingIndicator.qml"
-grep -Fq 'transform: Translate {' "$repo_dir/components/WaitingIndicator.qml"
-grep -Fq 'if (routePulse.running) {' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'property real waveProgress: 0' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'property int activePulseDuration: 760' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'function pulseStrength(position)' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'id: waitingCadence' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'id: messageSwap' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'if (wavePulse.running) {' "$repo_dir/components/WaitingIndicator.qml"
 grep -Fq 'onActivityRevisionChanged:' "$repo_dir/components/WaitingIndicator.qml"
 grep -Fq 'activityRevision++' "$repo_dir/components/QuickchatStore.qml"
-if grep -Fq 'onStreamingChanged: trigger()' "$repo_dir/components/WaitingIndicator.qml"; then
+if grep -Fq 'pulseTranslate' "$repo_dir/components/WaitingIndicator.qml"; then
+  printf 'OmaPilot activity motion must not teleport a moving marker\n' >&2
+  exit 1
+fi
+if grep -Fq 'Easing.OutBack' "$repo_dir/components/OmaPilotMark.qml"; then
+  printf 'OmaPilot activity mark must not use an overshooting bounce\n' >&2
+  exit 1
+fi
+if ! grep -Fq 'SmoothedAnimation {' "$repo_dir/Panel.qml"; then
+  printf 'OmaPilot streaming geometry must smooth continuously changing targets\n' >&2
+  exit 1
+fi
+if grep -Fq 'onStreamingChanged: wavePulse.restart()' "$repo_dir/components/WaitingIndicator.qml"; then
   printf 'Waiting-to-streaming motion must not reset an in-flight pulse\n' >&2
   exit 1
 fi
@@ -236,11 +252,31 @@ if grep -Eq "smoke loader failed|Failed to load|Type .* unavailable|Cannot assig
 fi
 
 cp "$repo_dir/tests/waiting-indicator-probe.qml" "$smoke_root/shell.qml"
-QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \
-  --path "$smoke_root" --no-color >"$smoke_root/motion.log" 2>&1
+if ! QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \
+    --path "$smoke_root" --no-color >"$smoke_root/motion.log" 2>&1; then
+  cat "$smoke_root/motion.log"
+  exit 1
+fi
 if grep -Eq "omapilot motion probe failed|Failed to load|Type .* unavailable|Cannot assign|TypeError" \
     "$smoke_root/motion.log" || ! grep -Fq 'OMAPILOT_MOTION_PROBE_OK' "$smoke_root/motion.log"; then
   cat "$smoke_root/motion.log"
+  exit 1
+fi
+
+motion_frame_root="$smoke_root/motion-frames"
+mkdir -p "$motion_frame_root"
+cp "$repo_dir/tests/motion-preview.qml" "$smoke_root/shell.qml"
+if ! OMAPILOT_MOTION_FRAME_DIR="$motion_frame_root" QT_QPA_PLATFORM=offscreen \
+    timeout 5s quickshell --no-duplicate --path "$smoke_root" --no-color \
+    >"$smoke_root/motion-preview.log" 2>&1; then
+  cat "$smoke_root/motion-preview.log"
+  exit 1
+fi
+if grep -Eq "omapilot motion preview failed|Failed to load|Type .* unavailable|Cannot assign|TypeError" \
+    "$smoke_root/motion-preview.log" \
+    || ! grep -Fq 'OMAPILOT_MOTION_PREVIEW_OK' "$smoke_root/motion-preview.log" \
+    || [[ $(find "$motion_frame_root" -maxdepth 1 -type f -name 'frame-*.png' | wc -l) -ne 10 ]]; then
+  cat "$smoke_root/motion-preview.log"
   exit 1
 fi
 
