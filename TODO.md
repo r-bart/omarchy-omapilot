@@ -980,9 +980,11 @@ turn per provider.
     reduced-motion regressions plus temporal renders.
   - [x] Pass focused QML/UI checks, full validation, deterministic package,
     `git diff --check`, and orchestrator diff review.
-  - [ ] Commit/push the corrected PR head and pass exact-head CI.
-  - [ ] Install that exact head, preserve center placement/settings, and verify
-    shell/broker health without a restart unless required.
+  - [x] Commit/push the corrected PR head and pass exact-head CI. Commit
+    `7c67157` passed both `validate` and deterministic `package` jobs in Actions
+    run `32041050737`; the draft PR remains open and mergeable.
+  - [x] Install that reviewed code head, preserve center placement/settings,
+    and verify shell/broker health without a restart unless required.
   - [ ] Owner confirms the live motion now meets the interaction-quality bar.
 - Current checkpoint: source gates are complete. The real-component probe and
   fourteen-frame renderer pass with uniform waiting phase deltas and a smooth
@@ -990,5 +992,12 @@ turn per provider.
   permission-focus, eight presentation, and seven quick-action checks; full
   validation passes 136 runtime tests with 12 opt-in live skips; three broker
   hashes are identical; package dry-run and Git whitespace checks pass. The
-  installed plugin remains the rejected `93cd8f5` build until this corrected
-  branch is committed, pushed, and passes exact-head CI.
+  corrected code is committed at `7c67157`, pushed to draft PR 5, and green in
+  exact-code-head CI. That commit is installed from its clean public Git
+  checkout at center index 4; plugin validation, shell IPC, and the existing
+  broker are healthy, and the hot-reload log contains no OmaPilot-specific
+  error. No restart occurred. The panel opened and dismissed through its real
+  IPC path, but the computer-use keyboard backend could not submit a harmless
+  prompt because this session's desktop portal does not expose `RemoteDesktop`;
+  it failed before replaying input. Owner waiting/streaming confirmation is
+  therefore still the only open quality gate.
