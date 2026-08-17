@@ -28,13 +28,14 @@ The reviewed plugin revision contains self-contained broker and adapter bundles 
 
 One compact JSON object is sent per line; embedded newlines remain JSON escapes. Each command has an `id`. Every correlated event repeats that `id`; asynchronous readiness events may omit it.
 
-The UI sends commands whose `type` is one of `initialize`, `submit`, `cancel`, `permission_response`, `dictation_start`, `dictation_stop`, `dictation_cancel`, `copy`, `open_link`, `load_image`, `continue_in_herdr`, `history_list`, `history_delete`, `history_clear`, or `shutdown`.
+The UI sends commands whose `type` is one of `initialize`, `submit`, `context_begin`, `context_capture`, `context_cancel`, `context_discard`, `cancel`, `permission_response`, `dictation_start`, `dictation_stop`, `dictation_cancel`, `copy`, `open_link`, `load_image`, `continue_in_herdr`, `history_list`, `history_delete`, `history_clear`, or `shutdown`.
 
-The broker emits events whose `type` is one of `ready`, `providers`, `state`, `content`, `permission`, `permission_closed`, `image`, `complete`, `error`, `dictation`, `history`, `herdr`, `link`, or `copied`. The broker's protocol tests are authoritative for exact fields and version negotiation.
+The broker emits events whose `type` is one of `ready`, `providers`, `state`, `content`, `context_ready`, `context_attachment`, `permission`, `permission_closed`, `image`, `complete`, `error`, `dictation`, `history`, `herdr`, `link`, or `copied`. The broker's protocol tests are authoritative for exact fields and version negotiation.
 
 ACP is the broker's normalization boundary, not the policy boundary. The submit
 command contains provider/model/question plus an optional versioned desktop
-snapshot. QML latches the active app immediately before the panel takes focus
+snapshot and up to four opaque context-attachment selections. QML latches the active app and
+its capture rectangle immediately before the panel takes focus
 and synchronously reads the current app/workspace/media inventory from
 Quickshell's public Hyprland and MPRIS objects at submit time; it does not poll
 `hyprctl` or create a second desktop service. The broker independently validates
@@ -44,6 +45,31 @@ the combined prompt to the selected ACP session but stores only the original
 question in Quickchat history. Provider-native session retention still applies.
 Native Herdr resume therefore inherits provider-retained context, while the
 transcript fallback contains only the stored question and answer.
+
+## Explicit context clips
+
+OmaPilot is a multi-kind `bar-widget` and `overlay` plugin. The panel asks the
+broker to begin a capture using the pre-focus window rectangle as a hint. The
+broker reads and bounds the current Hyprland monitor layout, returns only the
+validated target geometry, and retains the capture request. The overlay then
+supports one-click active-window capture or a dragged monitor-local region. It
+hides for two compositor frames before asking the broker to invoke `grim`, so
+OmaPilot chrome is not present in the pixels.
+
+The broker fully decodes and normalizes every image through the existing image
+policy. If local Tesseract is available, word boxes are hit-tested at the click
+point and expanded to their OCR paragraph. The resulting attachment may offer
+Text, Screenshot, or Text + screenshot. The thumbnail remains a local preview;
+only the representation IDs selected in the composer cross the submit boundary.
+QML never sends image paths, base64, OCR payloads, or arbitrary HTML back to the
+broker. The broker resolves opaque UUIDs against its in-memory attachment map,
+constructs ACP text/image blocks, and deletes the cached input image after
+submit or explicit removal.
+
+The representation contract reserves `element` for the separately installed
+browser companion. That integration must create a broker-owned bounded semantic
+candidate; the UI must never accept raw DOM in a normal submit command.
+
 The broker derives one automatic,
 fail-closed policy for that provider. Codex keeps the pinned adapter's read-only,
 on-request mode, disables native web search, and exposes only its strictly validated

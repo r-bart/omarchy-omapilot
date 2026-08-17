@@ -7,12 +7,19 @@ ShellRoot {
     source: Qt.resolvedUrl("BarWidget.qml")
   }
 
+  Loader {
+    id: overlayLoader
+    source: Qt.resolvedUrl("ContextCaptureOverlay.qml")
+  }
+
   Timer {
     interval: 600
     running: true
     onTriggered: {
       if (pluginLoader.status === Loader.Error)
         console.error("quickchat smoke loader failed")
+      if (overlayLoader.status === Loader.Error)
+        console.error("quickchat overlay smoke loader failed")
       Qt.quit()
     }
   }

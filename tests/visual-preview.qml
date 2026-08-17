@@ -17,6 +17,8 @@ ShellRoot {
     property bool busy: false
     property bool canSubmit: true
     property bool canRetry: false
+    property bool contextCaptureAvailable: true
+    property bool desktopContextActive: false
     property string state: root.previewState === "waiting" ? "preparing"
       : (root.previewState === "streaming" ? "streaming"
         : (root.previewState === "error" || root.previewState === "error-details"
@@ -47,6 +49,17 @@ ShellRoot {
     ]
     property var modelOptions: [{ value: "gpt-5.4", label: "gpt-5.4" }]
     property var providerPolicy: ({ tools: "device-approval", web: "approved-command", hostReads: true })
+    property var contextAttachments: root.previewState === "context" ? [{
+      id: "11111111-1111-4111-8111-111111111111",
+      title: "Contextual cursor article",
+      origin: { appId: "chromium", windowTitle: "OmaPilot design notes" },
+      previewImage: { source: Qt.resolvedUrl("assets/omapilot-mark.png") },
+      representations: [
+        { id: "text", kind: "text", label: "Text", preview: "The magic comes from clipping the semantic object under the cursor.", confidence: 0.92 },
+        { id: "image", kind: "image", label: "Screenshot", preview: "", confidence: 1 }
+      ],
+      selectedRepresentationIds: ["text"]
+    }] : []
 
     signal focusComposerRequested()
 
@@ -57,6 +70,11 @@ ShellRoot {
     function cancel() {}
     function retryBroker() {}
     function copyText(text) {}
+    function beginContextCapture() {}
+    function setContextRepresentation(id, mode) {
+      if (contextAttachments.length > 0) contextAttachments[0].selectedRepresentationIds = String(mode).split("+")
+    }
+    function removeContextAttachment(id) { contextAttachments = [] }
   }
 
   Window {
@@ -64,7 +82,7 @@ ShellRoot {
     width: 860
     height: root.previewState === "settings" || root.previewState === "dangerous-settings"
       || root.previewState === "actions-settings" ? 760
-      : (root.previewState === "error-details" ? 520 : 320)
+      : (root.previewState === "error-details" ? 520 : (root.previewState === "context" ? 430 : 320))
     visible: true
     color: "transparent"
     flags: Qt.FramelessWindowHint
@@ -78,7 +96,7 @@ ShellRoot {
       radius: Style.cornerRadius
 
       ColumnLayout {
-        visible: root.previewState === "empty" || root.previewState === "dangerous"
+        visible: root.previewState === "empty" || root.previewState === "dangerous" || root.previewState === "context"
         anchors.fill: parent
         anchors.leftMargin: previewSurface.contentLeftInset + Style.spacing.popupPadding
         anchors.rightMargin: previewSurface.contentRightInset + Style.spacing.popupPadding
@@ -243,7 +261,7 @@ ShellRoot {
     running: true
     repeat: false
     onTriggered: {
-      var invalidMain = (root.previewState === "empty" || root.previewState === "dangerous")
+      var invalidMain = (root.previewState === "empty" || root.previewState === "dangerous" || root.previewState === "context")
         && (header.implicitHeight <= 0 || composer.implicitHeight <= 0
           || actions.implicitHeight <= 0)
       var invalidSettings = (root.previewState === "settings"

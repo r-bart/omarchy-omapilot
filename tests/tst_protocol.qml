@@ -24,6 +24,37 @@ TestCase {
     verify(!Protocol.hasFeature(undefined, "desktop-context"))
   }
 
+  function test_contextAttachmentKeepsAlternativesLocalUntilSubmit() {
+    var id = "11111111-1111-4111-8111-111111111111"
+    var attachment = Protocol.normalizedContextAttachment({
+      version: 1,
+      id: id,
+      title: "Article section",
+      origin: { appId: "chromium", windowTitle: "Docs" },
+      previewImage: { id: id, localUrl: "file:///tmp/context.png" },
+      representations: [
+        { id: "text", kind: "text", label: "Text", preview: "Visible page text", confidence: 0.9 },
+        { id: "image", kind: "image", label: "Screenshot", confidence: 1 }
+      ],
+      selectedRepresentationIds: ["text"]
+    })
+    compare(attachment.title, "Article section")
+    compare(attachment.previewImage.source, "file:///tmp/context.png")
+    compare(Protocol.contextRepresentationMode(attachment), "text")
+    var options = Protocol.contextRepresentationOptions(attachment)
+    compare(options.length, 3)
+    compare(options[2].value, "text+image")
+
+    var payload = Protocol.submitCommand("turn", "Explain", "codex", "", null, false, [{
+      id: id, representationIds: ["text", "image", "text", "bogus"]
+    }])
+    compare(payload.contextAttachments.length, 1)
+    compare(payload.contextAttachments[0].representationIds.length, 2)
+    compare(payload.contextAttachments[0].representationIds[0], "text")
+    compare(payload.contextAttachments[0].representationIds[1], "image")
+    verify(payload.contextAttachments[0].payload === undefined)
+  }
+
   function test_desktopContextFiltersShellSurfaces() {
     verify(Protocol.isShellAppId("org.omarchy.quickshell"))
     var context = Protocol.normalizedDesktopContext({

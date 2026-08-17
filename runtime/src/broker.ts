@@ -3,7 +3,8 @@ import { spawn } from "node:child_process";
 import type { AcpRun, PermissionDecision } from "./acp.js";
 import { BrokerAcpError, deleteAcpSession, probeAcpModels, runAcpQuestion } from "./acp.js";
 import { DictationService } from "./dictation.js";
-import { promptWithDesktopContext } from "./context.js";
+import { promptWithContextAttachments } from "./context.js";
+import { ContextAttachmentError, ContextAttachmentStore } from "./context-attachments.js";
 import { HistoryStore, presentChat, presentImage } from "./history.js";
 import { continueInHerdr, describeHerdrError } from "./herdr.js";
 import { ImagePolicyError, ImageStore, isAllowedExternalLink } from "./images.js";
@@ -31,6 +32,7 @@ export class QuickchatBroker {
   readonly #herdrContinue: HerdrContinue;
   readonly #env: NodeJS.ProcessEnv;
   readonly #permissionTimeoutMs: number;
+  readonly #contextAttachments: ContextAttachmentStore;
   #providers = new Map<string, DiscoveredProvider>();
   #runs = new Map<string, AcpRun>();
   #handoffs = new Map<string, Promise<void>>();
@@ -40,11 +42,12 @@ export class QuickchatBroker {
 
   constructor(
     emit: (event: BrokerEvent) => void,
-    options: { history?: HistoryStore; images?: ImageStore; dictation?: DictationClient; sessionCleaner?: SessionCleaner; herdrContinue?: HerdrContinue; env?: NodeJS.ProcessEnv; permissionTimeoutMs?: number } = {}
+    options: { history?: HistoryStore; images?: ImageStore; contextAttachments?: ContextAttachmentStore; dictation?: DictationClient; sessionCleaner?: SessionCleaner; herdrContinue?: HerdrContinue; env?: NodeJS.ProcessEnv; permissionTimeoutMs?: number } = {}
   ) {
     this.#emit = emit;
     this.#history = options.history ?? new HistoryStore();
     this.#images = options.images ?? new ImageStore();
+    this.#contextAttachments = options.contextAttachments ?? new ContextAttachmentStore(this.#images, undefined, options.env ?? process.env);
     this.#dictation = options.dictation ?? new DictationService();
     this.#sessionCleaner = options.sessionCleaner ?? deleteAcpSession;
     this.#herdrContinue = options.herdrContinue ?? continueInHerdr;
@@ -56,6 +59,10 @@ export class QuickchatBroker {
     switch (command.type) {
       case "initialize": await this.#initialize(command); break;
       case "submit": await this.#submit(command); break;
+      case "context_begin": await this.#contextBegin(command); break;
+      case "context_capture": await this.#contextCapture(command); break;
+      case "context_cancel": this.#contextAttachments.cancel(command.id); break;
+      case "context_discard": await this.#contextAttachments.discard(command.id); break;
       case "cancel": await this.#cancel(command.id); break;
       case "permission_response": this.#respondPermission(command); break;
       case "history_list": await this.#emitHistory(); break;
@@ -97,7 +104,7 @@ export class QuickchatBroker {
     }));
     this.#providers = new Map(discovered.map((provider) => [provider.id, provider]));
     const history = (await this.#history.list()).map((chat) => presentChat(chat));
-    this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context"], providers: discovered.map(publicProvider), history });
+    this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context", "context-attachments"], providers: discovered.map(publicProvider), history });
   }
 
   async #submit(command: Extract<BrokerCommand, { type: "submit" }>): Promise<void> {
@@ -112,12 +119,30 @@ export class QuickchatBroker {
 
   async #submitOnce(command: Extract<BrokerCommand, { type: "submit" }>): Promise<void> {
     const provider = this.#providers.get(command.provider);
-    if (provider === undefined) { this.#error("provider_unavailable", "The selected harness is not installed and authenticated", false, command.id); return; }
+    if (provider === undefined) {
+      await this.#contextAttachments.discardMany((command.contextAttachments ?? []).map((value) => value.id));
+      this.#error("provider_unavailable", "The selected harness is not installed and authenticated", false, command.id);
+      return;
+    }
     const dangerousAutoApprove = command.dangerousAutoApprove === true
       && provider.policy.tools === "device-approval";
     this.#emit({ type: "state", id: command.id, state: "preparing", message: `Preparing ${provider.name}…` });
+    let selectedAttachmentIds: string[] = [];
+    let attachmentBlocks: Awaited<ReturnType<ContextAttachmentStore["resolve"]>>["blocks"] = [];
+    try {
+      const resolved = await this.#contextAttachments.resolve(command.contextAttachments ?? []);
+      attachmentBlocks = resolved.blocks;
+      selectedAttachmentIds = resolved.attachmentIds;
+    } catch (error) {
+      if (error instanceof ContextAttachmentError) {
+        await this.#contextAttachments.discardMany((command.contextAttachments ?? []).map((value) => value.id));
+        this.#error(error.code, error.message, false, command.id);
+        return;
+      }
+      throw error;
+    }
     const run = runAcpQuestion(
-      provider, command.id, promptWithDesktopContext(command.question, command.desktopContext), command.model,
+      provider, command.id, promptWithContextAttachments(command.question, command.desktopContext, attachmentBlocks), command.model,
       this.#emit, 180_000, this.#images,
       (request) => this.#requestToolPermission(
         command.id, provider.id, request, dangerousAutoApprove),
@@ -160,7 +185,34 @@ export class QuickchatBroker {
     } finally {
       this.#cancelPermissions(command.id);
       this.#runs.delete(command.id);
+      await this.#contextAttachments.discardMany(selectedAttachmentIds);
     }
+  }
+
+  async #contextBegin(command: Extract<BrokerCommand, { type: "context_begin" }>): Promise<void> {
+    try {
+      const target = await this.#contextAttachments.begin(command.id, command.target);
+      this.#emit({ type: "context_ready", id: command.id, target });
+    } catch (error) {
+      this.#contextError(error, command.id);
+    }
+  }
+
+  async #contextCapture(command: Extract<BrokerCommand, { type: "context_capture" }>): Promise<void> {
+    try {
+      const attachment = await this.#contextAttachments.capture(command.id, command.mode, command.region, command.anchor);
+      this.#emit({ type: "context_attachment", requestId: command.id, attachment });
+    } catch (error) {
+      this.#contextError(error, command.id);
+    }
+  }
+
+  #contextError(error: unknown, id: string): void {
+    if (error instanceof ContextAttachmentError || error instanceof ImagePolicyError) {
+      this.#error(error.code, error.message, false, id);
+      return;
+    }
+    this.#error("context_capture_failed", "The selected context could not be captured", true, id);
   }
 
   async #requestToolPermission(

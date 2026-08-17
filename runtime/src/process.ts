@@ -4,6 +4,7 @@ import { constants } from "node:fs";
 import { delimiter, isAbsolute } from "node:path";
 
 export type RunResult = { code: number; stdout: string; stderr: string };
+export type RunBinaryResult = { code: number; stdout: Buffer; stderr: string };
 
 export async function runCommand(
   executable: string,
@@ -31,6 +32,46 @@ export async function runCommand(
     child.once("close", (code) => {
       clearTimeout(timer);
       resolve({ code: code ?? 1, stdout, stderr });
+    });
+  });
+}
+
+export async function runBinaryCommand(
+  executable: string,
+  args: string[],
+  options: { env?: NodeJS.ProcessEnv; cwd?: string; timeoutMs?: number; maxOutput?: number } = {}
+): Promise<RunBinaryResult> {
+  const maxOutput = options.maxOutput ?? 8 * 1024 * 1024;
+  return new Promise((resolve, reject) => {
+    const child = spawn(executable, args, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32"
+    });
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    let stderr = "";
+    let exceeded = false;
+    child.stdout.on("data", (chunk: Buffer) => {
+      if (exceeded) return;
+      bytes += chunk.byteLength;
+      if (bytes > maxOutput) {
+        exceeded = true;
+        terminateProcessGroup(child.pid);
+        return;
+      }
+      chunks.push(chunk);
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr = (stderr + chunk.toString("utf8")).slice(-32_768);
+    });
+    child.once("error", reject);
+    const timer = setTimeout(() => terminateProcessGroup(child.pid), options.timeoutMs ?? 10_000);
+    timer.unref();
+    child.once("close", (code) => {
+      clearTimeout(timer);
+      resolve({ code: exceeded ? 1 : (code ?? 1), stdout: Buffer.concat(chunks), stderr });
     });
   });
 }

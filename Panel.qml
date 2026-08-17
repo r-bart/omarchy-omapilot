@@ -178,6 +178,16 @@ Panel {
   Connections {
     target: Quickchat.QuickchatStore
     function onHerdrContinued() { root.closeForExternalHandoff() }
+    function onContextOverlayRequested(payload) {
+      var hostShell = root.bar && root.bar.shell ? root.bar.shell : null
+      if (!hostShell || typeof hostShell.summon !== "function") {
+        Quickchat.QuickchatStore.toastRequested("Context capture is unavailable in this shell")
+        return
+      }
+      root.closeForExternalHandoff()
+      if (!hostShell.summon(root.moduleName, payload))
+        Quickchat.QuickchatStore.toastRequested("Context capture overlay could not be opened")
+    }
   }
 
   Shortcut {

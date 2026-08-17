@@ -1,6 +1,6 @@
 # OmaPilot for Omarchy
 
-OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget for asking questions and working on your desktop through an authenticated AI harness. Device actions stay behind an exact, inspectable approval unless you explicitly enable **Dangerous auto-approve** in settings. OmaPilot can attach a bounded desktop snapshot when you submit, renders Markdown in a themed panel, remembers the latest 30 completed chats, and can hand an answer to Herdr when you want to keep working.
+OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget and contextual-capture overlay for asking questions and working on your desktop through an authenticated AI harness. Device actions stay behind an exact, inspectable approval unless you explicitly enable **Dangerous auto-approve** in settings. OmaPilot can attach a bounded desktop snapshot, clip a window or exact region with a reviewed Text/Screenshot choice, render Markdown in a themed panel, remember the latest 30 completed chats, and hand an answer to Herdr when you want to keep working.
 
 The public project and product name is now OmaPilot. The existing plugin ID, IPC target, package/runtime identifiers, and local `quickchat` data paths remain unchanged so current installations and user data continue to work.
 
@@ -27,6 +27,8 @@ pulse, and a compact error notice opens an inspectable details pane.
 - Node.js 22 or newer for the broker and pinned ACP adapters.
 - At least one installed and authenticated harness: `codex`, `claude`, or `opencode`.
 - Optional: Voxtype for dictation and Herdr for durable continuation.
+- `grim` and ImageMagick for contextual screenshots; optional Tesseract adds
+  text-under-the-pointer extraction and the Text representation.
 
 OmaPilot does not install a harness, log you in, or read provider credentials. Authentication and model availability remain owned by the selected harness. The model picker is populated at startup from Codex's read-only app-server catalog, a non-persisted Claude ACP discovery session, or OpenCode's native catalog; if discovery is unavailable, OmaPilot safely falls back to the harness default.
 
@@ -147,6 +149,26 @@ provider receives the combined prompt and may retain it in its native session.
 An answer derived from desktop context is retained like any other completed
 answer.
 
+## Clip context from the desktop
+
+The crosshair button in the composer opens OmaPilot's fullscreen capture
+overlay. Click to capture the app that was active before OmaPilot opened, or
+drag an exact region. The overlay disappears before the screenshot is taken.
+
+When Tesseract is installed, OmaPilot uses its word boxes to find the text under
+the click and expands it to the surrounding paragraph. The composer then shows
+a local thumbnail and a selector with the representations actually available:
+**Text**, **Screenshot**, or **Text + screenshot**. OCR failure is not an error;
+the validated screenshot remains the fallback. Removing the attachment deletes
+its broker-owned input image, and submitting sends only the selected
+representation—not every locally generated alternative.
+
+Context clips are explicit and single-shot. OmaPilot does not continuously
+watch the pointer, index accessibility trees, monitor the clipboard, or capture
+screens in the background. Password-manager and password-like windows are
+blocked conservatively. Clip text and pixels are framed as untrusted
+observational data and do not expand tool authority.
+
 ## Storage and privacy
 
 OmaPilot persists only completed chats, capped at the newest 30. A chat contains the question, rendered answer source, timestamp, provider/model metadata, content references, and a resumable session identity when the harness supplies one. Draft text, authentication output, tokens, environment variables, and provider credentials are not persisted.
@@ -170,9 +192,9 @@ Remote Markdown images are not fetched automatically. OmaPilot shows the origin 
 
 Both integrations disappear or show a clear unavailable state when their required command is missing.
 
-## Future browser context
+## Future browser element context
 
-The main future context feature is an optional **OmaPilot Browser Companion**.
+The next semantic context source is an optional **OmaPilot Browser Companion**.
 It would be a separately installed browser extension and local native-messaging
 bridge that can provide the active tab URL/title and, only with explicit site
 permission, selected text or bounded visible-page text. The intended rules are:
@@ -188,9 +210,11 @@ Omarchy plugin directory, that companion would need its own explicit,
 reversible install and removal flow; the normal OmaPilot plugin install would not
 silently add it.
 
-Other roadmap candidates build on that same context contract: user-selectable
-context sources, richer app-specific adapters, and a preview of exactly what
-will be shared before submit. Browser actions would come later, only with their
+The shipped attachment contract already models multiple representations and
+labels the semantic browser representation **Element** in the UI. The
+companion will add Element alongside Text and Screenshot without changing the
+submit trust boundary. Other roadmap candidates include AT-SPI native controls
+and richer app-specific adapters. Browser actions would come later, only with their
 own inspectable per-action approval boundary for authenticated sites.
 
 ## Development

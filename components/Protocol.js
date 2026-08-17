@@ -17,7 +17,7 @@ function command(type, values) {
   return result
 }
 
-function submitCommand(id, question, provider, model, desktopContext, dangerousAutoApprove) {
+function submitCommand(id, question, provider, model, desktopContext, dangerousAutoApprove, contextAttachments) {
   var payload = command("submit", {
     id: String(id || ""),
     question: String(question || ""),
@@ -27,8 +27,114 @@ function submitCommand(id, question, provider, model, desktopContext, dangerousA
   if (selectedModel !== "") payload.model = selectedModel
   var context = normalizedDesktopContext(desktopContext)
   if (context !== null) payload.desktopContext = context
+  var attachments = normalizedContextSelections(contextAttachments)
+  if (attachments.length > 0) payload.contextAttachments = attachments
   if (dangerousAutoApprove === true) payload.dangerousAutoApprove = true
   return payload
+}
+
+function normalizedRectangle(raw) {
+  var source = raw && typeof raw === "object" ? raw : {}
+  var x = Math.round(Number(source.x)); var y = Math.round(Number(source.y))
+  var width = Math.round(Number(source.width)); var height = Math.round(Number(source.height))
+  if (![x, y, width, height].every(Number.isFinite) || width < 1 || height < 1
+      || width > 12000 || height > 12000 || width * height > 16000000) return null
+  return { x: x, y: y, width: width, height: height }
+}
+
+function normalizedCaptureTarget(raw) {
+  var source = raw && typeof raw === "object" ? raw : {}
+  var result = {}
+  var appId = safeContextText(source.appId, 160)
+  var title = safeContextText(source.title, 240)
+  var bounds = normalizedRectangle(source.bounds)
+  if (appId !== "") result.appId = appId
+  if (title !== "") result.title = title
+  if (bounds !== null) result.bounds = bounds
+  return Object.keys(result).length > 0 ? result : null
+}
+
+function normalizedContextSelections(raw) {
+  var source = Array.isArray(raw) ? raw : []
+  var result = []
+  var ids = {}
+  for (var i = 0; i < source.length && result.length < 4; i++) {
+    var item = source[i] && typeof source[i] === "object" ? source[i] : {}
+    var id = String(item.id || "")
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) || ids[id]) continue
+    var values = Array.isArray(item.representationIds) ? item.representationIds : []
+    var representations = []
+    for (var j = 0; j < values.length && representations.length < 2; j++) {
+      var value = String(values[j] || "")
+      if (["text", "element", "image"].indexOf(value) < 0 || representations.indexOf(value) >= 0) continue
+      representations.push(value)
+    }
+    if (representations.length === 0) continue
+    ids[id] = true
+    result.push({ id: id, representationIds: representations })
+  }
+  return result
+}
+
+function normalizedContextAttachment(raw) {
+  var source = raw && typeof raw === "object" ? raw : {}
+  var id = String(source.id || "")
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) return null
+  var representations = []
+  var rawRepresentations = Array.isArray(source.representations) ? source.representations : []
+  for (var i = 0; i < rawRepresentations.length && representations.length < 3; i++) {
+    var value = rawRepresentations[i] && typeof rawRepresentations[i] === "object" ? rawRepresentations[i] : {}
+    var kind = String(value.kind || value.id || "")
+    if (["text", "element", "image"].indexOf(kind) < 0) continue
+    representations.push({
+      id: kind,
+      kind: kind,
+      label: safeContextText(value.label, 40) || (kind === "image" ? "Screenshot" : kind === "element" ? "Element" : "Text"),
+      preview: safeContextText(value.preview, 320),
+      confidence: Math.max(0, Math.min(1, Number(value.confidence) || 0))
+    })
+  }
+  if (representations.length === 0) return null
+  var available = representations.map(function(value) { return value.id })
+  var selected = []
+  var rawSelected = Array.isArray(source.selectedRepresentationIds) ? source.selectedRepresentationIds : []
+  for (var j = 0; j < rawSelected.length && selected.length < 2; j++) {
+    var selectedId = String(rawSelected[j] || "")
+    if (available.indexOf(selectedId) >= 0 && selected.indexOf(selectedId) < 0) selected.push(selectedId)
+  }
+  if (selected.length === 0) selected.push(available[0])
+  var origin = source.origin && typeof source.origin === "object" ? source.origin : {}
+  return {
+    version: 1,
+    id: id,
+    title: safeContextText(source.title, 160) || "Context capture",
+    origin: {
+      appId: safeContextText(origin.appId, 160),
+      windowTitle: safeContextText(origin.windowTitle, 240)
+    },
+    previewImage: normalizedImage(source.previewImage),
+    representations: representations,
+    selectedRepresentationIds: selected
+  }
+}
+
+function contextRepresentationOptions(attachment) {
+  var source = attachment && attachment.representations && attachment.representations.length !== undefined
+    ? attachment.representations : []
+  var options = source.map(function(value) { return { value: value.id, label: value.label } })
+  var available = source.map(function(value) { return value.id })
+  if (available.indexOf("text") >= 0 && available.indexOf("image") >= 0)
+    options.push({ value: "text+image", label: "Text + screenshot" })
+  if (available.indexOf("element") >= 0 && available.indexOf("image") >= 0)
+    options.push({ value: "element+image", label: "Element + screenshot" })
+  return options
+}
+
+function contextRepresentationMode(attachment) {
+  var values = attachment && attachment.selectedRepresentationIds
+      && attachment.selectedRepresentationIds.length !== undefined
+    ? attachment.selectedRepresentationIds : []
+  return values.join("+")
 }
 
 function safeContextText(value, limit) {

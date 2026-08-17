@@ -68,6 +68,11 @@ export class ImageStore {
     await pruneImageCache(this.#paths);
     return image;
   }
+
+  async remove(image: StoredImage): Promise<void> {
+    if (basename(image.path) !== image.path || !/^[0-9a-f-]{36}\.(?:png|jpg|webp)$/iu.test(image.path)) return;
+    await rm(join(this.#paths.images, image.path), { force: true });
+  }
 }
 
 async function normalizeImage(bytes: Buffer, mime: string, paths: QuickchatPaths, env: NodeJS.ProcessEnv): Promise<Buffer> {

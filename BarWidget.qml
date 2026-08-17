@@ -120,6 +120,9 @@ BarWidget {
     function onIpcHistoryRequested() {
       if (root.routedWidget() === root) root.openHistory()
     }
+    function onContextAttachmentAdded() {
+      if (root.routedWidget() === root) root.open()
+    }
   }
 
   Loader {

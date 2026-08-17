@@ -35,6 +35,24 @@ export const desktopContextSchema = z.object({
 );
 export type DesktopContext = z.infer<typeof desktopContextSchema>;
 
+const captureRectangleSchema = z.object({
+  x: z.number().int().min(-100_000).max(100_000),
+  y: z.number().int().min(-100_000).max(100_000),
+  width: z.number().int().min(1).max(12_000),
+  height: z.number().int().min(1).max(12_000)
+}).strict().refine((value) => value.width * value.height <= 16_000_000, "capture rectangle is too large");
+const captureTargetHintSchema = z.object({
+  appId: contextText(160).optional(),
+  title: contextText(240).optional(),
+  bounds: captureRectangleSchema.optional()
+}).strict().refine((value) => Object.keys(value).length > 0, "capture target hint is empty");
+const contextAttachmentSelectionSchema = z.object({
+  id: z.string().uuid(),
+  representationIds: z.array(z.enum(["text", "element", "image"])).min(1).max(2)
+    .refine((values) => new Set(values).size === values.length, "context representations must be unique")
+}).strict();
+export type ContextAttachmentSelection = z.infer<typeof contextAttachmentSelectionSchema>;
+
 const initializeCommand = z.object({
   type: z.literal("initialize"),
   protocolVersion: z.number().int().positive(),
@@ -47,8 +65,26 @@ const submitCommand = z.object({
   provider: providerIdSchema,
   model: z.preprocess((value) => typeof value === "string" && value.trim() === "" ? undefined : value, z.string().min(1).max(500).optional()),
   desktopContext: desktopContextSchema.optional(),
+  contextAttachments: z.array(contextAttachmentSelectionSchema).max(4).optional(),
   dangerousAutoApprove: z.boolean().optional()
 });
+const contextBeginCommand = z.object({
+  type: z.literal("context_begin"),
+  id: z.string().min(1).max(120),
+  target: captureTargetHintSchema.optional()
+}).strict();
+const contextCaptureCommand = z.object({
+  type: z.literal("context_capture"),
+  id: z.string().min(1).max(120),
+  mode: z.enum(["window", "region"]),
+  region: captureRectangleSchema.optional(),
+  anchor: z.object({
+    x: z.number().int().min(-100_000).max(100_000),
+    y: z.number().int().min(-100_000).max(100_000)
+  }).strict().optional()
+}).strict().refine((value) => value.mode === "window" || value.region !== undefined, "region capture requires geometry");
+const contextDiscardCommand = z.object({ type: z.literal("context_discard"), id: z.string().uuid() }).strict();
+const contextCancelCommand = z.object({ type: z.literal("context_cancel"), id: z.string().min(1).max(120) }).strict();
 const cancelCommand = z.object({ type: z.literal("cancel"), id: z.string().min(1).max(120) });
 const permissionResponseCommand = z.object({
   type: z.literal("permission_response"),
@@ -64,6 +100,10 @@ const copyCommand = z.object({ type: z.literal("copy"), text: z.string().max(1_0
 export const commandSchema = z.discriminatedUnion("type", [
   initializeCommand,
   submitCommand,
+  contextBeginCommand,
+  contextCaptureCommand,
+  contextCancelCommand,
+  contextDiscardCommand,
   cancelCommand,
   permissionResponseCommand,
   chatCommand,
@@ -101,6 +141,24 @@ export type StoredImage = {
 
 export type RenderableImage = StoredImage & { localUrl: string };
 
+export type ContextRepresentationView = {
+  id: "text" | "element" | "image";
+  kind: "text" | "element" | "image";
+  label: string;
+  preview?: string;
+  confidence: number;
+};
+
+export type ContextAttachmentView = {
+  version: 1;
+  id: string;
+  title: string;
+  origin: { appId?: string; windowTitle?: string };
+  previewImage: RenderableImage;
+  representations: ContextRepresentationView[];
+  selectedRepresentationIds: Array<"text" | "element" | "image">;
+};
+
 export type ToolPermission = {
   id: string;
   requestId: string;
@@ -132,13 +190,15 @@ export type ChatRecord = {
 export type ChatView = Omit<ChatRecord, "images"> & { images: RenderableImage[] };
 
 export type BrokerEvent =
-  | { type: "ready"; protocolVersion: 2; features: Array<"desktop-context">; providers: ProviderInfo[]; history: ChatView[] }
+  | { type: "ready"; protocolVersion: 2; features: Array<"desktop-context" | "context-attachments">; providers: ProviderInfo[]; history: ChatView[] }
   | { type: "providers"; providers: ProviderInfo[] }
   | { type: "state"; id?: string; state: "idle" | "preparing" | "streaming" | "stopping"; message?: string }
   | { type: "content"; id: string; delta: string }
   | { type: "permission"; permission: ToolPermission }
   | { type: "permission_closed"; id: string; permissionId: string; reason: "decided" | "expired" | "cancelled" }
   | { type: "image"; id: string; image: RenderableImage }
+  | { type: "context_ready"; id: string; target: { appId?: string; title?: string; window?: z.infer<typeof captureRectangleSchema>; monitor: z.infer<typeof captureRectangleSchema> & { name?: string } } }
+  | { type: "context_attachment"; requestId: string; attachment: ContextAttachmentView }
   | { type: "complete"; chat: ChatView }
   | { type: "complete"; id: string; answer: string }
   | { type: "error"; id?: string; code: string; message: string; retryable: boolean }
