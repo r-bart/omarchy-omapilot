@@ -714,7 +714,11 @@ changed.
     The candidate passed 24 protocol/context, three permission-focus, eight
     presentation, seven quick-action, 27 merged provider-policy, and 23 merged
     protocol tests; the real component reported `OMAPILOT_MOTION_PROBE_OK`.
-  - [x] Install the candidate without changing `shell.json`. The installed
+  - [x] Install the candidate without directly editing `shell.json`; the file
+    remained byte-identical through the swap. During the subsequent restart,
+    Quattro rewrote unrelated clock defaults and the bar transparency field.
+    The complete OmaPilot/Quickchat settings object remained identical, so the
+    unrelated live rewrite was preserved rather than rolled back. The installed
     `runtime/src/context.ts` hash remains
     `bc12983327fcdde9a3960c8f3d57fa543f56f270d5597ab097cd6e6de03dfa0d`
     and the installed provider broker hash remains
