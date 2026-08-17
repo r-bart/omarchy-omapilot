@@ -671,3 +671,64 @@ changed.
   `runtime/policies/automatic.md`; and `git diff --check` passes. No plugin,
   shell, other worktree, or live desktop state was changed. Installed waiting,
   streaming, and real harness behavior remain the next owner gate.
+
+## OmaPilot publication and local test install checkpoint 7 (2026-08-17)
+
+- Goal: publish the accumulated OmaPilot checkpoint under its approved public
+  identity and prepare the existing local installation for owner testing
+  without replacing its separate desktop-context/provider-tools payload.
+- Done criteria: the public repository is named `omarchy-omapilot`; README,
+  security, and marketplace URLs use that name; stable plugin/runtime/data
+  identifiers remain compatible; `quickchat-style-revamp` is committed and
+  pushed; a backed-up merged install passes source, merged-QML, provider-policy,
+  protocol, motion, manifest, and shell-startup gates; owner interaction remains
+  explicitly separate from static and startup evidence.
+- Branch/worktree: `quickchat-style-revamp` at
+  `/home/sbull/worktrees/omarchy-quickchat-style-revamp`; published repository
+  `spencerbull/omarchy-omapilot`. Commit `03c569b` contains the complete visual,
+  interaction, permission-setting, quick-action, error, motion, prompt, test,
+  and public-name checkpoint.
+- Allowed: the owner's explicit authorization for commit/push, public GitHub
+  repository rename/description update, guarded three-way local install, and one
+  unlocked shell restart; scoped follow-up documentation and prompt-compatibility
+  wording on this branch.
+- Forbidden: edits to another worktree, merging or copying the context branch,
+  changing the stable reverse-DNS ID/IPC/data paths, weakening broker/provider
+  policy, opening the panel or executing a device action on the owner's behalf,
+  publishing a release, or merging either open branch.
+- Verification gates:
+  - [x] Reconfirm the branch was exactly based on `origin/main` commit `caa2439`
+    before the checkpoint commit and that the dirty files belonged to the
+    accumulated owner-directed OmaPilot work.
+  - [x] Pass full source validation: manifest/release contracts, typecheck,
+    lint, deterministic broker build, 122 runtime tests with six live-provider
+    skips, 18 protocol, three permission-focus, eight presentation, seven
+    quick-action QML checks, the real-component motion probe, headless renders,
+    and `git diff --check`. Shellcheck remained unavailable and was reported.
+  - [x] Rename the public repository to `spencerbull/omarchy-omapilot`, update
+    its description, preserve open provider-tools PR 3, and push
+    `quickchat-style-revamp` at `03c569b`.
+  - [x] Build and validate an installed-payload merge that preserves desktop
+    context and the provider bundle while applying only the new response-status
+    layout, waiting indicator, shared prompt, and public documentation deltas.
+    The candidate passed 24 protocol/context, three permission-focus, eight
+    presentation, seven quick-action, 27 merged provider-policy, and 23 merged
+    protocol tests; the real component reported `OMAPILOT_MOTION_PROBE_OK`.
+  - [x] Install the candidate without changing `shell.json`. The installed
+    `runtime/src/context.ts` hash remains
+    `bc12983327fcdde9a3960c8f3d57fa543f56f270d5597ab097cd6e6de03dfa0d`
+    and the installed provider broker hash remains
+    `61212d41c515994f648fba6ddc756664aee83dd68fec747aa604ad7f4815f9ca`.
+    Rollback snapshot:
+    `/home/sbull/.local/state/omarchy/quickchat-backups/pre-omapilot-motion-prompt-20260817T052319Z`.
+  - [x] Complete the unlocked guarded restart and verify shell IPC `ping`,
+    plugin discovery as enabled OmaPilot, and one new shell-owned installed
+    broker. The restart wrapper briefly exited status 255 after looking for a
+    default config, then its handler relaunched the correct Omarchy shell; the
+    settled log contains no OmaPilot/Quickchat load error.
+  - [ ] Owner-run visual, pointer, keyboard, settings persistence, real waiting/
+    streaming/completion/error, web-search, local action, permission, and
+    dangerous-auto-approve testing.
+- Current checkpoint: the public rename, branch push, merged local install, and
+  startup verification are complete. Static and startup evidence is green;
+  installed interaction and real-harness behavior remain owner validation.

@@ -11,6 +11,7 @@ Use this operating loop:
    include attached desktop context, installed skills, Omarchy commands, other
    installed CLIs, apps, and plugins. Prefer a structured action or an Omarchy
    interface over a generic shell command when both can complete the request.
+   Use relevant installed skills when they contain instructions for the request.
 3. Use the least authority that completes the outcome. Answer directly when no
    tool is needed. For local work, inspect or act through available local tools.
    For current, external, or uncertain information, use web search when it is
