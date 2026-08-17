@@ -5,10 +5,9 @@ import "components" as OmaPilot
 
 ShellRoot {
   id: root
-  property real waitingProgress: 0
-  property int waitingDuration: 0
-  property bool transitionChecked: false
-  property bool cadenceChecked: false
+  property real waitingPhase: 0
+  property real transitionPhase: 0
+  property real activityPhase: 0
   property bool failed: false
 
   function fail(message) {
@@ -18,100 +17,77 @@ ShellRoot {
 
   Window {
     width: 460
-    height: 52
+    height: 28
     visible: true
     color: "transparent"
 
-    Column {
+    OmaPilot.WaitingIndicator {
+      id: indicator
       anchors.fill: parent
-
-      OmaPilot.WaitingIndicator {
-        id: transitionIndicator
-        width: parent.width
-        height: 24
-        active: true
-        streaming: false
-        motionEnabled: true
-        message: streaming ? "Receiving response…" : "Preparing Codex…"
-      }
-
-      OmaPilot.WaitingIndicator {
-        id: cadenceIndicator
-        width: parent.width
-        height: 24
-        active: true
-        streaming: false
-        motionEnabled: true
-        message: "Preparing Codex…"
-      }
+      active: true
+      streaming: false
+      motionEnabled: true
+      message: streaming ? "Receiving response…" : "Preparing Codex…"
     }
   }
 
   Timer {
-    interval: 100
+    interval: 180
     running: true
     repeat: false
     onTriggered: {
-      root.waitingProgress = transitionIndicator.pulseProgress
-      root.waitingDuration = transitionIndicator.activePulseDuration
-      if (!transitionIndicator.pulseRunning || root.waitingProgress <= 0)
-        root.fail("waiting energy wave did not start")
+      root.waitingPhase = indicator.pulseProgress
+      if (!indicator.pulseRunning || root.waitingPhase <= 0
+          || root.waitingPhase >= 0.20)
+        root.fail("waiting frame-clock signal did not advance at a bounded rate")
 
-      transitionIndicator.streaming = true
-      if (!transitionIndicator.pulseRunning)
-        root.fail("first token stopped the active energy wave")
-      if (!transitionIndicator.pulseQueued)
-        root.fail("first token did not queue the streaming wave")
-      if (transitionIndicator.pulseProgress < root.waitingProgress - 0.03)
-        root.fail("first token reset the active energy wave")
-      if (transitionIndicator.activePulseDuration !== root.waitingDuration)
-        root.fail("first token changed the in-flight wave timing")
+      root.transitionPhase = indicator.pulseProgress
+      indicator.streaming = true
+      if (!indicator.pulseRunning || indicator.pulseProgress !== root.transitionPhase)
+        root.fail("first token reset the frame-clock phase")
 
-      transitionIndicator.activityRevision += 1
-      if (!transitionIndicator.pulseQueued)
-        root.fail("content event was discarded while the wave was active")
+      root.activityPhase = indicator.pulseProgress
+      indicator.activityRevision += 1
+      if (indicator.pulseProgress !== root.activityPhase)
+        root.fail("token activity restarted the frame-clock phase")
+    }
+  }
 
-      transitionIndicator.active = false
-      if (transitionIndicator.pulseRunning || transitionIndicator.pulseQueued
-          || transitionIndicator.pulseProgress !== 0
-          || transitionIndicator.waitingCadenceRunning)
-        root.fail("inactive motion did not settle")
+  Timer {
+    interval: 520
+    running: true
+    repeat: false
+    onTriggered: {
+      if (!indicator.pulseRunning || indicator.pulseProgress <= root.transitionPhase)
+        root.fail("streaming signal did not continue from the waiting phase")
+      if (indicator.signalSpeed < 0.76 || indicator.signalSpeed > 0.79)
+        root.fail("waiting-to-streaming velocity did not ease to its target")
 
-      transitionIndicator.motionEnabled = false
-      transitionIndicator.active = true
-      if (transitionIndicator.pulseRunning || transitionIndicator.pulseQueued
-          || transitionIndicator.pulseProgress !== 0
-          || transitionIndicator.waitingCadenceRunning)
+      indicator.active = false
+      if (indicator.pulseRunning || indicator.pulseProgress !== 0)
+        root.fail("inactive motion did not stop and settle")
+
+      indicator.signalPhase = 0
+      var restingQuarter = indicator.nodeEnergy(0.25)
+      var restingHalf = indicator.nodeEnergy(0.5)
+      var restingThreeQuarter = indicator.nodeEnergy(0.75)
+      indicator.signalPhase = 1
+      if (indicator.nodeEnergy(0.25) !== restingQuarter
+          || indicator.nodeEnergy(0.5) !== restingHalf
+          || indicator.nodeEnergy(0.75) !== restingThreeQuarter)
+        root.fail("phase wrap changed resting geometry")
+
+      indicator.signalPhase = 0
+      indicator.advanceSignal(1)
+      if (indicator.signalPhase <= 0 || indicator.signalPhase > 0.041)
+        root.fail("delayed-frame phase travel was not capped")
+      indicator.settle()
+
+      indicator.motionEnabled = false
+      indicator.active = true
+      if (indicator.pulseRunning || indicator.pulseProgress !== 0)
         root.fail("reduced motion did not remain settled")
 
-      root.transitionChecked = true
-    }
-  }
-
-  Timer {
-    interval: 900
-    running: true
-    repeat: false
-    onTriggered: {
-      if (cadenceIndicator.pulseRunning)
-        root.fail("waiting wave did not return to its rest state")
-      if (!cadenceIndicator.waitingCadenceRunning)
-        root.fail("waiting rest cadence was not scheduled")
-      if (cadenceIndicator.pulseProgress !== 0)
-        root.fail("waiting wave endpoint did not settle continuously")
-      root.cadenceChecked = true
-    }
-  }
-
-  Timer {
-    interval: 2250
-    running: true
-    repeat: false
-    onTriggered: {
-      if (!cadenceIndicator.pulseRunning || cadenceIndicator.pulseProgress <= 0)
-        root.fail("waiting cadence did not begin its next restrained wave")
-      if (!root.transitionChecked || !root.cadenceChecked)
-        root.fail("motion probe stages did not complete")
       if (!root.failed) console.log("OMAPILOT_MOTION_PROBE_OK")
       Qt.quit()
     }

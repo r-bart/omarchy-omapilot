@@ -946,3 +946,49 @@ turn per provider.
   dependencies; this presentation-only diff neither invokes their servers nor
   changes the lockfile. Draft PR 5 is open against main from
   `omapilot-motion-revamp`; installed and live shell state are unchanged.
+
+## OmaPilot frame-clock motion correction checkpoint 10 (2026-08-17)
+
+- Goal: replace the still-rough installed waiting/streaming pulse with a truly
+  continuous, understated OmaPilot signal whose motion is independent of token
+  burst timing and whose first-token transition moves no response geometry.
+- Owner evidence: live testing of installed PR 5 at exact commit `93cd8f5`
+  rejected checkpoint 9. The real-component capture advanced through phase
+  samples `0.013`, `0.102`, `0.346`, `0.723`, and `0.927` at equal 110 ms
+  intervals, confirming that the cubic timeline visibly accelerated through
+  the middle; queued streaming pulses could then run back-to-back.
+- Done criteria: use the Qt frame clock with capped delayed-frame deltas and
+  constant phase velocity; wait-to-stream eases speed without resetting phase;
+  token revisions do not restart or retime motion; wrap occurs at identical
+  resting geometry; first-token content uses opacity only; inactive and
+  reduced-motion states stop and settle; focused QML/render/repository checks,
+  PR-head CI, installed validation, shell health, and an owner visual gate pass.
+- Branch/worktree: `omapilot-motion-revamp` at
+  `/home/sbull/worktrees/omarchy-omapilot-motion-revamp`; update draft PR 5.
+- Allowed: presentation-only QML, focused motion tests/renders, documentation,
+  commits and push to the existing PR, exact reviewed local plugin update, and
+  bounded live interaction/capture for this motion flow.
+- Forbidden: broker/provider/policy/permission/protocol changes, stable ID or
+  persistence migration, edits to another worktree, release, merge, unrelated
+  desktop configuration, shell restart without a demonstrated need and clear
+  lock guard, or device-changing prompt execution.
+- Verification gates:
+  - [x] Record the failed owner gate and measure the previous non-uniform phase.
+  - [x] Replace restartable eased pulses with one frame-clock signal and remove
+    first-token translation.
+  - [x] Add continuity, frame-delta cap, phase-handoff, token-independence, and
+    reduced-motion regressions plus temporal renders.
+  - [x] Pass focused QML/UI checks, full validation, deterministic package,
+    `git diff --check`, and orchestrator diff review.
+  - [ ] Commit/push the corrected PR head and pass exact-head CI.
+  - [ ] Install that exact head, preserve center placement/settings, and verify
+    shell/broker health without a restart unless required.
+  - [ ] Owner confirms the live motion now meets the interaction-quality bar.
+- Current checkpoint: source gates are complete. The real-component probe and
+  fourteen-frame renderer pass with uniform waiting phase deltas and a smooth
+  speed handoff; the focused UI contract passes 23 protocol/context, three
+  permission-focus, eight presentation, and seven quick-action checks; full
+  validation passes 136 runtime tests with 12 opt-in live skips; three broker
+  hashes are identical; package dry-run and Git whitespace checks pass. The
+  installed plugin remains the rejected `93cd8f5` build until this corrected
+  branch is committed, pushed, and passes exact-head CI.

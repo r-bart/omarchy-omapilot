@@ -61,14 +61,16 @@ for editing, removal, and directional reordering; the list remains inside the
 same capped settings scroll owner.
 
 The response captures verify three distinct states without changing transcript
-ownership: a fixed-route energy wave while waiting, real-content-driven node
-energy while streaming, and an urgent but compact error notice. Waiting and
-streaming share one fixed, screen-aware status slot, and their copy crossfades,
-so phase changes do not resize the adjacent question. The route has no moving
-marker: both ends of each wave render the same resting geometry, eliminating
-the visible teleport that made the earlier treatment feel rough. The error
-notice opens a separate selectable details pane with the normalized message,
-code, retryability, and Copy action. No animation claims completion percentage.
+ownership: a clipped telemetry beam crossing a fixed route while waiting, the
+same frame-clock signal with a gently eased velocity while streaming, and an
+urgent but compact error notice. Waiting and streaming share one fixed,
+screen-aware status slot, and their copy crossfades, so phase changes do not
+resize the adjacent question.
+The route has no chunk-driven restart or slow-fast-slow easing; its moving beam
+is fully transparent at the clipped edge before phase wrapping, while the
+fixed nodes share identical resting geometry. The error notice
+opens a separate selectable details pane with the normalized message, code,
+retryability, and Copy action. No animation claims completion percentage.
 
 Copy, icon weight, border contrast, and control density are internally
 consistent. The implementation title and mark are intentionally smaller than
@@ -114,6 +116,14 @@ conversation content.
     between waiting waves, coalesces streaming bursts, crossfades phase copy,
     uses `SmoothedAnimation` for moving height/scroll targets, and replaces the
     header bounce with a quiet accent state.
+11. Owner validation of that build still found the energy transfer rough. The
+    captured phase samples (`0.013`, `0.102`, `0.346`, `0.723`, `0.927`) proved
+    the cubic timeline accelerated sharply through the middle, while queued
+    token pulses could run back-to-back. The replacement uses `FrameAnimation`
+    with capped frame deltas and constant phase velocity, renders a clipped
+    telemetry beam that is invisible at wrap, eases only the waiting-
+    to-streaming speed change, ignores burst timing, and removes the first-token
+    vertical slide so response geometry has one less moving axis.
 
 ## State and interaction evidence
 
@@ -129,11 +139,11 @@ conversation content.
   the bounded production settings view; focused broker tests prove the visual
   flag's no-prompt behavior separately from this rendering evidence.
 - The headless preview fails on QML load errors and rejects TypeError output.
-- A Quickshell motion probe exercises the real component timeline and fails if
-  first-token streaming stops, resets, or changes the duration of an in-flight
-  wave; if a content event is discarded while it runs; if waiting skips its
-  resting cadence; or if reduced motion leaves animation queued.
-- A separate real-component renderer captures ten consecutive waiting-to-
+- A Quickshell motion probe exercises the real component frame clock and fails
+  if waiting does not advance at a bounded rate, first-token streaming resets
+  phase, token activity retimes the signal, a delayed frame exceeds the capped
+  delta, or reduced motion leaves the clock running.
+- A separate real-component renderer captures fourteen consecutive waiting-to-
   streaming frames. The UI contract requires every frame and successful harness
   completion, making temporal load failures visible instead of relying on one
   static screenshot or source grep.
@@ -148,8 +158,9 @@ conversation content.
 
 - P0: none.
 - P1: none.
-- P2: none after the second render.
+- P2: checkpoint 9 was rejected in owner testing; the corrected frame-clock
+  candidate passes static temporal review and awaits a new installed gate.
 - P3: the native mark/title scale is smaller than the generated reference;
   accepted for the shell-sized checkpoint.
 
-final result: passed
+final result: static pass; installed owner gate pending

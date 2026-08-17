@@ -550,7 +550,6 @@ Panel {
                     onVisibleChanged: {
                       firstTokenReveal.stop()
                       opacity = visible && root.motionEnabled ? 0 : 1
-                      answerRevealTranslate.y = visible && root.motionEnabled ? Style.spacing.sm : 0
                       if (visible && root.motionEnabled) firstTokenReveal.restart()
                     }
                     onLinkActivated: function(url) { Quickchat.QuickchatStore.activateLink(url) }
@@ -561,26 +560,13 @@ Panel {
                     }
                     onCopyRequested: function(text) { Quickchat.QuickchatStore.copyText(text) }
 
-                    transform: Translate {
-                      id: answerRevealTranslate
-                    }
-
-                    ParallelAnimation {
+                    NumberAnimation {
                       id: firstTokenReveal
-                      NumberAnimation {
-                        target: markdownAnswer
-                        property: "opacity"
-                        to: 1
-                        duration: 160
-                        easing.type: Easing.OutCubic
-                      }
-                      NumberAnimation {
-                        target: answerRevealTranslate
-                        property: "y"
-                        to: 0
-                        duration: 180
-                        easing.type: Easing.OutCubic
-                      }
+                      target: markdownAnswer
+                      property: "opacity"
+                      to: 1
+                      duration: 160
+                      easing.type: Easing.OutCubic
                     }
                   }
                 }

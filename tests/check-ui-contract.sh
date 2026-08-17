@@ -152,14 +152,17 @@ grep -Fq 'tooltipText: "Jump to the newest response"' "$repo_dir/Panel.qml"
 grep -Fq 'Quickchat.WaitingIndicator {' "$repo_dir/Panel.qml"
 grep -Fq 'id: responseStatusSlot' "$repo_dir/Panel.qml"
 grep -Fq 'Layout.minimumWidth: Style.space(140)' "$repo_dir/Panel.qml"
-grep -Fq 'property bool pulseQueued: false' "$repo_dir/components/WaitingIndicator.qml"
-grep -Fq 'property real waveProgress: 0' "$repo_dir/components/WaitingIndicator.qml"
-grep -Fq 'property int activePulseDuration: 760' "$repo_dir/components/WaitingIndicator.qml"
-grep -Fq 'function pulseStrength(position)' "$repo_dir/components/WaitingIndicator.qml"
-grep -Fq 'id: waitingCadence' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'property real signalPhase: 0' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'property real signalSpeed: streaming ? 0.78 : 0.55' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'function nodeEnergy(position)' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'function edgeEnvelope()' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'id: signalClock' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'id: signalBeam' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'x: root.signalPhase * route.width - width / 2' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'FrameAnimation {' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'function advanceSignal(frameDelta)' "$repo_dir/components/WaitingIndicator.qml"
+grep -Fq 'Math.min(0.05, Math.max(0, frameDelta))' "$repo_dir/components/WaitingIndicator.qml"
 grep -Fq 'id: messageSwap' "$repo_dir/components/WaitingIndicator.qml"
-grep -Fq 'if (wavePulse.running) {' "$repo_dir/components/WaitingIndicator.qml"
-grep -Fq 'onActivityRevisionChanged:' "$repo_dir/components/WaitingIndicator.qml"
 grep -Fq 'activityRevision++' "$repo_dir/components/QuickchatStore.qml"
 if grep -Fq 'pulseTranslate' "$repo_dir/components/WaitingIndicator.qml"; then
   printf 'OmaPilot activity motion must not teleport a moving marker\n' >&2
@@ -173,8 +176,12 @@ if ! grep -Fq 'SmoothedAnimation {' "$repo_dir/Panel.qml"; then
   printf 'OmaPilot streaming geometry must smooth continuously changing targets\n' >&2
   exit 1
 fi
-if grep -Fq 'onStreamingChanged: wavePulse.restart()' "$repo_dir/components/WaitingIndicator.qml"; then
-  printf 'Waiting-to-streaming motion must not reset an in-flight pulse\n' >&2
+if grep -Eq 'onStreamingChanged:|onActivityRevisionChanged:' "$repo_dir/components/WaitingIndicator.qml"; then
+  printf 'Phase and token changes must not restart or retime the activity signal\n' >&2
+  exit 1
+fi
+if grep -Fq 'answerRevealTranslate' "$repo_dir/Panel.qml"; then
+  printf 'First-token reveal must not translate response geometry\n' >&2
   exit 1
 fi
 grep -Fq "You are OmaPilot, Omarchy's action-oriented system copilot" \
@@ -275,7 +282,7 @@ fi
 if grep -Eq "omapilot motion preview failed|Failed to load|Type .* unavailable|Cannot assign|TypeError" \
     "$smoke_root/motion-preview.log" \
     || ! grep -Fq 'OMAPILOT_MOTION_PREVIEW_OK' "$smoke_root/motion-preview.log" \
-    || [[ $(find "$motion_frame_root" -maxdepth 1 -type f -name 'frame-*.png' | wc -l) -ne 10 ]]; then
+    || [[ $(find "$motion_frame_root" -maxdepth 1 -type f -name 'frame-*.png' | wc -l) -ne 14 ]]; then
   cat "$smoke_root/motion-preview.log"
   exit 1
 fi
