@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -32,6 +33,14 @@ async function isExecutable(path: string): Promise<boolean> {
 
 function repoRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+}
+
+export function automaticInstructionPath(): string {
+  return resolve(repoRoot(), "runtime/policies/automatic.md");
+}
+
+export function automaticInstructions(): string {
+  return readFileSync(automaticInstructionPath(), "utf8").trim();
 }
 
 async function adapterExecutable(provider: "codex" | "claude", env: NodeJS.ProcessEnv): Promise<string | undefined> {

@@ -45,6 +45,7 @@ required=(
   runtime/dist/adapters/claude-agent-acp.js
   runtime/dist/adapters/claude-agent-acp.js.LEGAL.txt
   runtime/dist/adapters/Apache-2.0.txt
+  runtime/policies/automatic.md
   runtime/bin/quickchat-broker
   runtime/bin/codex-acp
   runtime/bin/claude-agent-acp
@@ -102,7 +103,7 @@ stage_parent=$(mktemp -d "${TMPDIR:-/tmp}/quickchat-package.XXXXXX")
 trap 'rm -rf -- "$stage_parent"' EXIT
 bundle_name="omarchy-quickchat-runtime-${version}-${platform}"
 stage="$stage_parent/$bundle_name"
-mkdir -p "$stage/runtime/dist/adapters" "$stage/runtime/bin"
+mkdir -p "$stage/runtime/dist/adapters" "$stage/runtime/bin" "$stage/runtime/policies"
 
 cp "$repo_root/package.json" "$repo_root/package-lock.json" "$stage/"
 cp "$repo_root/runtime/dist/quickchat-broker.js" "$stage/runtime/dist/"
@@ -110,6 +111,7 @@ cp "$repo_root/runtime/dist/adapters/codex-acp.js" "$stage/runtime/dist/adapters
 cp "$repo_root/runtime/dist/adapters/claude-agent-acp.js" "$stage/runtime/dist/adapters/"
 cp "$repo_root/runtime/dist/adapters/claude-agent-acp.js.LEGAL.txt" "$stage/runtime/dist/adapters/"
 cp "$repo_root/runtime/dist/adapters/Apache-2.0.txt" "$stage/runtime/dist/adapters/"
+cp "$repo_root/runtime/policies/automatic.md" "$stage/runtime/policies/"
 cp "$repo_root/runtime/bin/quickchat-broker" "$repo_root/runtime/bin/codex-acp" \
   "$repo_root/runtime/bin/claude-agent-acp" "$stage/runtime/bin/"
 cp "$repo_root/runtime/adapters.release.json" "$stage/runtime/"

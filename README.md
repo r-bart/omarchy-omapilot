@@ -1,19 +1,24 @@
-# Omarchy Quickchat
+# OmaPilot for Omarchy
 
-Quickchat is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget for fast, disposable AI answers. It uses the Codex, Claude, or OpenCode harness already authenticated on your machine, renders Markdown in a themed panel, remembers the latest 30 completed chats, and can hand an answer to Herdr when you want to keep working.
+OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget for asking questions and working on your desktop through an authenticated AI harness. Device actions stay behind an exact, inspectable approval unless you explicitly enable **Dangerous auto-approve** in settings. OmaPilot renders Markdown in a themed panel, remembers the latest 30 completed chats, and can hand an answer to Herdr when you want to keep working.
+
+The public project and product name is now OmaPilot. The existing plugin ID, IPC target, package/runtime identifiers, and local `quickchat` data paths remain unchanged so current installations and user data continue to work.
 
 > [!IMPORTANT]
-> Quickchat 0.1.1 is the current published release. Protocol-2 version `0.2.0`
+> The compatibility-ID `0.1.1` build is the current published release. Protocol-2 version `0.2.0`
 > remains unreleased until its release and marketplace gates are complete in
 > [`TODO.md`](TODO.md).
 
 ## Preview
 
-![Quickchat answering from OpenCode in the active Omarchy Quattro theme](docs/assets/quickchat-live.png)
+![OmaPilot answering from OpenCode in the active Omarchy Quattro theme](docs/assets/quickchat-live.png)
 
 The compact composer expands from the right side of the bar. Its result panel
 supports selectable Markdown, code blocks, tables, safe clickable links,
-bounded images, Copy, New chat, History, and Continue in Herdr.
+bounded images, Copy, New chat, History, and Continue in Herdr. The in-panel
+settings pane can add, edit, remove, and reorder up to five quick actions.
+Waiting uses a finite route reveal, streamed content drives its own activity
+pulse, and a compact error notice opens an inspectable details pane.
 
 ## Requirements
 
@@ -23,14 +28,14 @@ bounded images, Copy, New chat, History, and Continue in Herdr.
 - At least one installed and authenticated harness: `codex`, `claude`, or `opencode`.
 - Optional: Voxtype for dictation and Herdr for durable continuation.
 
-Quickchat does not install a harness, log you in, or read provider credentials. Authentication and model availability remain owned by the selected harness. The model picker is populated at startup from Codex's read-only app-server catalog, a non-persisted Claude ACP discovery session, or OpenCode's native catalog; if discovery is unavailable, Quickchat safely falls back to the harness default.
+OmaPilot does not install a harness, log you in, or read provider credentials. Authentication and model availability remain owned by the selected harness. The model picker is populated at startup from Codex's read-only app-server catalog, a non-persisted Claude ACP discovery session, or OpenCode's native catalog; if discovery is unavailable, OmaPilot safely falls back to the harness default.
 
 ## Install
 
 Review the repository before enabling it: Omarchy plugins execute unsandboxed inside the long-lived shell process.
 
 ```bash
-omarchy plugin add https://github.com/spencerbull/omarchy-quickchat.git
+omarchy plugin add https://github.com/spencerbull/omarchy-omapilot.git
 omarchy plugin validate ~/.config/omarchy/plugins/io.github.spencerbull.quickchat
 omarchy plugin enable io.github.spencerbull.quickchat right
 ```
@@ -44,7 +49,7 @@ omarchy plugin update io.github.spencerbull.quickchat
 omarchy plugin remove io.github.spencerbull.quickchat
 ```
 
-Removal deletes the cloned plugin. Quickchat deliberately leaves user-owned history and cached runtime files in place. Use **Clear all** before removal to erase history and cached chat images. If the plugin is already gone, inspect and remove the `quickchat` directories under your effective `XDG_STATE_HOME` and `XDG_CACHE_HOME` with a file manager; the default locations are `~/.local/state/quickchat` and `~/.cache/quickchat`.
+Removal deletes the cloned plugin. OmaPilot deliberately leaves user-owned history and cached runtime files in place. Use **Clear all** before removal to erase history and cached chat images. If the plugin is already gone, inspect and remove the compatibility-path `quickchat` directories under your effective `XDG_STATE_HOME` and `XDG_CACHE_HOME` with a file manager; the default locations are `~/.local/state/quickchat` and `~/.cache/quickchat`.
 
 ## How it works
 
@@ -52,7 +57,7 @@ Removal deletes the cloned plugin. Quickchat deliberately leaves user-owned hist
 Omarchy BarWidget/Panel
         │ one JSON command/event per line
         ▼
-Quickchat broker
+OmaPilot broker
         │ Agent Client Protocol over stdio
         ├── Codex ACP ── authenticated Codex CLI
         ├── Claude ACP ─ authenticated Claude harness
@@ -61,8 +66,9 @@ Quickchat broker
 
 Codex and Claude use exact, source-pinned official ACP adapter packages bundled in the repository. OpenCode uses its native `opencode acp` command. The broker normalizes provider discovery, streamed text/images, cancellation, permissions, errors, and session identities; QML does not parse provider-specific output.
 
-There is no chat/web/tools mode. Select a harness and model, ask one question,
-and the broker supplies that harness's reviewed automatic policy:
+Every request uses the selected harness and its reviewed automatic policy.
+OmaPilot displays each exact device approval, or auto-selects its allow-once
+option when the dangerous setting is enabled:
 
 - **Codex** may use its read-only device tools and read files available to the
   current user without asking. Native web search stays disabled in the same
@@ -82,19 +88,38 @@ and the broker supplies that harness's reviewed automatic policy:
 Every supported permission decision is bound to the exact in-flight request.
 Oversized or visually ambiguous requests, persistent grants, arbitrary MCP,
 browser/computer control, unclassified tools, and uninspectable targets remain
-blocked. Quickchat removes its per-turn working directory afterward. Raw tool
+blocked. OmaPilot removes its per-turn working directory afterward. Raw tool
 requests, decisions, inputs, and outputs are not stored in chat history; a
 completed answer may contain tool- or web-derived text and is retained normally.
-Quickchat never bypasses a harness permission system.
+OmaPilot never bypasses a harness permission system. When **Dangerous
+auto-approve** is enabled, a submission automatically selects only the
+normalized request's provider-native **Allow once** choice instead of showing
+the approval card. The setting cannot select a persistent grant and does not
+enable tools for a harness whose provider policy blocks them. It is off by
+default because approved commands run with the authority described above and
+may modify or delete user data or use the network.
 
 The broker does not classify prompt phrases or hardcode individual use cases.
 Questions and action requests follow the same provider path; the selected
-harness decides whether a tool is useful, and any broader device command still
-pauses on the exact request-bound approval described above.
+harness decides whether a tool is useful. Any broader device command remains
+inside the exact request-bound decision described above, whether that decision
+is made from the approval card or by Dangerous auto-approve.
+
+Each harness receives the same hidden OmaPilot instructions. They frame desktop
+context as optional, untrusted evidence; direct the harness to discover relevant
+installed skills, Omarchy commands, CLIs, apps, and plugins before declining;
+prefer the system default browser for authorized navigation; and use available
+web search for current or otherwise unknown information. These instructions
+shape how a harness chooses among capabilities but cannot enable a capability
+or bypass the provider policy and approval boundary above.
 
 ## Storage and privacy
 
-Quickchat persists only completed chats, capped at the newest 30. A chat contains the question, rendered answer source, timestamp, provider/model metadata, content references, and a resumable session identity when the harness supplies one. Draft text, authentication output, tokens, environment variables, and provider credentials are not persisted.
+OmaPilot persists only completed chats, capped at the newest 30. A chat contains the question, rendered answer source, timestamp, provider/model metadata, content references, and a resumable session identity when the harness supplies one. Draft text, authentication output, tokens, environment variables, and provider credentials are not persisted.
+
+Quick-action labels, prompts, and order are stored with the existing inline
+Omarchy widget settings. OmaPilot validates that list on every read, drops
+invalid entries, and caps it at five.
 
 | Path | Purpose |
 | --- | --- |
@@ -102,12 +127,12 @@ Quickchat persists only completed chats, capped at the newest 30. A chat contain
 | `${XDG_CACHE_HOME:-~/.cache}/quickchat/` | Bounded, validated image cache |
 | `${XDG_RUNTIME_DIR}/quickchat/` | Per-login sockets, temporary dictation, and in-flight data |
 
-Remote Markdown images are not fetched automatically. Quickchat shows the origin and requires a click before loading a validated HTTPS image. Links are scheme-checked and never interpolated into a shell command. See [`SECURITY.md`](SECURITY.md) for the threat model and reporting process.
+Remote Markdown images are not fetched automatically. OmaPilot shows the origin and requires a click before loading a validated HTTPS image. Links are scheme-checked and never interpolated into a shell command. See [`SECURITY.md`](SECURITY.md) for the threat model and reporting process.
 
 ## Optional integrations
 
-- **Voxtype:** when `voxtype` is installed and ready, the microphone records directly to a file under `$XDG_RUNTIME_DIR/quickchat`; Quickchat reads that transcript after recording stops. It never simulates keyboard input or modifies Voxtype configuration.
-- **Herdr:** when `herdr` is installed, Continue in Herdr launches it when needed or raises its existing window, creates or reuses a dedicated `Quickchat` workspace, creates a labeled tab, closes the Quickchat panel, and focuses the resumed agent pane. It resumes the native harness session when possible, otherwise starts the matching agent with a compact transcript and labels the fallback. This is an explicit handoff from Quickchat's one-shot permission boundary to Herdr's normal native-agent permission model; Codex resumes read-only and asks before commands.
+- **Voxtype:** when `voxtype` is installed and ready, the microphone records directly to a file under `$XDG_RUNTIME_DIR/quickchat`; OmaPilot reads that transcript after recording stops. It never simulates keyboard input or modifies Voxtype configuration.
+- **Herdr:** when `herdr` is installed, Continue in Herdr launches it when needed or raises its existing window, creates or reuses the compatibility-named `Quickchat` workspace, creates a labeled tab, closes the OmaPilot panel, and focuses the resumed agent pane. It resumes the native harness session when possible, otherwise starts the matching agent with a compact transcript and labels the fallback. This is an explicit handoff from OmaPilot's one-shot permission boundary to Herdr's normal native-agent permission model; Codex resumes read-only and asks before commands.
 
 Both integrations disappear or show a clear unavailable state when their required command is missing.
 
@@ -130,4 +155,4 @@ The package helper stages the self-contained checked-in runtime, emits a lockfil
 
 ## License and attribution
 
-Quickchat is MIT licensed. ACP adapters and bundled dependencies retain their own licenses; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and the generated release SBOM.
+OmaPilot is MIT licensed. ACP adapters and bundled dependencies retain their own licenses; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and the generated release SBOM.

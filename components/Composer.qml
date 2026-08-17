@@ -22,14 +22,24 @@ Item {
   signal escapeRequested()
 
   readonly property bool inputActive: inlineMode ? inlineInput.activeFocus : promptInput.activeFocus
-  readonly property bool popupOpen: inlineProvider.popupOpen || providerPicker.popupOpen || modelPicker.popupOpen
+  readonly property bool popupOpen: inlineProvider.popupOpen
 
   implicitWidth: inlineMode ? Style.space(360) : Style.space(520)
   implicitHeight: inlineMode ? Style.bar.sizeHorizontal : panelComposer.implicitHeight
 
   function submit() {
     if (!backend || !backend.submit(draftText)) return
+    draftText = ""
     submitted()
+  }
+
+  function setDraft(text) {
+    draftText = String(text || "")
+    Qt.callLater(function() {
+      root.forceInputFocus()
+      if (!root.inlineMode) promptInput.cursorPosition = promptInput.length
+      else inlineInput.cursorPosition = inlineInput.length
+    })
   }
 
   function forceInputFocus() {
@@ -39,8 +49,6 @@ Item {
 
   function closePopups() {
     inlineProvider.close()
-    providerPicker.close()
-    modelPicker.close()
     forceInputFocus()
   }
 
@@ -87,11 +95,13 @@ Item {
       Layout.fillHeight: true
       enabled: root.backend && !root.backend.busy
       text: root.draftText
-      placeholderText: root.backend && root.backend.initialized ? "Ask anything…" : "Starting…"
+      placeholderText: root.backend && root.backend.initialized
+        ? "What do you want to do?"
+        : "Starting…"
       foreground: root.foreground
       horizontalPadding: Style.spacing.md
       verticalPadding: Style.spacing.xxs
-      Accessible.name: "Quickchat question"
+      Accessible.name: "OmaPilot request"
       onTextEdited: {
         root.draftText = text
       }
@@ -137,75 +147,11 @@ Item {
     anchors.left: parent.left
     anchors.right: parent.right
     visible: !root.inlineMode
-    spacing: Style.spacing.lg
-
-    RowLayout {
-      Layout.fillWidth: true
-      spacing: Style.spacing.md
-
-      Dropdown {
-        id: providerPicker
-        Layout.preferredWidth: Style.space(132)
-        showLabel: false
-        options: root.backend ? root.backend.providers : []
-        value: root.backend ? root.backend.provider : ""
-        enabled: root.backend && !root.backend.busy
-        foreground: root.foreground
-        background: root.background
-        Accessible.name: "AI harness"
-        onChanged: function(value) {
-          root.backend.selectProvider(value)
-          root.providerChanged(value)
-        }
-      }
-
-      Dropdown {
-        id: modelPicker
-        Layout.fillWidth: true
-        showLabel: false
-        options: root.backend && root.backend.modelOptions.length > 0
-          ? root.backend.modelOptions
-          : [{ value: "", label: "Harness default" }]
-        value: root.backend ? root.backend.model : ""
-        enabled: root.backend && !root.backend.busy
-        foreground: root.foreground
-        background: root.background
-        Accessible.name: "AI model"
-        onChanged: function(value) {
-          root.backend.model = value
-          root.modelChanged(root.backend.provider, value)
-        }
-      }
-
-    }
-
-    Text {
-      Layout.fillWidth: true
-      visible: root.backend
-      text: !root.backend ? "" : Protocol.providerPolicyDescription(root.backend.provider, root.backend.providerPolicy)
-      color: Qt.darker(root.foreground, 1.45)
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      wrapMode: Text.Wrap
-      Accessible.role: Accessible.StaticText
-      Accessible.name: text
-    }
-
-    Text {
-      Layout.fillWidth: true
-      visible: root.backend && root.backend.modelOptions.length === 0
-      text: "Using the harness default. This harness did not expose a model catalog."
-      color: Qt.darker(root.foreground, 1.45)
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      wrapMode: Text.Wrap
-      Accessible.role: Accessible.StaticText
-      Accessible.name: text
-    }
+    spacing: Style.spacing.md
 
     BorderSurface {
       Layout.fillWidth: true
-      Layout.preferredHeight: Style.space(108)
+      Layout.preferredHeight: Style.space(126)
       visible: !root.backend || root.backend.pendingPermission === null
       color: Style.normalFillFor(root.foreground, root.accent)
       borderSpec: Border.controlSpec(promptInput.activeFocus ? "focus" : (promptHover.hovered ? "hover-cursor" : "normal"), root.foreground, root.accent)
@@ -213,35 +159,114 @@ Item {
 
       HoverHandler { id: promptHover }
 
-      TextArea {
-        id: promptInput
+      ColumnLayout {
         anchors.fill: parent
-        anchors.margins: Style.spacing.xs
-        enabled: root.backend && root.backend.state !== "streaming" && root.backend.state !== "preparing"
-        text: root.draftText
-        placeholderText: root.backend && root.backend.initialized ? "Ask anything…" : "Starting Quickchat…"
-        placeholderTextColor: Qt.darker(root.foreground, 1.55)
-        color: root.foreground
-        selectionColor: Style.selectionFillFor(root.foreground, root.accent)
-        selectedTextColor: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        wrapMode: TextEdit.Wrap
-        background: null
-        Accessible.name: "Quickchat question"
-        onTextEdited: {
-          root.draftText = text
+        anchors.topMargin: parent.contentTopInset
+        anchors.rightMargin: parent.contentRightInset
+        anchors.bottomMargin: parent.contentBottomInset
+        anchors.leftMargin: parent.contentLeftInset
+        spacing: 0
+
+        Item {
+          Layout.fillWidth: true
+          Layout.fillHeight: true
+
+          TextArea {
+            id: promptInput
+            anchors.fill: parent
+            anchors.leftMargin: Style.spacing.lg
+            anchors.rightMargin: Style.spacing.lg
+            anchors.topMargin: Style.spacing.md
+            anchors.bottomMargin: Style.spacing.sm
+            enabled: root.backend && root.backend.state !== "streaming" && root.backend.state !== "preparing"
+            text: root.draftText
+            placeholderText: root.backend && root.backend.initialized
+              ? "What do you want to do?"
+              : "Starting OmaPilot…"
+            placeholderTextColor: Qt.darker(root.foreground, 1.55)
+            color: root.foreground
+            selectionColor: Style.selectionFillFor(root.foreground, root.accent)
+            selectedTextColor: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            wrapMode: TextEdit.Wrap
+            background: null
+            Accessible.name: "OmaPilot request"
+            onTextEdited: root.draftText = text
+
+            Keys.onPressed: function(event) {
+              if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                  && !(event.modifiers & Qt.ShiftModifier)) {
+                root.submit()
+                event.accepted = true
+              } else if (event.key === Qt.Key_Escape) {
+                if (root.backend && root.backend.busy) root.backend.cancel()
+                else root.escapeRequested()
+                event.accepted = true
+              }
+            }
+          }
         }
 
-        Keys.onPressed: function(event) {
-          if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-              && !(event.modifiers & Qt.ShiftModifier)) {
-            root.submit()
-            event.accepted = true
-          } else if (event.key === Qt.Key_Escape) {
-            if (root.backend && root.backend.busy) root.backend.cancel()
-            else root.escapeRequested()
-            event.accepted = true
+        PanelSeparator {
+          Layout.fillWidth: true
+          foreground: root.foreground
+        }
+
+        RowLayout {
+          Layout.fillWidth: true
+          Layout.leftMargin: Style.spacing.lg
+          Layout.rightMargin: Style.spacing.md
+          Layout.topMargin: Style.spacing.sm
+          Layout.bottomMargin: Style.spacing.sm
+          spacing: Style.spacing.sm
+
+          Text {
+            Layout.fillWidth: true
+            text: "Using "
+              + (root.backend ? Protocol.providerLabel(root.backend.provider) : "OmaPilot")
+            color: Qt.darker(root.foreground, 1.4)
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            elide: Text.ElideRight
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
+          }
+
+          Button {
+            iconText: root.backend && root.backend.state === "dictating" ? "󰓛" : "󰍬"
+            tooltipText: root.backend && root.backend.state === "dictating" ? "Finish dictation" : "Dictate with Voxtype"
+            foreground: root.foreground
+            background: root.background
+            bordered: true
+            focusable: true
+            horizontalPadding: Style.spacing.md
+            verticalPadding: Style.spacing.md
+            enabled: root.backend && root.backend.initialized && root.backend.state !== "streaming" && root.backend.state !== "preparing"
+            Accessible.name: tooltipText
+            onClicked: {
+              if (root.backend.state === "dictating") root.backend.stopDictation()
+              else root.backend.startDictation()
+            }
+          }
+
+          Button {
+            iconText: root.backend && root.backend.busy ? "󰓛" : "󰒊"
+            tooltipText: root.backend && root.backend.busy ? "Stop response" : "Send request"
+            foreground: root.foreground
+            background: root.background
+            accent: root.accent
+            active: root.backend && !root.backend.busy && root.draftText.trim() !== ""
+            bordered: true
+            focusable: true
+            horizontalPadding: Style.spacing.md
+            verticalPadding: Style.spacing.md
+            enabled: root.backend && (root.backend.busy || (root.backend.canSubmit && root.draftText.trim() !== ""))
+            Accessible.name: tooltipText
+            onClicked: {
+              if (root.backend.busy) root.backend.cancel()
+              else root.submit()
+            }
           }
         }
       }
@@ -249,12 +274,18 @@ Item {
 
     RowLayout {
       Layout.fillWidth: true
+      visible: statusText.visible || retryButton.visible
       spacing: Style.spacing.md
 
       Text {
+        id: statusText
         Layout.fillWidth: true
         text: root.backend ? root.backend.statusMessage : ""
-        visible: text !== ""
+        visible: text !== "" && root.backend
+          && (root.backend.state === "dictating"
+            || (root.backend.question === ""
+              && root.backend.state !== "error"
+              && root.backend.state !== "unavailable"))
         color: root.backend && root.backend.state === "error" ? Color.urgent : Qt.darker(root.foreground, 1.45)
         font.family: root.fontFamily
         font.pixelSize: Style.font.bodySmall
@@ -264,49 +295,16 @@ Item {
       }
 
       Button {
+        id: retryButton
         visible: root.backend && root.backend.canRetry
         text: "Retry"
-        tooltipText: "Restart the Quickchat broker"
+        tooltipText: "Restart the OmaPilot broker"
         foreground: root.foreground
         background: root.background
         bordered: true
         focusable: true
         Accessible.name: tooltipText
         onClicked: root.backend.retryBroker()
-      }
-
-      Button {
-        iconText: root.backend && root.backend.state === "dictating" ? "󰓛" : "󰍬"
-        text: root.backend && root.backend.state === "dictating" ? "Stop listening" : "Dictate"
-        tooltipText: root.backend && root.backend.state === "dictating" ? "Finish dictation" : "Dictate with Voxtype"
-        foreground: root.foreground
-        background: root.background
-        bordered: true
-        focusable: true
-        enabled: root.backend && root.backend.initialized && root.backend.state !== "streaming" && root.backend.state !== "preparing"
-        Accessible.name: tooltipText
-        onClicked: {
-          if (root.backend.state === "dictating") root.backend.stopDictation()
-          else root.backend.startDictation()
-        }
-      }
-
-      Button {
-        iconText: root.backend && root.backend.busy ? "󰓛" : "󰒊"
-        text: root.backend && root.backend.busy ? "Stop" : "Send"
-        tooltipText: root.backend && root.backend.busy ? "Stop response" : "Send question"
-        foreground: root.foreground
-        background: root.background
-        accent: root.accent
-        active: root.backend && !root.backend.busy && root.draftText.trim() !== ""
-        bordered: true
-        focusable: true
-        enabled: root.backend && (root.backend.busy || (root.backend.canSubmit && root.draftText.trim() !== ""))
-        Accessible.name: tooltipText
-        onClicked: {
-          if (root.backend.busy) root.backend.cancel()
-          else root.submit()
-        }
       }
     }
   }

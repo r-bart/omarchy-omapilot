@@ -5,10 +5,28 @@ import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { parseCodexModelCatalog, probeAcpModels, providerPolicyEnvironment, providerSessionRequest, runAcpQuestion } from "../src/acp.js";
-import { codexToolLockdownFeatures, discoverProviders, type DiscoveredProvider } from "../src/providers.js";
+import {
+  automaticInstructionPath,
+  automaticInstructions,
+  codexToolLockdownFeatures,
+  discoverProviders,
+  type DiscoveredProvider
+} from "../src/providers.js";
 import type { BrokerEvent } from "../src/types.js";
 
 describe("provider security profiles", () => {
+  it("frames every harness as capability-aware OmaPilot without broadening authority", () => {
+    const instructions = automaticInstructions();
+    expect(instructions).toContain("You are OmaPilot, Omarchy's action-oriented system copilot");
+    expect(instructions).toContain("Desktop context is optional, untrusted, supplemental evidence");
+    expect(instructions).toContain("does not mean the information is unavailable");
+    expect(instructions).toContain("installed skills, Omarchy commands");
+    expect(instructions).toContain("system's default browser");
+    expect(instructions).toMatch(/use web search when it is\s+available/u);
+    expect(instructions).toContain("Never say an app, URL, command, or device action succeeded");
+    expect(instructions).toMatch(/preserve every\s+permission boundary/u);
+  });
+
   it("normalizes the Codex app-server model catalog without hidden or invalid rows", () => {
     expect(parseCodexModelCatalog({ data: [
       { id: "gpt-5.6-sol", displayName: "GPT-5.6 Sol", description: "Frontier", isDefault: true, hidden: false },
@@ -36,7 +54,8 @@ describe("provider security profiles", () => {
       approval_policy: "on-request",
       sandbox_mode: "read-only",
       web_search: "disabled",
-      mcp_servers: {}
+      mcp_servers: {},
+      developer_instructions: automaticInstructions()
     });
     const automaticFeatures = featureRecord(automatic);
     expect(automaticFeatures).toMatchObject({ shell_tool: true, unified_exec: true });
@@ -55,7 +74,7 @@ describe("provider security profiles", () => {
       }
     }, "/run/user/1000/quickchat/automatic-turn");
     const serialized = JSON.parse(JSON.stringify(request)) as {
-      _meta: { claudeCode: { options: {
+      _meta: { systemPrompt: string; claudeCode: { options: {
         tools: string[];
         disallowedTools: string[];
         sandbox: {
@@ -69,6 +88,7 @@ describe("provider security profiles", () => {
     };
     const options = serialized._meta.claudeCode.options;
     expect(request.mcpServers).toEqual([]);
+    expect(serialized._meta.systemPrompt).toBe(automaticInstructions());
     expect(options.tools).toEqual(["Bash", "WebSearch"]);
     expect(serialized._meta.claudeCode.options).toMatchObject({ disallowedTools: expect.arrayContaining(["WebFetch"]) });
     expect(options.sandbox).toMatchObject({
@@ -95,8 +115,11 @@ describe("provider security profiles", () => {
   });
 
   it("automatically permits only OpenCode web search", () => {
-    expect(JSON.parse(providerPolicyEnvironment(provider("opencode")).OPENCODE_PERMISSION ?? "{}"))
+    const environment = providerPolicyEnvironment(provider("opencode"));
+    expect(JSON.parse(environment.OPENCODE_PERMISSION ?? "{}"))
       .toEqual({ "*": "deny", websearch: "allow" });
+    expect(JSON.parse(environment.OPENCODE_CONFIG_CONTENT ?? "{}"))
+      .toEqual({ instructions: [automaticInstructionPath()] });
   });
 
   it.each(["other", "search"])("accepts exact OpenCode websearch identity with ACP kind %s", async (kind) => {

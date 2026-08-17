@@ -13,7 +13,8 @@ const submitCommand = z.object({
   id: z.string().min(1).max(120),
   question: z.string().trim().min(1).max(100_000),
   provider: providerIdSchema,
-  model: z.preprocess((value) => typeof value === "string" && value.trim() === "" ? undefined : value, z.string().min(1).max(500).optional())
+  model: z.preprocess((value) => typeof value === "string" && value.trim() === "" ? undefined : value, z.string().min(1).max(500).optional()),
+  dangerousAutoApprove: z.boolean().optional()
 });
 const cancelCommand = z.object({ type: z.literal("cancel"), id: z.string().min(1).max(120) });
 const permissionResponseCommand = z.object({

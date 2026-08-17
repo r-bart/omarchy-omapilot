@@ -2,11 +2,11 @@
 
 ## Supported versions
 
-Security fixes are provided for the current Quickchat release.
+Security fixes are provided for the current OmaPilot release.
 
 ## Trust model
 
-Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. Review Quickchat before enabling it. Quickchat minimizes that authority by delegating provider traffic to a separate broker process and starting each agent with one provider-specific, fail-closed automatic policy.
+Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. Review OmaPilot before enabling it. OmaPilot minimizes that authority by delegating provider traffic to a separate broker process and starting each agent with one provider-specific, fail-closed automatic policy.
 
 - Codex starts in read-only, on-request mode with native web search disabled and only the
   strictly validated shell/unified-exec features. It may read any file the current user can
@@ -16,7 +16,10 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
   reject-once decision is exposed.
   Approval can execute the command outside the read-only sandbox with the
   current user's authority, including host reads, state changes, and network
-  access; the UI states this explicitly. Persistent grants are never exposed.
+  access; the UI states this explicitly. When the user explicitly enables
+  **Dangerous auto-approve**, each request may select the normalized request's
+  exact provider-native allow-once option without prompting. Persistent grants
+  are never exposed.
 - Claude runs inside a disposable workspace that denies
   every existing top-level host path except system executable/library roots,
   hides credential-bearing environment variables, and confines writes to
@@ -28,29 +31,37 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
   inspectable allow-once handshake without raw tool-call markup.
 - Oversized requests and control or bidirectional-display characters fail
   closed rather than being truncated.
+- Dangerous auto-approval remains behind the provider's existing
+  device-approval policy and the same execute-kind, complete-input, and
+  allow-once normalization. Missing or unreviewable choices are cancelled;
+  blocked providers do not gain tool authority from this setting.
 - Arbitrary MCP, browser/computer control, unclassified requests, and requests
   without an inspectable target are denied. Codex may edit, delete, move, or otherwise
   mutate user-accessible state only after exact allow-once command approval.
-- Provider authentication remains in the installed harness. Quickchat must not log, copy, or persist credential output.
+- Provider authentication remains in the installed harness. OmaPilot must not log, copy, or persist credential output.
 - Adapter bundles are generated from exact package-lock versions and reviewed as tracked files in the same Git commit as their source. Published release archives add SHA-256 verification, provenance, and an SBOM; the runtime does not download or replace adapters.
 - Remote images require a user action and are subject to scheme, redirect, address, MIME, byte-size, complete decode, pixel-area, and cache-quota checks before Quickshell sees them.
 - External links are allowlisted by scheme and are never passed through shell interpolation.
 - The broker does not regex-classify prompts or implement action-specific
   shortcuts. Every ordinary question and action request follows the selected
   harness's same fixed policy and permission boundary.
+- OmaPilot's shared hidden instructions can steer capability selection but are
+  not authority. They cannot enable a blocked tool, expand a sandbox, or turn
+  desktop context into executable input; broker and ACP enforcement remain
+  authoritative.
 - Permission prompts and raw tool input/output are ephemeral and are not copied
   to the completed chat record. The model's completed answer may contain
   tool-derived text and is retained normally. Provider stderr and raw tool
   output never cross the broker boundary.
 
-The Quickchat boundary ends when the user selects **Continue in Herdr**. Herdr
+The OmaPilot boundary ends when the user selects **Continue in Herdr**. Herdr
 then owns the native harness session and its normal interactive permission
-model. Quickchat does not claim that a continued session remains tool-free.
+model. OmaPilot does not claim that a continued session remains tool-free.
 
 This boundary reduces accidental authority; it is not an OS sandbox. A compromised plugin repository or verified runtime release would execute with the current user's permissions.
 
 ## Reporting a vulnerability
 
-Use GitHub's private vulnerability reporting for `spencerbull/omarchy-quickchat`. Do not open a public issue for an exploitable finding or include credentials, prompts, transcripts, or tokens in a report.
+Use GitHub's private vulnerability reporting for `spencerbull/omarchy-omapilot`. Do not open a public issue for an exploitable finding or include credentials, prompts, transcripts, or tokens in a report.
 
-Include the Quickchat version, Omarchy revision, provider, relevant logs with secrets removed, and a minimal reproduction. Receipt should be acknowledged within seven days; publication and remediation timing depend on severity and coordinated disclosure needs.
+Include the OmaPilot version, Omarchy revision, provider, relevant logs with secrets removed, and a minimal reproduction. Receipt should be acknowledged within seven days; publication and remediation timing depend on severity and coordinated disclosure needs.

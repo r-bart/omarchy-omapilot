@@ -1,28 +1,30 @@
 {
   "schemaVersion": 1,
   "id": "io.github.spencerbull.quickchat",
-  "name": "Quickchat",
+  "name": "OmaPilot",
   "version": "0.2.0",
   "author": "Spencer Bull",
   "license": "MIT",
-  "description": "Fast, disposable AI answers from Codex, Claude, or OpenCode in the Omarchy bar.",
+  "description": "Use authenticated AI harnesses from a native Omarchy desktop surface.",
   "kinds": ["bar-widget"],
   "activation": "on-demand",
   "entryPoints": {
     "barWidget": "BarWidget.qml"
   },
   "barWidget": {
-    "displayName": "Quickchat",
-    "description": "Ask an authenticated local AI harness a question without leaving the Omarchy bar.",
+    "displayName": "OmaPilot",
+    "description": "Work through an authenticated AI harness without leaving the Omarchy bar.",
     "category": "AI",
-    "aliases": ["ai", "ask", "chat", "codex", "claude", "opencode"],
+    "aliases": ["ai", "chat", "pilot", "omapilot", "quickchat", "codex", "claude", "opencode"],
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
       "provider": "codex",
       "codexModel": "",
       "claudeModel": "",
-      "opencodeModel": ""
+      "opencodeModel": "",
+      "quickActionsJson": "",
+      "dangerousAutoApprove": false
     },
     "schema": [
       {
@@ -31,28 +33,35 @@
         "label": "Default harness",
         "options": ["codex", "claude", "opencode"],
         "defaultValue": "codex",
-        "description": "Quickchat shows only installed, authenticated harnesses at runtime."
+        "description": "OmaPilot shows only installed, authenticated harnesses at runtime."
       },
       {
         "key": "codexModel",
         "type": "string",
         "label": "Last Codex model",
         "defaultValue": "",
-        "description": "Empty uses the Codex default; discovered models are selected in Quickchat."
+        "description": "Empty uses the Codex default; discovered models are selected in OmaPilot."
       },
       {
         "key": "claudeModel",
         "type": "string",
         "label": "Last Claude model",
         "defaultValue": "",
-        "description": "Empty uses the Claude default; discovered models are selected in Quickchat."
+        "description": "Empty uses the Claude default; discovered models are selected in OmaPilot."
       },
       {
         "key": "opencodeModel",
         "type": "string",
         "label": "Last OpenCode model",
         "defaultValue": "",
-        "description": "Empty uses the OpenCode default; discovered models are selected in Quickchat."
+        "description": "Empty uses the OpenCode default; discovered models are selected in OmaPilot."
+      },
+      {
+        "key": "dangerousAutoApprove",
+        "type": "boolean",
+        "label": "Dangerous auto-approve",
+        "defaultValue": false,
+        "description": "Automatically select each exact ACP request's Allow once option instead of prompting."
       }
     ]
   }

@@ -17483,13 +17483,12 @@ var legacyClientNotificationMethods = /* @__PURE__ */ new Set([
   CLIENT_METHODS.elicitation_complete
 ]);
 
-// runtime/src/images.ts
-import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { get } from "node:https";
-import { isIP } from "node:net";
-import { lookup } from "node:dns/promises";
-import { basename, extname, join as join2 } from "node:path";
+// runtime/src/providers.ts
+import { readFileSync } from "node:fs";
+import { access as access2 } from "node:fs/promises";
+import { constants as constants2 } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // runtime/src/paths.ts
 import { homedir, tmpdir } from "node:os";
@@ -17590,7 +17589,148 @@ function stripAnsi(value) {
   return value.replaceAll(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
 }
 
+// runtime/src/providers.ts
+var providerNames = {
+  codex: "Codex",
+  claude: "Claude",
+  opencode: "OpenCode"
+};
+var providerPolicies = {
+  codex: { tools: "device-approval", web: "approved-command", hostReads: true },
+  claude: { tools: "sandboxed", web: "search", hostReads: false },
+  opencode: { tools: "blocked", web: "search", hostReads: false }
+};
+async function isExecutable(path) {
+  try {
+    await access2(path, constants2.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function repoRoot() {
+  return resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+}
+function automaticInstructionPath() {
+  return resolve(repoRoot(), "runtime/policies/automatic.md");
+}
+function automaticInstructions() {
+  return readFileSync(automaticInstructionPath(), "utf8").trim();
+}
+async function adapterExecutable(provider, env) {
+  const explicit = env[provider === "codex" ? "QUICKCHAT_CODEX_ACP" : "QUICKCHAT_CLAUDE_ACP"];
+  const binary = provider === "codex" ? "codex-acp" : "claude-agent-acp";
+  const paths = quickchatPaths(env);
+  const candidates = [
+    explicit,
+    resolve(repoRoot(), `runtime/bin/${binary}`),
+    resolve(repoRoot(), `node_modules/.bin/${binary}`),
+    resolve(paths.adapters, `${provider}/current/bin/${binary}`)
+  ];
+  for (const candidate of candidates) {
+    if (candidate !== void 0 && await isExecutable(candidate)) return candidate;
+  }
+  return void 0;
+}
+async function authenticated(provider, path, env) {
+  if (provider === "codex") {
+    return (await runCommand(path, ["login", "status"], { env, timeoutMs: 8e3, maxOutput: 64e3 })).code === 0;
+  }
+  if (provider === "claude") {
+    const result2 = await runCommand(path, ["auth", "status"], { env, timeoutMs: 8e3, maxOutput: 64e3 });
+    if (result2.code !== 0) return false;
+    try {
+      const value = JSON.parse(result2.stdout);
+      return typeof value === "object" && value !== null && "loggedIn" in value && value.loggedIn === true;
+    } catch {
+      return false;
+    }
+  }
+  const result = await runCommand(path, ["--pure", "auth", "list"], { env, timeoutMs: 8e3, maxOutput: 64e3 });
+  const output = stripAnsi(result.stdout + result.stderr);
+  return result.code === 0 && /Credentials/u.test(output) && /(?:●|oauth|api)/iu.test(output);
+}
+async function version2(path, env) {
+  const result = await runCommand(path, ["--version"], { env, timeoutMs: 5e3, maxOutput: 4096 });
+  if (result.code !== 0) return void 0;
+  const safe = stripAnsi(result.stdout).trim().split("\n")[0]?.replaceAll(/[^a-zA-Z0-9._+ -]/g, "").slice(0, 80);
+  return safe === "" ? void 0 : safe;
+}
+function agentEnvironment(provider, harnessPath, env) {
+  if (provider === "codex") {
+    return { ...env, CODEX_PATH: harnessPath, INITIAL_AGENT_MODE: "read-only", NO_BROWSER: "1" };
+  }
+  if (provider === "claude") return { ...env, CLAUDE_CODE_EXECUTABLE: harnessPath };
+  return { ...env, OPENCODE_PERMISSION: JSON.stringify({ "*": "deny" }) };
+}
+async function discoverProviders(env = process.env) {
+  const found = [];
+  for (const id of ["codex", "claude", "opencode"]) {
+    const harnessPath = await resolveExecutable(id, env);
+    if (harnessPath === void 0 || !await authenticated(id, harnessPath, env)) continue;
+    let executable;
+    let args;
+    if (id === "opencode") {
+      executable = harnessPath;
+      args = ["--pure", "acp"];
+    } else {
+      executable = await adapterExecutable(id, env);
+      args = [];
+    }
+    if (executable === void 0) continue;
+    const lockdownFeatures = id === "codex" ? await codexToolLockdownFeatures(harnessPath, env) : void 0;
+    if (id === "codex" && lockdownFeatures === void 0) continue;
+    if (id === "codex" && (lockdownFeatures?.includes("shell_tool") !== true || !lockdownFeatures.includes("unified_exec"))) continue;
+    const providerVersion = await version2(harnessPath, env);
+    found.push({
+      id,
+      name: providerNames[id],
+      ...providerVersion === void 0 ? {} : { version: providerVersion },
+      models: [],
+      policy: providerPolicies[id],
+      harnessPath,
+      agent: { executable, args, env: agentEnvironment(id, harnessPath, env) },
+      ...lockdownFeatures === void 0 ? {} : { lockdownFeatures }
+    });
+  }
+  return found;
+}
+async function codexToolLockdownFeatures(path, env) {
+  const listed = await runCommand(path, ["features", "list"], {
+    env,
+    timeoutMs: 1e4,
+    maxOutput: 256e3
+  });
+  if (listed.code !== 0) return void 0;
+  const output = stripAnsi(listed.stdout);
+  const features = [...new Set(output.split("\n").map((line) => /^([a-z][a-z0-9_]*)\s/u.exec(line)?.[1]).filter((feature) => feature !== void 0))];
+  if (features.length === 0) return void 0;
+  const featureArguments = features.flatMap((feature) => ["-c", `features.${feature}=false`]);
+  const validated = await runCommand(path, ["app-server", "--strict-config", ...featureArguments, "--listen", "stdio://"], {
+    env,
+    timeoutMs: 1e4,
+    maxOutput: 64e3
+  });
+  return validated.code === 0 ? features : void 0;
+}
+async function fallbackModels(provider) {
+  if (provider.id !== "opencode") return [];
+  const result = await runCommand(provider.harnessPath, ["--pure", "models"], {
+    env: provider.agent.env,
+    timeoutMs: 15e3,
+    maxOutput: 2e6
+  });
+  if (result.code !== 0) return [];
+  return [...new Set(stripAnsi(result.stdout).split("\n").map((line) => line.trim()).filter((line) => /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.:/+-]+$/u.test(line)))].map((id) => ({ id, name: id }));
+}
+
 // runtime/src/images.ts
+import { randomUUID } from "node:crypto";
+import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { get } from "node:https";
+import { isIP } from "node:net";
+import { lookup } from "node:dns/promises";
+import { basename, extname, join as join2 } from "node:path";
 var MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 var MAX_IMAGE_DIMENSION = 12e3;
 var MAX_IMAGE_PIXELS = 16e6;
@@ -18397,13 +18537,18 @@ function secureEnvironment(provider) {
       sandbox_mode: "read-only",
       web_search: "disabled",
       mcp_servers: {},
+      developer_instructions: automaticInstructions(),
       features
     };
     return { ...provider.agent.env, CODEX_CONFIG: JSON.stringify(config2), INITIAL_AGENT_MODE: "read-only" };
   }
   if (provider.id === "opencode") {
     const permission = { "*": "deny", websearch: "allow" };
-    return { ...provider.agent.env, OPENCODE_PERMISSION: JSON.stringify(permission) };
+    return {
+      ...provider.agent.env,
+      OPENCODE_CONFIG_CONTENT: JSON.stringify({ instructions: [automaticInstructionPath()] }),
+      OPENCODE_PERMISSION: JSON.stringify(permission)
+    };
   }
   return provider.agent.env;
 }
@@ -18421,7 +18566,7 @@ function providerSessionRequest(provider, cwd, ephemeral = false) {
   const base = { cwd, mcpServers: [] };
   if (provider.id !== "claude") return base;
   const tools = ["Bash", "WebSearch"];
-  const systemPrompt = "Answer the user's question directly and concisely. Use web search when current information is useful. You may use Bash only inside the isolated disposable workspace. Host files, credentials, direct network access, and writes outside that workspace are unavailable.";
+  const systemPrompt = automaticInstructions();
   return {
     ...base,
     _meta: {
@@ -19245,139 +19390,6 @@ function boundedText(value, limit) {
   return value.replaceAll(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu, " ").trim().slice(0, limit);
 }
 
-// runtime/src/providers.ts
-import { access as access2 } from "node:fs/promises";
-import { constants as constants2 } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-var providerNames = {
-  codex: "Codex",
-  claude: "Claude",
-  opencode: "OpenCode"
-};
-var providerPolicies = {
-  codex: { tools: "device-approval", web: "approved-command", hostReads: true },
-  claude: { tools: "sandboxed", web: "search", hostReads: false },
-  opencode: { tools: "blocked", web: "search", hostReads: false }
-};
-async function isExecutable(path) {
-  try {
-    await access2(path, constants2.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-function repoRoot() {
-  return resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-}
-async function adapterExecutable(provider, env) {
-  const explicit = env[provider === "codex" ? "QUICKCHAT_CODEX_ACP" : "QUICKCHAT_CLAUDE_ACP"];
-  const binary = provider === "codex" ? "codex-acp" : "claude-agent-acp";
-  const paths = quickchatPaths(env);
-  const candidates = [
-    explicit,
-    resolve(repoRoot(), `runtime/bin/${binary}`),
-    resolve(repoRoot(), `node_modules/.bin/${binary}`),
-    resolve(paths.adapters, `${provider}/current/bin/${binary}`)
-  ];
-  for (const candidate of candidates) {
-    if (candidate !== void 0 && await isExecutable(candidate)) return candidate;
-  }
-  return void 0;
-}
-async function authenticated(provider, path, env) {
-  if (provider === "codex") {
-    return (await runCommand(path, ["login", "status"], { env, timeoutMs: 8e3, maxOutput: 64e3 })).code === 0;
-  }
-  if (provider === "claude") {
-    const result2 = await runCommand(path, ["auth", "status"], { env, timeoutMs: 8e3, maxOutput: 64e3 });
-    if (result2.code !== 0) return false;
-    try {
-      const value = JSON.parse(result2.stdout);
-      return typeof value === "object" && value !== null && "loggedIn" in value && value.loggedIn === true;
-    } catch {
-      return false;
-    }
-  }
-  const result = await runCommand(path, ["--pure", "auth", "list"], { env, timeoutMs: 8e3, maxOutput: 64e3 });
-  const output = stripAnsi(result.stdout + result.stderr);
-  return result.code === 0 && /Credentials/u.test(output) && /(?:●|oauth|api)/iu.test(output);
-}
-async function version2(path, env) {
-  const result = await runCommand(path, ["--version"], { env, timeoutMs: 5e3, maxOutput: 4096 });
-  if (result.code !== 0) return void 0;
-  const safe = stripAnsi(result.stdout).trim().split("\n")[0]?.replaceAll(/[^a-zA-Z0-9._+ -]/g, "").slice(0, 80);
-  return safe === "" ? void 0 : safe;
-}
-function agentEnvironment(provider, harnessPath, env) {
-  if (provider === "codex") {
-    return { ...env, CODEX_PATH: harnessPath, INITIAL_AGENT_MODE: "read-only", NO_BROWSER: "1" };
-  }
-  if (provider === "claude") return { ...env, CLAUDE_CODE_EXECUTABLE: harnessPath };
-  return { ...env, OPENCODE_PERMISSION: JSON.stringify({ "*": "deny" }) };
-}
-async function discoverProviders(env = process.env) {
-  const found = [];
-  for (const id of ["codex", "claude", "opencode"]) {
-    const harnessPath = await resolveExecutable(id, env);
-    if (harnessPath === void 0 || !await authenticated(id, harnessPath, env)) continue;
-    let executable;
-    let args;
-    if (id === "opencode") {
-      executable = harnessPath;
-      args = ["--pure", "acp"];
-    } else {
-      executable = await adapterExecutable(id, env);
-      args = [];
-    }
-    if (executable === void 0) continue;
-    const lockdownFeatures = id === "codex" ? await codexToolLockdownFeatures(harnessPath, env) : void 0;
-    if (id === "codex" && lockdownFeatures === void 0) continue;
-    if (id === "codex" && (lockdownFeatures?.includes("shell_tool") !== true || !lockdownFeatures.includes("unified_exec"))) continue;
-    const providerVersion = await version2(harnessPath, env);
-    found.push({
-      id,
-      name: providerNames[id],
-      ...providerVersion === void 0 ? {} : { version: providerVersion },
-      models: [],
-      policy: providerPolicies[id],
-      harnessPath,
-      agent: { executable, args, env: agentEnvironment(id, harnessPath, env) },
-      ...lockdownFeatures === void 0 ? {} : { lockdownFeatures }
-    });
-  }
-  return found;
-}
-async function codexToolLockdownFeatures(path, env) {
-  const listed = await runCommand(path, ["features", "list"], {
-    env,
-    timeoutMs: 1e4,
-    maxOutput: 256e3
-  });
-  if (listed.code !== 0) return void 0;
-  const output = stripAnsi(listed.stdout);
-  const features = [...new Set(output.split("\n").map((line) => /^([a-z][a-z0-9_]*)\s/u.exec(line)?.[1]).filter((feature) => feature !== void 0))];
-  if (features.length === 0) return void 0;
-  const featureArguments = features.flatMap((feature) => ["-c", `features.${feature}=false`]);
-  const validated = await runCommand(path, ["app-server", "--strict-config", ...featureArguments, "--listen", "stdio://"], {
-    env,
-    timeoutMs: 1e4,
-    maxOutput: 64e3
-  });
-  return validated.code === 0 ? features : void 0;
-}
-async function fallbackModels(provider) {
-  if (provider.id !== "opencode") return [];
-  const result = await runCommand(provider.harnessPath, ["--pure", "models"], {
-    env: provider.agent.env,
-    timeoutMs: 15e3,
-    maxOutput: 2e6
-  });
-  if (result.code !== 0) return [];
-  return [...new Set(stripAnsi(result.stdout).split("\n").map((line) => line.trim()).filter((line) => /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.:/+-]+$/u.test(line)))].map((id) => ({ id, name: id }));
-}
-
 // runtime/src/broker.ts
 var QuickchatBroker = class {
   #emit;
@@ -19494,6 +19506,7 @@ var QuickchatBroker = class {
       this.#error("provider_unavailable", "The selected harness is not installed and authenticated", false, command.id);
       return;
     }
+    const dangerousAutoApprove = command.dangerousAutoApprove === true && provider.policy.tools === "device-approval";
     this.#emit({ type: "state", id: command.id, state: "preparing", message: `Preparing ${provider.name}\u2026` });
     const run = runAcpQuestion(
       provider,
@@ -19503,7 +19516,12 @@ var QuickchatBroker = class {
       this.#emit,
       9e4,
       this.#images,
-      (request) => this.#requestToolPermission(command.id, provider.id, request),
+      (request) => this.#requestToolPermission(
+        command.id,
+        provider.id,
+        request,
+        dangerousAutoApprove
+      ),
       () => this.#cancelPermissions(command.id)
     );
     this.#runs.set(command.id, run);
@@ -19545,10 +19563,11 @@ var QuickchatBroker = class {
       this.#runs.delete(command.id);
     }
   }
-  async #requestToolPermission(requestId, provider, request) {
+  async #requestToolPermission(requestId, provider, request, dangerousAutoApprove) {
     const permissionId = randomUUID2();
     const pending = normalizeToolPermission(requestId, permissionId, provider, request);
     if (pending === void 0) return void 0;
+    if (dangerousAutoApprove) return pending.allowOptionId;
     return new Promise((resolvePermission) => {
       const timeout = setTimeout(() => {
         this.#permissions.delete(permissionId);
@@ -19709,7 +19728,8 @@ var submitCommand = external_exports.object({
   id: external_exports.string().min(1).max(120),
   question: external_exports.string().trim().min(1).max(1e5),
   provider: providerIdSchema,
-  model: external_exports.preprocess((value) => typeof value === "string" && value.trim() === "" ? void 0 : value, external_exports.string().min(1).max(500).optional())
+  model: external_exports.preprocess((value) => typeof value === "string" && value.trim() === "" ? void 0 : value, external_exports.string().min(1).max(500).optional()),
+  dangerousAutoApprove: external_exports.boolean().optional()
 });
 var cancelCommand = external_exports.object({ type: external_exports.literal("cancel"), id: external_exports.string().min(1).max(120) });
 var permissionResponseCommand = external_exports.object({

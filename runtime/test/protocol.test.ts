@@ -24,6 +24,15 @@ describe("NDJSON protocol", () => {
     const parsed = commandSchema.parse({ type: "submit", id: "one", question: "hello", provider: "codex", model: "", capability: "answer" });
     expect(parsed.type === "submit" ? parsed.model : "wrong-command").toBeUndefined();
     expect(parsed).not.toHaveProperty("capability");
+    const dangerous = commandSchema.parse({
+      type: "submit", id: "two", question: "act", provider: "codex",
+      dangerousAutoApprove: true
+    });
+    expect(dangerous).toMatchObject({ dangerousAutoApprove: true });
+    expect(commandSchema.safeParse({
+      type: "submit", id: "three", question: "act", provider: "codex",
+      dangerousAutoApprove: "true"
+    }).success).toBe(false);
   });
 
   it("rejects malformed commands", () => {
@@ -175,8 +184,9 @@ describe("NDJSON protocol", () => {
     await new Promise((resolveExit) => child.once("close", resolveExit));
   }, 20_000);
 
-  it("fails closed when automatic OpenCode attempts a device tool", async () => {
-    const events = await forbiddenAttempt("opencode", { FAKE_ACP_PERMISSION_ATTEMPT: "1" });
+  it("does not let dangerous auto-approve bypass blocked OpenCode policy", async () => {
+    const events = await forbiddenAttempt(
+      "opencode", { FAKE_ACP_PERMISSION_ATTEMPT: "1" }, true);
     expect(events.find((event) => event.type === "error")).toMatchObject({
       code: "forbidden_tool_attempt",
       message: "The selected harness attempted a device tool that Quickchat cannot safely authorize",
@@ -219,6 +229,25 @@ describe("NDJSON protocol", () => {
     child.stdin.end('{"type":"shutdown"}\n');
     await new Promise((resolveExit) => child.once("close", resolveExit));
   }, 25_000);
+
+  it("auto-selects Codex's exact allow-once option without emitting a prompt", async () => {
+    const events = await autoApproveAttempt({ FAKE_ACP_EXPECT_ALLOW: "1" });
+    expect(events.some((event) => event.type === "permission")).toBe(false);
+    expect(events.some((event) => event.type === "permission_closed")).toBe(false);
+    expect(events.some((event) => event.type === "complete")).toBe(true);
+    expect(events.some((event) => event.type === "error")).toBe(false);
+  }, 20_000);
+
+  it.each([
+    { name: "a request without allow-once", env: { FAKE_ACP_PERMISSION_NO_ALLOW: "1" } },
+    { name: "an unreviewable request", env: { FAKE_ACP_PERMISSION_UNREVIEWABLE: "1" } }
+  ])("fails closed without prompting for $name in auto-approve", async ({ env }) => {
+    const events = await autoApproveAttempt(env);
+    expect(events.some((event) => event.type === "permission")).toBe(false);
+    expect(events.some((event) => event.type === "permission_closed")).toBe(false);
+    expect(events.some((event) => event.type === "complete")).toBe(true);
+    expect(events.some((event) => event.type === "error")).toBe(false);
+  }, 20_000);
 
   it("round-trips a deny decision and lets the harness answer without the tool", async () => {
     const state = await mkdtemp(join(tmpdir(), "quickchat-tool-deny-")); roots.push(state);
@@ -344,7 +373,11 @@ function brokerExecutable(): string {
   return process.env.QUICKCHAT_TEST_BROKER ?? resolve("runtime/bin/quickchat-broker");
 }
 
-async function forbiddenAttempt(provider: "codex" | "opencode", extraEnv: NodeJS.ProcessEnv): Promise<Record<string, unknown>[]> {
+async function forbiddenAttempt(
+  provider: "codex" | "opencode",
+  extraEnv: NodeJS.ProcessEnv,
+  dangerousAutoApprove = false
+): Promise<Record<string, unknown>[]> {
   const state = await mkdtemp(join(tmpdir(), "quickchat-forbidden-tool-")); roots.push(state);
   const child = spawn(brokerExecutable(), [], {
     env: {
@@ -361,8 +394,40 @@ async function forbiddenAttempt(provider: "codex" | "opencode", extraEnv: NodeJS
   createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
   child.stdin.write('{"type":"initialize","protocolVersion":2}\n');
   await until(() => events.some((event) => event.type === "ready"));
-  child.stdin.write(`${JSON.stringify({ type: "submit", id: "forbidden", question: "Run a device command", provider })}\n`);
+  child.stdin.write(`${JSON.stringify({
+    type: "submit", id: "forbidden", question: "Run a device command", provider,
+    ...(dangerousAutoApprove ? { dangerousAutoApprove: true } : {})
+  })}\n`);
   await until(() => events.some((event) => event.type === "error"));
+  child.stdin.end('{"type":"shutdown"}\n');
+  await new Promise((resolveExit) => child.once("close", resolveExit));
+  return events;
+}
+
+async function autoApproveAttempt(extraEnv: NodeJS.ProcessEnv): Promise<Record<string, unknown>[]> {
+  const state = await mkdtemp(join(tmpdir(), "quickchat-auto-approve-")); roots.push(state);
+  const child = spawn(brokerExecutable(), [], {
+    env: {
+      ...process.env,
+      FAKE_ACP_PERMISSION_ATTEMPT: "1",
+      ...extraEnv,
+      XDG_STATE_HOME: join(state, "state"),
+      XDG_CACHE_HOME: join(state, "cache"),
+      XDG_RUNTIME_DIR: join(state, "run"),
+      QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+      PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+    },
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  const events: Record<string, unknown>[] = [];
+  createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
+  child.stdin.write('{"type":"initialize","protocolVersion":2}\n');
+  await until(() => events.some((event) => event.type === "ready"));
+  child.stdin.write(`${JSON.stringify({
+    type: "submit", id: "auto-turn", question: "Run uname", provider: "codex",
+    dangerousAutoApprove: true
+  })}\n`);
+  await until(() => events.some((event) => event.type === "complete" || event.type === "error"));
   child.stdin.end('{"type":"shutdown"}\n');
   await new Promise((resolveExit) => child.once("close", resolveExit));
   return events;

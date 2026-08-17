@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import * as acp from "@agentclientprotocol/sdk";
 import type { ContentBlock, NewSessionRequest, RequestPermissionRequest, SessionConfigOption } from "@agentclientprotocol/sdk";
-import type { DiscoveredProvider } from "./providers.js";
+import { automaticInstructionPath, automaticInstructions, type DiscoveredProvider } from "./providers.js";
 import type { BrokerEvent, ModelOption, StoredImage } from "./types.js";
 import { ImageStore } from "./images.js";
 import { presentImage } from "./history.js";
@@ -359,13 +359,18 @@ function secureEnvironment(provider: DiscoveredProvider): NodeJS.ProcessEnv {
       sandbox_mode: "read-only",
       web_search: "disabled",
       mcp_servers: {},
+      developer_instructions: automaticInstructions(),
       features
     };
     return { ...provider.agent.env, CODEX_CONFIG: JSON.stringify(config), INITIAL_AGENT_MODE: "read-only" };
   }
   if (provider.id === "opencode") {
     const permission = { "*": "deny", websearch: "allow" };
-    return { ...provider.agent.env, OPENCODE_PERMISSION: JSON.stringify(permission) };
+    return {
+      ...provider.agent.env,
+      OPENCODE_CONFIG_CONTENT: JSON.stringify({ instructions: [automaticInstructionPath()] }),
+      OPENCODE_PERMISSION: JSON.stringify(permission)
+    };
   }
   return provider.agent.env;
 }
@@ -390,7 +395,7 @@ export function providerSessionRequest(provider: DiscoveredProvider, cwd: string
   const base: NewSessionRequest = { cwd, mcpServers: [] };
   if (provider.id !== "claude") return base;
   const tools = ["Bash", "WebSearch"];
-  const systemPrompt = "Answer the user's question directly and concisely. Use web search when current information is useful. You may use Bash only inside the isolated disposable workspace. Host files, credentials, direct network access, and writes outside that workspace are unavailable.";
+  const systemPrompt = automaticInstructions();
   return {
     ...base,
     _meta: {

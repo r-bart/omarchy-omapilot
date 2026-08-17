@@ -80,10 +80,14 @@ TestCase {
     compare(payload.type, "submit")
     compare(payload.provider, "codex")
     verify(payload.model === undefined)
+    verify(payload.dangerousAutoApprove === undefined)
     verify(payload.capability === undefined)
-    payload = Protocol.submitCommand("2", "Hello", "claude", " opus ")
+    payload = Protocol.submitCommand("2", "Hello", "claude", " opus ", false)
     compare(payload.model, "opus")
+    verify(payload.dangerousAutoApprove === undefined)
     verify(payload.capability === undefined)
+    payload = Protocol.submitCommand("3", "Act", "codex", "", true)
+    verify(payload.dangerousAutoApprove)
   }
 
   function test_markdownImagesRequireExplicitLoading() {
@@ -141,6 +145,22 @@ TestCase {
     compare(Protocol.herdrOutcome({ state: "continued", mode: "native" }).message, "Continued native session in Herdr")
     compare(Protocol.herdrOutcome({ state: "failed", message: "No Herdr" }).state, "error")
     compare(Protocol.herdrOutcome({ state: "unavailable" }).toast, false)
+  }
+
+  function test_errorDetailsRemainBoundedAndInspectable() {
+    var details = Protocol.normalizedError({
+      code: "provider_failed",
+      message: "The harness stopped before completing the response.",
+      retryable: true
+    })
+    compare(details.title, "Request failed")
+    compare(details.code, "provider_failed")
+    verify(details.retryable)
+    verify(Protocol.errorDiagnosticText(details).indexOf("Retryable: yes") >= 0)
+
+    var unavailable = Protocol.normalizedError({ unavailable: true })
+    compare(unavailable.title, "OmaPilot unavailable")
+    compare(unavailable.code, "unavailable")
   }
 
   function test_linkSchemeAllowlist() {

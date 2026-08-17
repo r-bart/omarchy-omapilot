@@ -17,7 +17,7 @@ function command(type, values) {
   return result
 }
 
-function submitCommand(id, question, provider, model) {
+function submitCommand(id, question, provider, model, dangerousAutoApprove) {
   var payload = command("submit", {
     id: String(id || ""),
     question: String(question || ""),
@@ -25,6 +25,7 @@ function submitCommand(id, question, provider, model) {
   })
   var selectedModel = String(model || "").trim()
   if (selectedModel !== "") payload.model = selectedModel
+  if (dangerousAutoApprove === true) payload.dangerousAutoApprove = true
   return payload
 }
 
@@ -44,6 +45,26 @@ function isCompatibleEvent(event) {
 function normalizedState(value, fallback) {
   var state = String(value || "")
   return validStates.indexOf(state) >= 0 ? state : (fallback || "idle")
+}
+
+function normalizedError(raw, fallbackMessage) {
+  var value = raw && typeof raw === "object" ? raw : {}
+  var unavailable = value.unavailable === true
+  var message = String(value.message || fallbackMessage
+    || (unavailable ? "OmaPilot is unavailable." : "OmaPilot could not complete that request."))
+  return {
+    title: unavailable ? "OmaPilot unavailable" : "Request failed",
+    message: message.slice(0, 2000),
+    code: String(value.code || (unavailable ? "unavailable" : "unknown_error")).slice(0, 120),
+    retryable: value.retryable === true,
+    unavailable: unavailable
+  }
+}
+
+function errorDiagnosticText(raw) {
+  var error = normalizedError(raw)
+  return error.title + "\n" + error.message + "\nCode: " + error.code
+    + "\nRetryable: " + (error.retryable ? "yes" : "no")
 }
 
 function normalizedProvider(value) {

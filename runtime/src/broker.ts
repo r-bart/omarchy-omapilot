@@ -112,11 +112,14 @@ export class QuickchatBroker {
   async #submitOnce(command: Extract<BrokerCommand, { type: "submit" }>): Promise<void> {
     const provider = this.#providers.get(command.provider);
     if (provider === undefined) { this.#error("provider_unavailable", "The selected harness is not installed and authenticated", false, command.id); return; }
+    const dangerousAutoApprove = command.dangerousAutoApprove === true
+      && provider.policy.tools === "device-approval";
     this.#emit({ type: "state", id: command.id, state: "preparing", message: `Preparing ${provider.name}…` });
     const run = runAcpQuestion(
       provider, command.id, command.question, command.model,
       this.#emit, 90_000, this.#images,
-      (request) => this.#requestToolPermission(command.id, provider.id, request),
+      (request) => this.#requestToolPermission(
+        command.id, provider.id, request, dangerousAutoApprove),
       () => this.#cancelPermissions(command.id)
     );
     this.#runs.set(command.id, run);
@@ -159,10 +162,16 @@ export class QuickchatBroker {
     }
   }
 
-  async #requestToolPermission(requestId: string, provider: ProviderId, request: RequestPermissionRequest): Promise<string | undefined> {
+  async #requestToolPermission(
+    requestId: string,
+    provider: ProviderId,
+    request: RequestPermissionRequest,
+    dangerousAutoApprove: boolean
+  ): Promise<string | undefined> {
     const permissionId = randomUUID();
     const pending = normalizeToolPermission(requestId, permissionId, provider, request);
     if (pending === undefined) return undefined;
+    if (dangerousAutoApprove) return pending.allowOptionId;
     return new Promise<string | undefined>((resolvePermission) => {
       const timeout = setTimeout(() => {
         this.#permissions.delete(permissionId);

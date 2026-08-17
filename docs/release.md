@@ -1,6 +1,6 @@
 # Release and marketplace checklist
 
-Quickchat is submitted only from a public GitHub repository whose default branch is the exact commit validated below. The marketplace validates metadata, not plugin security.
+OmaPilot is submitted only from a public GitHub repository whose default branch is the exact commit validated below. The marketplace validates metadata, not plugin security.
 
 ## Release preparation
 
@@ -29,7 +29,7 @@ The target is <https://omarchyplugins.com>. Its current publishing guide require
 
 Submission metadata:
 
-- Repository: `https://github.com/spencerbull/omarchy-quickchat`
+- Repository: `https://github.com/spencerbull/omarchy-omapilot`
 - Plugin ID: `io.github.spencerbull.quickchat`
 - Category: Widgets
 - Tags: `ai`, `bar`, `quickshell`
