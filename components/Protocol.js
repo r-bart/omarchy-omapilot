@@ -33,6 +33,13 @@ function submitCommand(id, question, provider, model, desktopContext, dangerousA
   return payload
 }
 
+function contextBeginCommand(id, captureTarget) {
+  var payload = command("context_begin", { id: String(id || "") })
+  var target = normalizedCaptureTarget(captureTarget)
+  if (target !== null) payload.target = target
+  return payload
+}
+
 function normalizedRectangle(raw) {
   var source = raw && typeof raw === "object" ? raw : {}
   var x = Math.round(Number(source.x)); var y = Math.round(Number(source.y))

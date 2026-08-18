@@ -178,6 +178,8 @@ grep -Fq 'transform: Translate {' "$repo_dir/components/WaitingIndicator.qml"
 grep -Fq 'if (routePulse.running) {' "$repo_dir/components/WaitingIndicator.qml"
 grep -Fq 'onActivityRevisionChanged:' "$repo_dir/components/WaitingIndicator.qml"
 grep -Fq 'activityRevision++' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'Protocol.contextBeginCommand(pendingContextRequestId, latchedCaptureTarget)' \
+  "$repo_dir/components/QuickchatStore.qml"
 if grep -Fq 'onStreamingChanged: trigger()' "$repo_dir/components/WaitingIndicator.qml"; then
   printf 'Waiting-to-streaming motion must not reset an in-flight pulse\n' >&2
   exit 1

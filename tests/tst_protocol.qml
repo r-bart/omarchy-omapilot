@@ -55,6 +55,25 @@ TestCase {
     verify(payload.contextAttachments[0].payload === undefined)
   }
 
+  function test_contextCaptureBeginKeepsLatchedPreFocusTarget() {
+    var payload = Protocol.contextBeginCommand("capture-1", {
+      appId: "chromium",
+      title: "Omarchy docs",
+      address: "0x1234",
+      bounds: { x: 1920, y: 40, width: 1200, height: 800 }
+    })
+    compare(payload.type, "context_begin")
+    compare(payload.id, "capture-1")
+    compare(payload.target.appId, "chromium")
+    compare(payload.target.title, "Omarchy docs")
+    compare(payload.target.bounds.x, 1920)
+    compare(payload.target.bounds.width, 1200)
+    verify(payload.target.address === undefined)
+
+    var withoutTarget = Protocol.contextBeginCommand("capture-2", null)
+    verify(withoutTarget.target === undefined)
+  }
+
   function test_browserCompanionStatusDefaultsFailClosed() {
     var status = Protocol.normalizedBrowserCompanion({
       phase: "installing", relayInstalled: true, chromiumConnected: true,
