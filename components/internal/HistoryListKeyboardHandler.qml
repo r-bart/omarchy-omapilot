@@ -12,6 +12,8 @@ Item {
   signal closeRequested()
 
   function handleKey(event) {
+    if (event.modifiers !== Qt.NoModifier
+        && event.modifiers !== Qt.KeypadModifier) return
     var directional = event.key === Qt.Key_Down || event.key === Qt.Key_J
       || event.key === Qt.Key_Up || event.key === Qt.Key_K
     if (root.confirmingClear && directional) {
