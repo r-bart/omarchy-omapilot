@@ -23,7 +23,6 @@ Item {
     + 2 * Math.max(0, trackHeight - 2 * trackRadius)
     + 2 * Math.PI * trackRadius
   readonly property real glowSpan: 0.10
-  readonly property real coreSpan: 0.018
   readonly property int travelDuration: 1800
   readonly property int glowBlurMax: 36
 
@@ -122,8 +121,8 @@ Item {
     anchors.fill: runnerGlowSource
     source: runnerGlowSource
     visible: root.visible
-    // The selected direction lets this localized halo breathe across the card
-    // edge. Keep the crisp path on the perimeter and leave the bloom unclipped.
+    // Paint only the softened source. A second crisp stroke reads as a hard
+    // dash at the leading edge instead of one continuous luminous runner.
     autoPaddingEnabled: true
     blurEnabled: true
     blur: 1
@@ -133,68 +132,5 @@ Item {
     colorization: 0.8
     colorizationColor: root.accent
     opacity: 0.88
-  }
-
-  Shape {
-    id: runnerCore
-    objectName: "responseActivityCore"
-    anchors.fill: parent
-    anchors.margins: root.trackInset
-    visible: root.visible
-    preferredRendererType: Shape.CurveRenderer
-
-    readonly property real strokeWidth: Style.spaceReal(2)
-    readonly property real effectiveSpan: Math.min(0.5,
-      Math.max(strokeWidth / root.trackPerimeter, root.coreSpan))
-    readonly property real dashLength:
-      root.trackPerimeter * effectiveSpan / strokeWidth
-    readonly property real gapLength:
-      root.trackPerimeter * (1 - effectiveSpan) / strokeWidth
-
-    ShapePath {
-      strokeColor: root.accent
-      strokeWidth: runnerCore.strokeWidth
-      fillColor: "transparent"
-      capStyle: ShapePath.RoundCap
-      joinStyle: ShapePath.RoundJoin
-      strokeStyle: ShapePath.DashLine
-      dashPattern: [runnerCore.dashLength, runnerCore.gapLength]
-      dashOffset: (1 - root.phase) * root.trackPerimeter / runnerCore.strokeWidth
-      startX: root.trackRadius
-      startY: 0
-
-      PathLine { x: root.trackWidth - root.trackRadius; y: 0 }
-      PathArc {
-        x: root.trackWidth
-        y: root.trackRadius
-        radiusX: root.trackRadius
-        radiusY: root.trackRadius
-        direction: PathArc.Clockwise
-      }
-      PathLine { x: root.trackWidth; y: root.trackHeight - root.trackRadius }
-      PathArc {
-        x: root.trackWidth - root.trackRadius
-        y: root.trackHeight
-        radiusX: root.trackRadius
-        radiusY: root.trackRadius
-        direction: PathArc.Clockwise
-      }
-      PathLine { x: root.trackRadius; y: root.trackHeight }
-      PathArc {
-        x: 0
-        y: root.trackHeight - root.trackRadius
-        radiusX: root.trackRadius
-        radiusY: root.trackRadius
-        direction: PathArc.Clockwise
-      }
-      PathLine { x: 0; y: root.trackRadius }
-      PathArc {
-        x: root.trackRadius
-        y: 0
-        radiusX: root.trackRadius
-        radiusY: root.trackRadius
-        direction: PathArc.Clockwise
-      }
-    }
   }
 }

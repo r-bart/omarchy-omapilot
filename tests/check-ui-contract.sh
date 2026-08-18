@@ -178,13 +178,30 @@ grep -Fq 'import QtQuick.Shapes' "$repo_dir/components/ResponseActivityBorder.qm
 grep -Fq 'id: perimeterTravel' "$repo_dir/components/ResponseActivityBorder.qml"
 grep -Fq 'loops: Animation.Infinite' "$repo_dir/components/ResponseActivityBorder.qml"
 grep -Fq 'objectName: "responseActivityBloom"' "$repo_dir/components/ResponseActivityBorder.qml"
-grep -Fq 'objectName: "responseActivityCore"' "$repo_dir/components/ResponseActivityBorder.qml"
 grep -Fq 'blurMax: root.glowBlurMax' "$repo_dir/components/ResponseActivityBorder.qml"
 grep -Fq 'blurMultiplier: 1.1' "$repo_dir/components/ResponseActivityBorder.qml"
 grep -Fq 'colorizationColor: root.accent' "$repo_dir/components/ResponseActivityBorder.qml"
-test "$(grep -Fc 'strokeColor: root.accent' "$repo_dir/components/ResponseActivityBorder.qml")" -eq 2
+test "$(grep -Fc 'strokeColor: root.accent' "$repo_dir/components/ResponseActivityBorder.qml")" -eq 1
 test "$(grep -Fc 'dashOffset: (1 - root.phase) * root.trackPerimeter' \
-  "$repo_dir/components/ResponseActivityBorder.qml")" -eq 2
+  "$repo_dir/components/ResponseActivityBorder.qml")" -eq 1
+test "$(grep -Ec '(^|[^[:alnum:]_.])Shape \{' \
+  "$repo_dir/components/ResponseActivityBorder.qml")" -eq 1
+test "$(grep -Fc 'MultiEffect {' "$repo_dir/components/ResponseActivityBorder.qml")" -eq 1
+grep -Fq 'source: runnerGlowSource' "$repo_dir/components/ResponseActivityBorder.qml"
+if ! awk '
+  /^  Shape \{/ { inside = 1; next }
+  /^  [A-Z]/ { inside = 0 }
+  inside && /^    visible: false([[:space:]]|$)/ { hidden = 1 }
+  END { if (!hidden) exit 1 }
+' "$repo_dir/components/ResponseActivityBorder.qml"; then
+  printf 'OmaPilot perimeter source Shape must stay hidden behind the blur\n' >&2
+  exit 1
+fi
+if grep -Eq 'responseActivityCore|id: runnerCore|coreSpan' \
+    "$repo_dir/components/ResponseActivityBorder.qml"; then
+  printf 'OmaPilot perimeter motion must render as one blur without a crisp core\n' >&2
+  exit 1
+fi
 grep -Fq 'active: root.responseActivityActive && root.opened' "$repo_dir/Panel.qml"
 grep -Fq 'id: activityStatus' "$repo_dir/Panel.qml"
 if grep -Eq 'WaitingIndicator|signalClock|FrameAnimation|onTriggered:' \

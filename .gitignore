@@ -7,3 +7,4 @@ coverage/
 .tmp/
 *.log
 screenshots/implementation-*.png
+!screenshots/implementation-perimeter-blur-only.png

@@ -223,7 +223,7 @@ turn per provider.
 - [x] Installed-shell open, submit/answer, history, dismissal/reopen, active-theme,
   narrow-layout, and Herdr flows are verified; stream/stop, error, and keyboard
   contracts pass the focused QML/runtime suites.
-- [x] `design-qa.md` says `final result: passed`.
+- [x] `design-qa.md` said `final result: passed` at the published release commit.
 - [x] Public main branch and annotated-tag release assets are published.
 
 ## Release blockers
@@ -1117,3 +1117,50 @@ turn per provider.
   - [x] Inspect the complete diff, commit, push, and verify PR 6 exact-head state.
 - Current checkpoint: the reviewed commit is the PR 6 publication artifact; all
   source/static/headless gates pass. No installed or live state has been changed.
+
+## OmaPilot blur-only perimeter follow-up checkpoint 12 (2026-08-18)
+
+- Goal: remove the visibly separate solid dash from the accepted perimeter
+  animation so the moving signal reads as one continuous soft glow.
+- Owner evidence:
+  `/home/sbull/Pictures/screenshot-2026-08-18_14-33-42.png` shows the 2-pixel
+  `runnerCore` as a hard cyan segment at one end of the wider bloom.
+- Done criteria: the component paints exactly one hidden theme-accent Shape into
+  one MultiEffect; no crisp core layer or core-specific state remains; direction,
+  phase continuity, terminal/reduced-motion settling, and layout behavior stay
+  unchanged; focused, full, native Wayland, installed, and owner gates pass.
+- Branch/worktree: `blur-only-perimeter-runner` at
+  `/home/sbull/worktrees/omarchy-omapilot-blur-only`, based on merged `main`
+  commit `c36771c`.
+- Allowed: the scoped component, contract/docs evidence, local validation,
+  native Wayland preview, and reversible update of the already installed local
+  plugin for owner testing. Forbidden: broker/provider/policy/protocol changes,
+  shell settings, unrelated desktop configuration, commit, push, PR, merge, or
+  release without separate owner authorization.
+- Verification gates:
+  - [x] Remove `runnerCore`, `coreSpan`, and `responseActivityCore`.
+  - [x] Add a contract guard requiring exactly one accent stroke and dash path.
+  - [x] Pass focused QML/UI validation.
+  - [x] Render the real Qt MultiEffect on Wayland and confirm no hard segment.
+  - [x] Pass full repository validation.
+  - [x] Receive a clean independent diff review or resolve every finding.
+  - [x] Install the reviewed one-file production update.
+  - [ ] Resolve or owner-accept the shell-owned `shell.json` drift observed after
+    restart (`ed0f6bcc…` before, `b6b8d498…` after); do not revert blindly.
+  - [ ] Owner confirms the live blur-only runner.
+- Review worker: named Herdr Claude agent `omapilot_blur_review`, pane `w1A:pE`,
+  in this worktree, read-only. The orchestrator owns any remediation and cleanup.
+- Current checkpoint: the focused UI suite passes and the 1232 by 1252 native
+  Wayland capture shows one diffuse runner with no separate hard stroke. Full
+  validation passes 156 runtime tests with 12 opt-in live-provider skips plus
+  manifest, browser-companion, release, typecheck, lint, build, QML/UI, and Git
+  whitespace gates. Shellcheck remains unavailable. Independent review found
+  the hard-core removal sound; its contract robustness and evidence-bookkeeping
+  findings are resolved and mutation-tested. The installed component now
+  byte-matches the reviewed worktree (`ddca70ed…`), plugin validation passes,
+  a fresh shell/broker process loaded it without OmaPilot QML errors. The shell
+  later rewrote `shell.json` from `ed0f6bcc…` to `b6b8d498…` during the live
+  verification sequence; the orchestrator did not edit or restore that
+  user-owned file. The prior component is recoverable from
+  `/home/sbull/.local/state/omarchy/quickchat-backups/20260818T193946Z-before-blur-only/`.
+  Installed owner verification remains open.
