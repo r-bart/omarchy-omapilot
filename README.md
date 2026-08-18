@@ -18,9 +18,9 @@ supports selectable Markdown, code blocks, tables, safe clickable links,
 bounded images, Copy, New chat, History, and Continue in Herdr. The in-panel
 settings pane can add, edit, remove, and reorder up to five quick actions.
 Waiting and streaming use one theme-native perimeter runner around the response
-surface. A crisp accent core and localized GPU-blurred bloom replace the old
-route glyph without adding fake progress; phase changes never restart the
-runner, and reduced motion keeps the ordinary static border. First-token
+surface. One GPU-blurred accent form replaces the old route glyph without a
+separate hard stroke or fake progress; phase changes never restart the runner,
+and reduced motion keeps the ordinary static border. First-token
 content, panel growth, and follow-latest scrolling transition smoothly, while a
 compact error notice opens an inspectable details pane.
 
