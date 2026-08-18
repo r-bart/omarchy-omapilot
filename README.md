@@ -1,6 +1,6 @@
 # OmaPilot for Omarchy
 
-OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget for asking questions and working on your desktop through an authenticated AI harness. Device actions stay behind an exact, inspectable approval unless you explicitly enable **Dangerous auto-approve** in settings. OmaPilot can attach a bounded desktop snapshot when you submit, renders Markdown in a themed panel, remembers the latest 30 completed chats, and can hand an answer to Herdr when you want to keep working.
+OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget and contextual-capture overlay for asking questions and working on your desktop through an authenticated AI harness. Device actions stay behind an exact, inspectable approval unless you explicitly enable **Dangerous auto-approve** in settings. OmaPilot can attach a bounded desktop snapshot, clip a window or exact region with a reviewed Text/Screenshot choice, render Markdown in a themed panel, remember the latest 30 completed chats, and hand an answer to Herdr when you want to keep working.
 
 The public project and product name is now OmaPilot. The existing plugin ID, IPC target, package/runtime identifiers, and local `quickchat` data paths remain unchanged so current installations and user data continue to work.
 
@@ -31,6 +31,10 @@ compact error notice opens an inspectable details pane.
 - Node.js 22 or newer for the broker and pinned ACP adapters.
 - At least one installed and authenticated harness: `codex`, `claude`, or `opencode`.
 - Optional: Voxtype for dictation and Herdr for durable continuation.
+- `grim` for contextual screenshots. ImageMagick, already used by OmaPilot's
+  image policy, validates and normalizes every captured image.
+- Optional: Tesseract adds text-under-the-pointer extraction and the **Text**
+  representation. Without it, screenshot and browser-element capture still work.
 
 OmaPilot does not install a harness, log you in, or read provider credentials. Authentication and model availability remain owned by the selected harness. The model picker is populated at startup from Codex's read-only app-server catalog, a non-persisted Claude ACP discovery session, or OpenCode's native catalog; if discovery is unavailable, OmaPilot safely falls back to the harness default.
 
@@ -151,6 +155,28 @@ provider receives the combined prompt and may retain it in its native session.
 An answer derived from desktop context is retained like any other completed
 answer.
 
+## Clip context from the desktop
+
+The crosshair button in the composer opens OmaPilot's fullscreen capture
+overlay. Click a window beneath the pointer, or drag an exact region. OmaPilot
+resolves the click against the compositor's window geometry, so opening the
+panel or overlay does not change the intended target. The overlay disappears
+before the screenshot is taken.
+
+When Tesseract is installed, OmaPilot uses its word boxes to find the text under
+the click and expands it to the surrounding paragraph. The composer then shows
+a local thumbnail and a selector with the representations actually available:
+**Text**, **Screenshot**, or **Text + screenshot**. OCR failure is not an error;
+the validated screenshot remains the fallback. Removing the attachment deletes
+its broker-owned input image, and submitting sends only the selected
+representation—not every locally generated alternative.
+
+Context clips are explicit and single-shot. OmaPilot does not continuously
+watch the pointer, index accessibility trees, monitor the clipboard, or capture
+screens in the background. Password-manager and password-like windows are
+blocked conservatively. Clip text and pixels are framed as untrusted
+observational data and do not expand tool authority.
+
 ## Storage and privacy
 
 OmaPilot persists only completed chats, capped at the newest 30. A chat contains the question, rendered answer source, timestamp, provider/model metadata, content references, and a resumable session identity when the harness supplies one. Draft text, authentication output, tokens, environment variables, and provider credentials are not persisted.
@@ -174,28 +200,92 @@ Remote Markdown images are not fetched automatically. OmaPilot shows the origin 
 
 Both integrations disappear or show a clear unavailable state when their required command is missing.
 
-## Future browser context
+## Browser element context
 
-The main future context feature is an optional **OmaPilot Browser Companion**.
-It would be a separately installed browser extension and local native-messaging
-bridge that can provide the active tab URL/title and, only with explicit site
-permission, selected text or bounded visible-page text. The intended rules are:
+The optional **OmaPilot Browser Companion** adds semantic page clipping to the
+same crosshair button. On a site the user has enabled, OmaPilot closes its
+desktop overlay and the page itself highlights the element beneath the pointer.
+Clicking produces bounded **Element**, **Text**, and **Screenshot** choices; on
+an unsupported, restricted, or non-enabled page, the existing desktop capture
+opens instead.
+
+The companion is one WebExtension source with Chromium and Firefox builds plus
+a small local native-messaging relay. It supports Omarchy's Chromium, Chrome,
+Brave, Brave Origin, Edge, Vivaldi, Helium, Firefox, Zen, and LibreWolf browser
+families. Its rules are:
 
 - the Omarchy plugin remains fully useful without the extension;
-- context is visibly disclosed and captured only when a request is submitted;
+- context is visibly disclosed and captured only after an explicit clip request and page click;
 - page access is opt-in and scoped per site, with no browsing-history collection;
 - the bridge accepts a small versioned schema and does not expose a general command channel; and
 - the extension avoids Chrome's broad `debugger` permission and requests only the minimum tab/site/native-messaging permissions needed for enabled features.
 
-Because native messaging requires browser-host registration outside the
-Omarchy plugin directory, that companion would need its own explicit,
-reversible install and removal flow; the normal OmaPilot plugin install would not
-silently add it.
+Native messaging requires registration outside the plugin directory, so it is
+enabled only with the user's explicit consent. The primary setup path does not
+require a terminal: open **OmaPilot settings → Browser context** and choose
+**Enable browser context**. OmaPilot registers the user-local relay and adds the
+bundled unpacked extension to detected Omarchy Chromium-family browser flags.
+Restart the browser afterward, pin the OmaPilot extension, then choose **Enable
+on this site** once for each site where DOM capture should be available.
 
-Other roadmap candidates build on that same context contract: user-selectable
-context sources, richer app-specific adapters, and a preview of exactly what
-will be shared before submit. Browser actions would come later, only with their
-own inspectable per-action approval boundary for authenticated sites.
+Firefox and Zen development builds still require browser confirmation to load
+`browser-companion/dist/firefox` temporarily; browsers do not allow another
+application to silently install an unsigned temporary extension. Expand
+**Finish browser setup** in OmaPilot settings to open the correct Chromium or
+Firefox extension page and copy the matching bundled folder path. The same
+controls remain available as a manual fallback when a Chromium-family browser
+does not honor its unpacked-extension flag.
+
+The script remains available for development, diagnostics, and removal:
+
+```bash
+./scripts/install-browser-companion.sh install
+```
+
+For local Omarchy Chromium-family development, it can add the unpacked build to
+detected browser flag files:
+
+```bash
+./scripts/install-browser-companion.sh install --development
+```
+
+The primary removal path is also in settings. Choose **Remove browser context**
+and confirm before removing the OmaPilot plugin. This removes the user-local
+relay, native-messaging manifests, and unpacked-extension browser flags. Restart
+open browsers afterward to unload the already-running extension process.
+
+Omarchy deliberately does not execute plugin install or removal hooks, so
+`omarchy plugin remove` cannot invoke OmaPilot's cleanup automatically. Remove
+browser context from settings first. The script remains available for recovery
+or development if the plugin has not yet been removed:
+
+```bash
+./scripts/install-browser-companion.sh uninstall
+```
+
+The desktop capture feature needs no separate OmaPilot package: its QML,
+broker code, and built browser assets ship in the plugin repository. A durable
+browser release does need two additional delivery channels because browsers do
+not permit a plugin clone to install them silently:
+
+1. publish the Chromium and Firefox builds through their browser extension
+   stores so users receive a stable extension ID and browser-managed updates;
+2. keep the tiny native relay in this repository initially, with an explicit
+   install/uninstall command, then package that relay separately (for example as
+   an AUR package) if automatic upgrades and ownership tracking are desired.
+
+The relay and extension have no additional npm dependencies. The current relay
+installer uses the already-required Node.js runtime plus `jq` to write native
+messaging manifests. Store-packaged extensions can share the same versioned
+wire contract and release from the existing source; they do not require a
+separate source repository.
+
+The element representation is a capped semantic tree—not raw `outerHTML`—and
+omits editable values, editable accessible-name fallbacks, selections rooted in
+editable content, password content, hidden nodes, scripts, styles, event
+handlers, query strings, and fragments. Each capture remains bound to the exact
+tab and native-relay session that answered its probe. Browser actions remain
+out of scope; they would need their own inspectable per-action approval boundary.
 
 ## Development
 

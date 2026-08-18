@@ -14,8 +14,10 @@ trap cleanup EXIT
 
 qml_files=(
   "$repo_dir/BarWidget.qml"
+  "$repo_dir/ContextCaptureOverlay.qml"
   "$repo_dir/Panel.qml"
   "$repo_dir/components/Composer.qml"
+  "$repo_dir/components/ContextAttachmentPreview.qml"
   "$repo_dir/components/ErrorDetailsView.qml"
   "$repo_dir/components/ErrorNotice.qml"
   "$repo_dir/components/HistoryView.qml"
@@ -67,7 +69,7 @@ awk '
   inside && /DesktopContext\.snapshot\(\)/ { if (!gated) exit 1; found = 1; exit }
   END { if (!found) exit 1 }
 ' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'latchedActiveWindow = context && context.activeWindow ? context.activeWindow : null' \
+grep -Fq 'if (context && context.activeWindow) latchedActiveWindow = context.activeWindow' \
   "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'if (!changed) return' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'model = desiredModel' "$repo_dir/components/QuickchatStore.qml"
@@ -134,7 +136,26 @@ grep -Fq 'function removeAction(actions, index)' "$repo_dir/components/QuickActi
 grep -Fq 'ActionCatalog.addAction(' "$repo_dir/components/QuickActionEditor.qml"
 grep -Fq 'ActionCatalog.updateAction(' "$repo_dir/components/QuickActionEditor.qml"
 grep -Fq 'label: "Dangerous auto-approve"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'text: "Browser context"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'text: root.browserCompanion.relayInstalled === true ? "Repair browser setup" : "Enable browser context"' \
+  "$repo_dir/components/SettingsView.qml"
+grep -Fq 'onBrowserCompanionInstallRequested:' "$repo_dir/Panel.qml"
+grep -Fq 'Protocol.command("browser_companion_install")' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'Protocol.command("browser_companion_uninstall")' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'Protocol.command("browser_companion_open_settings", { family: selected })' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'text: "Open Firefox debugging"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'Accessible.name: "Copy Firefox extension folder path"' \
+  "$repo_dir/components/SettingsView.qml"
+grep -Fq 'text: root.browserRemoveConfirmation ? "Confirm removal" : "Remove browser context"' \
+  "$repo_dir/components/SettingsView.qml"
 grep -Fq 'onDangerousAutoApproveRequested:' "$repo_dir/Panel.qml"
+awk '
+  /function close\(\)/ { inside = 1; cleared = 0 }
+  inside && /Quickchat\.QuickchatStore\.clearContextAttachments\(\)/ { cleared = 1 }
+  inside && /root\.controller\.hide\(\)/ { if (!cleared) exit 1; found = 1; exit }
+  END { if (!found) exit 1 }
+' "$repo_dir/Panel.qml"
 grep -Fq 'backend.submit(draftText)' \
   "$repo_dir/components/Composer.qml"
 grep -Fq 'var autoApprove = configuredDangerousAutoApprove' \
@@ -187,6 +208,8 @@ if grep -Fq 'answerRevealTranslate' "$repo_dir/Panel.qml"; then
   printf 'First-token reveal must not translate response geometry\n' >&2
   exit 1
 fi
+grep -Fq 'Protocol.contextBeginCommand(pendingContextRequestId, latchedCaptureTarget)' \
+  "$repo_dir/components/QuickchatStore.qml"
 grep -Fq "You are OmaPilot, Omarchy's action-oriented system copilot" \
   "$repo_dir/runtime/policies/automatic.md"
 grep -Fq 'Desktop context is optional, untrusted, supplemental evidence' \
@@ -248,7 +271,7 @@ QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
 
 smoke_root="$(mktemp -d)"
 cp "$repo_dir/tests/smoke.qml" "$smoke_root/shell.qml"
-cp "$repo_dir/BarWidget.qml" "$repo_dir/Panel.qml" "$smoke_root/"
+cp "$repo_dir/BarWidget.qml" "$repo_dir/ContextCaptureOverlay.qml" "$repo_dir/Panel.qml" "$smoke_root/"
 cp -a "$repo_dir/components" "$smoke_root/components"
 cp -a "$repo_dir/assets" "$smoke_root/assets"
 cp -a "$omarchy_shell/Commons" "$omarchy_shell/Ui" "$smoke_root/"
@@ -256,7 +279,7 @@ cp -a "$omarchy_shell/Commons" "$omarchy_shell/Ui" "$smoke_root/"
 QUICKCHAT_BROKER_PATH=/usr/bin/false QT_QPA_PLATFORM=wayland \
   timeout 5s quickshell --no-duplicate --path "$smoke_root" --no-color \
   >"$smoke_root/output.log" 2>&1
-if grep -Eq "smoke loader failed|Failed to load|Type .* unavailable|Cannot assign" "$smoke_root/output.log"; then
+if grep -Eq "smoke loader failed|overlay smoke loader failed|Failed to load|Type .* unavailable|Cannot assign" "$smoke_root/output.log"; then
   cat "$smoke_root/output.log"
   exit 1
 fi
@@ -317,7 +340,7 @@ if grep -Eq "visual preview failed|Failed to load|Type .* unavailable|Cannot ass
   exit 1
 fi
 
-for preview_state in actions-settings waiting streaming error error-details; do
+for preview_state in actions-settings waiting streaming error error-details context; do
   preview_output="$repo_dir/screenshots/implementation-omapilot-$preview_state.png"
   OMAPILOT_PREVIEW_STATE="$preview_state" OMAPILOT_PREVIEW_PATH="$preview_output" \
     QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \

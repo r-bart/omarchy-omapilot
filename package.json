@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "node runtime/scripts/build.mjs",
+    "build": "node runtime/scripts/build.mjs && ./browser-companion/scripts/build.sh",
     "typecheck": "tsc --noEmit",
     "lint": "eslint 'runtime/**/*.ts' --max-warnings=0",
     "test": "vitest run",

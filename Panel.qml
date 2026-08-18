@@ -112,6 +112,7 @@ Panel {
 
   function openSettings() {
     viewMode = "settings"
+    Quickchat.QuickchatStore.requestBrowserCompanionStatus()
     Qt.callLater(function() { settingsView.forceInitialFocus() })
   }
 
@@ -129,6 +130,7 @@ Panel {
   function close() {
     setCenterHoverRevealSuppressed(false)
     previewSource = ""
+    Quickchat.QuickchatStore.clearContextAttachments()
     Quickchat.QuickchatStore.clearDesktopContextLatch()
     root.controller.hide()
     if (hostWidget) Qt.callLater(function() {
@@ -178,6 +180,17 @@ Panel {
   Connections {
     target: Quickchat.QuickchatStore
     function onHerdrContinued() { root.closeForExternalHandoff() }
+    function onContextOverlayRequested(payload) {
+      var hostShell = root.bar && root.bar.shell ? root.bar.shell : null
+      if (!hostShell || typeof hostShell.summon !== "function") {
+        Quickchat.QuickchatStore.toastRequested("Context capture is unavailable in this shell")
+        return
+      }
+      root.closeForExternalHandoff()
+      if (!hostShell.summon(root.moduleName, payload))
+        Quickchat.QuickchatStore.toastRequested("Context capture overlay could not be opened")
+    }
+    function onContextBrowserPickerRequested() { root.closeForExternalHandoff() }
   }
 
   Shortcut {
@@ -696,6 +709,11 @@ Panel {
           var values = {}; values[root.providerModelKey(provider)] = model; root.persistSettings(values)
         }
         onQuickActionsEdited: function(actions) { root.setQuickActions(actions) }
+        onBrowserCompanionInstallRequested: Quickchat.QuickchatStore.installBrowserCompanion()
+        onBrowserCompanionUninstallRequested: Quickchat.QuickchatStore.uninstallBrowserCompanion()
+        onBrowserCompanionRefreshRequested: Quickchat.QuickchatStore.requestBrowserCompanionStatus()
+        onBrowserCompanionOpenSettingsRequested: function(family) { Quickchat.QuickchatStore.openBrowserCompanionSettings(family) }
+        onBrowserCompanionCopyPathRequested: function(family) { Quickchat.QuickchatStore.copyBrowserCompanionPath(family) }
         onRecentChatsRequested: root.openHistory()
         onDismissed: root.showChat()
       }

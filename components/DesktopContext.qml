@@ -54,4 +54,20 @@ QtObject {
       media: media
     })
   }
+
+  function captureTarget() {
+    var toplevel = isShellToplevel(Hyprland.activeToplevel) ? null : Hyprland.activeToplevel
+    if (!toplevel) return null
+    var ipc = toplevel.lastIpcObject || {}
+    var at = Array.isArray(ipc.at) ? ipc.at : []
+    var size = Array.isArray(ipc.size) ? ipc.size : []
+    var bounds = at.length >= 2 && size.length >= 2 ? {
+      x: Number(at[0]), y: Number(at[1]), width: Number(size[0]), height: Number(size[1])
+    } : null
+    return Protocol.normalizedCaptureTarget({
+      appId: appIdFor(toplevel),
+      title: toplevel.title || ipc.title || "",
+      bounds: bounds
+    })
+  }
 }

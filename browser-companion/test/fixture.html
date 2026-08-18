@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>OmaPilot semantic context demo</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; font: 18px/1.5 system-ui, sans-serif; color: #18181b; background: #f4f4f5; }
+      main { width: min(52rem, calc(100% - 5rem)); }
+      article { padding: 2.5rem; border: 1px solid #d4d4d8; border-radius: 1.25rem; background: white; box-shadow: 0 1.5rem 4rem rgba(24,24,27,.08); }
+      .eyebrow { margin: 0 0 .5rem; color: #7c3aed; font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+      h1 { margin: 0; font-size: 2.2rem; line-height: 1.15; }
+      .summary { margin: 1rem 0 1.75rem; max-width: 42rem; color: #52525b; }
+      dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; margin: 0; }
+      dl div { padding: 1rem; border-radius: .75rem; background: #f4f4f5; }
+      dt { color: #71717a; font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+      dd { margin: .2rem 0 0; font-weight: 700; }
+      .ready { color: #15803d; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article aria-labelledby="fixture-title">
+        <p class="eyebrow">Semantic browser context</p>
+        <h1 id="fixture-title">Release readiness</h1>
+        <p class="summary">OmaPilot can capture this complete section as structured DOM, preserving its heading, description, status, and nearby metadata without relying on OCR.</p>
+        <dl aria-label="Release details">
+          <div><dt>Status</dt><dd class="ready">Ready</dd></div>
+          <div><dt>Scope</dt><dd>Article section</dd></div>
+          <div><dt>Source</dt><dd>Chromium DOM</dd></div>
+        </dl>
+      </article>
+    </main>
+  </body>
+</html>

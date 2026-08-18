@@ -50,6 +50,15 @@ Scope {
   property bool desktopContextEnabled: true
   property bool brokerDesktopContextSupported: false
   property var latchedActiveWindow: null
+  property var latchedCaptureTarget: null
+  property var contextAttachments: []
+  property bool brokerContextAttachmentsSupported: false
+  property string pendingContextRequestId: ""
+  property var browserCompanionStatus: ({
+    phase: "ready", relayInstalled: false, setupAvailable: false,
+    chromiumConnected: false, firefoxConnected: false,
+    chromiumExtensionPath: "", firefoxExtensionPath: "", message: ""
+  })
 
   readonly property bool busy: state === "preparing" || state === "dictating" || state === "streaming" || state === "stopping"
   readonly property bool canSubmit: initialized && providers.length > 0 && !busy
@@ -57,6 +66,11 @@ Scope {
   readonly property var modelOptions: Protocol.modelOptions(providers, provider)
   readonly property var providerPolicy: Protocol.providerPolicy(providers, provider)
   readonly property bool desktopContextActive: desktopContextEnabled && brokerDesktopContextSupported
+  readonly property bool contextCaptureAvailable: initialized && brokerContextAttachmentsSupported && !busy
+  readonly property bool browserCompanionConnected: browserCompanionStatus.chromiumConnected === true
+    || browserCompanionStatus.firefoxConnected === true
+  readonly property bool browserCompanionBusy: browserCompanionStatus.phase === "installing"
+    || browserCompanionStatus.phase === "removing"
 
   signal answerChanged()
   signal focusComposerRequested()
@@ -66,6 +80,9 @@ Scope {
   signal ipcCloseRequested()
   signal ipcToggleRequested()
   signal ipcHistoryRequested()
+  signal contextOverlayRequested(string payload)
+  signal contextBrowserPickerRequested()
+  signal contextAttachmentAdded()
 
   function routeIpc(method) {
     if (method === "open" || method === "show") ipcOpenRequested()
@@ -150,13 +167,16 @@ Scope {
   }
 
   function latchDesktopContext() {
+    var captureTarget = DesktopContext.captureTarget()
+    if (captureTarget !== null) latchedCaptureTarget = captureTarget
     if (!desktopContextEnabled) return
     var context = DesktopContext.snapshot()
-    latchedActiveWindow = context && context.activeWindow ? context.activeWindow : null
+    if (context && context.activeWindow) latchedActiveWindow = context.activeWindow
   }
 
   function clearDesktopContextLatch() {
     latchedActiveWindow = null
+    latchedCaptureTarget = null
   }
 
   function desktopContextForSubmit() {
@@ -179,11 +199,99 @@ Scope {
     state = "preparing"
     statusMessage = "Preparing " + Protocol.providerLabel(provider) + "…"
     var context = desktopContextForSubmit()
+    var attachmentSelections = []
+    for (var attachmentIndex = 0; attachmentIndex < contextAttachments.length; attachmentIndex++) {
+      var attachment = contextAttachments[attachmentIndex]
+      attachmentSelections.push({ id: attachment.id, representationIds: attachment.selectedRepresentationIds })
+    }
     var autoApprove = configuredDangerousAutoApprove
     sendCommand(Protocol.submitCommand(
-      currentId, prompt, provider, model, context, autoApprove))
+      currentId, prompt, provider, model, context, autoApprove, attachmentSelections))
+    contextAttachments = []
     answerChanged()
     return true
+  }
+
+  function beginContextCapture() {
+    if (!contextCaptureAvailable) return false
+    pendingContextRequestId = "capture-" + Date.now() + "-" + Math.floor(Math.random() * 100000)
+    sendCommand(Protocol.contextBeginCommand(pendingContextRequestId, latchedCaptureTarget))
+    statusMessage = "Preparing context capture…"
+    return true
+  }
+
+  function requestBrowserCompanionStatus() {
+    sendCommand(Protocol.command("browser_companion_status"))
+  }
+
+  function installBrowserCompanion() {
+    if (browserCompanionBusy) return
+    sendCommand(Protocol.command("browser_companion_install"))
+  }
+
+  function uninstallBrowserCompanion() {
+    if (browserCompanionBusy) return
+    sendCommand(Protocol.command("browser_companion_uninstall"))
+  }
+
+  function openBrowserCompanionSettings(family) {
+    var selected = family === "firefox" ? "firefox" : "chromium"
+    sendCommand(Protocol.command("browser_companion_open_settings", { family: selected }))
+  }
+
+  function copyBrowserCompanionPath(family) {
+    var path = family === "firefox" ? browserCompanionStatus.firefoxExtensionPath
+      : browserCompanionStatus.chromiumExtensionPath
+    if (String(path || "") !== "") copyText(path)
+  }
+
+  function captureContext(requestId, mode, region, anchor) {
+    var values = { id: String(requestId || ""), mode: mode === "window" ? "window" : "region" }
+    var normalizedRegion = Protocol.normalizedRectangle(region)
+    if (normalizedRegion !== null) values.region = normalizedRegion
+    if (anchor && Number.isFinite(Number(anchor.x)) && Number.isFinite(Number(anchor.y)))
+      values.anchor = { x: Math.round(Number(anchor.x)), y: Math.round(Number(anchor.y)) }
+    sendCommand(Protocol.command("context_capture", values))
+    statusMessage = "Extracting context…"
+  }
+
+  function cancelContextCapture(requestId) {
+    var id = String(requestId || "")
+    if (id === "") return
+    if (pendingContextRequestId === id) pendingContextRequestId = ""
+    sendCommand(Protocol.command("context_cancel", { id: id }))
+    statusMessage = ""
+  }
+
+  function setContextRepresentation(attachmentId, mode) {
+    var values = String(mode || "").split("+")
+    var next = []
+    for (var i = 0; i < contextAttachments.length; i++) {
+      var attachment = contextAttachments[i]
+      if (String(attachment.id) === String(attachmentId)) {
+        var copy = {}
+        for (var key in attachment) copy[key] = attachment[key]
+        copy.selectedRepresentationIds = values
+        next.push(copy)
+      } else next.push(attachment)
+    }
+    contextAttachments = next
+  }
+
+  function removeContextAttachment(attachmentId) {
+    var id = String(attachmentId || "")
+    var next = []
+    for (var i = 0; i < contextAttachments.length; i++)
+      if (String(contextAttachments[i].id) !== id) next.push(contextAttachments[i])
+    contextAttachments = next
+    sendCommand(Protocol.command("context_discard", { id: id }))
+  }
+
+  function clearContextAttachments() {
+    var current = contextAttachments
+    contextAttachments = []
+    for (var i = 0; i < current.length; i++)
+      sendCommand(Protocol.command("context_discard", { id: String(current[i].id || "") }))
   }
 
   function cancel() {
@@ -216,6 +324,7 @@ Scope {
   }
 
   function newChat() {
+    clearContextAttachments()
     currentId = ""
     currentChatId = ""
     question = ""
@@ -338,6 +447,7 @@ Scope {
       }
       initialized = true
       brokerDesktopContextSupported = Protocol.hasFeature(event.features, "desktop-context")
+      brokerContextAttachmentsSupported = Protocol.hasFeature(event.features, "context-attachments")
       applyProviders(event.providers || [])
       history = Protocol.normalizedHistory(event.history || [])
       if (providers.length > 0 && (state === "preparing" || state === "unavailable")) {
@@ -406,6 +516,44 @@ Scope {
       answerChanged()
       return
     }
+    if (type === "context_ready") {
+      if (String(event.id || "") !== pendingContextRequestId) return
+      statusMessage = ""
+      contextOverlayRequested(JSON.stringify({ id: event.id, target: event.target || {} }))
+      return
+    }
+    if (type === "context_picker") {
+      if (String(event.id || "") !== pendingContextRequestId) return
+      statusMessage = "Click an element in " + String(event.browser || "the browser") + "…"
+      contextBrowserPickerRequested()
+      return
+    }
+    if (type === "context_notice") {
+      if (String(event.id || "") !== pendingContextRequestId) return
+      toastRequested(String(event.message || "Browser element capture is unavailable"))
+      return
+    }
+    if (type === "context_attachment") {
+      if (String(event.requestId || "") !== pendingContextRequestId) return
+      pendingContextRequestId = ""
+      var attachment = Protocol.normalizedContextAttachment(event.attachment)
+      if (!attachment) {
+        toastRequested("The captured context was invalid")
+        return
+      }
+      var nextAttachments = contextAttachments.slice()
+      if (nextAttachments.length >= 4) removeContextAttachment(nextAttachments.shift().id)
+      nextAttachments.push(attachment)
+      contextAttachments = nextAttachments
+      statusMessage = ""
+      contextAttachmentAdded()
+      return
+    }
+    if (type === "browser_companion") {
+      browserCompanionStatus = Protocol.normalizedBrowserCompanion(event)
+      if (browserCompanionStatus.message !== "") toastRequested(browserCompanionStatus.message)
+      return
+    }
     if (type === "complete") {
       if (event.id && currentId && String(event.id) !== currentId) return
       if (event.answer !== undefined) answerMarkdown = String(event.answer)
@@ -426,6 +574,12 @@ Scope {
       return
     }
     if (type === "error") {
+      if (pendingContextRequestId !== "" && String(event.id || "") === pendingContextRequestId) {
+        pendingContextRequestId = ""
+        statusMessage = ""
+        toastRequested(String(event.message || "Context capture failed"))
+        return
+      }
       if (event.id && currentId && String(event.id) !== currentId) return
       if (!event.id && String(event.code || "").indexOf("image_") === 0) {
         toastRequested(String(event.message || "Could not load that image"))

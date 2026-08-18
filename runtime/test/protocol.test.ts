@@ -50,6 +50,12 @@ describe("NDJSON protocol", () => {
   it("rejects malformed commands", () => {
     expect(commandSchema.safeParse({ type: "submit", id: "one", question: "", provider: "codex" }).success).toBe(false);
     expect(commandSchema.safeParse({ type: "permission_response", id: "one", permissionId: "not-a-uuid", decision: "allow_always" }).success).toBe(false);
+    expect(commandSchema.safeParse({ type: "browser_companion_status" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "browser_companion_install" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "browser_companion_uninstall" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "browser_companion_open_settings", family: "firefox" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "browser_companion_open_settings", family: "other" }).success).toBe(false);
+    expect(commandSchema.safeParse({ type: "browser_companion_install", command: "anything" }).success).toBe(false);
   });
 
   it("rejects incompatible protocol versions without becoming ready", async () => {
@@ -97,7 +103,7 @@ describe("NDJSON protocol", () => {
     await until(() => events.some((event) => event.type === "ready"));
     const ready = readySchema.parse(events.find((event) => event.type === "ready"));
     expect(ready.protocolVersion).toBe(2);
-    expect(ready.features).toEqual(["desktop-context"]);
+    expect(ready.features).toEqual(["desktop-context", "context-attachments"]);
     expect(ready.providers.find((provider) => provider.id === "codex")?.models).toContainEqual({ id: "test/default", name: "Default" });
     expect(ready.providers.map(({ id, policy }) => ({ id, policy }))).toEqual([
       { id: "codex", policy: { tools: "device-approval", web: "approved-command", hostReads: true } },
@@ -160,6 +166,62 @@ describe("NDJSON protocol", () => {
       .map((event) => typeof event.delta === "string" ? event.delta : "");
     expect(deltas.length).toBeGreaterThanOrEqual(2);
     expect(deltas.join("")).toBe("Short answer streams in pieces.");
+    child.stdin.end('{"type":"shutdown"}\n');
+    await new Promise((resolveExit) => child.once("close", resolveExit));
+  }, 20_000);
+
+  it("sends only the selected broker-owned context representations and removes the input image", async () => {
+    const state = await mkdtemp(join(tmpdir(), "quickchat-context-wire-")); roots.push(state);
+    const promptCapture = join(state, "prompt-capture.jsonl");
+    const child = spawn(brokerExecutable(), [], {
+      env: {
+        ...process.env,
+        HOME: state,
+        XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
+        QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+        FAKE_ACP_PROMPT_CAPTURE: promptCapture,
+        PATH: `${resolve("runtime/test/fixtures/context-bin")}:${resolve("runtime/test/fixtures/image-bin")}:${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+      },
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    const events: Record<string, unknown>[] = [];
+    createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
+    child.stdin.write('{"type":"initialize","protocolVersion":2}\n');
+    await until(() => events.some((event) => event.type === "ready"));
+    child.stdin.write(`${JSON.stringify({
+      type: "context_begin", id: "clip-1",
+      target: { appId: "chromium", title: "Documentation", bounds: { x: 100, y: 80, width: 800, height: 600 } }
+    })}\n`);
+    await until(() => events.some((event) => event.type === "context_ready"));
+    child.stdin.write(`${JSON.stringify({
+      type: "context_capture", id: "clip-1", mode: "window", anchor: { x: 100, y: 80 }
+    })}\n`);
+    await until(() => events.some((event) => event.type === "context_attachment"));
+    const attachmentEvent = z.object({
+      type: z.literal("context_attachment"),
+      attachment: z.object({
+        id: z.string().uuid(),
+        previewImage: z.object({ localUrl: z.string() }),
+        representations: z.array(z.object({ id: z.enum(["text", "element", "image"]) }))
+      })
+    }).parse(events.find((event) => event.type === "context_attachment"));
+    expect(attachmentEvent.attachment.representations.map((value) => value.id)).toEqual(["text", "image"]);
+    child.stdin.write(`${JSON.stringify({
+      type: "submit", id: "clip-turn", question: "Explain this", provider: "codex",
+      contextAttachments: [{ id: attachmentEvent.attachment.id, representationIds: ["text", "image"] }]
+    })}\n`);
+    await until(() => events.some((event) => event.type === "complete"));
+    const blocks = z.array(z.discriminatedUnion("type", [
+      z.object({ type: z.literal("text"), text: z.string() }),
+      z.object({ type: z.literal("image"), data: z.string(), mimeType: z.string() })
+    ])).parse(JSON.parse((await readFile(promptCapture, "utf8")).trim()));
+    expect(blocks.map((block) => block.type)).toEqual(["text", "text", "image", "text"]);
+    expect(blocks[1]).toMatchObject({ type: "text", text: expect.stringContaining("Captured context") });
+    expect(blocks[2]).toMatchObject({ type: "image", mimeType: "image/png" });
+    const imagePath = new URL(attachmentEvent.attachment.previewImage.localUrl);
+    await until(async () => {
+      try { await readFile(imagePath); return false; } catch { return true; }
+    });
     child.stdin.end('{"type":"shutdown"}\n');
     await new Promise((resolveExit) => child.once("close", resolveExit));
   }, 20_000);
@@ -378,7 +440,7 @@ describe("NDJSON protocol", () => {
 const readySchema = z.object({
   type: z.literal("ready"),
   protocolVersion: z.literal(2),
-  features: z.tuple([z.literal("desktop-context")]),
+  features: z.tuple([z.literal("desktop-context"), z.literal("context-attachments")]),
   providers: z.array(z.object({
     id: z.string(),
     models: z.array(z.object({ id: z.string(), name: z.string() })),

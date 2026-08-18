@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "OmaPilot Browser Companion",
+  "version": "0.1.0",
+  "description": "Explicitly clip bounded semantic context from the current page into OmaPilot.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApNEX5oghjjf+/lvbvR22/2q4rFxkJTU3UI6LSl6A1gGMCLVDoigDn3GYxpjBjRUvLHOIo1znfd7S7EwoXBSzmEUGnwl9955OqXc6qSPrDoaleA1LMiUVWYggr/YC6L0ZvJE0Qx8kcf3GsQumVRwjnaOzG/ffBwpuKNif3f8/49dlswwF1ctDZRM2NRqVe8rcJvVf36WbGH28GMRupFydx3N4uA0XdDzsb2tgegPuimB5cEJF+BBTLMey6ZHtPyXtSDhaL5LfW/Q+uoEIUOwRuTd/o5PbDsMkwAB9qoDTFEc+lXi3vGYp08ZN4gNWJzzpYa7+15uBTF2Ad6nWYtyPcQIDAQAB",
+  "permissions": ["activeTab", "nativeMessaging", "scripting", "storage"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "OmaPilot page access",
+    "default_popup": "popup.html"
+  }
+}
