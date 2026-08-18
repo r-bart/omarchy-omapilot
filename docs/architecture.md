@@ -106,6 +106,14 @@ and enables the bundled unpacked Chromium build in detected Omarchy browser flag
 files. It remains separate from normal plugin installation, requires a browser
 restart, and cannot grant origin permission on the user's behalf.
 
+The matching two-step **Remove browser context** action asks the broker to run
+the repository-owned uninstaller, disconnect active relay sessions, and remove
+the user-local host, browser registrations, and extension flags. Open browsers
+must restart to unload an extension process already in memory. Omarchy's plugin
+manager intentionally executes no plugin lifecycle hooks, so this cleanup must
+run before the plugin directory is removed; automatic cleanup on
+`omarchy plugin remove` requires a future host-owned lifecycle contract.
+
 The broker derives one automatic,
 fail-closed policy for that provider. Codex keeps the pinned adapter's read-only,
 on-request mode, disables native web search, and exposes only its strictly validated

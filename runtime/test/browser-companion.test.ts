@@ -46,8 +46,9 @@ describe("browser companion broker", () => {
     })}\n`);
     await expect(arm).resolves.toMatchObject({ status: "armed", browser: "Chromium", title: "Documentation" });
     await until(() => lines.some((line) => line.type === "capture.arm"));
-    client.destroy();
-    await until(() => !server.status().chromiumConnected);
+    server.disconnect();
+    expect(server.status()).toEqual({ chromiumConnected: false, firefoxConnected: false });
+    await new Promise<void>((resolve) => client.once("close", () => resolve()));
   });
 
   it("reports a missing site grant without collecting page metadata", async () => {

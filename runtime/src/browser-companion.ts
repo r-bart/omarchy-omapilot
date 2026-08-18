@@ -160,7 +160,7 @@ export class BrowserCompanionServer {
       this.#send(session.socket, { version: 1, type: "capture.cancel", requestId });
   }
 
-  async close(): Promise<void> {
+  disconnect(): void {
     for (const pending of this.#pendingProbes.values()) {
       clearTimeout(pending.timer);
       pending.resolve({ status: "unavailable" });
@@ -169,6 +169,11 @@ export class BrowserCompanionServer {
     for (const socket of this.#sockets) socket.destroy();
     this.#sockets.clear();
     this.#sessions.clear();
+    this.#callbacks.statusChanged?.();
+  }
+
+  async close(): Promise<void> {
+    this.disconnect();
     const server = this.#server;
     this.#server = undefined;
     if (server !== undefined) await new Promise<void>((resolve) => server.close(() => resolve()));

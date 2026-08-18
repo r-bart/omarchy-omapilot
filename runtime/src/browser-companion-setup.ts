@@ -51,3 +51,15 @@ export async function installBrowserCompanion(
   });
   return result.code === 0;
 }
+
+export async function uninstallBrowserCompanion(
+  env: NodeJS.ProcessEnv,
+  root = repositoryRoot()
+): Promise<boolean> {
+  const installer = resolve(root, "scripts/install-browser-companion.sh");
+  if (!await executable(installer)) return false;
+  const result = await runCommand(installer, ["uninstall"], {
+    env, cwd: root, timeoutMs: 30_000, maxOutput: 64_000
+  });
+  return result.code === 0;
+}

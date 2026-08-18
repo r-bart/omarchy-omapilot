@@ -66,6 +66,7 @@ TestCase {
     verify(!status.firefoxConnected)
     compare(status.message, "Restart the browser")
     compare(Protocol.normalizedBrowserCompanion({ phase: "unknown" }).phase, "ready")
+    compare(Protocol.normalizedBrowserCompanion({ phase: "removing" }).phase, "removing")
   }
 
   function test_desktopContextFiltersShellSurfaces() {

@@ -86,7 +86,7 @@ const contextCaptureCommand = z.object({
 const contextDiscardCommand = z.object({ type: z.literal("context_discard"), id: z.string().uuid() }).strict();
 const contextCancelCommand = z.object({ type: z.literal("context_cancel"), id: z.string().min(1).max(120) }).strict();
 const browserCompanionCommand = z.object({
-  type: z.enum(["browser_companion_status", "browser_companion_install"])
+  type: z.enum(["browser_companion_status", "browser_companion_install", "browser_companion_uninstall"])
 }).strict();
 const cancelCommand = z.object({ type: z.literal("cancel"), id: z.string().min(1).max(120) });
 const permissionResponseCommand = z.object({
@@ -205,7 +205,7 @@ export type BrokerEvent =
   | { type: "context_picker"; id: string; browser: string; title: string; url: string }
   | { type: "context_notice"; id: string; message: string }
   | { type: "context_attachment"; requestId: string; attachment: ContextAttachmentView }
-  | { type: "browser_companion"; phase: "ready" | "installing" | "failed"; relayInstalled: boolean; setupAvailable: boolean; chromiumConnected: boolean; firefoxConnected: boolean; message?: string }
+  | { type: "browser_companion"; phase: "ready" | "installing" | "removing" | "failed"; relayInstalled: boolean; setupAvailable: boolean; chromiumConnected: boolean; firefoxConnected: boolean; message?: string }
   | { type: "complete"; chat: ChatView }
   | { type: "complete"; id: string; answer: string }
   | { type: "error"; id?: string; code: string; message: string; retryable: boolean }

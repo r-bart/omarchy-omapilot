@@ -120,7 +120,7 @@ function normalizedContextAttachment(raw) {
 
 function normalizedBrowserCompanion(raw) {
   var source = raw && typeof raw === "object" ? raw : {}
-  var phase = ["ready", "installing", "failed"].indexOf(String(source.phase || "")) >= 0
+  var phase = ["ready", "installing", "removing", "failed"].indexOf(String(source.phase || "")) >= 0
     ? String(source.phase) : "ready"
   return {
     phase: phase,

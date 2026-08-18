@@ -141,8 +141,10 @@ uninstall_companion() {
   local directory spec flags_file
   for directory in "${chromium_dirs[@]}"; do
     rm -f -- "$directory/NativeMessagingHosts/$host_name.json"
+    rmdir --ignore-fail-on-non-empty "$directory/NativeMessagingHosts" 2>/dev/null || true
   done
   rm -f -- "$HOME/.mozilla/native-messaging-hosts/$host_name.json"
+  rmdir --ignore-fail-on-non-empty "$HOME/.mozilla/native-messaging-hosts" 2>/dev/null || true
   for spec in "${flag_specs[@]}"; do
     flags_file=${spec#*:}
     [[ -f $flags_file ]] && edit_load_extension remove "$flags_file"

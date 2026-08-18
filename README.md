@@ -241,7 +241,15 @@ detected browser flag files:
 ./scripts/install-browser-companion.sh install --development
 ```
 
-Removal is reversible:
+The primary removal path is also in settings. Choose **Remove browser context**
+and confirm before removing the OmaPilot plugin. This removes the user-local
+relay, native-messaging manifests, and unpacked-extension browser flags. Restart
+open browsers afterward to unload the already-running extension process.
+
+Omarchy deliberately does not execute plugin install or removal hooks, so
+`omarchy plugin remove` cannot invoke OmaPilot's cleanup automatically. Remove
+browser context from settings first. The script remains available for recovery
+or development if the plugin has not yet been removed:
 
 ```bash
 ./scripts/install-browser-companion.sh uninstall

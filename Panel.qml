@@ -681,6 +681,7 @@ Panel {
         }
         onQuickActionsEdited: function(actions) { root.setQuickActions(actions) }
         onBrowserCompanionInstallRequested: Quickchat.QuickchatStore.installBrowserCompanion()
+        onBrowserCompanionUninstallRequested: Quickchat.QuickchatStore.uninstallBrowserCompanion()
         onBrowserCompanionRefreshRequested: Quickchat.QuickchatStore.requestBrowserCompanionStatus()
         onRecentChatsRequested: root.openHistory()
         onDismissed: root.showChat()

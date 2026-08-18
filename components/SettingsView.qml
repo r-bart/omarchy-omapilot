@@ -18,6 +18,7 @@ Item {
   readonly property var browserCompanion: backend ? backend.browserCompanionStatus : ({})
   readonly property bool browserCompanionConnected: backend && backend.browserCompanionConnected
   readonly property bool browserCompanionBusy: backend && backend.browserCompanionBusy
+  property bool browserRemoveConfirmation: false
   readonly property bool popupOpen: providerPicker.popupOpen || modelPicker.popupOpen
 
   signal dangerousAutoApproveRequested(bool enabled)
@@ -25,6 +26,7 @@ Item {
   signal modelChanged(string provider, string model)
   signal quickActionsEdited(var actions)
   signal browserCompanionInstallRequested()
+  signal browserCompanionUninstallRequested()
   signal browserCompanionRefreshRequested()
   signal recentChatsRequested()
   signal dismissed()
@@ -199,11 +201,12 @@ Item {
 
               Text {
                 Layout.fillWidth: true
-                text: root.browserCompanionBusy ? "Enabling browser context…"
+                text: root.browserCompanion.phase === "installing" ? "Enabling browser context…"
+                  : (root.browserCompanion.phase === "removing" ? "Removing browser context…"
                   : (root.browserCompanionConnected ? "Browser companion connected"
                     : (root.browserCompanion.relayInstalled === true
                       ? "Relay installed · browser restart required"
-                      : "Browser companion is off"))
+                      : "Browser companion is off")))
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall
@@ -274,9 +277,54 @@ Item {
             }
           }
 
+          RowLayout {
+            Layout.fillWidth: true
+            visible: root.browserCompanion.relayInstalled === true || root.browserRemoveConfirmation
+            spacing: Style.spacing.md
+
+            Button {
+              Layout.fillWidth: true
+              iconText: "󰆴"
+              text: root.browserRemoveConfirmation ? "Confirm removal" : "Remove browser context"
+              tooltipText: root.browserRemoveConfirmation
+                ? "Confirm removal of the native relay, browser registrations, and extension flags"
+                : "Remove the native relay, browser registrations, and extension flags"
+              foreground: root.foreground
+              background: root.background
+              accent: Color.urgent
+              active: root.browserRemoveConfirmation
+              bordered: true
+              focusable: true
+              enabled: root.backend && !root.browserCompanionBusy
+                && root.browserCompanion.setupAvailable === true
+              Accessible.name: tooltipText
+              onClicked: {
+                if (!root.browserRemoveConfirmation) {
+                  root.browserRemoveConfirmation = true
+                  return
+                }
+                root.browserRemoveConfirmation = false
+                root.browserCompanionUninstallRequested()
+              }
+            }
+
+            Button {
+              visible: root.browserRemoveConfirmation
+              text: "Cancel"
+              tooltipText: "Keep browser context enabled"
+              foreground: root.foreground
+              background: root.background
+              bordered: true
+              focusable: true
+              enabled: !root.browserCompanionBusy
+              Accessible.name: tooltipText
+              onClicked: root.browserRemoveConfirmation = false
+            }
+          }
+
           Text {
             Layout.fillWidth: true
-            visible: !root.browserCompanionConnected
+            visible: !root.browserCompanionConnected && root.browserCompanion.relayInstalled !== true
             text: "OmaPilot registers the native-messaging host and adds its bundled extension to detected Omarchy Chromium-family browsers for you. Firefox and Zen still require browser confirmation to load the temporary Firefox build."
             color: Qt.darker(root.foreground, 1.45)
             font.family: root.fontFamily

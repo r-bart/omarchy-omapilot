@@ -20319,7 +20319,7 @@ var BrowserCompanionServer = class {
     for (const session of this.#sessions)
       this.#send(session.socket, { version: 1, type: "capture.cancel", requestId });
   }
-  async close() {
+  disconnect() {
     for (const pending of this.#pendingProbes.values()) {
       clearTimeout(pending.timer);
       pending.resolve({ status: "unavailable" });
@@ -20328,6 +20328,10 @@ var BrowserCompanionServer = class {
     for (const socket of this.#sockets) socket.destroy();
     this.#sockets.clear();
     this.#sessions.clear();
+    this.#callbacks.statusChanged?.();
+  }
+  async close() {
+    this.disconnect();
     const server = this.#server;
     this.#server = void 0;
     if (server !== void 0) await new Promise((resolve3) => server.close(() => resolve3()));
@@ -20500,6 +20504,17 @@ async function installBrowserCompanion(env, root = repositoryRoot()) {
   });
   return result.code === 0;
 }
+async function uninstallBrowserCompanion(env, root = repositoryRoot()) {
+  const installer = resolve2(root, "scripts/install-browser-companion.sh");
+  if (!await executable(installer)) return false;
+  const result = await runCommand(installer, ["uninstall"], {
+    env,
+    cwd: root,
+    timeoutMs: 3e4,
+    maxOutput: 64e3
+  });
+  return result.code === 0;
+}
 
 // runtime/src/broker.ts
 var QuickchatBroker = class {
@@ -20519,7 +20534,7 @@ var QuickchatBroker = class {
   #permissions = /* @__PURE__ */ new Map();
   #submissions = /* @__PURE__ */ new Set();
   #dictationGeneration = 0;
-  #browserCompanionInstalling = false;
+  #browserCompanionSetupBusy = false;
   constructor(emit2, options = {}) {
     this.#emit = emit2;
     this.#history = options.history ?? new HistoryStore();
@@ -20568,6 +20583,9 @@ var QuickchatBroker = class {
         break;
       case "browser_companion_install":
         await this.#installBrowserCompanion();
+        break;
+      case "browser_companion_uninstall":
+        await this.#uninstallBrowserCompanion();
         break;
       case "cancel":
         await this.#cancel(command.id);
@@ -20792,8 +20810,8 @@ var QuickchatBroker = class {
     });
   }
   async #installBrowserCompanion() {
-    if (this.#browserCompanionInstalling) return;
-    this.#browserCompanionInstalling = true;
+    if (this.#browserCompanionSetupBusy) return;
+    this.#browserCompanionSetupBusy = true;
     await this.#emitBrowserCompanionStatus("installing");
     try {
       const installed = await installBrowserCompanion(this.#env);
@@ -20801,7 +20819,21 @@ var QuickchatBroker = class {
     } catch {
       await this.#emitBrowserCompanionStatus("failed", "Browser companion setup could not finish. Retry from Settings; no terminal setup is required.");
     } finally {
-      this.#browserCompanionInstalling = false;
+      this.#browserCompanionSetupBusy = false;
+    }
+  }
+  async #uninstallBrowserCompanion() {
+    if (this.#browserCompanionSetupBusy) return;
+    this.#browserCompanionSetupBusy = true;
+    await this.#emitBrowserCompanionStatus("removing");
+    try {
+      const removed = await uninstallBrowserCompanion(this.#env);
+      if (removed) this.#browserCompanion.disconnect();
+      await this.#emitBrowserCompanionStatus(removed ? "ready" : "failed", removed ? "Browser context removed. Restart open browsers to unload the extension." : "Browser context removal could not finish. Retry from Settings before removing OmaPilot.");
+    } catch {
+      await this.#emitBrowserCompanionStatus("failed", "Browser context removal could not finish. Retry from Settings before removing OmaPilot.");
+    } finally {
+      this.#browserCompanionSetupBusy = false;
     }
   }
   #contextError(error48, id) {
@@ -21045,7 +21077,7 @@ var contextCaptureCommand = external_exports.object({
 var contextDiscardCommand = external_exports.object({ type: external_exports.literal("context_discard"), id: external_exports.string().uuid() }).strict();
 var contextCancelCommand = external_exports.object({ type: external_exports.literal("context_cancel"), id: external_exports.string().min(1).max(120) }).strict();
 var browserCompanionCommand = external_exports.object({
-  type: external_exports.enum(["browser_companion_status", "browser_companion_install"])
+  type: external_exports.enum(["browser_companion_status", "browser_companion_install", "browser_companion_uninstall"])
 }).strict();
 var cancelCommand = external_exports.object({ type: external_exports.literal("cancel"), id: external_exports.string().min(1).max(120) });
 var permissionResponseCommand = external_exports.object({

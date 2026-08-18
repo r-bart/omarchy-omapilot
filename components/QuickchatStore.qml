@@ -70,6 +70,7 @@ Scope {
   readonly property bool browserCompanionConnected: browserCompanionStatus.chromiumConnected === true
     || browserCompanionStatus.firefoxConnected === true
   readonly property bool browserCompanionBusy: browserCompanionStatus.phase === "installing"
+    || browserCompanionStatus.phase === "removing"
 
   signal answerChanged()
   signal focusComposerRequested()
@@ -228,6 +229,11 @@ Scope {
   function installBrowserCompanion() {
     if (browserCompanionBusy) return
     sendCommand(Protocol.command("browser_companion_install"))
+  }
+
+  function uninstallBrowserCompanion() {
+    if (browserCompanionBusy) return
+    sendCommand(Protocol.command("browser_companion_uninstall"))
   }
 
   function captureContext(requestId, mode, region, anchor) {

@@ -52,6 +52,7 @@ describe("NDJSON protocol", () => {
     expect(commandSchema.safeParse({ type: "permission_response", id: "one", permissionId: "not-a-uuid", decision: "allow_always" }).success).toBe(false);
     expect(commandSchema.safeParse({ type: "browser_companion_status" }).success).toBe(true);
     expect(commandSchema.safeParse({ type: "browser_companion_install" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "browser_companion_uninstall" }).success).toBe(true);
     expect(commandSchema.safeParse({ type: "browser_companion_install", command: "anything" }).success).toBe(false);
   });
 
