@@ -239,6 +239,14 @@ choose **Enable on this site**. Removal is reversible:
 ./scripts/install-browser-companion.sh uninstall
 ```
 
+The same development setup is available from **OmaPilot settings → Browser
+context → Enable browser context**. That explicit action registers the
+user-local native-messaging relay and adds the unpacked Chromium build to
+detected Omarchy browser flag files; it never runs during normal plugin install.
+Restart the browser afterward, then grant access once per site from the
+extension popup. Firefox and Zen development builds still need to be loaded
+temporarily from `browser-companion/dist/firefox`.
+
 The desktop capture feature needs no separate OmaPilot package: its QML,
 broker code, and built browser assets ship in the plugin repository. A durable
 browser release does need two additional delivery channels because browsers do

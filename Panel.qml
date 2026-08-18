@@ -112,6 +112,7 @@ Panel {
 
   function openSettings() {
     viewMode = "settings"
+    Quickchat.QuickchatStore.requestBrowserCompanionStatus()
     Qt.callLater(function() { settingsView.forceInitialFocus() })
   }
 
@@ -679,6 +680,8 @@ Panel {
           var values = {}; values[root.providerModelKey(provider)] = model; root.persistSettings(values)
         }
         onQuickActionsEdited: function(actions) { root.setQuickActions(actions) }
+        onBrowserCompanionInstallRequested: Quickchat.QuickchatStore.installBrowserCompanion()
+        onBrowserCompanionRefreshRequested: Quickchat.QuickchatStore.requestBrowserCompanionStatus()
         onRecentChatsRequested: root.openHistory()
         onDismissed: root.showChat()
       }

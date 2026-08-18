@@ -20,6 +20,10 @@ let nativeBuffer = Buffer.alloc(0);
 let socketBuffer = "";
 const pending = [];
 
+process.stdout.on("error", (error) => {
+  process.exit(error?.code === "EPIPE" ? 0 : 1);
+});
+
 function writeNative(message) {
   const payload = Buffer.from(JSON.stringify(message), "utf8");
   if (payload.byteLength > 1024 * 1024) return;

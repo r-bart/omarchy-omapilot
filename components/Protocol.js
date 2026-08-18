@@ -118,6 +118,20 @@ function normalizedContextAttachment(raw) {
   }
 }
 
+function normalizedBrowserCompanion(raw) {
+  var source = raw && typeof raw === "object" ? raw : {}
+  var phase = ["ready", "installing", "failed"].indexOf(String(source.phase || "")) >= 0
+    ? String(source.phase) : "ready"
+  return {
+    phase: phase,
+    relayInstalled: source.relayInstalled === true,
+    setupAvailable: source.setupAvailable === true,
+    chromiumConnected: source.chromiumConnected === true,
+    firefoxConnected: source.firefoxConnected === true,
+    message: safeContextText(source.message, 240)
+  }
+}
+
 function contextRepresentationOptions(attachment) {
   var source = attachment && attachment.representations && attachment.representations.length !== undefined
     ? attachment.representations : []

@@ -2,12 +2,19 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-action=${1:-install}
+action=install
 development=0
-if [[ ${2:-} == "--development" || ${1:-} == "--development" ]]; then
-  development=1
-  [[ ${1:-} == "--development" ]] && action=install
-fi
+build=1
+while (($#)); do
+  case "$1" in
+    install|uninstall|status) action=$1 ;;
+    --development) development=1 ;;
+    --no-build) build=0 ;;
+    -h|--help) action=help ;;
+    *) printf 'Unknown option: %s\n' "$1" >&2; exit 2 ;;
+  esac
+  shift
+done
 
 host_name="io.github.spencerbull.omapilot_browser"
 install_root="${XDG_DATA_HOME:-$HOME/.local/share}/omapilot/browser-companion"
@@ -98,7 +105,12 @@ edit_load_extension() {
 
 install_companion() {
   require_install_tools
-  "$repo_root/browser-companion/scripts/build.sh"
+  if ((build)); then
+    "$repo_root/browser-companion/scripts/build.sh"
+  elif [[ ! -f $extension_path/manifest.json || ! -f $repo_root/browser-companion/dist/firefox/manifest.json ]]; then
+    printf 'Browser companion builds are missing; run the installer without --no-build\n' >&2
+    exit 1
+  fi
   mkdir -p "$install_root"
   cp "$repo_root/browser-companion/native-host/host.mjs" "$install_root/host.mjs"
   cp "$repo_root/browser-companion/native-host/omapilot-browser-companion-host" "$host_path"
@@ -150,6 +162,6 @@ case "$action" in
   install) install_companion ;;
   uninstall) uninstall_companion ;;
   status) status_companion ;;
-  -h|--help) usage ;;
+  help) usage ;;
   *) usage >&2; exit 2 ;;
 esac

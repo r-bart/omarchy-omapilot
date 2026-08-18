@@ -135,6 +135,11 @@ grep -Fq 'function removeAction(actions, index)' "$repo_dir/components/QuickActi
 grep -Fq 'ActionCatalog.addAction(' "$repo_dir/components/QuickActionEditor.qml"
 grep -Fq 'ActionCatalog.updateAction(' "$repo_dir/components/QuickActionEditor.qml"
 grep -Fq 'label: "Dangerous auto-approve"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'text: "Browser context"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'text: root.browserCompanion.relayInstalled === true ? "Repair browser setup" : "Enable browser context"' \
+  "$repo_dir/components/SettingsView.qml"
+grep -Fq 'onBrowserCompanionInstallRequested:' "$repo_dir/Panel.qml"
+grep -Fq 'Protocol.command("browser_companion_install")' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'onDangerousAutoApproveRequested:' "$repo_dir/Panel.qml"
 grep -Fq 'backend.submit(draftText)' \
   "$repo_dir/components/Composer.qml"

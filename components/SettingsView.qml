@@ -15,12 +15,17 @@ Item {
   property color accent: Color.accent
   property string fontFamily: Style.font.family
   readonly property var modeProviders: backend ? backend.providers : []
+  readonly property var browserCompanion: backend ? backend.browserCompanionStatus : ({})
+  readonly property bool browserCompanionConnected: backend && backend.browserCompanionConnected
+  readonly property bool browserCompanionBusy: backend && backend.browserCompanionBusy
   readonly property bool popupOpen: providerPicker.popupOpen || modelPicker.popupOpen
 
   signal dangerousAutoApproveRequested(bool enabled)
   signal providerChanged(string provider)
   signal modelChanged(string provider, string model)
   signal quickActionsEdited(var actions)
+  signal browserCompanionInstallRequested()
+  signal browserCompanionRefreshRequested()
   signal recentChatsRequested()
   signal dismissed()
 
@@ -78,7 +83,7 @@ Item {
           }
 
           Text {
-            text: "Harness, permissions, and quick actions"
+            text: "Harness, browser context, permissions, and quick actions"
             color: Qt.darker(root.foreground, 1.45)
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -143,6 +148,137 @@ Item {
             visible: root.dangerousAutoApprove
             text: "Approval prompts are skipped. Commands may read, change, or delete device data and use the network."
             color: Color.urgent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.Wrap
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
+          }
+
+          PanelSeparator {
+            Layout.fillWidth: true
+            Layout.topMargin: Style.spacing.md
+            foreground: root.foreground
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Browser context"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.subtitle
+            font.bold: true
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Select semantic page elements and choose Element, Text, or Screenshot before sharing context."
+            color: Qt.darker(root.foreground, 1.45)
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.Wrap
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
+          }
+
+          RowLayout {
+            Layout.fillWidth: true
+            spacing: Style.spacing.md
+
+            Rectangle {
+              Layout.preferredWidth: Style.space(8)
+              Layout.preferredHeight: Style.space(8)
+              radius: width / 2
+              color: root.browserCompanionConnected ? root.accent
+                : (root.browserCompanion.phase === "failed" ? Color.urgent : Color.muted)
+            }
+
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: 0
+
+              Text {
+                Layout.fillWidth: true
+                text: root.browserCompanionBusy ? "Enabling browser context…"
+                  : (root.browserCompanionConnected ? "Browser companion connected"
+                    : (root.browserCompanion.relayInstalled === true
+                      ? "Relay installed · browser restart required"
+                      : "Browser companion is off"))
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                font.bold: true
+                wrapMode: Text.Wrap
+              }
+
+              Text {
+                Layout.fillWidth: true
+                text: root.browserCompanionConnected
+                  ? "Use the OmaPilot extension icon once per site to grant page access."
+                  : (root.browserCompanion.relayInstalled === true
+                    ? "Restart Chromium, then pin the OmaPilot extension and enable the current site."
+                    : "Enable the user-local relay and bundled unpacked extension, then restart your browser.")
+                color: Qt.darker(root.foreground, 1.45)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                wrapMode: Text.Wrap
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
+              }
+            }
+          }
+
+          Text {
+            Layout.fillWidth: true
+            visible: root.browserCompanion.phase === "failed"
+            text: root.browserCompanion.message || "Browser companion setup failed."
+            color: Color.urgent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.Wrap
+          }
+
+          RowLayout {
+            Layout.fillWidth: true
+            spacing: Style.spacing.md
+
+            Button {
+              Layout.fillWidth: true
+              visible: !root.browserCompanionConnected
+              iconText: "󰖟"
+              text: root.browserCompanion.relayInstalled === true ? "Repair browser setup" : "Enable browser context"
+              tooltipText: "Register the native relay and enable the bundled browser extension"
+              foreground: root.foreground
+              background: root.background
+              accent: root.accent
+              active: true
+              bordered: true
+              focusable: true
+              enabled: root.backend && !root.browserCompanionBusy
+                && root.browserCompanion.setupAvailable === true
+              Accessible.name: tooltipText
+              onClicked: root.browserCompanionInstallRequested()
+            }
+
+            Button {
+              iconText: "󰑓"
+              text: "Refresh"
+              tooltipText: "Refresh browser companion status"
+              foreground: root.foreground
+              background: root.background
+              bordered: true
+              focusable: true
+              enabled: root.backend && !root.browserCompanionBusy
+              Accessible.name: tooltipText
+              onClicked: root.browserCompanionRefreshRequested()
+            }
+          }
+
+          Text {
+            Layout.fillWidth: true
+            visible: !root.browserCompanionConnected
+            text: "This explicit setup registers a native-messaging host and adds an unpacked extension to detected Omarchy Chromium-family browser flags. Firefox and Zen still require loading the temporary Firefox build."
+            color: Qt.darker(root.foreground, 1.45)
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
             wrapMode: Text.Wrap

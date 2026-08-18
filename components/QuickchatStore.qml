@@ -55,6 +55,10 @@ Scope {
   property var contextAttachments: []
   property bool brokerContextAttachmentsSupported: false
   property string pendingContextRequestId: ""
+  property var browserCompanionStatus: ({
+    phase: "ready", relayInstalled: false, setupAvailable: false,
+    chromiumConnected: false, firefoxConnected: false, message: ""
+  })
 
   readonly property bool busy: state === "preparing" || state === "dictating" || state === "streaming" || state === "stopping"
   readonly property bool canSubmit: initialized && providers.length > 0 && !busy
@@ -63,6 +67,9 @@ Scope {
   readonly property var providerPolicy: Protocol.providerPolicy(providers, provider)
   readonly property bool desktopContextActive: desktopContextEnabled && brokerDesktopContextSupported
   readonly property bool contextCaptureAvailable: initialized && brokerContextAttachmentsSupported && !busy
+  readonly property bool browserCompanionConnected: browserCompanionStatus.chromiumConnected === true
+    || browserCompanionStatus.firefoxConnected === true
+  readonly property bool browserCompanionBusy: browserCompanionStatus.phase === "installing"
 
   signal answerChanged()
   signal focusComposerRequested()
@@ -212,6 +219,15 @@ Scope {
     sendCommand(Protocol.command("context_begin", values))
     statusMessage = "Preparing context capture…"
     return true
+  }
+
+  function requestBrowserCompanionStatus() {
+    sendCommand(Protocol.command("browser_companion_status"))
+  }
+
+  function installBrowserCompanion() {
+    if (browserCompanionBusy) return
+    sendCommand(Protocol.command("browser_companion_install"))
   }
 
   function captureContext(requestId, mode, region, anchor) {
@@ -519,6 +535,11 @@ Scope {
       contextAttachments = nextAttachments
       statusMessage = ""
       contextAttachmentAdded()
+      return
+    }
+    if (type === "browser_companion") {
+      browserCompanionStatus = Protocol.normalizedBrowserCompanion(event)
+      if (browserCompanionStatus.message !== "") toastRequested(browserCompanionStatus.message)
       return
     }
     if (type === "complete") {

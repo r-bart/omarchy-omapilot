@@ -98,6 +98,14 @@ gesture cannot activate browser `activeTab` authority. Permission is optional,
 origin-scoped, and registers the inert picker content script only for enabled
 origins. It does not collect page metadata until an explicit broker probe.
 
+Settings exposes broker-reported relay and per-family connection readiness. An
+explicit **Enable browser context** action asks the broker to run only the
+repository-owned companion installer; QML never constructs a command or edits
+browser configuration. The action registers a user-local native-messaging host
+and enables the bundled unpacked Chromium build in detected Omarchy browser flag
+files. It remains separate from normal plugin installation, requires a browser
+restart, and cannot grant origin permission on the user's behalf.
+
 The broker derives one automatic,
 fail-closed policy for that provider. Codex keeps the pinned adapter's read-only,
 on-request mode, disables native web search, and exposes only its strictly validated

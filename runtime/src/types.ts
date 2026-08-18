@@ -85,6 +85,9 @@ const contextCaptureCommand = z.object({
 }).strict().refine((value) => value.mode === "window" || value.region !== undefined, "region capture requires geometry");
 const contextDiscardCommand = z.object({ type: z.literal("context_discard"), id: z.string().uuid() }).strict();
 const contextCancelCommand = z.object({ type: z.literal("context_cancel"), id: z.string().min(1).max(120) }).strict();
+const browserCompanionCommand = z.object({
+  type: z.enum(["browser_companion_status", "browser_companion_install"])
+}).strict();
 const cancelCommand = z.object({ type: z.literal("cancel"), id: z.string().min(1).max(120) });
 const permissionResponseCommand = z.object({
   type: z.literal("permission_response"),
@@ -103,6 +106,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   contextBeginCommand,
   contextCaptureCommand,
   contextCancelCommand,
+  browserCompanionCommand,
   contextDiscardCommand,
   cancelCommand,
   permissionResponseCommand,
@@ -201,6 +205,7 @@ export type BrokerEvent =
   | { type: "context_picker"; id: string; browser: string; title: string; url: string }
   | { type: "context_notice"; id: string; message: string }
   | { type: "context_attachment"; requestId: string; attachment: ContextAttachmentView }
+  | { type: "browser_companion"; phase: "ready" | "installing" | "failed"; relayInstalled: boolean; setupAvailable: boolean; chromiumConnected: boolean; firefoxConnected: boolean; message?: string }
   | { type: "complete"; chat: ChatView }
   | { type: "complete"; id: string; answer: string }
   | { type: "error"; id?: string; code: string; message: string; retryable: boolean }

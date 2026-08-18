@@ -15935,11 +15935,11 @@ var Connection = class {
     const id = this.nextRequestId++;
     let cancel = () => {
     };
-    const response = new Promise((resolve2, reject) => {
+    const response = new Promise((resolve3, reject) => {
       const pendingResponse = {
         resolve: (value) => {
           try {
-            resolve2(mapResponse ? mapResponse(value) : value);
+            resolve3(mapResponse ? mapResponse(value) : value);
           } catch (error48) {
             reject(error48);
           }
@@ -15996,8 +15996,8 @@ var Connection = class {
     this.stream = stream;
     this.staticHandlers = handlers;
     this.allowBatches = options?.allowBatches ?? true;
-    this.closedPromise = new Promise((resolve2) => {
-      this.abortController.signal.addEventListener("abort", () => resolve2());
+    this.closedPromise = new Promise((resolve3) => {
+      this.abortController.signal.addEventListener("abort", () => resolve3());
     });
     void this.receive();
   }
@@ -16878,8 +16878,8 @@ var AsyncQueue = class {
     if (this.failed) {
       return Promise.reject(this.failure);
     }
-    return new Promise((resolve2, reject) => {
-      this.waiters.push({ resolve: resolve2, reject });
+    return new Promise((resolve3, reject) => {
+      this.waiters.push({ resolve: resolve3, reject });
     });
   }
 };
@@ -17517,10 +17517,10 @@ import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { delimiter, isAbsolute } from "node:path";
-async function runCommand(executable, args, options = {}) {
+async function runCommand(executable2, args, options = {}) {
   const maxOutput = options.maxOutput ?? 1e6;
-  return new Promise((resolve2, reject) => {
-    const child = spawn(executable, args, {
+  return new Promise((resolve3, reject) => {
+    const child = spawn(executable2, args, {
       cwd: options.cwd,
       env: options.env,
       stdio: ["ignore", "pipe", "pipe"],
@@ -17542,14 +17542,14 @@ async function runCommand(executable, args, options = {}) {
     timer.unref();
     child.once("close", (code) => {
       clearTimeout(timer);
-      resolve2({ code: code ?? 1, stdout, stderr });
+      resolve3({ code: code ?? 1, stdout, stderr });
     });
   });
 }
-async function runBinaryCommand(executable, args, options = {}) {
+async function runBinaryCommand(executable2, args, options = {}) {
   const maxOutput = options.maxOutput ?? 8 * 1024 * 1024;
-  return new Promise((resolve2, reject) => {
-    const child = spawn(executable, args, {
+  return new Promise((resolve3, reject) => {
+    const child = spawn(executable2, args, {
       cwd: options.cwd,
       env: options.env,
       stdio: ["ignore", "pipe", "pipe"],
@@ -17577,7 +17577,7 @@ async function runBinaryCommand(executable, args, options = {}) {
     timer.unref();
     child.once("close", (code) => {
       clearTimeout(timer);
-      resolve2({ code: exceeded ? 1 : code ?? 1, stdout: Buffer.concat(chunks), stderr });
+      resolve3({ code: exceeded ? 1 : code ?? 1, stdout: Buffer.concat(chunks), stderr });
     });
   });
 }
@@ -17740,16 +17740,16 @@ async function discoverProviders(env = process.env) {
   for (const id of ["codex", "claude", "opencode"]) {
     const harnessPath = await resolveExecutable(id, env);
     if (harnessPath === void 0 || !await authenticated(id, harnessPath, env)) continue;
-    let executable;
+    let executable2;
     let args;
     if (id === "opencode") {
-      executable = harnessPath;
+      executable2 = harnessPath;
       args = ["--pure", "acp"];
     } else {
-      executable = await adapterExecutable(id, env);
+      executable2 = await adapterExecutable(id, env);
       args = [];
     }
-    if (executable === void 0) continue;
+    if (executable2 === void 0) continue;
     const lockdownFeatures = id === "codex" ? await codexToolLockdownFeatures(harnessPath, env) : void 0;
     if (id === "codex" && lockdownFeatures === void 0) continue;
     if (id === "codex" && (lockdownFeatures?.includes("shell_tool") !== true || !lockdownFeatures.includes("unified_exec") || !lockdownFeatures.includes("skill_search"))) continue;
@@ -17767,7 +17767,7 @@ async function discoverProviders(env = process.env) {
       models: [],
       policy: providerPolicies[id],
       harnessPath,
-      agent: { executable, args, env: agentEnv },
+      agent: { executable: executable2, args, env: agentEnv },
       ...lockdownFeatures === void 0 ? {} : { lockdownFeatures }
     });
   }
@@ -19819,18 +19819,18 @@ function transcriptPrompt(chat) {
   ].join("\n");
 }
 async function continueInHerdr(chat, env = process.env, dependencies = {}) {
-  const resolve2 = dependencies.resolve ?? resolveExecutable;
+  const resolve3 = dependencies.resolve ?? resolveExecutable;
   const [herdr, launcher, tuiLauncher, hyprctl] = await Promise.all([
-    resolve2("herdr", env),
-    resolve2("omarchy-launch-or-focus", env),
-    resolve2("omarchy-launch-tui", env),
-    resolve2("hyprctl", env)
+    resolve3("herdr", env),
+    resolve3("omarchy-launch-or-focus", env),
+    resolve3("omarchy-launch-tui", env),
+    resolve3("hyprctl", env)
   ]);
   if (herdr === void 0) throw new HerdrHandoffError("availability", "herdr_missing");
   if (launcher === void 0 || tuiLauncher === void 0 || hyprctl === void 0)
     throw new HerdrHandoffError("availability", "omarchy_launcher_missing");
   const commands = { herdr, launcher, tuiLauncher, hyprctl };
-  const run = dependencies.run ?? (async (executable, args) => runCommand(executable, args, {
+  const run = dependencies.run ?? (async (executable2, args) => runCommand(executable2, args, {
     env,
     timeoutMs: 35e3,
     maxOutput: 256e3
@@ -19914,9 +19914,9 @@ async function continueInHerdr(chat, env = process.env, dependencies = {}) {
     throw error48;
   }
 }
-async function launchDetached(executable, args, env) {
+async function launchDetached(executable2, args, env) {
   await new Promise((resolveLaunch, rejectLaunch) => {
-    const child = spawn3(executable, args, { env, stdio: "ignore", detached: true });
+    const child = spawn3(executable2, args, { env, stdio: "ignore", detached: true });
     child.once("error", rejectLaunch);
     child.once("spawn", () => {
       child.unref();
@@ -20283,20 +20283,27 @@ var BrowserCompanionServer = class {
     this.#ready ??= this.#listen();
     return this.#ready;
   }
+  status() {
+    const sessions = [...this.#sessions].filter((session) => !session.socket.destroyed);
+    return {
+      chromiumConnected: sessions.some((session) => session.family === "chromium"),
+      firefoxConnected: sessions.some((session) => session.family === "firefox")
+    };
+  }
   async tryArm(requestId, appId, targetTitle) {
     const family = browserFamily(appId);
     if (family === void 0) return { status: "not-browser" };
     await this.start();
     const sessions = [...this.#sessions].filter((session) => session.family === family && !session.socket.destroyed);
     if (sessions.length === 0) return { status: "unavailable" };
-    return new Promise((resolve2) => {
+    return new Promise((resolve3) => {
       const timer = setTimeout(() => this.#finishProbe(requestId), 350);
       timer.unref();
       this.#pendingProbes.set(requestId, {
         requestId,
         ...targetTitle === void 0 ? {} : { targetTitle },
         responses: [],
-        resolve: resolve2,
+        resolve: resolve3,
         timer
       });
       for (const session of sessions) this.#send(session.socket, { version: 1, type: "probe", requestId });
@@ -20323,7 +20330,7 @@ var BrowserCompanionServer = class {
     this.#sessions.clear();
     const server = this.#server;
     this.#server = void 0;
-    if (server !== void 0) await new Promise((resolve2) => server.close(() => resolve2()));
+    if (server !== void 0) await new Promise((resolve3) => server.close(() => resolve3()));
     await rm5(this.socketPath, { force: true });
   }
   async #listen() {
@@ -20331,11 +20338,11 @@ var BrowserCompanionServer = class {
     await rm5(this.socketPath, { force: true });
     const server = createServer((socket) => this.#accept(socket));
     this.#server = server;
-    await new Promise((resolve2, reject) => {
+    await new Promise((resolve3, reject) => {
       server.once("error", reject);
       server.listen(this.socketPath, () => {
         server.off("error", reject);
-        resolve2();
+        resolve3();
       });
     });
     await chmod(this.socketPath, 384);
@@ -20377,6 +20384,7 @@ var BrowserCompanionServer = class {
           session = { socket, family: message.family, browser: message.browser };
           this.#sessions.add(session);
           this.#send(socket, { version: 1, type: "hello.ack" });
+          this.#callbacks.statusChanged?.();
           continue;
         }
         if (session === void 0) {
@@ -20388,7 +20396,10 @@ var BrowserCompanionServer = class {
     });
     socket.on("close", () => {
       this.#sockets.delete(socket);
-      if (session !== void 0) this.#sessions.delete(session);
+      if (session !== void 0) {
+        this.#sessions.delete(session);
+        this.#callbacks.statusChanged?.();
+      }
     });
     socket.on("error", () => socket.destroy());
   }
@@ -20450,6 +20461,46 @@ function titleScore(candidate, target) {
   return 0;
 }
 
+// runtime/src/browser-companion-setup.ts
+import { access as access3 } from "node:fs/promises";
+import { constants as constants3 } from "node:fs";
+import { dirname as dirname3, join as join8, resolve as resolve2 } from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
+function repositoryRoot() {
+  return resolve2(dirname3(fileURLToPath2(import.meta.url)), "../..");
+}
+async function executable(path) {
+  try {
+    await access3(path, constants3.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function relayPath(env) {
+  const dataRoot = env.XDG_DATA_HOME?.startsWith("/") ? env.XDG_DATA_HOME : join8(env.HOME ?? "/tmp", ".local/share");
+  return join8(dataRoot, "omapilot/browser-companion/omapilot-browser-companion-host");
+}
+async function browserCompanionSetupStatus(env, root = repositoryRoot()) {
+  const installer = resolve2(root, "scripts/install-browser-companion.sh");
+  const [relayInstalled, setupAvailable] = await Promise.all([
+    executable(relayPath(env)),
+    executable(installer)
+  ]);
+  return { relayInstalled, setupAvailable };
+}
+async function installBrowserCompanion(env, root = repositoryRoot()) {
+  const installer = resolve2(root, "scripts/install-browser-companion.sh");
+  if (!await executable(installer)) return false;
+  const result = await runCommand(installer, ["install", "--development", "--no-build"], {
+    env,
+    cwd: root,
+    timeoutMs: 3e4,
+    maxOutput: 64e3
+  });
+  return result.code === 0;
+}
+
 // runtime/src/broker.ts
 var QuickchatBroker = class {
   #emit;
@@ -20468,6 +20519,7 @@ var QuickchatBroker = class {
   #permissions = /* @__PURE__ */ new Map();
   #submissions = /* @__PURE__ */ new Set();
   #dictationGeneration = 0;
+  #browserCompanionInstalling = false;
   constructor(emit2, options = {}) {
     this.#emit = emit2;
     this.#history = options.history ?? new HistoryStore();
@@ -20479,7 +20531,10 @@ var QuickchatBroker = class {
         this.#contextAttachments.cancel(requestId);
         this.#error("context_cancelled", "Browser element capture was cancelled", false, requestId);
       },
-      error: (requestId, reason) => this.#browserCaptureError(requestId, reason)
+      error: (requestId, reason) => this.#browserCaptureError(requestId, reason),
+      statusChanged: () => {
+        void this.#emitBrowserCompanionStatus();
+      }
     });
     this.#dictation = options.dictation ?? new DictationService();
     this.#sessionCleaner = options.sessionCleaner ?? deleteAcpSession;
@@ -20507,6 +20562,12 @@ var QuickchatBroker = class {
         break;
       case "context_discard":
         await this.#contextAttachments.discard(command.id);
+        break;
+      case "browser_companion_status":
+        await this.#emitBrowserCompanionStatus();
+        break;
+      case "browser_companion_install":
+        await this.#installBrowserCompanion();
         break;
       case "cancel":
         await this.#cancel(command.id);
@@ -20565,6 +20626,7 @@ var QuickchatBroker = class {
     }
     const discovered = await discoverProviders(this.#env);
     await this.#browserCompanion.start().catch(() => void 0);
+    await this.#emitBrowserCompanionStatus();
     await Promise.all(discovered.map(async (provider) => {
       const acpModels = await probeAcpModels(provider);
       const models = acpModels.models.length > 0 ? acpModels.models : await fallbackModels(provider);
@@ -20706,11 +20768,40 @@ var QuickchatBroker = class {
           id: command.id,
           message: "DOM capture is not enabled for this site; using OCR and screenshot"
         });
+        else if (browser.status === "unavailable") this.#emit({
+          type: "context_notice",
+          id: command.id,
+          message: "Browser companion is not connected; using OCR and screenshot. Enable it in OmaPilot settings."
+        });
       }
       const attachment = await this.#contextAttachments.capture(command.id, command.mode, command.region, command.anchor);
       this.#emit({ type: "context_attachment", requestId: command.id, attachment });
     } catch (error48) {
       this.#contextError(error48, command.id);
+    }
+  }
+  async #emitBrowserCompanionStatus(phase = "ready", message) {
+    const setup = await browserCompanionSetupStatus(this.#env);
+    const connected = this.#browserCompanion.status();
+    this.#emit({
+      type: "browser_companion",
+      phase,
+      ...setup,
+      ...connected,
+      ...message === void 0 ? {} : { message }
+    });
+  }
+  async #installBrowserCompanion() {
+    if (this.#browserCompanionInstalling) return;
+    this.#browserCompanionInstalling = true;
+    await this.#emitBrowserCompanionStatus("installing");
+    try {
+      const installed = await installBrowserCompanion(this.#env);
+      await this.#emitBrowserCompanionStatus(installed ? "ready" : "failed", installed ? "Browser companion installed. Restart your browser, then enable access from its OmaPilot extension icon." : "Browser companion setup failed. Check that Node.js and jq are installed, then try again.");
+    } catch {
+      await this.#emitBrowserCompanionStatus("failed", "Browser companion setup failed. Try the installer from a terminal for details.");
+    } finally {
+      this.#browserCompanionInstalling = false;
     }
   }
   #contextError(error48, id) {
@@ -20953,6 +21044,9 @@ var contextCaptureCommand = external_exports.object({
 }).strict().refine((value) => value.mode === "window" || value.region !== void 0, "region capture requires geometry");
 var contextDiscardCommand = external_exports.object({ type: external_exports.literal("context_discard"), id: external_exports.string().uuid() }).strict();
 var contextCancelCommand = external_exports.object({ type: external_exports.literal("context_cancel"), id: external_exports.string().min(1).max(120) }).strict();
+var browserCompanionCommand = external_exports.object({
+  type: external_exports.enum(["browser_companion_status", "browser_companion_install"])
+}).strict();
 var cancelCommand = external_exports.object({ type: external_exports.literal("cancel"), id: external_exports.string().min(1).max(120) });
 var permissionResponseCommand = external_exports.object({
   type: external_exports.literal("permission_response"),
@@ -20970,6 +21064,7 @@ var commandSchema = external_exports.discriminatedUnion("type", [
   contextBeginCommand,
   contextCaptureCommand,
   contextCancelCommand,
+  browserCompanionCommand,
   contextDiscardCommand,
   cancelCommand,
   permissionResponseCommand,

@@ -14,6 +14,7 @@ import { resolveExecutable, runCommand } from "./process.js";
 import type { BrokerCommand, BrokerEvent, ChatRecord, ProviderId, ProviderInfo } from "./types.js";
 import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import { BrowserCompanionServer, type BrowserCapture } from "./browser-companion.js";
+import { browserCompanionSetupStatus, installBrowserCompanion } from "./browser-companion-setup.js";
 
 type DictationClient = Pick<DictationService, "start" | "stop" | "cancel">;
 type SessionCleaner = (provider: DiscoveredProvider, sessionId: string) => Promise<boolean>;
@@ -41,6 +42,7 @@ export class QuickchatBroker {
   #permissions = new Map<string, PermissionWaiter>();
   #submissions = new Set<string>();
   #dictationGeneration = 0;
+  #browserCompanionInstalling = false;
 
   constructor(
     emit: (event: BrokerEvent) => void,
@@ -56,7 +58,8 @@ export class QuickchatBroker {
         this.#contextAttachments.cancel(requestId);
         this.#error("context_cancelled", "Browser element capture was cancelled", false, requestId);
       },
-      error: (requestId, reason) => this.#browserCaptureError(requestId, reason)
+      error: (requestId, reason) => this.#browserCaptureError(requestId, reason),
+      statusChanged: () => { void this.#emitBrowserCompanionStatus(); }
     });
     this.#dictation = options.dictation ?? new DictationService();
     this.#sessionCleaner = options.sessionCleaner ?? deleteAcpSession;
@@ -73,6 +76,8 @@ export class QuickchatBroker {
       case "context_capture": await this.#contextCapture(command); break;
       case "context_cancel": this.#contextAttachments.cancel(command.id); this.#browserCompanion.cancel(command.id); break;
       case "context_discard": await this.#contextAttachments.discard(command.id); break;
+      case "browser_companion_status": await this.#emitBrowserCompanionStatus(); break;
+      case "browser_companion_install": await this.#installBrowserCompanion(); break;
       case "cancel": await this.#cancel(command.id); break;
       case "permission_response": this.#respondPermission(command); break;
       case "history_list": await this.#emitHistory(); break;
@@ -111,6 +116,7 @@ export class QuickchatBroker {
     }
     const discovered = await discoverProviders(this.#env);
     await this.#browserCompanion.start().catch(() => undefined);
+    await this.#emitBrowserCompanionStatus();
     await Promise.all(discovered.map(async (provider) => {
       const acpModels = await probeAcpModels(provider);
       const models = acpModels.models.length > 0 ? acpModels.models : await fallbackModels(provider);
@@ -243,11 +249,41 @@ export class QuickchatBroker {
           type: "context_notice", id: command.id,
           message: "DOM capture is not enabled for this site; using OCR and screenshot"
         });
+        else if (browser.status === "unavailable") this.#emit({
+          type: "context_notice", id: command.id,
+          message: "Browser companion is not connected; using OCR and screenshot. Enable it in OmaPilot settings."
+        });
       }
       const attachment = await this.#contextAttachments.capture(command.id, command.mode, command.region, command.anchor);
       this.#emit({ type: "context_attachment", requestId: command.id, attachment });
     } catch (error) {
       this.#contextError(error, command.id);
+    }
+  }
+
+  async #emitBrowserCompanionStatus(
+    phase: "ready" | "installing" | "failed" = "ready",
+    message?: string
+  ): Promise<void> {
+    const setup = await browserCompanionSetupStatus(this.#env);
+    const connected = this.#browserCompanion.status();
+    this.#emit({ type: "browser_companion", phase, ...setup, ...connected,
+      ...(message === undefined ? {} : { message }) });
+  }
+
+  async #installBrowserCompanion(): Promise<void> {
+    if (this.#browserCompanionInstalling) return;
+    this.#browserCompanionInstalling = true;
+    await this.#emitBrowserCompanionStatus("installing");
+    try {
+      const installed = await installBrowserCompanion(this.#env);
+      await this.#emitBrowserCompanionStatus(installed ? "ready" : "failed", installed
+        ? "Browser companion installed. Restart your browser, then enable access from its OmaPilot extension icon."
+        : "Browser companion setup failed. Check that Node.js and jq are installed, then try again.");
+    } catch {
+      await this.#emitBrowserCompanionStatus("failed", "Browser companion setup failed. Try the installer from a terminal for details.");
+    } finally {
+      this.#browserCompanionInstalling = false;
     }
   }
 

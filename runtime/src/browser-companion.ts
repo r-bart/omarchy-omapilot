@@ -98,6 +98,7 @@ type BrowserCompanionCallbacks = {
   capture: (capture: BrowserCapture) => void | Promise<void>;
   cancelled: (requestId: string) => void;
   error: (requestId: string, reason: string) => void;
+  statusChanged?: () => void;
 };
 
 export class BrowserCompanionServer {
@@ -120,6 +121,14 @@ export class BrowserCompanionServer {
   start(): Promise<void> {
     this.#ready ??= this.#listen();
     return this.#ready;
+  }
+
+  status(): { chromiumConnected: boolean; firefoxConnected: boolean } {
+    const sessions = [...this.#sessions].filter((session) => !session.socket.destroyed);
+    return {
+      chromiumConnected: sessions.some((session) => session.family === "chromium"),
+      firefoxConnected: sessions.some((session) => session.family === "firefox")
+    };
   }
 
   async tryArm(requestId: string, appId?: string, targetTitle?: string): Promise<BrowserArmResult> {
@@ -204,6 +213,7 @@ export class BrowserCompanionServer {
           session = { socket, family: message.family, browser: message.browser };
           this.#sessions.add(session);
           this.#send(socket, { version: 1, type: "hello.ack" });
+          this.#callbacks.statusChanged?.();
           continue;
         }
         if (session === undefined) { socket.destroy(); return; }
@@ -212,7 +222,10 @@ export class BrowserCompanionServer {
     });
     socket.on("close", () => {
       this.#sockets.delete(socket);
-      if (session !== undefined) this.#sessions.delete(session);
+      if (session !== undefined) {
+        this.#sessions.delete(session);
+        this.#callbacks.statusChanged?.();
+      }
     });
     socket.on("error", () => socket.destroy());
   }
