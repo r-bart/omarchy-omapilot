@@ -1,166 +1,130 @@
-# OmaPilot design QA
+# OmaPilot perimeter-motion design QA
 
-## Reference and scope
+## Comparison target
 
-- Selected reference: `/home/sbull/.codex/generated_images/01a00be1-4685-7fc3-8db3-390b6d71668c/exec-4df27182-89cb-45b2-ac78-7ca8bb5f7ef2.png`.
-- Selected mark reference: `/home/sbull/.codex/generated_images/01a00be1-4685-7fc3-8db3-390b6d71668c/exec-e7bae836-9753-4248-b4df-553b566c4739.png`.
-- Implementation captures: `screenshots/implementation-omapilot-empty.png`,
-  `screenshots/implementation-omapilot-dangerous-settings.png`,
-  `screenshots/implementation-omapilot-actions-settings.png`,
-  `screenshots/implementation-omapilot-waiting.png`,
-  `screenshots/implementation-omapilot-streaming.png`,
-  `screenshots/implementation-omapilot-error.png`, and
-  `screenshots/implementation-omapilot-error-details.png`.
-- Mark comparison: `screenshots/comparison-omapilot-mark.png`, with the
-  selected source and the rendered 42-pixel production mark in one image.
-- Reference dimensions: 1680 by 938 pixels, interpreted as an approximately
-  840 by 469 logical-pixel concept at 2x.
-- Implementation dimensions: 860 by 320 logical pixels at the headless test
-  scale.
-- Compared state: empty unified request surface with the current provider,
-  safety notice, integrated composer, and both quick actions visible.
-- Comparison scope: code and headless static rendering. The owner subsequently
-  authorized installation of the validated merge and a guarded shell restart;
-  no claim below treats that install alone as visual or interaction validation.
+- Source visual truth:
+  `/home/sbull/.codex/generated_images/01a014a9-a73e-71e3-beaf-8afd052ca604/exec-0755f5a7-8ed6-4a8e-893f-582f4f33330a.png`.
+- Rendered implementation:
+  `screenshots/implementation-omapilot-streaming.png`.
+- Combined full-view evidence:
+  `screenshots/implementation-perimeter-full-comparison.png`.
+- Combined focused evidence:
+  `screenshots/implementation-perimeter-glow-comparison.png`.
+- Clockwise direction evidence:
+  `screenshots/implementation-perimeter-direction.png`.
+- Native scene-graph evidence:
+  `/tmp/omapilot-wayland-final-streaming-v2.png`.
+- State: dark Omarchy theme, active streaming response, plain
+  `Receiving response…` status, and one perimeter runner.
 
-## Visual comparison
+## Viewport and normalization
 
-The full-view comparison preserves the reference's hierarchy: identity is the
-first row, the safety contract stays beside the provider metadata, the composer
-is the dominant surface, and quick actions are quiet secondary choices. A
-focused header/composer/action-row comparison confirms that the production
-components keep the reference's left-aligned brand, compact settings
-affordance, single bordered composer, and natural-width action buttons. The
-earlier Ask / Act switch was removed after hands-on review because it duplicated
-the permission setting without improving the request flow.
+- The source is 2055 by 765 pixels. Its aspect ratio was normalized directly to
+  the production preview's 860 by 320 logical-pixel surface.
+- The implementation is an 860 by 320 offscreen QML capture at one output pixel
+  per requested logical pixel. The combined full view therefore compares equal
+  860 by 320 regions without browser chrome, device framing, or density drift.
+- The native Wayland preview was compositor-tiled to 1232 by 1252 pixels. It is
+  not used to judge full-view proportions; it is focused evidence that the real
+  Qt scene graph renders the MultiEffect bloom that the software offscreen
+  renderer omits.
+- The runner is intentionally in a different perimeter position between still
+  frames. Position is phase-dependent and is not a fidelity mismatch.
 
-The implementation intentionally differs in three places:
+## Findings
 
-- It uses Quattro Color, Style, spacing, radius, border, focus, and typography
-  tokens instead of the reference's fixed blue glow and gradient.
-- It is substantially shorter in the empty state. This is required by the
-  content-driven compact-height contract; response content grows the panel only
-  until the screen-aware cap, after which the transcript owns scrolling.
-- It keeps truthful provider/model metadata and an exact-approval notice. The
-  reference's desktop-context selector is omitted because that capability is
-  owned by the separate provider/context stream.
+- No actionable P0, P1, P2, or P3 mismatch remains.
+- The owner accepted the glow strength and motion feel during a real installed
+  response after the guarded fresh-shell load.
 
-The new production mark uses the selected generated asset, including the
-broken Omarchy-square frame, centered heading arrow and dot, and square lower
-edge without the rejected protruding tab. Qt Quick Controls applies the active
-Quattro accent color to the source asset at both header and bar sizes. The
-side-by-side comparison confirms the geometry is preserved; only scale,
-antialiasing, and theme color differ.
+## Full-view comparison evidence
 
-The settings capture verifies that Dangerous auto-approve stays inside the
-Permissions group, uses the native toggle, remains visually secondary while
-off, and reveals a concise urgent warning while on. The warning does not move
-provider/model or quick-action controls out of the bounded scrollable pane.
-The action-editor capture verifies native fields and pointer/keyboard targets
-for editing, removal, and directional reordering; the list remains inside the
-same capped settings scroll owner.
+The combined 860 by 320 comparison preserves the selected concept's hierarchy:
+the OmaPilot identity and permission posture remain quiet, the response is the
+dominant surface, the question and phase copy share the top row, and the moving
+signal belongs to the response perimeter rather than the status text. The
+implementation intentionally keeps production's sharper native rendering and
+compact shell scale instead of reproducing the concept image's global blur.
 
-The response captures verify three distinct states without changing transcript
-ownership: a clipped telemetry beam crossing a fixed route while waiting, the
-same frame-clock signal with a gently eased velocity while streaming, and an
-urgent but compact error notice. Waiting and streaming share one fixed,
-screen-aware status slot, and their copy crossfades, so phase changes do not
-resize the adjacent question.
-The route has no chunk-driven restart or slow-fast-slow easing; its moving beam
-is fully transparent at the clipped edge before phase wrapping, while the
-fixed nodes share identical resting geometry. The error notice
-opens a separate selectable details pane with the normalized message, code,
-retryability, and Copy action. No animation claims completion percentage.
+The streaming implementation contains response copy that is absent from the
+concept. That difference is expected product behavior: the runner stays active
+through both preparing and token streaming without representing completion.
 
-Copy, icon weight, border contrast, and control density are internally
-consistent. The implementation title and mark are intentionally smaller than
-the concept so they fit the native shell scale and leave more room for
-conversation content.
+## Focused comparison evidence
 
-## Iteration history
+The combined runner crop compares the actual source glow and the native Wayland
+scene-graph result in one image. Both use one short, bright core traveling on a
+rounded accent-colored boundary with a soft bloom localized around the runner.
+The implementation's ordinary border remains legible beneath the effect, and
+there are no dots, route glyphs, or a separate line beside the status copy.
 
-1. The first 860 by 430 render exposed excessive empty space between the
-   composer and actions, and layout stretch pushed the two quick actions apart
-   (P2).
-2. The preview was reduced to its content-driven 320-pixel height, the filler
-   was removed, and the actions were changed to a natural-width row. The final
-   full-view capture has no remaining P0, P1, or P2 visual issue.
-3. The temporary gauge-and-spark glyph was replaced with the selected mark.
-   Its alpha mask is colorized through the Qt Quick Controls icon API, avoiding
-   a hardcoded theme color while retaining the exact generated geometry.
-4. The enabled dangerous setting initially contradicted the ordinary approval
-   description. The copy now switches with the flag and the separate urgent
-   warning states the concrete device and network risk.
-5. Hands-on review found the Ask / Act split redundant. The switch, mode state,
-   provider filtering, auto-denial branch, and mode-gated quick actions were
-   removed; approval behavior is now controlled solely by the dangerous toggle.
-6. The two fixed action toggles became a bounded editor for up to five ordered
-   prompts. The empty surface uses a wrapping native Flow so additional actions
-   do not clip horizontally.
-7. The one-shot three-dot waiting reveal became an OmaPilot route signal. Its
-   waiting motion runs once and settles; subsequent pulses occur only when a
-   real streamed content event increments the activity revision.
-8. Error copy became an explicit details affordance and pane so the compact
-   conversation remains readable while diagnostics stay available on demand.
-9. Hands-on review exposed a first-token snap and question-row reflow. The route
-   marker now moves through a non-layout `Translate`, waiting-to-streaming queues
-   rather than resets the active sweep, bursty chunks coalesce into one pending
-   pulse, opacity and travel durations match, and one stable status slot owns
-   waiting, streaming, and completion copy.
-10. A second hands-on review found that non-layout movement still looked rough:
-    the marker necessarily teleported home between pulses, fixed-duration panel
-    and transcript animations repeatedly restarted under streaming updates, and
-    the header mark overshot on every busy-state change. The production pass now
-    keeps route geometry fixed and transfers only node energy, latches each
-    in-flight wave's duration across the first-token handoff, inserts a long rest
-    between waiting waves, coalesces streaming bursts, crossfades phase copy,
-    uses `SmoothedAnimation` for moving height/scroll targets, and replaces the
-    header bounce with a quiet accent state.
-11. Owner validation of that build still found the energy transfer rough. The
-    captured phase samples (`0.013`, `0.102`, `0.346`, `0.723`, `0.927`) proved
-    the cubic timeline accelerated sharply through the middle, while queued
-    token pulses could run back-to-back. The replacement uses `FrameAnimation`
-    with capped frame deltas and constant phase velocity, renders a clipped
-    telemetry beam that is invisible at wrap, eases only the waiting-
-    to-streaming speed change, ignores burst timing, and removes the first-token
-    vertical slide so response geometry has one less moving axis.
+## Required fidelity surfaces
+
+- Fonts and typography: the production Omarchy font family, caption sizing,
+  medium status weight, hierarchy, antialiasing, and single-line truncation are
+  retained. The source's globally softened display treatment is intentionally
+  not applied to readable UI copy.
+- Spacing and layout rhythm: the existing 860 by 320 panel geometry, response
+  padding, question/status alignment, native radius, fixed status slot,
+  smoothed height, and follow-latest scrolling are unchanged. The overlay does
+  not participate in layout.
+- Colors and visual tokens: core stroke, bloom source, and MultiEffect
+  colorization all resolve from `Color.accent` through the panel's active accent
+  property. No accent literal or separate animation palette is shipped.
+- Image quality and assets: no raster, generated, inline SVG, emoji, or text
+  glyph is used in the product motion. The generated image remains reference
+  evidence only; the runner uses Qt's native Shape and GPU effect primitives at
+  runtime.
+- Copy and content: the selected plain `Receiving response…` and provider-aware
+  preparing copy remain truthful. The rejected three dots and adjacent route
+  line are removed, and the animation does not imply progress percentage.
 
 ## State and interaction evidence
 
-- The shared production header, composer, quick actions, and
-  settings view load in the real Quickshell binary through the offscreen visual
-  harness; screenshot creation is asserted by the UI contract check.
-- Focused QML tests cover screen-aware height capping, transcript viewport
-  ownership, near-bottom streaming follow, waiting/streaming presentation,
-  settings, history, and error Escape dismissal, approval posture, bounded
-  action add/edit/remove/reorder behavior, serialized action migration, error
-  normalization, and exact editable prompt prefills.
-- The enabled dangerous-settings capture proves the toggle and warning load in
-  the bounded production settings view; focused broker tests prove the visual
-  flag's no-prompt behavior separately from this rendering evidence.
-- The headless preview fails on QML load errors and rejects TypeError output.
-- A Quickshell motion probe exercises the real component frame clock and fails
-  if waiting does not advance at a bounded rate, first-token streaming resets
-  phase, token activity retimes the signal, a delayed frame exceeds the capped
-  delta, or reduced motion leaves the clock running.
-- A separate real-component renderer captures fourteen consecutive waiting-to-
-  streaming frames. The UI contract requires every frame and successful harness
-  completion, making temporal load failures visible instead of relying on one
-  static screenshot or source grep.
-- The merged installed path passes the same QML/UI contracts, its shell-owned
-  broker was relaunched from the new deterministic bundle, and the recovered
-  shell log contains no OmaPilot/Quickchat-specific load error.
-- Pointer feel, keyboard traversal in the installed anchor, reduced-motion
-  behavior in a real compositor, and real provider waiting/stream/cancel/error
-  transitions remain live-validation gates.
+- The real component probe verifies preparing starts motion, preparing to
+  streaming preserves phase, completion stops and settles, and reduced motion
+  leaves only the ordinary static response border.
+- The temporal renderer captures fourteen consecutive frames, verifies positive
+  bounded phase steps, and checks the streaming handoff does not reset phase.
+- The seven-frame direction strip shows the runner advancing left-to-right on
+  the authored top edge before continuing around the clockwise path. The UI
+  contract pins the inverted Qt dash offset that produces that direction.
+- The real-component probe animates the response-card height from 156 to 236
+  pixels during the preparing-to-streaming handoff and verifies the runner
+  neither restarts nor jumps phase.
+- Waiting and streaming 860 by 320 previews load with the active theme tokens.
+- A native Wayland Quickshell run loaded the component and rendered the bloom.
+  No OmaPilot motion error or TypeError was logged. The preview fixture retains
+  one pre-existing `Composer.qml` undefined-bool warning unrelated to this
+  component.
+- The source QA pass itself did not mutate the active shell. After separate
+  owner authorization, the scoped production payload was installed, validated,
+  loaded through a guarded fresh-shell restart, and accepted in a real response.
+  The existing shell configuration remained byte-identical.
 
-## Severity result
+## Comparison history
 
-- P0: none.
-- P1: none.
-- P2: checkpoint 9 was rejected in owner testing; the corrected frame-clock
-  candidate passes static temporal review and awaits a new installed gate.
-- P3: the native mark/title scale is smaller than the generated reference;
-  accepted for the shell-sized checkpoint.
+- The first combined artifact used a waiting implementation against the source's
+  streaming label. The evidence was normalized to the streaming capture before
+  judgment; this was an evidence-state correction, not a product fix.
+- The normalized full-view and focused comparisons found no P0, P1, or P2
+  difference, so no visual-fix iteration was required.
 
-final result: static pass; installed owner gate pending
+## Open questions
+
+- None for this motion scope. Merge and release remain separate decisions.
+
+## Implementation checklist
+
+- [x] Use one clockwise perimeter runner with a crisp core and soft bloom.
+- [x] Resolve every runner color from the active Omarchy accent.
+- [x] Remove the three-dot/route treatment from response status.
+- [x] Preserve phase across preparing and streaming.
+- [x] Stop and settle on terminal, hidden, and reduced-motion states.
+- [x] Pass focused QML, temporal rendering, full repository, and visual gates.
+
+## Follow-up polish
+
+- None required by the accepted installed result.
+
+final result: passed

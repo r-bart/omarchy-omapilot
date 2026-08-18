@@ -258,6 +258,16 @@ Panel {
             || Quickchat.QuickchatStore.state === "error"
             || Quickchat.QuickchatStore.state === "unavailable"
 
+          Quickchat.ResponseActivityBorder {
+            id: responseActivityBorder
+            anchors.fill: parent
+            z: 10
+            active: root.responseActivityActive && root.opened
+            motionEnabled: root.motionEnabled
+            accent: root.accent
+            radius: answerCard.radius
+          }
+
           ColumnLayout {
             id: answerLayout
             anchors.fill: parent
@@ -289,26 +299,31 @@ Panel {
                 Layout.preferredWidth: Math.min(Style.space(220),
                   Math.max(Layout.minimumWidth, answerLayout.width * 0.38))
                 Layout.maximumWidth: Style.space(220)
-                Layout.preferredHeight: Math.max(activityIndicator.implicitHeight,
+                Layout.preferredHeight: Math.max(activityStatus.implicitHeight,
                   responseState.implicitHeight)
 
                 // Keep one screen-aware status slot for every response phase.
                 // Status copy and phase changes can no longer resize the
                 // question column while a response is arriving.
-                Quickchat.WaitingIndicator {
-                  id: activityIndicator
-                  anchors.fill: parent
-                  active: root.responseActivityActive
-                  streaming: Quickchat.QuickchatStore.state === "streaming"
-                  activityRevision: Quickchat.QuickchatStore.activityRevision
-                  motionEnabled: root.motionEnabled
-                  message: Quickchat.QuickchatStore.statusMessage !== ""
+                Text {
+                  id: activityStatus
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: parent.width
+                  text: Quickchat.QuickchatStore.statusMessage !== ""
                     ? Quickchat.QuickchatStore.statusMessage
-                    : (streaming ? "Receiving response…"
+                    : (Quickchat.QuickchatStore.state === "streaming" ? "Receiving response…"
                       : "Waiting for " + Protocol.providerLabel(Quickchat.QuickchatStore.provider) + "…")
-                  foreground: root.foreground
-                  accent: root.accent
-                  fontFamily: root.fontFamily
+                  visible: root.responseActivityActive
+                  color: Qt.darker(root.foreground, 1.25)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  font.weight: Font.Medium
+                  horizontalAlignment: Text.AlignRight
+                  elide: Text.ElideRight
+                  maximumLineCount: 1
+                  Accessible.role: Accessible.StaticText
+                  Accessible.name: text
                 }
 
                 Text {
