@@ -10,5 +10,5 @@ OmaPilotHeader 1.0 OmaPilotHeader.qml
 OmaPilotMark 1.0 OmaPilotMark.qml
 QuickActions 1.0 QuickActions.qml
 QuickActionEditor 1.0 QuickActionEditor.qml
+ResponseActivityBorder 1.0 ResponseActivityBorder.qml
 SettingsView 1.0 SettingsView.qml
-WaitingIndicator 1.0 WaitingIndicator.qml

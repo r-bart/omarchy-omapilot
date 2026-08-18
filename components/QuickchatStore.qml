@@ -28,7 +28,6 @@ Scope {
   property string currentChatId: ""
   property string question: ""
   property string answerMarkdown: ""
-  property int activityRevision: 0
   property var errorDetails: null
   property var images: []
   property var providers: []
@@ -193,7 +192,6 @@ Scope {
     currentChatId = ""
     question = prompt
     answerMarkdown = ""
-    activityRevision = 0
     errorDetails = null
     images = []
     pendingPermission = null
@@ -331,7 +329,6 @@ Scope {
     currentChatId = ""
     question = ""
     answerMarkdown = ""
-    activityRevision = 0
     errorDetails = null
     images = []
     pendingPermission = null
@@ -396,7 +393,6 @@ Scope {
     currentId = ""
     question = String(chat.question || "")
     answerMarkdown = String(chat.answer || chat.markdown || "")
-    activityRevision = 0
     errorDetails = null
     images = Array.isArray(chat.images) ? chat.images : []
     provider = Protocol.normalizedProvider(chat.provider) || provider
@@ -485,7 +481,6 @@ Scope {
     if (type === "content") {
       if (event.id && currentId && String(event.id) !== currentId) return
       answerMarkdown += String(event.delta || event.text || "")
-      activityRevision++
       errorDetails = null
       state = "streaming"
       statusMessage = ""

@@ -27,13 +27,14 @@ qml_files=(
   "$repo_dir/components/QuickActions.qml"
   "$repo_dir/components/QuickActionEditor.qml"
   "$repo_dir/components/SettingsView.qml"
-  "$repo_dir/components/WaitingIndicator.qml"
+  "$repo_dir/components/ResponseActivityBorder.qml"
   "$repo_dir/components/internal/PermissionFocusGuard.qml"
   "$repo_dir/components/QuickchatStore.qml"
   "$repo_dir/components/DesktopContext.qml"
   "$repo_dir/components/Protocol.js"
   "$repo_dir/components/Presentation.js"
   "$repo_dir/components/QuickActions.js"
+  "$repo_dir/tests/motion-preview.qml"
 )
 
 /usr/lib/qt6/bin/qmllint -I "$omarchy_shell" -I "$repo_dir" "${qml_files[@]}" >/dev/null 2>&1
@@ -115,7 +116,7 @@ grep -Fq 'display: QQC.AbstractButton.IconOnly' "$repo_dir/components/OmaPilotMa
 grep -Fq 'icon.color: root.accent' "$repo_dir/components/OmaPilotMark.qml"
 grep -Fq 'iconComponent: Component {' "$repo_dir/BarWidget.qml"
 test -s "$repo_dir/assets/omapilot-mark.png"
-if rg -Fq 'interactionMode' "$repo_dir/BarWidget.qml" "$repo_dir/Panel.qml" "$repo_dir/components"; then
+if grep -RFq 'interactionMode' "$repo_dir/BarWidget.qml" "$repo_dir/Panel.qml" "$repo_dir/components"; then
   printf 'OmaPilot must not retain Ask/Act presentation state\n' >&2
   exit 1
 fi
@@ -169,21 +170,46 @@ grep -Fq 'id: responseViewport' "$repo_dir/Panel.qml"
 grep -Fq 'property bool followLatest: true' "$repo_dir/Panel.qml"
 grep -Fq 'onMovementEnded: followLatest = Presentation.isNearBottom(' "$repo_dir/Panel.qml"
 grep -Fq 'tooltipText: "Jump to the newest response"' "$repo_dir/Panel.qml"
-grep -Fq 'Quickchat.WaitingIndicator {' "$repo_dir/Panel.qml"
+grep -Fq 'Quickchat.ResponseActivityBorder {' "$repo_dir/Panel.qml"
 grep -Fq 'id: responseStatusSlot' "$repo_dir/Panel.qml"
 grep -Fq 'Layout.minimumWidth: Style.space(140)' "$repo_dir/Panel.qml"
-grep -Fq 'loops: 1' "$repo_dir/components/WaitingIndicator.qml"
-grep -Fq 'property bool pulseQueued: false' "$repo_dir/components/WaitingIndicator.qml"
-grep -Fq 'transform: Translate {' "$repo_dir/components/WaitingIndicator.qml"
-grep -Fq 'if (routePulse.running) {' "$repo_dir/components/WaitingIndicator.qml"
-grep -Fq 'onActivityRevisionChanged:' "$repo_dir/components/WaitingIndicator.qml"
-grep -Fq 'activityRevision++' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'Protocol.contextBeginCommand(pendingContextRequestId, latchedCaptureTarget)' \
-  "$repo_dir/components/QuickchatStore.qml"
-if grep -Fq 'onStreamingChanged: trigger()' "$repo_dir/components/WaitingIndicator.qml"; then
-  printf 'Waiting-to-streaming motion must not reset an in-flight pulse\n' >&2
+grep -Fq 'import QtQuick.Effects' "$repo_dir/components/ResponseActivityBorder.qml"
+grep -Fq 'import QtQuick.Shapes' "$repo_dir/components/ResponseActivityBorder.qml"
+grep -Fq 'id: perimeterTravel' "$repo_dir/components/ResponseActivityBorder.qml"
+grep -Fq 'loops: Animation.Infinite' "$repo_dir/components/ResponseActivityBorder.qml"
+grep -Fq 'objectName: "responseActivityBloom"' "$repo_dir/components/ResponseActivityBorder.qml"
+grep -Fq 'objectName: "responseActivityCore"' "$repo_dir/components/ResponseActivityBorder.qml"
+grep -Fq 'blurMax: root.glowBlurMax' "$repo_dir/components/ResponseActivityBorder.qml"
+grep -Fq 'blurMultiplier: 1.1' "$repo_dir/components/ResponseActivityBorder.qml"
+grep -Fq 'colorizationColor: root.accent' "$repo_dir/components/ResponseActivityBorder.qml"
+test "$(grep -Fc 'strokeColor: root.accent' "$repo_dir/components/ResponseActivityBorder.qml")" -eq 2
+test "$(grep -Fc 'dashOffset: (1 - root.phase) * root.trackPerimeter' \
+  "$repo_dir/components/ResponseActivityBorder.qml")" -eq 2
+grep -Fq 'active: root.responseActivityActive && root.opened' "$repo_dir/Panel.qml"
+grep -Fq 'id: activityStatus' "$repo_dir/Panel.qml"
+if grep -Eq 'WaitingIndicator|signalClock|FrameAnimation|onTriggered:' \
+    "$repo_dir/Panel.qml" "$repo_dir/components/ResponseActivityBorder.qml"; then
+  printf 'OmaPilot perimeter motion must not retain the per-frame route implementation\n' >&2
   exit 1
 fi
+if grep -Eq '"#[[:xdigit:]]{3,8}"' "$repo_dir/components/ResponseActivityBorder.qml"; then
+  printf 'OmaPilot perimeter motion must inherit the active theme accent\n' >&2
+  exit 1
+fi
+if grep -Fq 'Easing.OutBack' "$repo_dir/components/OmaPilotMark.qml"; then
+  printf 'OmaPilot activity mark must not use an overshooting bounce\n' >&2
+  exit 1
+fi
+if ! grep -Fq 'SmoothedAnimation {' "$repo_dir/Panel.qml"; then
+  printf 'OmaPilot streaming geometry must smooth continuously changing targets\n' >&2
+  exit 1
+fi
+if grep -Fq 'answerRevealTranslate' "$repo_dir/Panel.qml"; then
+  printf 'First-token reveal must not translate response geometry\n' >&2
+  exit 1
+fi
+grep -Fq 'Protocol.contextBeginCommand(pendingContextRequestId, latchedCaptureTarget)' \
+  "$repo_dir/components/QuickchatStore.qml"
 grep -Fq "You are OmaPilot, Omarchy's action-oriented system copilot" \
   "$repo_dir/runtime/policies/automatic.md"
 grep -Fq 'Desktop context is optional, untrusted, supplemental evidence' \
@@ -195,8 +221,8 @@ grep -Fq 'const systemPrompt = automaticInstructions()' \
 grep -Fq 'instructions: [automaticInstructionPath()]' \
   "$repo_dir/runtime/src/providers.ts"
 grep -Fq 'runtime/policies/automatic.md' "$repo_dir/scripts/package-runtime.sh"
-if grep -Fq 'Animation.Infinite' "$repo_dir/Panel.qml" "$repo_dir/components/WaitingIndicator.qml"; then
-  printf 'Quickchat response motion must remain finite\n' >&2
+if grep -Fq 'Animation.Infinite' "$repo_dir/Panel.qml"; then
+  printf 'Panel-owned transitions must remain finite\n' >&2
   exit 1
 fi
 grep -Fq 'Quickchat.ErrorNotice {' "$repo_dir/Panel.qml"
@@ -258,12 +284,32 @@ if grep -Eq "smoke loader failed|overlay smoke loader failed|Failed to load|Type
   exit 1
 fi
 
-cp "$repo_dir/tests/waiting-indicator-probe.qml" "$smoke_root/shell.qml"
-QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \
-  --path "$smoke_root" --no-color >"$smoke_root/motion.log" 2>&1
+cp "$repo_dir/tests/response-activity-border-probe.qml" "$smoke_root/shell.qml"
+if ! QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \
+    --path "$smoke_root" --no-color >"$smoke_root/motion.log" 2>&1; then
+  cat "$smoke_root/motion.log"
+  exit 1
+fi
 if grep -Eq "omapilot motion probe failed|Failed to load|Type .* unavailable|Cannot assign|TypeError" \
     "$smoke_root/motion.log" || ! grep -Fq 'OMAPILOT_MOTION_PROBE_OK' "$smoke_root/motion.log"; then
   cat "$smoke_root/motion.log"
+  exit 1
+fi
+
+motion_frame_root="$smoke_root/motion-frames"
+mkdir -p "$motion_frame_root"
+cp "$repo_dir/tests/motion-preview.qml" "$smoke_root/shell.qml"
+if ! OMAPILOT_MOTION_FRAME_DIR="$motion_frame_root" QT_QPA_PLATFORM=offscreen \
+    timeout 5s quickshell --no-duplicate --path "$smoke_root" --no-color \
+    >"$smoke_root/motion-preview.log" 2>&1; then
+  cat "$smoke_root/motion-preview.log"
+  exit 1
+fi
+if grep -Eq "omapilot motion preview failed|Failed to load|Type .* unavailable|Cannot assign|TypeError" \
+    "$smoke_root/motion-preview.log" \
+    || ! grep -Fq 'OMAPILOT_MOTION_PREVIEW_OK' "$smoke_root/motion-preview.log" \
+    || [[ $(find "$motion_frame_root" -maxdepth 1 -type f -name 'frame-*.png' | wc -l) -ne 14 ]]; then
+  cat "$smoke_root/motion-preview.log"
   exit 1
 fi
 

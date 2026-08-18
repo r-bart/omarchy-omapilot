@@ -222,7 +222,13 @@ Panel {
 
     Behavior on contentHeight {
       enabled: root.motionEnabled
-      NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+      // Streaming repeatedly retargets the natural height. SmoothedAnimation
+      // follows that moving target without restarting a fixed timeline for
+      // every wrapped line.
+      SmoothedAnimation {
+        velocity: Style.spaceReal(900)
+        maximumEasingTime: 120
+      }
     }
 
     Item {
@@ -265,6 +271,16 @@ Panel {
             || Quickchat.QuickchatStore.state === "error"
             || Quickchat.QuickchatStore.state === "unavailable"
 
+          Quickchat.ResponseActivityBorder {
+            id: responseActivityBorder
+            anchors.fill: parent
+            z: 10
+            active: root.responseActivityActive && root.opened
+            motionEnabled: root.motionEnabled
+            accent: root.accent
+            radius: answerCard.radius
+          }
+
           ColumnLayout {
             id: answerLayout
             anchors.fill: parent
@@ -296,34 +312,41 @@ Panel {
                 Layout.preferredWidth: Math.min(Style.space(220),
                   Math.max(Layout.minimumWidth, answerLayout.width * 0.38))
                 Layout.maximumWidth: Style.space(220)
-                Layout.preferredHeight: Math.max(activityIndicator.implicitHeight,
+                Layout.preferredHeight: Math.max(activityStatus.implicitHeight,
                   responseState.implicitHeight)
 
                 // Keep one screen-aware status slot for every response phase.
                 // Status copy and phase changes can no longer resize the
                 // question column while a response is arriving.
-                Quickchat.WaitingIndicator {
-                  id: activityIndicator
-                  anchors.fill: parent
-                  active: root.responseActivityActive
-                  streaming: Quickchat.QuickchatStore.state === "streaming"
-                  activityRevision: Quickchat.QuickchatStore.activityRevision
-                  motionEnabled: root.motionEnabled
-                  message: Quickchat.QuickchatStore.statusMessage !== ""
+                Text {
+                  id: activityStatus
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: parent.width
+                  text: Quickchat.QuickchatStore.statusMessage !== ""
                     ? Quickchat.QuickchatStore.statusMessage
-                    : (streaming ? "Receiving response…"
+                    : (Quickchat.QuickchatStore.state === "streaming" ? "Receiving response…"
                       : "Waiting for " + Protocol.providerLabel(Quickchat.QuickchatStore.provider) + "…")
-                  foreground: root.foreground
-                  accent: root.accent
-                  fontFamily: root.fontFamily
+                  visible: root.responseActivityActive
+                  color: Qt.darker(root.foreground, 1.25)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  font.weight: Font.Medium
+                  horizontalAlignment: Text.AlignRight
+                  elide: Text.ElideRight
+                  maximumLineCount: 1
+                  Accessible.role: Accessible.StaticText
+                  Accessible.name: text
                 }
 
                 Text {
                   id: responseState
+                  readonly property bool phaseVisible: text !== "" && !root.responseActivityActive
                   anchors.right: parent.right
                   anchors.verticalCenter: parent.verticalCenter
                   text: root.responsePhase.label
-                  visible: text !== "" && !root.responseActivityActive
+                  visible: phaseVisible || opacity > 0
+                  opacity: phaseVisible ? 1 : 0
                   color: root.responsePhase.tone === "urgent" ? Color.urgent
                     : (root.responsePhase.tone === "muted" ? Color.muted : root.accent)
                   font.family: root.fontFamily
@@ -333,19 +356,9 @@ Panel {
                   Accessible.role: Accessible.StaticText
                   Accessible.name: text
 
-                  onTextChanged: {
-                    responseStateReveal.stop()
-                    opacity = root.motionEnabled ? 0.45 : 1
-                    if (root.motionEnabled) responseStateReveal.restart()
-                  }
-
-                  NumberAnimation {
-                    id: responseStateReveal
-                    target: responseState
-                    property: "opacity"
-                    to: 1
-                    duration: 150
-                    easing.type: Easing.OutCubic
+                  Behavior on opacity {
+                    enabled: root.motionEnabled
+                    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
                   }
                 }
               }
@@ -468,8 +481,19 @@ Panel {
                 boundsBehavior: Flickable.StopAtBounds
                 interactive: contentHeight > height
                 property bool followLatest: true
+                property bool followMotionEnabled: true
                 readonly property real bottomThreshold: Style.space(56)
                 readonly property bool latestAvailable: contentHeight > height && !followLatest
+
+                Behavior on contentY {
+                  enabled: root.motionEnabled && answerScroll.followLatest
+                    && answerScroll.followMotionEnabled
+                    && !answerScroll.dragging && !answerScroll.flicking
+                  SmoothedAnimation {
+                    velocity: Style.spaceReal(820)
+                    maximumEasingTime: 110
+                  }
+                }
 
                 function maximumContentY() {
                   return Math.max(0, contentHeight - height)
@@ -482,12 +506,16 @@ Panel {
 
                 function resetForNewTurn() {
                   followLatest = true
+                  followMotionEnabled = false
                   contentY = 0
+                  Qt.callLater(function() { answerScroll.followMotionEnabled = true })
                 }
 
                 function showFromStart() {
                   followLatest = false
+                  followMotionEnabled = false
                   contentY = 0
+                  Qt.callLater(function() { answerScroll.followMotionEnabled = true })
                 }
 
                 function followContentIfNeeded() {
@@ -499,7 +527,7 @@ Panel {
 
                 onContentHeightChanged: followContentIfNeeded()
                 onHeightChanged: followContentIfNeeded()
-                onContentYChanged: if (moving)
+                onContentYChanged: if (dragging || flicking)
                   followLatest = Presentation.isNearBottom(contentY, contentHeight, height, bottomThreshold)
                 onMovementEnded: followLatest = Presentation.isNearBottom(
                   contentY, contentHeight, height, bottomThreshold)
@@ -565,7 +593,7 @@ Panel {
                       target: markdownAnswer
                       property: "opacity"
                       to: 1
-                      duration: 180
+                      duration: 160
                       easing.type: Easing.OutCubic
                     }
                   }

@@ -10,6 +10,11 @@ import "components/QuickActions.js" as ActionCatalog
 ShellRoot {
   id: root
   readonly property string previewState: Quickshell.env("OMAPILOT_PREVIEW_STATE") || "empty"
+  readonly property bool holdOpen: Quickshell.env("OMAPILOT_PREVIEW_HOLD") === "1"
+  readonly property int captureDelay: {
+    const requested = Number(Quickshell.env("OMAPILOT_PREVIEW_DELAY"))
+    return Number.isFinite(requested) && requested > 0 ? requested : 700
+  }
 
   QtObject {
     id: backend
@@ -34,7 +39,6 @@ ShellRoot {
       || root.previewState === "error"
       || root.previewState === "error-details"
       ? "Find the current status and summarize what matters." : ""
-    property int activityRevision: root.previewState === "streaming" ? 4 : 0
     property var errorDetails: ({
       title: "Request failed",
       message: "The harness stopped before completing the response.",
@@ -86,6 +90,7 @@ ShellRoot {
     visible: true
     color: "transparent"
     flags: Qt.FramelessWindowHint
+    title: "OmaPilot Visual Preview"
 
     BorderSurface {
       id: previewSurface
@@ -179,11 +184,21 @@ ShellRoot {
         }
 
         BorderSurface {
+          id: responseSurface
           Layout.fillWidth: true
           Layout.fillHeight: true
           color: Style.normalFillFor(Color.popups.text, Color.accent)
           borderSpec: Border.controlSpec("normal", Color.popups.text, Color.accent)
           radius: Style.cornerRadius
+
+          OmaPilot.ResponseActivityBorder {
+            anchors.fill: parent
+            z: 10
+            active: root.previewState === "waiting" || root.previewState === "streaming"
+            motionEnabled: true
+            accent: Color.accent
+            radius: responseSurface.radius
+          }
 
           ColumnLayout {
             anchors.fill: parent
@@ -202,14 +217,12 @@ ShellRoot {
                 elide: Text.ElideRight
               }
 
-              OmaPilot.WaitingIndicator {
-                active: root.previewState === "waiting" || root.previewState === "streaming"
-                streaming: root.previewState === "streaming"
-                activityRevision: backend.activityRevision
-                message: streaming ? "Receiving response…" : backend.statusMessage
-                foreground: Color.popups.text
-                accent: Color.accent
-                fontFamily: Style.font.family
+              Text {
+                text: root.previewState === "streaming" ? "Receiving response…" : backend.statusMessage
+                color: Qt.darker(Color.popups.text, 1.25)
+                font.family: Style.font.family
+                font.pixelSize: Style.font.caption
+                font.weight: Font.Medium
               }
             }
 
@@ -257,7 +270,7 @@ ShellRoot {
   }
 
   Timer {
-    interval: 700
+    interval: root.captureDelay
     running: true
     repeat: false
     onTriggered: {
@@ -283,7 +296,7 @@ ShellRoot {
         if (!result || !result.saveToFile(output))
           console.error("omapilot visual preview failed: screenshot save")
         else console.log("OMAPILOT_PREVIEW_SAVED=" + output)
-        Qt.quit()
+        if (!root.holdOpen) Qt.quit()
       }, Qt.size(previewSurface.width, previewSurface.height))
     }
   }

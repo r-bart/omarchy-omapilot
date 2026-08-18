@@ -895,6 +895,195 @@ turn per provider.
   review surface and provider-only PR 3 is closed as superseded. Owner-run live
   interaction remains the next gate; no live desktop state was changed here.
 
+## OmaPilot motion-quality revamp checkpoint 9 (2026-08-17)
+
+- Goal: replace the rough waiting/streaming motion with a calm, native Quattro
+  activity language that stays smooth under bursty token delivery and makes
+  each response phase legible without fake progress or layout jitter.
+- Done criteria: no moving marker teleports or repeated animation restarts;
+  waiting remains visibly alive with restrained cadence; first-token and
+  streaming feedback transition without snapping; bursty chunks coalesce;
+  completion/cancellation/error crossfade cleanly in the stable status slot;
+  panel growth and follow-latest scrolling tolerate continuously changing
+  targets; reduced motion settles immediately; focused state-machine, render,
+  and repository gates pass; the branch is pushed and a draft PR targets main.
+- Branch/worktree: `omapilot-motion-revamp` at
+  `/home/sbull/worktrees/omarchy-omapilot-motion-revamp`, based on merged
+  `origin/main` commit `da25c94`.
+- Allowed: presentation-only QML motion and layout ownership, focused QML test
+  harnesses, ignored headless render evidence, design documentation, this
+  ledger, dependency installation inside this worktree, commit/push, and a
+  draft pull request.
+- Forbidden: installed-plugin changes, shell restart or live desktop control,
+  edits to any other worktree, broker/provider/policy/permission/protocol
+  changes, stable ID or persistence migrations, releases, and merging to main.
+- Verification gates:
+  - [x] Inventory current animation ownership, Quickshell 0.3.0, and active
+    Quattro timing/easing conventions.
+  - [x] Capture baseline waiting/streaming renders and identify the concrete
+    sources of discontinuity.
+  - [x] Implement a cohesive activity/status/first-token/follow-motion pass
+    with no authority or interaction-contract changes.
+  - [x] Add focused real-component regressions for endpoint continuity,
+    waiting cadence, burst coalescing, phase handoff, and reduced motion.
+  - [x] Pass QML lint/UI contracts, headless motion and visual renders, full
+    repository validation, deterministic build/package checks, and Git
+    whitespace checks.
+  - [x] Commit and push the branch at `fc398cf`, open draft PR 5 to main, and leave installed
+    and live shell state unchanged for owner validation.
+- Current checkpoint: the presentation-only implementation is complete. The
+  fixed route now transfers node energy with identical resting endpoints;
+  waiting uses a 760 ms wave plus 1320 ms rest, streaming uses coalesced 460 ms
+  content-driven waves, phase copy crossfades, the header no longer overshoots,
+  and moving height/scroll targets use smoothing. The real-component cadence
+  probe, ten-frame renderer, QML/UI contract, and full 136-test runtime suite
+  pass. Final evidence is 23 protocol/context, three permission-focus, eight
+  presentation, and seven quick-action QML checks; the cadence probe and all ten
+  motion frames; 136 runtime tests with 12 opt-in live-provider skips; two
+  byte-identical broker builds; successful package dry-run; and clean Git
+  whitespace. Shellcheck remains unavailable. `npm ci` also reports unchanged
+  development-server advisories in direct esbuild (low) and Vitest (critical)
+  dependencies; this presentation-only diff neither invokes their servers nor
+  changes the lockfile. Draft PR 5 is open against main from
+  `omapilot-motion-revamp`; installed and live shell state are unchanged.
+
+## OmaPilot frame-clock motion correction checkpoint 10 (2026-08-17)
+
+- Goal: replace the still-rough installed waiting/streaming pulse with a truly
+  continuous, understated OmaPilot signal whose motion is independent of token
+  burst timing and whose first-token transition moves no response geometry.
+- Owner evidence: live testing of installed PR 5 at exact commit `93cd8f5`
+  rejected checkpoint 9. The real-component capture advanced through phase
+  samples `0.013`, `0.102`, `0.346`, `0.723`, and `0.927` at equal 110 ms
+  intervals, confirming that the cubic timeline visibly accelerated through
+  the middle; queued streaming pulses could then run back-to-back.
+- Done criteria: use the Qt frame clock with capped delayed-frame deltas and
+  constant phase velocity; wait-to-stream eases speed without resetting phase;
+  token revisions do not restart or retime motion; wrap occurs at identical
+  resting geometry; first-token content uses opacity only; inactive and
+  reduced-motion states stop and settle; focused QML/render/repository checks,
+  PR-head CI, installed validation, shell health, and an owner visual gate pass.
+- Branch/worktree: `omapilot-motion-revamp` at
+  `/home/sbull/worktrees/omarchy-omapilot-motion-revamp`; update draft PR 5.
+- Allowed: presentation-only QML, focused motion tests/renders, documentation,
+  commits and push to the existing PR, exact reviewed local plugin update, and
+  bounded live interaction/capture for this motion flow.
+- Forbidden: broker/provider/policy/permission/protocol changes, stable ID or
+  persistence migration, edits to another worktree, release, merge, unrelated
+  desktop configuration, shell restart without a demonstrated need and clear
+  lock guard, or device-changing prompt execution.
+- Verification gates:
+  - [x] Record the failed owner gate and measure the previous non-uniform phase.
+  - [x] Replace restartable eased pulses with one frame-clock signal and remove
+    first-token translation.
+  - [x] Add continuity, frame-delta cap, phase-handoff, token-independence, and
+    reduced-motion regressions plus temporal renders.
+  - [x] Pass focused QML/UI checks, full validation, deterministic package,
+    `git diff --check`, and orchestrator diff review.
+  - [x] Commit/push the corrected PR head and pass exact-head CI. Commit
+    `7c67157` passed both `validate` and deterministic `package` jobs in Actions
+    run `32041050737`; the draft PR remains open and mergeable.
+  - [x] Install that reviewed code head, preserve center placement/settings,
+    and verify shell/broker health without a restart unless required.
+  - [ ] Owner confirms the live motion now meets the interaction-quality bar.
+- Current checkpoint: source gates are complete. The real-component probe and
+  fourteen-frame renderer pass with uniform waiting phase deltas and a smooth
+  speed handoff; the focused UI contract passes 23 protocol/context, three
+  permission-focus, eight presentation, and seven quick-action checks; full
+  validation passes 136 runtime tests with 12 opt-in live skips; three broker
+  hashes are identical; package dry-run and Git whitespace checks pass. The
+  corrected code is committed at `7c67157`, pushed to draft PR 5, and green in
+  exact-code-head CI. That commit is installed from its clean public Git
+  checkout at center index 4; plugin validation, shell IPC, and the existing
+  broker are healthy, and the hot-reload log contains no OmaPilot-specific
+  error. No restart occurred. The panel opened and dismissed through its real
+  IPC path, but the computer-use keyboard backend could not submit a harmless
+  prompt because this session's desktop portal does not expose `RemoteDesktop`;
+  it failed before replaying input. Owner waiting/streaming confirmation is
+  therefore still the only open quality gate.
+
+## OmaPilot perimeter-motion polish checkpoint 11 (2026-08-18)
+
+- Goal: replace the rejected route telemetry with one theme-native, softly
+  blurred perimeter runner that makes active work feel immediate without
+  competing with the response or adding per-frame JavaScript.
+- Done criteria: the response card owns one clockwise runner with a crisp core
+  and localized bloom; every motion color derives from the active Omarchy
+  accent; waiting-to-streaming preserves phase; hidden, terminal, and reduced-
+  motion states stop cleanly; status remains plain text; smoothed height and
+  follow-latest behavior from checkpoint 10 remain intact; focused, full,
+  visual, and independent-review gates pass.
+- Branch/worktree: `perimeter-motion-polish` at
+  `/home/sbull/worktrees/omarchy-omapilot-perimeter-motion`, based on reviewed
+  remote head `origin/omapilot-motion-revamp` (`7d8156f`).
+- Initial implementation authorization: presentation-only QML, focused motion
+  probes/renders, ignored visual evidence, documentation, local validation, one
+  named read-only Herdr review, and an isolated Wayland preview. Separate owner
+  approvals later added the merged local install, guarded shell restart, commit,
+  branch push, and draft PR. Forbidden throughout: broker/provider/policy/
+  permission/protocol changes, shell-setting mutation, release, merge, or
+  unrelated desktop configuration.
+- Selected visual reference:
+  `/home/sbull/.codex/generated_images/01a014a9-a73e-71e3-beaf-8afd052ca604/exec-0755f5a7-8ed6-4a8e-893f-582f4f33330a.png`.
+- Verification gates:
+  - [x] Create the isolated worktree and confirm a clean baseline.
+  - [x] Replace the route/frame-clock component with one perimeter Shape core
+    and one XENEON-inspired MultiEffect bloom.
+  - [x] Remove the inline glyph and retain a fixed plain-text status slot.
+  - [x] Add focused continuity, completion, reduced-motion, theme-token, and
+    temporal-render checks.
+  - [x] Pass full repository validation, visual comparison, and diff review.
+  - [x] Receive a clean independent Herdr review or resolve every finding.
+  - [x] Run a final isolated Wayland preview and record remaining live-only
+    gates; do not install or reload the active shell without separate approval.
+  - [x] After separate owner authorization, merge the five production UI files
+    into the newer installed payload, validate and rescan it, and preserve an
+    exact rollback copy without changing shell settings.
+  - [x] Owner judges the installed waiting/streaming glow during a real prompt.
+- Review worker: named Herdr Claude agent `omapilot_perimeter_review`, pane
+  `w1A:p6`, in this worktree. Its initial review found a real Qt dash-direction
+  inversion, vacuous phase handoff checks, wraparound flakiness, undeclared
+  `rg` guards, an orphaned activity revision, and inaccurate README copy. The
+  direction was inverted and pinned by contract; the handoff now counts runner
+  restarts and uses modular phase advance while the card resizes; all guards use
+  `grep`; dead revision state was removed; and the README was corrected. The
+  worker confirmed those non-direction resolutions and isolated the dash
+  inversion as its sole remaining P1; that exact fix was then applied, pinned by
+  contract, and verified in the final direction strip. Its hypothesized resize
+  teleport was downgraded after the new resizing probe, and edge bloom was
+  accepted as an intentional match to the selected reference. The worker exited
+  normally and the created pane was closed.
+- Current checkpoint: every source gate passes. Focused QML/UI checks pass 23
+  protocol/context, three permission-focus, eight presentation, and seven
+  quick-action tests; the real component covers continuity, completion, reduced
+  motion, and a 156-to-236-pixel card resize; the fourteen-frame renderer passes
+  and a seven-frame strip proves clockwise top-edge travel. Full validation
+  passes 136 runtime tests with 12 opt-in live skips, typecheck, lint, build,
+  visual comparison, design QA, and `git diff --check`. The final isolated
+  Wayland scene graph renders the crisp core and soft bloom in the active theme.
+  It retains one unrelated preview-fixture `Composer.qml` undefined-bool warning.
+  The separately authorized local install is now complete at
+  `~/.config/omarchy/plugins/io.github.spencerbull.quickchat`. A guarded
+  three-way payload merge changed only `Panel.qml`, `QuickchatStore.qml`, the
+  component registry, removal of `WaitingIndicator.qml`, and addition of
+  `ResponseActivityBorder.qml`; the installed context-capture and browser-
+  companion work remains intact. The installed manifest, merged Wayland smoke,
+  and real motion probe pass. The initial plugin rescan left the original shell
+  responsive and registered the panel IPC target, but did not prove that the
+  already-instantiated panel had adopted the new component. After the owner
+  reported no animation during a real 08:45 response, the session lock guard
+  confirmed unlocked state, the broker had no provider child, and a guarded
+  shell restart created fresh shell PID `2997941` and broker PID `2998782`.
+  The fresh shell has no OmaPilot QML error, registers the expected IPC target,
+  and opens the keyboard-panel layer at alpha `1`; this is the completed live
+  installation gate.
+  `shell.json` remains byte-identical at SHA-256
+  `4ce875fdbddbaff26f3ea847a4fe9484fa7e4ee47ba9cd0f549f4fdfdb1bd92c`.
+  Rollback is
+  `~/.config/omarchy/plugins/.io.github.spencerbull.quickchat.perimeter-backup.20260818T133740Z`.
+  The owner exercised a real response after the fresh restart, accepted the
+  result as looking good, and authorized commit, branch push, and a PR. Merge
+  and release remain outside this checkpoint.
 ## Browser companion PR remediation checkpoint 9 (2026-08-17)
 
 - Goal: take Jacob's latest PR 6 onboarding/removal work, resolve the verified
