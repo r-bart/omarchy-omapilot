@@ -16,6 +16,7 @@ type CaptureTarget = {
   window?: Rectangle;
   monitor: Rectangle & { name?: string };
 };
+type WindowAtPoint = Rectangle & { appId?: string; title?: string; address?: string };
 type PendingAttachment = {
   view: ContextAttachmentView;
   image: StoredImage;
@@ -45,8 +46,10 @@ export class ContextAttachmentStore {
 
   async begin(id: string, hint?: TargetHint): Promise<CaptureTarget> {
     const monitors = await this.#monitors();
-    const window = hint?.bounds ?? await this.#activeWindowBounds(hint?.appId);
-    const monitor = monitorFor(window, monitors) ?? monitors.find((value) => value.focused) ?? monitors[0];
+    const window = hint?.bounds;
+    const cursor = window === undefined ? await this.#cursorPosition() : undefined;
+    const monitor = monitorFor(window, monitors) ?? monitorAtPoint(cursor, monitors)
+      ?? monitors.find((value) => value.focused) ?? monitors[0];
     if (monitor === undefined) throw new ContextAttachmentError("context_monitor", "No active monitor is available for capture");
     const target: CaptureTarget = {
       ...(hint?.appId === undefined ? {} : { appId: hint.appId }),
@@ -63,18 +66,47 @@ export class ContextAttachmentStore {
     return target;
   }
 
-  async #activeWindowBounds(expectedAppId?: string): Promise<Rectangle | undefined> {
+  async #cursorPosition(): Promise<{ x: number; y: number } | undefined> {
     try {
       const hyprctl = await resolveExecutable("hyprctl", this.#env);
       if (hyprctl === undefined) return undefined;
-      const result = await runCommand(hyprctl, ["-j", "activewindow"], {
-        env: this.#env, timeoutMs: 5_000, maxOutput: 256_000
+      const result = await runCommand(hyprctl, ["-j", "cursorpos"], {
+        env: this.#env, timeoutMs: 5_000, maxOutput: 64_000
       });
       if (result.code !== 0) return undefined;
-      return windowBoundsFromHyprland(JSON.parse(result.stdout), expectedAppId);
-    } catch {
-      return undefined;
+      const value: unknown = JSON.parse(result.stdout);
+      if (!isObject(value)) return undefined;
+      const x = integer(value.x); const y = integer(value.y);
+      return x === undefined || y === undefined ? undefined : { x, y };
+    } catch { return undefined; }
+  }
+
+  async selectWindow(requestId: string, localAnchor: { x: number; y: number }): Promise<CaptureTarget> {
+    const pending = this.#targets.get(requestId);
+    if (pending === undefined) throw new ContextAttachmentError("context_expired", "That context capture has expired");
+    const point = { x: pending.monitor.x + localAnchor.x, y: pending.monitor.y + localAnchor.y };
+    const hyprctl = await resolveExecutable("hyprctl", this.#env);
+    if (hyprctl === undefined) throw new ContextAttachmentError("context_window", "Window selection is unavailable");
+    const result = await runCommand(hyprctl, ["-j", "clients"], {
+      env: this.#env, timeoutMs: 5_000, maxOutput: 2_000_000
+    });
+    if (result.code !== 0) throw new ContextAttachmentError("context_window", "The window beneath the cursor could not be identified");
+    let selected: WindowAtPoint | undefined;
+    try { selected = windowAtPointFromHyprland(JSON.parse(result.stdout), point); } catch { selected = undefined; }
+    if (selected === undefined) throw new ContextAttachmentError("context_window", "No capturable window is beneath the cursor");
+    const target: CaptureTarget = {
+      ...(selected.appId === undefined ? {} : { appId: selected.appId }),
+      ...(selected.title === undefined ? {} : { title: selected.title }),
+      window: clampRectangle(selected, pending.monitor),
+      monitor: pending.monitor
+    };
+    this.#targets.set(requestId, target);
+    if (selected.address !== undefined) {
+      await runCommand(hyprctl, ["dispatch", "focuswindow", `address:${selected.address}`], {
+        env: this.#env, timeoutMs: 5_000, maxOutput: 256_000
+      });
     }
+    return target;
   }
 
   cancel(requestId: string): void {
@@ -446,6 +478,12 @@ function monitorFor(rectangle: Rectangle | undefined, monitors: Array<Rectangle 
   return monitors.find((monitor) => center.x >= monitor.x && center.x < monitor.x + monitor.width && center.y >= monitor.y && center.y < monitor.y + monitor.height);
 }
 
+function monitorAtPoint(point: { x: number; y: number } | undefined, monitors: Array<Rectangle & { focused?: boolean; name?: string }>): (Rectangle & { focused?: boolean; name?: string }) | undefined {
+  if (point === undefined) return undefined;
+  return monitors.find((monitor) => point.x >= monitor.x && point.x < monitor.x + monitor.width
+    && point.y >= monitor.y && point.y < monitor.y + monitor.height);
+}
+
 function clampRectangle(value: Rectangle, container: Rectangle): Rectangle {
   const left = Math.max(value.x, container.x);
   const top = Math.max(value.y, container.y);
@@ -474,6 +512,27 @@ export function windowBoundsFromHyprland(value: unknown, expectedAppId?: string)
   if (x === undefined || y === undefined || width === undefined || height === undefined || width < 1 || height < 1)
     return undefined;
   return { x, y, width, height };
+}
+
+export function windowAtPointFromHyprland(value: unknown, point: { x: number; y: number }): WindowAtPoint | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((client, index) => {
+    const bounds = windowBoundsFromHyprland(client);
+    if (bounds === undefined || !isObject(client) || client.mapped === false || client.hidden === true
+        || point.x < bounds.x || point.x >= bounds.x + bounds.width
+        || point.y < bounds.y || point.y >= bounds.y + bounds.height) return [];
+    const appId = typeof client.class === "string" && client.class.trim() !== "" ? client.class.trim()
+      : typeof client.initialClass === "string" && client.initialClass.trim() !== "" ? client.initialClass.trim() : undefined;
+    if (/^(?:org\.omarchy\.quickshell|quickshell)$/iu.test(appId ?? "")) return [];
+    const title = typeof client.title === "string" && client.title.trim() !== "" ? client.title.trim() : undefined;
+    const address = typeof client.address === "string" && client.address.trim() !== "" ? client.address.trim() : undefined;
+    const focus = integer(client.focusHistoryID) ?? 1_000_000;
+    const floating = client.floating === true ? 1 : 0;
+    const fullscreen = integer(client.fullscreen) ?? 0;
+    return [{ ...bounds, ...(appId === undefined ? {} : { appId }), ...(title === undefined ? {} : { title }),
+      ...(address === undefined ? {} : { address }), focus, floating, fullscreen, area: bounds.width * bounds.height, index }];
+  }).sort((left, right) => right.fullscreen - left.fullscreen || right.floating - left.floating
+    || left.focus - right.focus || left.area - right.area || left.index - right.index)[0];
 }
 
 function rectangleDistance(point: { x: number; y: number }, row: Rectangle): number {

@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { ContextAttachmentStore, textAtPointFromTsv, windowBoundsFromHyprland } from "../src/context-attachments.js";
+import { ContextAttachmentStore, textAtPointFromTsv, windowAtPointFromHyprland, windowBoundsFromHyprland } from "../src/context-attachments.js";
 import { promptWithContextAttachments } from "../src/context.js";
 import { ImageStore } from "../src/images.js";
 import { quickchatPaths } from "../src/paths.js";
@@ -17,6 +17,18 @@ describe("explicit context attachments", () => {
     const active = { class: "chromium-browser", at: [807, 38], size: [781, 950] };
     expect(windowBoundsFromHyprland(active, "chromium-browser")).toEqual({ x: 807, y: 38, width: 781, height: 950 });
     expect(windowBoundsFromHyprland(active, "firefox")).toBeUndefined();
+  });
+
+  it("selects the window beneath the committed cursor instead of the active window", () => {
+    const clients = [
+      { address: "0xterminal", class: "kitty", title: "Terminal", at: [0, 0], size: [900, 900], mapped: true, focusHistoryID: 0 },
+      { address: "0xbrowser", class: "chromium-browser", title: "Docs - Chromium", at: [900, 0], size: [900, 900], mapped: true, focusHistoryID: 8 },
+      { address: "0xshell", class: "org.omarchy.quickshell", title: "OmaPilot", at: [900, 0], size: [900, 400], mapped: true, floating: true }
+    ];
+    expect(windowAtPointFromHyprland(clients, { x: 1200, y: 500 })).toMatchObject({
+      address: "0xbrowser", appId: "chromium-browser", title: "Docs - Chromium", x: 900, width: 900
+    });
+    expect(windowAtPointFromHyprland(clients, { x: 400, y: 500 })).toMatchObject({ address: "0xterminal" });
   });
 
   it("selects the OCR paragraph beneath the pointer instead of unrelated visible text", () => {

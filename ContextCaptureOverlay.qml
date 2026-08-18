@@ -181,9 +181,7 @@ Item {
 
           Text {
             Layout.alignment: Qt.AlignHCenter
-            text: root.target && root.target.window
-              ? "Click for the active window, or drag an exact region"
-              : "Drag a region to clip"
+            text: "Click a window beneath the cursor, or drag an exact region"
             color: Color.popups.text
             font.family: Style.font.family
             font.pixelSize: Style.font.body
@@ -191,7 +189,7 @@ Item {
           }
           Text {
             Layout.alignment: Qt.AlignHCenter
-            text: "Escape cancels • OCR is used when available • screenshot always remains an option"
+            text: "Browsers open the DOM picker • other apps offer OCR and screenshot • Escape cancels"
             color: Qt.darker(Color.popups.text, 1.4)
             font.family: Style.font.family
             font.pixelSize: Style.font.caption

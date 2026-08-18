@@ -19284,8 +19284,9 @@ var ContextAttachmentStore = class {
   }
   async begin(id, hint) {
     const monitors = await this.#monitors();
-    const window = hint?.bounds ?? await this.#activeWindowBounds(hint?.appId);
-    const monitor = monitorFor(window, monitors) ?? monitors.find((value) => value.focused) ?? monitors[0];
+    const window = hint?.bounds;
+    const cursor = window === void 0 ? await this.#cursorPosition() : void 0;
+    const monitor = monitorFor(window, monitors) ?? monitorAtPoint(cursor, monitors) ?? monitors.find((value) => value.focused) ?? monitors[0];
     if (monitor === void 0) throw new ContextAttachmentError("context_monitor", "No active monitor is available for capture");
     const target = {
       ...hint?.appId === void 0 ? {} : { appId: hint.appId },
@@ -19301,20 +19302,59 @@ var ContextAttachmentStore = class {
     }
     return target;
   }
-  async #activeWindowBounds(expectedAppId) {
+  async #cursorPosition() {
     try {
       const hyprctl = await resolveExecutable("hyprctl", this.#env);
       if (hyprctl === void 0) return void 0;
-      const result = await runCommand(hyprctl, ["-j", "activewindow"], {
+      const result = await runCommand(hyprctl, ["-j", "cursorpos"], {
+        env: this.#env,
+        timeoutMs: 5e3,
+        maxOutput: 64e3
+      });
+      if (result.code !== 0) return void 0;
+      const value = JSON.parse(result.stdout);
+      if (!isObject4(value)) return void 0;
+      const x = integer2(value.x);
+      const y = integer2(value.y);
+      return x === void 0 || y === void 0 ? void 0 : { x, y };
+    } catch {
+      return void 0;
+    }
+  }
+  async selectWindow(requestId, localAnchor) {
+    const pending = this.#targets.get(requestId);
+    if (pending === void 0) throw new ContextAttachmentError("context_expired", "That context capture has expired");
+    const point = { x: pending.monitor.x + localAnchor.x, y: pending.monitor.y + localAnchor.y };
+    const hyprctl = await resolveExecutable("hyprctl", this.#env);
+    if (hyprctl === void 0) throw new ContextAttachmentError("context_window", "Window selection is unavailable");
+    const result = await runCommand(hyprctl, ["-j", "clients"], {
+      env: this.#env,
+      timeoutMs: 5e3,
+      maxOutput: 2e6
+    });
+    if (result.code !== 0) throw new ContextAttachmentError("context_window", "The window beneath the cursor could not be identified");
+    let selected;
+    try {
+      selected = windowAtPointFromHyprland(JSON.parse(result.stdout), point);
+    } catch {
+      selected = void 0;
+    }
+    if (selected === void 0) throw new ContextAttachmentError("context_window", "No capturable window is beneath the cursor");
+    const target = {
+      ...selected.appId === void 0 ? {} : { appId: selected.appId },
+      ...selected.title === void 0 ? {} : { title: selected.title },
+      window: clampRectangle(selected, pending.monitor),
+      monitor: pending.monitor
+    };
+    this.#targets.set(requestId, target);
+    if (selected.address !== void 0) {
+      await runCommand(hyprctl, ["dispatch", "focuswindow", `address:${selected.address}`], {
         env: this.#env,
         timeoutMs: 5e3,
         maxOutput: 256e3
       });
-      if (result.code !== 0) return void 0;
-      return windowBoundsFromHyprland(JSON.parse(result.stdout), expectedAppId);
-    } catch {
-      return void 0;
     }
+    return target;
   }
   cancel(requestId) {
     this.#targets.delete(requestId);
@@ -19653,6 +19693,10 @@ function monitorFor(rectangle, monitors) {
   const center = { x: rectangle.x + rectangle.width / 2, y: rectangle.y + rectangle.height / 2 };
   return monitors.find((monitor) => center.x >= monitor.x && center.x < monitor.x + monitor.width && center.y >= monitor.y && center.y < monitor.y + monitor.height);
 }
+function monitorAtPoint(point, monitors) {
+  if (point === void 0) return void 0;
+  return monitors.find((monitor) => point.x >= monitor.x && point.x < monitor.x + monitor.width && point.y >= monitor.y && point.y < monitor.y + monitor.height);
+}
 function clampRectangle(value, container) {
   const left = Math.max(value.x, container.x);
   const top = Math.max(value.y, container.y);
@@ -19679,6 +19723,31 @@ function windowBoundsFromHyprland(value, expectedAppId) {
   if (x === void 0 || y === void 0 || width === void 0 || height === void 0 || width < 1 || height < 1)
     return void 0;
   return { x, y, width, height };
+}
+function windowAtPointFromHyprland(value, point) {
+  if (!Array.isArray(value)) return void 0;
+  return value.flatMap((client2, index) => {
+    const bounds = windowBoundsFromHyprland(client2);
+    if (bounds === void 0 || !isObject4(client2) || client2.mapped === false || client2.hidden === true || point.x < bounds.x || point.x >= bounds.x + bounds.width || point.y < bounds.y || point.y >= bounds.y + bounds.height) return [];
+    const appId = typeof client2.class === "string" && client2.class.trim() !== "" ? client2.class.trim() : typeof client2.initialClass === "string" && client2.initialClass.trim() !== "" ? client2.initialClass.trim() : void 0;
+    if (/^(?:org\.omarchy\.quickshell|quickshell)$/iu.test(appId ?? "")) return [];
+    const title = typeof client2.title === "string" && client2.title.trim() !== "" ? client2.title.trim() : void 0;
+    const address = typeof client2.address === "string" && client2.address.trim() !== "" ? client2.address.trim() : void 0;
+    const focus = integer2(client2.focusHistoryID) ?? 1e6;
+    const floating = client2.floating === true ? 1 : 0;
+    const fullscreen = integer2(client2.fullscreen) ?? 0;
+    return [{
+      ...bounds,
+      ...appId === void 0 ? {} : { appId },
+      ...title === void 0 ? {} : { title },
+      ...address === void 0 ? {} : { address },
+      focus,
+      floating,
+      fullscreen,
+      area: bounds.width * bounds.height,
+      index
+    }];
+  }).sort((left, right) => right.fullscreen - left.fullscreen || right.floating - left.floating || left.focus - right.focus || left.area - right.area || left.index - right.index)[0];
 }
 function rectangleDistance(point, row) {
   const dx = Math.max(row.x - point.x, 0, point.x - (row.x + row.width));
@@ -20600,22 +20669,6 @@ var QuickchatBroker = class {
   async #contextBegin(command) {
     try {
       const target = await this.#contextAttachments.begin(command.id, command.target);
-      const browser = await this.#browserCompanion.tryArm(command.id, target.appId, target.title);
-      if (browser.status === "armed") {
-        this.#emit({
-          type: "context_picker",
-          id: command.id,
-          browser: browser.browser,
-          title: browser.title,
-          url: browser.url
-        });
-        return;
-      }
-      if (browser.status === "permission-required") this.#emit({
-        type: "context_notice",
-        id: command.id,
-        message: "DOM capture is not enabled for this site; using desktop capture"
-      });
       this.#emit({ type: "context_ready", id: command.id, target });
     } catch (error48) {
       this.#contextError(error48, command.id);
@@ -20635,6 +20688,25 @@ var QuickchatBroker = class {
   }
   async #contextCapture(command) {
     try {
+      if (command.mode === "window" && command.anchor !== void 0) {
+        const target = await this.#contextAttachments.selectWindow(command.id, command.anchor);
+        const browser = await this.#browserCompanion.tryArm(command.id, target.appId, target.title);
+        if (browser.status === "armed") {
+          this.#emit({
+            type: "context_picker",
+            id: command.id,
+            browser: browser.browser,
+            title: browser.title,
+            url: browser.url
+          });
+          return;
+        }
+        if (browser.status === "permission-required") this.#emit({
+          type: "context_notice",
+          id: command.id,
+          message: "DOM capture is not enabled for this site; using OCR and screenshot"
+        });
+      }
       const attachment = await this.#contextAttachments.capture(command.id, command.mode, command.region, command.anchor);
       this.#emit({ type: "context_attachment", requestId: command.id, attachment });
     } catch (error48) {

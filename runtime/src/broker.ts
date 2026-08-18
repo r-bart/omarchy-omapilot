@@ -207,18 +207,6 @@ export class QuickchatBroker {
   async #contextBegin(command: Extract<BrokerCommand, { type: "context_begin" }>): Promise<void> {
     try {
       const target = await this.#contextAttachments.begin(command.id, command.target);
-      const browser = await this.#browserCompanion.tryArm(command.id, target.appId, target.title);
-      if (browser.status === "armed") {
-        this.#emit({
-          type: "context_picker", id: command.id, browser: browser.browser,
-          title: browser.title, url: browser.url
-        });
-        return;
-      }
-      if (browser.status === "permission-required") this.#emit({
-        type: "context_notice", id: command.id,
-        message: "DOM capture is not enabled for this site; using desktop capture"
-      });
       this.#emit({ type: "context_ready", id: command.id, target });
     } catch (error) {
       this.#contextError(error, command.id);
@@ -241,6 +229,21 @@ export class QuickchatBroker {
 
   async #contextCapture(command: Extract<BrokerCommand, { type: "context_capture" }>): Promise<void> {
     try {
+      if (command.mode === "window" && command.anchor !== undefined) {
+        const target = await this.#contextAttachments.selectWindow(command.id, command.anchor);
+        const browser = await this.#browserCompanion.tryArm(command.id, target.appId, target.title);
+        if (browser.status === "armed") {
+          this.#emit({
+            type: "context_picker", id: command.id, browser: browser.browser,
+            title: browser.title, url: browser.url
+          });
+          return;
+        }
+        if (browser.status === "permission-required") this.#emit({
+          type: "context_notice", id: command.id,
+          message: "DOM capture is not enabled for this site; using OCR and screenshot"
+        });
+      }
       const attachment = await this.#contextAttachments.capture(command.id, command.mode, command.region, command.anchor);
       this.#emit({ type: "context_attachment", requestId: command.id, attachment });
     } catch (error) {

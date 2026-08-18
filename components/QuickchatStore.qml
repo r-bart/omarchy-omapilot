@@ -209,8 +209,6 @@ Scope {
     if (!contextCaptureAvailable) return false
     pendingContextRequestId = "capture-" + Date.now() + "-" + Math.floor(Math.random() * 100000)
     var values = { id: pendingContextRequestId }
-    var target = Protocol.normalizedCaptureTarget(latchedCaptureTarget)
-    if (target !== null) values.target = target
     sendCommand(Protocol.command("context_begin", values))
     statusMessage = "Preparing context capture…"
     return true
