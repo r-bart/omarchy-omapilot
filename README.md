@@ -27,8 +27,10 @@ pulse, and a compact error notice opens an inspectable details pane.
 - Node.js 22 or newer for the broker and pinned ACP adapters.
 - At least one installed and authenticated harness: `codex`, `claude`, or `opencode`.
 - Optional: Voxtype for dictation and Herdr for durable continuation.
-- `grim` and ImageMagick for contextual screenshots; optional Tesseract adds
-  text-under-the-pointer extraction and the Text representation.
+- `grim` for contextual screenshots. ImageMagick, already used by OmaPilot's
+  image policy, validates and normalizes every captured image.
+- Optional: Tesseract adds text-under-the-pointer extraction and the **Text**
+  representation. Without it, screenshot and browser-element capture still work.
 
 OmaPilot does not install a harness, log you in, or read provider credentials. Authentication and model availability remain owned by the selected harness. The model picker is populated at startup from Codex's read-only app-server catalog, a non-persisted Claude ACP discovery session, or OpenCode's native catalog; if discovery is unavailable, OmaPilot safely falls back to the harness default.
 
@@ -152,8 +154,10 @@ answer.
 ## Clip context from the desktop
 
 The crosshair button in the composer opens OmaPilot's fullscreen capture
-overlay. Click to capture the app that was active before OmaPilot opened, or
-drag an exact region. The overlay disappears before the screenshot is taken.
+overlay. Click a window beneath the pointer, or drag an exact region. OmaPilot
+resolves the click against the compositor's window geometry, so opening the
+panel or overlay does not change the intended target. The overlay disappears
+before the screenshot is taken.
 
 When Tesseract is installed, OmaPilot uses its word boxes to find the text under
 the click and expands it to the surrounding paragraph. The composer then shows
@@ -203,7 +207,8 @@ opens instead.
 
 The companion is one WebExtension source with Chromium and Firefox builds plus
 a small local native-messaging relay. It supports Omarchy's Chromium, Chrome,
-Brave, Brave Origin, Edge, Firefox, and Zen browser families. Its rules are:
+Brave, Brave Origin, Edge, Vivaldi, Helium, Firefox, Zen, and LibreWolf browser
+families. Its rules are:
 
 - the Omarchy plugin remains fully useful without the extension;
 - context is visibly disclosed and captured only after an explicit clip request and page click;
@@ -233,6 +238,23 @@ choose **Enable on this site**. Removal is reversible:
 ```bash
 ./scripts/install-browser-companion.sh uninstall
 ```
+
+The desktop capture feature needs no separate OmaPilot package: its QML,
+broker code, and built browser assets ship in the plugin repository. A durable
+browser release does need two additional delivery channels because browsers do
+not permit a plugin clone to install them silently:
+
+1. publish the Chromium and Firefox builds through their browser extension
+   stores so users receive a stable extension ID and browser-managed updates;
+2. keep the tiny native relay in this repository initially, with an explicit
+   install/uninstall command, then package that relay separately (for example as
+   an AUR package) if automatic upgrades and ownership tracking are desired.
+
+The relay and extension have no additional npm dependencies. The current relay
+installer uses the already-required Node.js runtime plus `jq` to write native
+messaging manifests. Store-packaged extensions can share the same versioned
+wire contract and release from the existing source; they do not require a
+separate source repository.
 
 The element representation is a capped semantic tree—not raw `outerHTML`—and
 omits editable values, password content, hidden nodes, scripts, styles, event

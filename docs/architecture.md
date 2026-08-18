@@ -49,12 +49,14 @@ transcript fallback contains only the stored question and answer.
 ## Explicit context clips
 
 OmaPilot is a multi-kind `bar-widget` and `overlay` plugin. The panel asks the
-broker to begin a capture using the pre-focus window rectangle as a hint. The
-broker reads and bounds the current Hyprland monitor layout, returns only the
-validated target geometry, and retains the capture request. The overlay then
-supports one-click active-window capture or a dragged monitor-local region. It
-hides for two compositor frames before asking the broker to invoke `grim`, so
-OmaPilot chrome is not present in the pixels.
+broker to begin a capture, and the broker selects the monitor containing the
+current compositor cursor. A click is resolved against the current Hyprland
+client geometries, excluding OmaPilot's own Quickshell surface, so panel focus
+cannot replace the user's intended target. The broker focuses that resolved
+window and either arms its browser companion or captures the validated window
+geometry. A drag remains an exact monitor-local region. The overlay hides for
+two compositor frames before asking the broker to invoke `grim`, so OmaPilot
+chrome is not present in the pixels.
 
 The broker fully decodes and normalizes every image through the existing image
 policy. If local Tesseract is available, word boxes are hit-tested at the click
@@ -73,14 +75,15 @@ to an allowlisted extension ID through the browser's native-messaging transport.
 The relay exposes only versioned hello, probe, arm, result, cancel, and error
 messages. It is not a general browser command channel.
 
-On `context_begin`, the broker maps the latched app ID to the Chromium or
-Firefox family and probes connected companion sessions. A permitted content
-script returns active-page title and URL only for that explicit request. The
-broker normalizes the compositor title, chooses one matching session, and arms
-only that page. Quickshell closes rather than intercepting the next click; the
-content script performs browser-native hit testing, visibly highlights the
-candidate, and captures on click or cancels on Escape. If no permitted picker
-responds, the normal Quickshell screenshot/OCR overlay remains authoritative.
+After the overlay click resolves a browser window beneath the cursor, the broker
+maps its app ID to the Chromium or Firefox family and probes connected companion
+sessions. A permitted content script returns active-page title and URL only for
+that explicit request. The broker normalizes the compositor title, chooses one
+matching session, and arms only that page. Quickshell closes rather than
+intercepting the next click; the content script performs browser-native hit
+testing, visibly highlights the candidate, and captures on click or cancels on
+Escape. If no permitted picker responds, the normal Quickshell screenshot/OCR
+capture remains authoritative.
 
 The broker validates the returned page and semantic-node schema, caps the tree
 again to 80 nodes, depth four, 12 KiB visible text, and a 32 KiB serialized
