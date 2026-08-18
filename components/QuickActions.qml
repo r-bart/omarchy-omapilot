@@ -11,6 +11,7 @@ Item {
   property color background: Color.popups.background
   property color accent: Color.accent
   property string fontFamily: Style.font.family
+  property string workInAppShortcutText: ""
   signal actionRequested(string actionId, string prompt)
 
   implicitHeight: actions.length > 0 ? actionFlow.implicitHeight : 0
@@ -30,7 +31,9 @@ Item {
         width: Math.min(implicitWidth, actionFlow.width)
         iconText: String(modelData.icon || "")
         text: String(modelData.label || "")
-        tooltipText: text
+        tooltipText: text + (String(modelData.id || "") === "work-in-app"
+          && root.workInAppShortcutText !== ""
+          ? " (" + root.workInAppShortcutText + ")" : "")
         foreground: root.foreground
         background: root.background
         accent: root.accent

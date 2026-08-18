@@ -29,6 +29,8 @@ qml_files=(
   "$repo_dir/components/SettingsView.qml"
   "$repo_dir/components/ResponseActivityBorder.qml"
   "$repo_dir/components/internal/PermissionFocusGuard.qml"
+  "$repo_dir/components/internal/PanelKeyboardNavigation.qml"
+  "$repo_dir/components/internal/HistoryListKeyboardHandler.qml"
   "$repo_dir/components/QuickchatStore.qml"
   "$repo_dir/components/DesktopContext.qml"
   "$repo_dir/components/Protocol.js"
@@ -126,6 +128,20 @@ if [[ -e "$repo_dir/components/ModeSwitch.qml" ]]; then
 fi
 grep -Fq 'visible: Quickchat.QuickchatStore.pendingPermission !== null' "$repo_dir/Panel.qml"
 grep -Fq 'Quickchat.QuickActions {' "$repo_dir/Panel.qml"
+grep -Fq 'workInAppShortcutText: "Ctrl+Shift+A"' "$repo_dir/Panel.qml"
+grep -Fq 'sequence: "Ctrl+Shift+A"' \
+  "$repo_dir/components/internal/PanelKeyboardNavigation.qml"
+if grep -RFq 'Ctrl+Alt+A' "$repo_dir/Panel.qml" "$repo_dir/components"; then
+  printf 'OmaPilot production QML must not retain the AltGr-aliased shortcut\n' >&2
+  exit 1
+fi
+grep -Fq 'var prompt = ActionCatalog.promptFor(root.quickActionItems, "work-in-app")' \
+  "$repo_dir/Panel.qml"
+grep -Fq 'composer.setDraft(prompt)' "$repo_dir/Panel.qml"
+test "$(grep -Fc '&& !Quickchat.QuickchatStore.busy' "$repo_dir/Panel.qml")" -ge 2
+grep -Fq 'modalInteractionActive: root.modalInteractionActive' \
+  "$repo_dir/Panel.qml"
+grep -Fq 'Accessible.name: tooltipText' "$repo_dir/components/QuickActions.qml"
 grep -Fq 'quickActionsJson' "$repo_dir/Panel.qml"
 grep -Fq 'onQuickActionsEdited:' "$repo_dir/Panel.qml"
 grep -Fq 'text: "OmaPilot settings"' "$repo_dir/components/SettingsView.qml"
@@ -273,6 +289,16 @@ QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
 
 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -input "$repo_dir/tests/tst_permission_focus.qml" \
+  -import "$repo_dir" \
+  -import "$omarchy_shell"
+
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
+  -input "$repo_dir/tests/tst_panel_keyboard_navigation.qml" \
+  -import "$repo_dir" \
+  -import "$omarchy_shell"
+
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
+  -input "$repo_dir/tests/tst_history_keyboard.qml" \
   -import "$repo_dir" \
   -import "$omarchy_shell"
 

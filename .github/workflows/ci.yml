@@ -26,6 +26,25 @@ jobs:
           git clone --filter=blob:none https://github.com/basecamp/omarchy.git /tmp/omarchy
           git -C /tmp/omarchy checkout "$OMARCHY_QUATTRO_COMMIT"
           /tmp/omarchy/bin/omarchy-plugin-validate .
+      - name: Install QML test runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            qml6-module-qtquick \
+            qml6-module-qtquick-controls \
+            qml6-module-qtquick-templates \
+            qml6-module-qtquick-window \
+            qml6-module-qtqml-workerscript \
+            qml6-module-qttest \
+            qt6-declarative-dev-tools
+      - name: Run keyboard QML tests
+        run: |
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
+            -input tests/tst_panel_keyboard_navigation.qml \
+            -import .
+          QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
+            -input tests/tst_history_keyboard.qml \
+            -import .
       - name: Run shell lint
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
         with:
@@ -36,6 +55,8 @@ jobs:
         run: ./scripts/check-release-metadata.sh
       - name: Run broker checks
         run: npm run check
+      - name: Verify generated artifacts are current
+        run: git diff --exit-code -- runtime/dist browser-companion/dist
       - name: Broker protocol smoke test
         run: npm test
 

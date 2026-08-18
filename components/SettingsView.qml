@@ -26,6 +26,10 @@ Item {
   property bool browserRemoveConfirmation: false
   property bool browserSetupExpanded: false
   readonly property bool popupOpen: providerPicker.popupOpen || modelPicker.popupOpen
+  readonly property bool modalInteractionActive: popupOpen
+    || browserRemoveConfirmation
+    || browserCompanionBusy
+    || quickActionEditor.interactionActive
 
   signal dangerousAutoApproveRequested(bool enabled)
   signal providerChanged(string provider)
@@ -561,6 +565,7 @@ Item {
           }
 
           QuickActionEditor {
+            id: quickActionEditor
             Layout.fillWidth: true
             actions: root.quickActions
             foreground: root.foreground

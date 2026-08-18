@@ -13,6 +13,7 @@ ColumnLayout {
   property color accent: Color.accent
   property string fontFamily: Style.font.family
   property bool adding: false
+  readonly property bool interactionActive: adding
   readonly property bool atLimit: actions.length >= ActionCatalog.maximumActions
   readonly property bool canSaveNew: String(newLabel.text || "").trim() !== ""
     && String(newPrompt.text || "").trim() !== ""
