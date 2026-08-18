@@ -20799,7 +20799,7 @@ var QuickchatBroker = class {
       const installed = await installBrowserCompanion(this.#env);
       await this.#emitBrowserCompanionStatus(installed ? "ready" : "failed", installed ? "Browser companion installed. Restart your browser, then enable access from its OmaPilot extension icon." : "Browser companion setup failed. Check that Node.js and jq are installed, then try again.");
     } catch {
-      await this.#emitBrowserCompanionStatus("failed", "Browser companion setup failed. Try the installer from a terminal for details.");
+      await this.#emitBrowserCompanionStatus("failed", "Browser companion setup could not finish. Retry from Settings; no terminal setup is required.");
     } finally {
       this.#browserCompanionInstalling = false;
     }

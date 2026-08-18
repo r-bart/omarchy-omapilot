@@ -172,7 +172,7 @@ Item {
 
           Text {
             Layout.fillWidth: true
-            text: "Select semantic page elements and choose Element, Text, or Screenshot before sharing context."
+            text: "Select semantic page elements and choose Element, Text, or Screenshot before sharing context. OmaPilot handles setup from here—no terminal command is required."
             color: Qt.darker(root.foreground, 1.45)
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -217,7 +217,7 @@ Item {
                   ? "Use the OmaPilot extension icon once per site to grant page access."
                   : (root.browserCompanion.relayInstalled === true
                     ? "Restart Chromium, then pin the OmaPilot extension and enable the current site."
-                    : "Enable the user-local relay and bundled unpacked extension, then restart your browser.")
+                    : "Choose Enable browser context to install the relay and bundled extension automatically, then restart your browser.")
                 color: Qt.darker(root.foreground, 1.45)
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -277,7 +277,7 @@ Item {
           Text {
             Layout.fillWidth: true
             visible: !root.browserCompanionConnected
-            text: "This explicit setup registers a native-messaging host and adds an unpacked extension to detected Omarchy Chromium-family browser flags. Firefox and Zen still require loading the temporary Firefox build."
+            text: "OmaPilot registers the native-messaging host and adds its bundled extension to detected Omarchy Chromium-family browsers for you. Firefox and Zen still require browser confirmation to load the temporary Firefox build."
             color: Qt.darker(root.foreground, 1.45)
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
