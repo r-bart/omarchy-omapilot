@@ -733,6 +733,7 @@ Scope {
     }
 
     onExited: function(exitCode, exitStatus) {
+      var preserveStartupError = Protocol.preserveBrokerExitError(root.errorDetails)
       root.processStarted = false
       root.initialized = false
       root.pendingPermission = null
@@ -742,14 +743,16 @@ Scope {
         Qt.callLater(function() { broker.running = true })
         return
       }
-      if (root.state !== "canceled") root.state = "unavailable"
-      root.statusMessage = root.stderrTail || "OmaPilot is unavailable."
-      root.errorDetails = Protocol.normalizedError({
-        unavailable: true,
-        code: "broker_unavailable",
-        message: root.statusMessage,
-        retryable: true
-      })
+      if (!preserveStartupError) {
+        if (root.state !== "canceled") root.state = "unavailable"
+        root.statusMessage = root.stderrTail || "OmaPilot is unavailable."
+        root.errorDetails = Protocol.normalizedError({
+          unavailable: true,
+          code: "broker_unavailable",
+          message: root.statusMessage,
+          retryable: true
+        })
+      }
     }
 
     stdout: SplitParser {

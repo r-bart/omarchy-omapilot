@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -60,7 +60,8 @@ describe("NDJSON protocol", () => {
   });
 
   it("rejects incompatible protocol versions without becoming ready", async () => {
-    const child = spawn(brokerExecutable(), [], { stdio: ["pipe", "pipe", "pipe"] });
+    const state = await mkdtemp(join(tmpdir(), "quickchat-version-")); roots.push(state);
+    const child = spawn(brokerExecutable(), [], { env: { ...process.env, HOME: state }, stdio: ["pipe", "pipe", "pipe"] });
     const events: Record<string, unknown>[] = [];
     createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
     child.stdin.write('{"type":"initialize","protocolVersion":1,"harness":"codex"}\n');
@@ -72,7 +73,8 @@ describe("NDJSON protocol", () => {
   });
 
   it("rejects initialize without an explicit protocol version", async () => {
-    const child = spawn(brokerExecutable(), [], { stdio: ["pipe", "pipe", "pipe"] });
+    const state = await mkdtemp(join(tmpdir(), "quickchat-invalid-init-")); roots.push(state);
+    const child = spawn(brokerExecutable(), [], { env: { ...process.env, HOME: state }, stdio: ["pipe", "pipe", "pipe"] });
     const events: Record<string, unknown>[] = [];
     createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
     child.stdin.write('{"type":"initialize"}\n');
@@ -82,6 +84,56 @@ describe("NDJSON protocol", () => {
     await new Promise((resolveExit) => child.once("close", resolveExit));
   });
 
+  it("reports a preserved skill-path conflict before accepting commands", async () => {
+    const state = await mkdtemp(join(tmpdir(), "quickchat-skill-conflict-")); roots.push(state);
+    const target = join(state, ".agents", "skills", "omarchy-omapilot");
+    await mkdir(target, { recursive: true });
+    await writeFile(join(target, "SKILL.md"), "# User owned\n");
+    const child = spawn(brokerExecutable(), [], {
+      env: { ...process.env, HOME: state },
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    const events: Record<string, unknown>[] = [];
+    createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
+    const code = await new Promise<number | null>((resolveExit) => child.once("close", resolveExit));
+    expect(code).toBe(1);
+    expect(events).toContainEqual({
+      type: "error",
+      code: "skill_setup_failed",
+      message: "OmaPilot could not prepare ~/.agents/skills/omarchy-omapilot; any existing path was preserved",
+      retryable: false
+    });
+    expect(events.some((event) => event.type === "ready")).toBe(false);
+    await expect(readFile(join(target, "SKILL.md"), "utf8")).resolves.toBe("# User owned\n");
+  });
+
+  it.each(["skip", "wrong", "pending"])("fails a turn when OpenCode skill loading is %s", async (mode) => {
+    const state = await mkdtemp(join(tmpdir(), "quickchat-skill-load-")); roots.push(state);
+    const child = spawn(brokerExecutable(), [], {
+      env: {
+        ...process.env,
+        HOME: state,
+        FAKE_ACP_SKILL_MODE: mode,
+        XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
+        PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+      },
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    const events: Record<string, unknown>[] = [];
+    createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
+    child.stdin.write('{"type":"initialize","protocolVersion":2,"harness":"opencode"}\n');
+    await until(() => events.some((event) => event.type === "ready"));
+    child.stdin.write('{"type":"submit","id":"skill-load","question":"hello","provider":"opencode"}\n');
+    await until(() => events.some((event) => event.type === "error"));
+    expect(events.find((event) => event.type === "error")).toMatchObject({
+      code: "skill_load_failed",
+      retryable: true
+    });
+    expect(events.some((event) => event.type === "complete")).toBe(false);
+    child.stdin.end('{"type":"shutdown"}\n');
+    await new Promise((resolveExit) => child.once("close", resolveExit));
+  }, 20_000);
+
   it("initializes, exposes models, streams markdown, and stores completion", async () => {
     const state = await mkdtemp(join(tmpdir(), "quickchat-protocol-")); roots.push(state);
     const fake = resolve("runtime/test/fake-acp-agent.mjs");
@@ -90,6 +142,7 @@ describe("NDJSON protocol", () => {
     const launcher = brokerExecutable();
     const env = {
       ...process.env,
+      HOME: state,
       XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
       QUICKCHAT_CODEX_ACP: fake, QUICKCHAT_CLAUDE_ACP: fake,
       FAKE_ACP_AUDIT_FILE: audit,
@@ -103,6 +156,7 @@ describe("NDJSON protocol", () => {
     child.stdin.write(`${JSON.stringify({ type: "initialize", protocolVersion: 2, harness: "codex", client: "test" })}\n`);
     await until(() => events.some((event) => event.type === "ready"));
     const ready = readySchema.parse(events.find((event) => event.type === "ready"));
+    expect((await lstat(join(state, ".agents", "skills", "omarchy-omapilot"))).isSymbolicLink()).toBe(true);
     expect(ready.protocolVersion).toBe(2);
     expect(ready.features).toEqual(["desktop-context", "context-attachments"]);
     expect(ready.providers.find((provider) => provider.id === "codex")?.models).toContainEqual({ id: "test/default", name: "Default" });
@@ -131,10 +185,11 @@ describe("NDJSON protocol", () => {
     expect(JSON.parse(saved)).toMatchObject({ question: "Say hello" });
     const capturedPrompt: unknown = JSON.parse((await readFile(promptCapture, "utf8")).trim());
     const promptBlocks = z.array(z.object({ type: z.literal("text"), text: z.string() })).parse(capturedPrompt);
-    expect(promptBlocks).toHaveLength(2);
-    expect(promptBlocks[0]?.text).toContain("QUICKCHAT DESKTOP CONTEXT");
-    expect(promptBlocks[0]?.text).toContain("Context-only browser title");
-    expect(promptBlocks[1]?.text).toBe("Say hello");
+    expect(promptBlocks).toHaveLength(3);
+    expect(promptBlocks[0]?.text).toBe("$omarchy-omapilot");
+    expect(promptBlocks[1]?.text).toContain("QUICKCHAT DESKTOP CONTEXT");
+    expect(promptBlocks[1]?.text).toContain("Context-only browser title");
+    expect(promptBlocks[2]?.text).toBe("Say hello");
     child.stdin.write(`${JSON.stringify({ type: "history_delete", chatId: complete.chat.id })}\n`);
     await until(async () => (await readFile(audit, "utf8").catch(() => "")).trim() === "delete:fake-1");
     child.stdin.end(`${JSON.stringify({ type: "shutdown" })}\n`);
@@ -146,6 +201,7 @@ describe("NDJSON protocol", () => {
     const child = spawn(brokerExecutable(), [], {
       env: {
         ...process.env,
+        HOME: state,
         XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
         QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
         FAKE_ACP_STREAM_CHUNKS: JSON.stringify(["Short ", "answer ", "streams ", "in ", "pieces."]),
@@ -215,9 +271,10 @@ describe("NDJSON protocol", () => {
       z.object({ type: z.literal("text"), text: z.string() }),
       z.object({ type: z.literal("image"), data: z.string(), mimeType: z.string() })
     ])).parse(JSON.parse((await readFile(promptCapture, "utf8")).trim()));
-    expect(blocks.map((block) => block.type)).toEqual(["text", "text", "image", "text"]);
-    expect(blocks[1]).toMatchObject({ type: "text", text: expect.stringContaining("Captured context") });
-    expect(blocks[2]).toMatchObject({ type: "image", mimeType: "image/png" });
+    expect(blocks.map((block) => block.type)).toEqual(["text", "text", "text", "image", "text"]);
+    expect(blocks[0]).toEqual({ type: "text", text: "$omarchy-omapilot" });
+    expect(blocks[2]).toMatchObject({ type: "text", text: expect.stringContaining("Captured context") });
+    expect(blocks[3]).toMatchObject({ type: "image", mimeType: "image/png" });
     const imagePath = new URL(attachmentEvent.attachment.previewImage.localUrl);
     await until(async () => {
       try { await readFile(imagePath); return false; } catch { return true; }
@@ -231,6 +288,7 @@ describe("NDJSON protocol", () => {
     const child = spawn(brokerExecutable(), [], {
       env: {
         ...process.env,
+        HOME: state,
         XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
         QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
         PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
@@ -258,6 +316,7 @@ describe("NDJSON protocol", () => {
       env: {
         ...process.env,
         FAKE_ACP_PROMPT_AUDIT: audit,
+        HOME: state,
         XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
         QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
         PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
@@ -296,6 +355,7 @@ describe("NDJSON protocol", () => {
         ...process.env,
         FAKE_ACP_PERMISSION_ATTEMPT: "1",
         FAKE_ACP_EXPECT_ALLOW: "1",
+        HOME: state,
         XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
         QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
         QUICKCHAT_CLAUDE_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
@@ -353,6 +413,7 @@ describe("NDJSON protocol", () => {
       env: {
         ...process.env,
         FAKE_ACP_PERMISSION_ATTEMPT: "1",
+        HOME: state,
         XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
         QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
         QUICKCHAT_CLAUDE_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
@@ -390,7 +451,7 @@ describe("NDJSON protocol", () => {
     const state = await mkdtemp(join(tmpdir(), "quickchat-errors-")); roots.push(state);
     const child = spawn(brokerExecutable(), [], {
       env: {
-        ...process.env, FAKE_ACP_FAIL_SECRET: "1", XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
+        ...process.env, HOME: state, FAKE_ACP_FAIL_SECRET: "1", XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
         QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"), PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
       },
       stdio: ["pipe", "pipe", "pipe"]
@@ -415,7 +476,7 @@ describe("NDJSON protocol", () => {
     const chunkAudit = join(state, "chunk-audit.txt");
     const child = spawn(brokerExecutable(), [], {
       env: {
-        ...process.env, FAKE_ACP_WAIT: "1", XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
+        ...process.env, HOME: state, FAKE_ACP_WAIT: "1", XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
         QUICKCHAT_CODEX_ACP: fake, QUICKCHAT_CLAUDE_ACP: fake,
         FAKE_ACP_STREAM_CHUNKS: JSON.stringify(["partial <"]), FAKE_ACP_CHUNK_AUDIT: chunkAudit,
         FAKE_ACP_LATE_AFTER_CANCEL: "1",
@@ -480,6 +541,7 @@ async function forbiddenAttempt(provider: "codex" | "opencode", extraEnv: NodeJS
     env: {
       ...process.env,
       ...extraEnv,
+      HOME: state,
       XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
       QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
       QUICKCHAT_CLAUDE_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
@@ -508,6 +570,7 @@ async function autoApproveAttempt(
       ...process.env,
       FAKE_ACP_PERMISSION_ATTEMPT: "1",
       ...extraEnv,
+      HOME: state,
       XDG_STATE_HOME: join(state, "state"),
       XDG_CACHE_HOME: join(state, "cache"),
       XDG_RUNTIME_DIR: join(state, "run"),

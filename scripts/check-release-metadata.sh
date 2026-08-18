@@ -9,13 +9,13 @@ fail() {
 }
 
 for relative in manifest.json package.json package-lock.json runtime/adapters.release.json \
-  runtime/policies/automatic.md \
   runtime/licenses/earendil-works-pi-0.84.2-MIT.txt \
   runtime/licenses/data-uri-to-buffer-4.0.1-MIT.txt \
   runtime/licenses/ignore-5.3.2-MIT.txt \
   runtime/licenses/ignore-7.0.5-MIT.txt \
   runtime/licenses/ignore-7.0.6-MIT.txt \
   runtime/dist/quickchat-broker.THIRD_PARTY_LICENSES.txt \
+  skills/omarchy-omapilot/SKILL.md skills/omarchy-omapilot/agents/openai.yaml \
   runtime/dist/adapters/Apache-2.0.txt runtime/dist/adapters/claude-agent-acp.js.LEGAL.txt \
   THIRD_PARTY_NOTICES.md; do
   [[ -f "$repo_root/$relative" ]] || fail "missing $relative"

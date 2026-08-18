@@ -47,12 +47,12 @@ required=(
   runtime/dist/adapters/claude-agent-acp.js
   runtime/dist/adapters/claude-agent-acp.js.LEGAL.txt
   runtime/dist/adapters/Apache-2.0.txt
-  runtime/policies/automatic.md
   runtime/bin/quickchat-broker
   runtime/bin/codex-acp
   runtime/bin/claude-agent-acp
   runtime/adapters.release.json
-  runtime/policies/automatic.md
+  skills/omarchy-omapilot/SKILL.md
+  skills/omarchy-omapilot/agents/openai.yaml
   THIRD_PARTY_NOTICES.md
   LICENSE
 )
@@ -106,7 +106,7 @@ stage_parent=$(mktemp -d "${TMPDIR:-/tmp}/quickchat-package.XXXXXX")
 trap 'rm -rf -- "$stage_parent"' EXIT
 bundle_name="omarchy-quickchat-runtime-${version}-${platform}"
 stage="$stage_parent/$bundle_name"
-mkdir -p "$stage/runtime/dist/adapters" "$stage/runtime/bin" "$stage/runtime/policies"
+mkdir -p "$stage/runtime/dist/adapters" "$stage/runtime/bin" "$stage/skills/omarchy-omapilot/agents"
 
 cp "$repo_root/package.json" "$repo_root/package-lock.json" "$stage/"
 cp "$repo_root/runtime/dist/quickchat-broker.js" "$stage/runtime/dist/"
@@ -116,11 +116,11 @@ cp "$repo_root/runtime/dist/adapters/codex-acp.js" "$stage/runtime/dist/adapters
 cp "$repo_root/runtime/dist/adapters/claude-agent-acp.js" "$stage/runtime/dist/adapters/"
 cp "$repo_root/runtime/dist/adapters/claude-agent-acp.js.LEGAL.txt" "$stage/runtime/dist/adapters/"
 cp "$repo_root/runtime/dist/adapters/Apache-2.0.txt" "$stage/runtime/dist/adapters/"
-cp "$repo_root/runtime/policies/automatic.md" "$stage/runtime/policies/"
 cp "$repo_root/runtime/bin/quickchat-broker" "$repo_root/runtime/bin/codex-acp" \
   "$repo_root/runtime/bin/claude-agent-acp" "$stage/runtime/bin/"
 cp "$repo_root/runtime/adapters.release.json" "$stage/runtime/"
-cp "$repo_root/runtime/policies/automatic.md" "$stage/runtime/policies/"
+cp "$repo_root/skills/omarchy-omapilot/SKILL.md" "$stage/skills/omarchy-omapilot/"
+cp "$repo_root/skills/omarchy-omapilot/agents/openai.yaml" "$stage/skills/omarchy-omapilot/agents/"
 cp "$repo_root/THIRD_PARTY_NOTICES.md" "$repo_root/LICENSE" "$stage/"
 chmod 0755 "$stage/runtime/bin/quickchat-broker" "$stage/runtime/bin/codex-acp" \
   "$stage/runtime/bin/claude-agent-acp"

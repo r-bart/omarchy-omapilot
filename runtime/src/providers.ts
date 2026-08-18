@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -78,19 +77,11 @@ function repoRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 }
 
-export function automaticInstructionPath(): string {
-  return resolve(repoRoot(), "runtime/policies/automatic.md");
-}
-
-export function automaticInstructions(): string {
-  return readFileSync(automaticInstructionPath(), "utf8").trim();
-}
-
 export function openCodePolicyEnvironment(env: NodeJS.ProcessEnv, disabledMcp: string[] = []): NodeJS.ProcessEnv {
   const permission = { ...OPEN_CODE_PERMISSION };
   const config = {
     default_agent: "build",
-    instructions: [automaticInstructionPath()],
+    instructions: [],
     skills: { urls: [] },
     agent: { build: { permission } },
     mcp: Object.fromEntries(disabledMcp.map((name) => [name, false]))
@@ -256,7 +247,7 @@ function openCodeConfigIsHardened(config: Record<string, unknown>): boolean {
   if (isObject(config.mcp) && Object.values(config.mcp).some((value) => value !== false)) return false;
   const skills = isObject(config.skills) ? config.skills : undefined;
   if (skills === undefined || !Array.isArray(skills.urls) || skills.urls.length !== 0) return false;
-  return Array.isArray(config.instructions) && config.instructions.includes(automaticInstructionPath());
+  return Array.isArray(config.instructions) && config.instructions.length === 0;
 }
 
 function permissionRecordIsHardened(value: unknown): boolean {

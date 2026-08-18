@@ -1,8 +1,20 @@
-import type { DesktopContext } from "./types.js";
+import type { DesktopContext, ProviderId } from "./types.js";
 
 export type TextBlock = { type: "text"; text: string };
 export type ImageBlock = { type: "image"; data: string; mimeType: string };
 export type AcpPrompt = string | Array<TextBlock | ImageBlock>;
+
+export function promptWithOmapilotSkill(provider: ProviderId, prompt: AcpPrompt): Array<TextBlock | ImageBlock> {
+  const invocation = provider === "codex"
+    ? "$omarchy-omapilot"
+    : provider === "claude"
+      ? "Use the Skill tool to load omarchy-omapilot-installed-skills:omarchy-omapilot before handling this request."
+      : "Use the skill tool to load the installed skill named omarchy-omapilot before handling this request.";
+  const request: Array<TextBlock | ImageBlock> = typeof prompt === "string"
+    ? [{ type: "text", text: prompt }]
+    : prompt;
+  return [{ type: "text", text: invocation }, ...request];
+}
 
 export function promptWithDesktopContext(question: string, context: DesktopContext | undefined): string | TextBlock[] {
   if (context === undefined) return question;

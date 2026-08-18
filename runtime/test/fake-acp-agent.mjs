@@ -41,6 +41,32 @@ const server = acp.agent({ name: "quickchat-fake" })
       process.stderr.write("provider failed for person@example.com token=top-secret sk-secret-value\n");
       throw new Error("provider failed for person@example.com token=top-secret sk-secret-value");
     }
+    const invocation = params.prompt?.[0]?.type === "text" ? params.prompt[0].text : "";
+    const skillMode = process.env.FAKE_ACP_SKILL_MODE || "correct";
+    if (skillMode !== "skip") {
+      const claude = invocation.includes("omarchy-omapilot-installed-skills:");
+      const expected = claude
+        ? "omarchy-omapilot-installed-skills:omarchy-omapilot"
+        : "omarchy-omapilot";
+      const skillName = skillMode === "wrong" ? "unrelated-skill" : expected;
+      const rawInput = claude ? { skill: skillName } : { name: skillName };
+      await client.notify(acp.methods.client.session.update, {
+        sessionId: params.sessionId,
+        update: {
+          sessionUpdate: "tool_call", toolCallId: "omapilot-skill", kind: "other",
+          name: "skill", title: "skill", status: "pending", rawInput
+        }
+      });
+      if (skillMode !== "pending") {
+        await client.notify(acp.methods.client.session.update, {
+          sessionId: params.sessionId,
+          update: {
+            sessionUpdate: "tool_call_update", toolCallId: "omapilot-skill",
+            status: "completed", rawInput
+          }
+        });
+      }
+    }
     const controller = new AbortController();
     pending = controller;
     if (process.env.FAKE_ACP_PERMISSION_ATTEMPT === "1") {

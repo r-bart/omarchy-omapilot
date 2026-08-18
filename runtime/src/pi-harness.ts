@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -21,9 +21,10 @@ import { Type } from "typebox";
 import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import type { AcpPrompt } from "./context.js";
 import type { AcpResult, AcpRun, PermissionHandler } from "./acp.js";
-import { automaticInstructions, type PiDiscoveredProvider } from "./providers.js";
+import type { PiDiscoveredProvider } from "./providers.js";
 import type { BrokerEvent, ModelOption, ProviderPolicyInfo } from "./types.js";
 import { quickchatPaths } from "./paths.js";
+import { managedOmapilotSkillPath } from "./skill.js";
 
 const PROVIDER_GROUPS = [
   { id: "codex", name: "Codex", piProviderIds: ["openai-codex"] },
@@ -35,6 +36,7 @@ const MUTATING_TOOLS = new Set(["bash", "edit", "write"]);
 const BASIC_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls", "agent"];
 const SAFE_AGENT_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const MAX_AGENT_FILE_BYTES = 128 * 1024;
+const OMAPILOT_SKILL_NAME = "omarchy-omapilot";
 
 registerBundledOAuthFlowLoaders({
   anthropic: () => anthropicOAuth,
@@ -196,17 +198,20 @@ export function runPiQuestion(
     const profiles = discoverAgentProfiles(provider.sharedAgentsDir, provider.cwd);
     const approvals = new PiApprovalState(join(provider.agentDir, "approvals.json"), provider.cwd);
     const permissionExtension = createPermissionExtension(requestId, requestPermission, approvals);
+    const skillFailure: { error?: BrokerPiError } = {};
+    const requiredSkillPath = managedOmapilotSkillPath(provider.agent.env);
     const loader = new DefaultResourceLoader({
       cwd: provider.cwd,
       agentDir: provider.agentDir,
       noExtensions: true,
       noSkills: true,
-      additionalSkillPaths: existingSkillPaths(provider.sharedAgentsDir, provider.cwd),
+      additionalSkillPaths: existingSkillPaths(provider.sharedAgentsDir, provider.cwd, requiredSkillPath),
       extensionFactories: [permissionExtension],
-      appendSystemPrompt: [automaticInstructions(), formatAgentProfiles(profiles)]
+      appendSystemPrompt: [formatAgentProfiles(profiles)]
     });
     await loader.reload();
-    const agentTool = createAgentTool(provider, model, profiles, requestId, requestPermission, approvals, controller.signal);
+    requireOmapilotSkill(loader, requiredSkillPath);
+    const agentTool = createAgentTool(provider, model, profiles, requestId, requestPermission, approvals, controller.signal, skillFailure);
     const settings = SettingsManager.inMemory({
       compaction: { enabled: true },
       retry: { enabled: true, maxRetries: 2 }
@@ -234,7 +239,11 @@ export function runPiQuestion(
     timeout.unref();
     try {
       const normalized = normalizePrompt(prompt);
-      await session.prompt(normalized.text, normalized.images.length === 0 ? undefined : { images: normalized.images });
+      await session.prompt(
+        `/skill:${OMAPILOT_SKILL_NAME} ${normalized.text}`,
+        normalized.images.length === 0 ? undefined : { images: normalized.images }
+      );
+      if (skillFailure.error !== undefined) throw skillFailure.error;
       if (controller.signal.aborted) throw new BrokerPiError("cancelled", "The request was cancelled", false);
       if (answer.trim() === "") answer = finalAssistantText(session.state.messages);
       if (answer.trim() === "") {
@@ -391,13 +400,14 @@ function toolTitle(name: string, input: Record<string, unknown>): string {
   return `${name === "write" ? "Write" : "Edit"} ${path}`;
 }
 
-export function existingSkillPaths(directory: string, cwd: string): string[] {
+export function existingSkillPaths(directory: string, cwd: string, requiredSkillPath?: string): string[] {
   const candidates = [
+    requiredSkillPath,
     join(directory, "skills"),
     join(cwd, ".agents/skills"),
     join(cwd, ".pi/skills")
   ];
-  return [...new Set(candidates.filter((path) => existsSync(path)))];
+  return [...new Set(candidates.filter((path): path is string => path !== undefined && existsSync(path)))];
 }
 
 export function discoverAgentProfiles(directory: string, cwd: string): AgentProfile[] {
@@ -458,7 +468,8 @@ function createAgentTool(
   requestId: string,
   requestPermission: PermissionHandler | undefined,
   approvals: PiApprovalState,
-  parentSignal: AbortSignal
+  parentSignal: AbortSignal,
+  skillFailure: { error?: BrokerPiError }
 ): ToolDefinition<typeof agentToolParameters> {
   return {
     name: "agent",
@@ -467,33 +478,62 @@ function createAgentTool(
     promptSnippet: "Delegate a task to a named agent from ~/.agents/agents",
     parameters: agentToolParameters,
     async execute(_toolCallId, input, signal) {
-      const profile = profiles.find((candidate) => candidate.name === input.name);
-      if (profile === undefined) return { content: [{ type: "text", text: `Unknown agent: ${input.name}` }], details: undefined, isError: true };
-      const model = profile.model === undefined ? parentModel : resolveProfileModel(provider, profile.model) ?? parentModel;
-      const loader = new DefaultResourceLoader({
-        cwd: provider.cwd,
-        agentDir: provider.agentDir,
-        noExtensions: true,
-        noSkills: true,
-        additionalSkillPaths: existingSkillPaths(provider.sharedAgentsDir, provider.cwd),
-        extensionFactories: [createPermissionExtension(requestId, requestPermission, approvals)],
-        systemPrompt: [automaticInstructions(), profile.systemPrompt].join("\n\n")
-      });
-      await loader.reload();
-      const sessionResult = await createAgentSession({
-        cwd: provider.cwd,
-        agentDir: provider.agentDir,
-        model,
-        modelRuntime: provider.runtime,
-        resourceLoader: loader,
-        sessionManager: SessionManager.inMemory(provider.cwd),
-        settingsManager: SettingsManager.inMemory({ compaction: { enabled: true } }),
-        tools: profile.tools ?? ["read", "grep", "find", "ls"]
-      });
-      const output = await runNestedAgentPrompt(sessionResult.session, input.task, [parentSignal, signal]);
-      return { content: [{ type: "text", text: output || "The agent returned no answer." }], details: { agent: profile.name } };
+      try {
+        const profile = profiles.find((candidate) => candidate.name === input.name);
+        if (profile === undefined) return { content: [{ type: "text", text: `Unknown agent: ${input.name}` }], details: undefined, isError: true };
+        const model = profile.model === undefined ? parentModel : resolveProfileModel(provider, profile.model) ?? parentModel;
+        const requiredSkillPath = managedOmapilotSkillPath(provider.agent.env);
+        const loader = new DefaultResourceLoader({
+          cwd: provider.cwd,
+          agentDir: provider.agentDir,
+          noExtensions: true,
+          noSkills: true,
+          additionalSkillPaths: existingSkillPaths(provider.sharedAgentsDir, provider.cwd, requiredSkillPath),
+          extensionFactories: [createPermissionExtension(requestId, requestPermission, approvals)],
+          systemPrompt: profile.systemPrompt
+        });
+        await loader.reload();
+        requireOmapilotSkill(loader, requiredSkillPath);
+        const sessionResult = await createAgentSession({
+          cwd: provider.cwd,
+          agentDir: provider.agentDir,
+          model,
+          modelRuntime: provider.runtime,
+          resourceLoader: loader,
+          sessionManager: SessionManager.inMemory(provider.cwd),
+          settingsManager: SettingsManager.inMemory({ compaction: { enabled: true } }),
+          tools: profile.tools ?? ["read", "grep", "find", "ls"]
+        });
+        const output = await runNestedAgentPrompt(
+          sessionResult.session,
+          `/skill:${OMAPILOT_SKILL_NAME} ${input.task}`,
+          [parentSignal, signal]
+        );
+        return { content: [{ type: "text", text: output || "The agent returned no answer." }], details: { agent: profile.name } };
+      } catch (error) {
+        if (error instanceof BrokerPiError && error.code === "skill_load_failed") skillFailure.error ??= error;
+        throw error;
+      }
     }
   };
+}
+
+function requireOmapilotSkill(loader: DefaultResourceLoader, requiredSkillPath: string): void {
+  const loaded = loader.getSkills();
+  const canonical = (path: string): string | undefined => {
+    try { return realpathSync(path); } catch { return undefined; }
+  };
+  const expectedFile = canonical(join(requiredSkillPath, "SKILL.md"));
+  const skill = loaded.skills.find((candidate) => candidate.name === OMAPILOT_SKILL_NAME);
+  const collision = loaded.diagnostics.some((diagnostic) =>
+    diagnostic.type === "collision" && diagnostic.collision?.name === OMAPILOT_SKILL_NAME
+  );
+  if (expectedFile !== undefined && !collision && skill !== undefined && canonical(skill.filePath) === expectedFile) return;
+  throw new BrokerPiError(
+    "skill_load_failed",
+    "The built-in Pi harness could not load the required OmaPilot skill",
+    false
+  );
 }
 
 type NestedAgentSession = {

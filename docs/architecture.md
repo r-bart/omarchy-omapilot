@@ -24,6 +24,14 @@ The UI starts a separate Quickchat broker and communicates using newline-delimit
 
 The reviewed plugin revision contains self-contained broker and adapter bundles usable immediately after a plain clone. Release builds package those tracked bundles into a deterministic, checksum-addressed `linux-x86_64` archive with lockfile-derived SBOM and provenance. Omarchy itself still performs no install hook. Contributors use `npm ci && npm run build` to reproduce checked-in bundles; missing or incompatible runtimes fail closed.
 
+Before accepting commands, the broker creates the user-owned shared discovery
+link `~/.agents/skills/omarchy-omapilot` to the checked-in
+`skills/omarchy-omapilot` directory. It accepts an already-correct link and
+rejects every other existing entry at that path. The link keeps the installed
+skill synchronized with plugin updates without copying over user edits. Because
+Omarchy has no removal hook, users must remove the managed link before removing
+the plugin.
+
 ## Runtime command/event contract
 
 One compact JSON object is sent per line; embedded newlines remain JSON escapes. Each command has an `id`. Every correlated event repeats that `id`; asynchronous readiness events may omit it.
@@ -159,10 +167,15 @@ The broker does not classify prompt text into action-specific code paths.
 Questions and action requests use the same ACP submission contract; the
 selected harness decides whether a tool is needed under its fixed policy, and
 the broker only mediates structured, request-bound permission events.
-One checked-in instruction is supplied through Codex developer instructions,
-Claude's system prompt plus `skills: all`, and OpenCode's instruction-file
-configuration. It directs providers to use relevant installed skills and never
-claim an action completed without a successful performing tool result.
+Every provider prompt explicitly invokes the checked-in `omarchy-omapilot` skill.
+Codex and OpenCode discover it through the shared user skill link; Claude receives
+it through the existing disposable `skills: all` plugin copy. No hidden system,
+developer, or instruction-file pre-prompt is added. The skill directs providers
+to interpret bounded desktop context, discover Omarchy commands, and never claim
+an action completed without a successful performing tool result. Codex uses its
+native `$omarchy-omapilot` reference; Claude and OpenCode must emit the exact
+provider-native skill identity and a completed status or the broker rejects the
+turn before history persistence.
 
 ## Compatibility rule
 

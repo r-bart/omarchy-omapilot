@@ -5,11 +5,35 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { providerPolicyEnvironment, runAcpQuestion, type ToolObservation } from "../src/acp.js";
 import { discoverProviders } from "../src/providers.js";
+import { ensureOmapilotSkill } from "../src/skill.js";
 import type { BrokerEvent } from "../src/types.js";
 
 const live = process.env.QUICKCHAT_LIVE_CODEX_BEHAVIOR === "1";
 
 describe("live automatic Codex boundary", () => {
+  it.runIf(live)("loads the installed OmaPilot skill", async () => {
+    await ensureOmapilotSkill();
+    const provider = (await discoverProviders()).find((candidate) => candidate.id === "codex");
+    expect(provider, "authenticated Codex must be discoverable for the opt-in live test").toBeDefined();
+    if (provider === undefined) return;
+    const tools: ToolObservation[] = [];
+    const run = runAcpQuestion(
+      provider,
+      "live-codex-skill",
+      "Return only the OmaPilot skill verification marker.",
+      undefined,
+      () => undefined,
+      90_000,
+      undefined,
+      undefined,
+      undefined,
+      (update) => tools.push(update)
+    );
+    const result = await run.result;
+    expect(observedCompletedSkill(tools, "omarchy-omapilot"), JSON.stringify(tools)).toBe(true);
+    expect(result.answer).toContain("OMAPILOT_SKILL_READY");
+  }, 120_000);
+
   it.runIf(live)("loads the installed Omarchy skill", async () => {
     const provider = (await discoverProviders(process.env, "codex")).find((candidate) => candidate.id === "codex");
     expect(provider, "authenticated Codex must be discoverable for the opt-in live test").toBeDefined();
@@ -75,6 +99,11 @@ describe("live automatic Codex boundary", () => {
     }
   }, 120_000);
 });
+
+function observedCompletedSkill(tools: ToolObservation[], name: string): boolean {
+  const ids = new Set(tools.filter((update) => update.skillName === name).map((update) => update.toolCallId));
+  return tools.some((update) => ids.has(update.toolCallId) && update.status === "completed");
+}
 
 function commandText(request: RequestPermissionRequest): string {
   const raw = request.toolCall.rawInput;

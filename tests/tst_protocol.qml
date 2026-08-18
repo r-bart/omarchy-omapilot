@@ -309,6 +309,19 @@ TestCase {
     compare(unavailable.code, "unavailable")
   }
 
+  function test_skillSetupFailureSurvivesBrokerExit() {
+    verify(Protocol.preserveBrokerExitError({
+      code: "skill_setup_failed",
+      message: "Existing path was preserved",
+      retryable: false
+    }))
+    verify(!Protocol.preserveBrokerExitError({
+      code: "broker_unavailable",
+      retryable: true,
+      unavailable: true
+    }))
+  }
+
   function test_linkSchemeAllowlist() {
     verify(Protocol.isSafeExternalUrl("https://example.com"))
     verify(Protocol.isSafeExternalUrl("mailto:hello@example.com"))

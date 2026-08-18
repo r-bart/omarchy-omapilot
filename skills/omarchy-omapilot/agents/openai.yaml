@@ -1,0 +1,7 @@
+interface:
+  display_name: "OmaPilot"
+  short_description: "Operate the Omarchy desktop with OmaPilot"
+  default_prompt: "Use $omarchy-omapilot to handle this desktop request."
+
+policy:
+  allow_implicit_invocation: false

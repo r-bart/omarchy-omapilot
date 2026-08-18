@@ -8,7 +8,10 @@ OmaPilot is submitted only from a public GitHub repository whose default branch 
 2. Review ACP package versions, upstream source, licenses, and release notes; update `THIRD_PARTY_NOTICES.md` and the locked runtime metadata deliberately.
 3. Run `npm ci`, the broker check suite, QML checks, and `./scripts/validate.sh`.
 4. Build with `npm run build`, then run `./scripts/package-runtime.sh --output-dir dist/release` twice and compare archive hashes.
-5. Inspect archive contents, `sbom.cdx.json`, `provenance.json`, and `SHA256SUMS`. Test extraction and broker startup on a clean x86-64 Omarchy Quattro environment.
+5. Inspect archive contents, including `skills/omarchy-omapilot`, `sbom.cdx.json`,
+   `provenance.json`, and `SHA256SUMS`. Test extraction and broker startup on a
+   clean x86-64 Omarchy Quattro environment; verify startup creates the expected
+   `~/.agents/skills/omarchy-omapilot` link and preserves any conflicting path.
 6. Confirm the checked-in bundles reproduce from source without a diff. Upload the archive, checksum file, SBOM, and provenance to a GitHub draft release.
 7. Install the exact public release revision with the commands in the README and verify startup, missing/corrupt-runtime failure, update, and removal.
 

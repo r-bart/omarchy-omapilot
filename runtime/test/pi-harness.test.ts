@@ -105,6 +105,36 @@ describe("native Pi harness", () => {
     expect(existingSkillPaths(agentDir, project)).toEqual([userSkills, projectSkills, piProjectSkills]);
   });
 
+  it("rejects a duplicate OmaPilot skill instead of trusting its matching name", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-pi-skill-collision-"));
+    roots.push(root);
+    const agentDir = join(root, ".config/omapilot");
+    const alternateAgents = join(root, "alternate-agents");
+    await installPiSkill(root);
+    await mkdir(join(alternateAgents, "skills/untrusted"), { recursive: true });
+    await writeFile(join(alternateAgents, "skills/untrusted/SKILL.md"), [
+      "---",
+      "name: omarchy-omapilot",
+      "description: Untrusted duplicate.",
+      "---",
+      "UNTRUSTED_SKILL"
+    ].join("\n"));
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, "models.json"), JSON.stringify({ providers: { local: {
+      baseUrl: "http://127.0.0.1:9/v1", api: "openai-completions", apiKey: "test",
+      models: [{ id: "coder", name: "Coder" }]
+    } } }));
+    const [provider] = await discoverPiProviders({
+      HOME: root,
+      OMAPILOT_CONFIG_DIR: agentDir,
+      OMAPILOT_AGENTS_DIR: alternateAgents
+    });
+    if (provider === undefined) throw new Error("compatible provider was not discovered");
+
+    await expect(runPiQuestion(provider, "collision", "hello", "local::coder", () => undefined).result)
+      .rejects.toMatchObject({ code: "skill_load_failed", retryable: false });
+  });
+
   it("aborts and disposes a delegated Pi session when its parent is cancelled", async () => {
     const controller = new AbortController();
     let releasePrompt: (() => void) | undefined;
@@ -135,7 +165,13 @@ describe("native Pi harness", () => {
   it("runs and streams a complete turn through an OpenAI-compatible endpoint", async () => {
     const root = await mkdtemp(join(tmpdir(), "omapilot-pi-run-"));
     roots.push(root);
-    const server = createServer((_request, response) => {
+    const requests: string[] = [];
+    const server = createServer((request, response) => {
+      let body = "";
+      request.setEncoding("utf8");
+      request.on("data", (chunk: string) => { body += chunk; });
+      request.on("end", () => {
+        requests.push(body);
       response.writeHead(200, { "content-type": "text/event-stream" });
       response.write(`data: ${JSON.stringify({
         id: "chatcmpl-test", object: "chat.completion.chunk", created: 1, model: "coder",
@@ -151,12 +187,14 @@ describe("native Pi harness", () => {
         usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 }
       })}\n\ndata: [DONE]\n\n`);
       response.end();
+      });
     });
     await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
     try {
       const address = server.address();
       if (address === null || typeof address === "string") throw new Error("test server did not bind");
       const agentDir = join(root, ".config/omapilot");
+      await installPiSkill(root);
       await mkdir(agentDir, { recursive: true });
       await writeFile(join(agentDir, "models.json"), JSON.stringify({ providers: { local: {
         baseUrl: `http://127.0.0.1:${String(address.port)}/v1`, api: "openai-completions", apiKey: "test",
@@ -171,6 +209,116 @@ describe("native Pi harness", () => {
         { type: "content", id: "pi-turn", delta: "Hello " },
         { type: "content", id: "pi-turn", delta: "from Pi." }
       ]);
+      expect(requests.join("\n")).toContain("PI_SKILL_FIXTURE");
+    } finally {
+      await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+    }
+  });
+
+  it("expands the managed skill for a delegated Pi agent", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-pi-delegated-skill-"));
+    roots.push(root);
+    const bodies: string[] = [];
+    let requests = 0;
+    const server = createServer((request, response) => {
+      let body = "";
+      request.setEncoding("utf8");
+      request.on("data", (chunk: string) => { body += chunk; });
+      request.on("end", () => {
+        bodies.push(body);
+        requests += 1;
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        if (requests === 1) {
+          response.end(`data: ${JSON.stringify({
+            id: "chatcmpl-agent", object: "chat.completion.chunk", created: 1, model: "coder",
+            choices: [{ index: 0, delta: {
+              role: "assistant",
+              tool_calls: [{ index: 0, id: "call-agent", type: "function", function: {
+                name: "agent", arguments: JSON.stringify({ name: "reviewer", task: "Inspect delegated" })
+              } }]
+            }, finish_reason: "tool_calls" }]
+          })}\n\ndata: [DONE]\n\n`);
+          return;
+        }
+        const content = requests === 2 ? "Nested done." : "Parent done.";
+        response.end(`data: ${JSON.stringify({
+          id: `chatcmpl-${requests}`, object: "chat.completion.chunk", created: 1, model: "coder",
+          choices: [{ index: 0, delta: { role: "assistant", content }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 }
+        })}\n\ndata: [DONE]\n\n`);
+      });
+    });
+    await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+    try {
+      const address = server.address();
+      if (address === null || typeof address === "string") throw new Error("test server did not bind");
+      const agentDir = join(root, ".config/omapilot");
+      await installPiSkill(root);
+      await installPiAgent(root);
+      await mkdir(agentDir, { recursive: true });
+      await writeFile(join(agentDir, "models.json"), JSON.stringify({ providers: { local: {
+        baseUrl: `http://127.0.0.1:${String(address.port)}/v1`, api: "openai-completions", apiKey: "test",
+        models: [{ id: "coder", name: "Coder" }]
+      } } }));
+      const [provider] = await discoverPiProviders({ HOME: root, OMAPILOT_CONFIG_DIR: agentDir });
+      if (provider === undefined) throw new Error("compatible provider was not discovered");
+
+      await expect(runPiQuestion(provider, "delegated", "Delegate this", "local::coder", () => undefined, 5_000).result)
+        .resolves.toMatchObject({ answer: "Parent done." });
+      expect(requests).toBe(3);
+      expect(bodies[1]).toContain("PI_SKILL_FIXTURE");
+      expect(bodies[1]).toContain("Inspect delegated");
+    } finally {
+      await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+    }
+  });
+
+  it("fails the parent turn when delegated skill setup disappears", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-pi-delegated-skill-failure-"));
+    roots.push(root);
+    let requests = 0;
+    const server = createServer((request, response) => {
+      request.resume();
+      requests += 1;
+      void (async () => {
+        if (requests === 1) await rm(join(root, ".agents/skills/omarchy-omapilot"), { recursive: true, force: true });
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        const chunk = requests === 1
+          ? {
+              id: "chatcmpl-agent-failure", object: "chat.completion.chunk", created: 1, model: "coder",
+              choices: [{ index: 0, delta: {
+                role: "assistant",
+                tool_calls: [{ index: 0, id: "call-agent", type: "function", function: {
+                  name: "agent", arguments: JSON.stringify({ name: "reviewer", task: "Inspect delegated" })
+                } }]
+              }, finish_reason: "tool_calls" }]
+            }
+          : {
+              id: "chatcmpl-parent-failure", object: "chat.completion.chunk", created: 1, model: "coder",
+              choices: [{ index: 0, delta: { role: "assistant", content: "False success." }, finish_reason: "stop" }],
+              usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 }
+            };
+        response.end(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`);
+      })();
+    });
+    await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+    try {
+      const address = server.address();
+      if (address === null || typeof address === "string") throw new Error("test server did not bind");
+      const agentDir = join(root, ".config/omapilot");
+      await installPiSkill(root);
+      await installPiAgent(root);
+      await mkdir(agentDir, { recursive: true });
+      await writeFile(join(agentDir, "models.json"), JSON.stringify({ providers: { local: {
+        baseUrl: `http://127.0.0.1:${String(address.port)}/v1`, api: "openai-completions", apiKey: "test",
+        models: [{ id: "coder", name: "Coder" }]
+      } } }));
+      const [provider] = await discoverPiProviders({ HOME: root, OMAPILOT_CONFIG_DIR: agentDir });
+      if (provider === undefined) throw new Error("compatible provider was not discovered");
+
+      await expect(runPiQuestion(provider, "delegated-failure", "Delegate this", "local::coder", () => undefined, 5_000).result)
+        .rejects.toMatchObject({ code: "skill_load_failed", retryable: false });
+      expect(requests).toBeGreaterThanOrEqual(2);
     } finally {
       await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
     }
@@ -207,6 +355,7 @@ describe("native Pi harness", () => {
       const address = server.address();
       if (address === null || typeof address === "string") throw new Error("test server did not bind");
       const agentDir = join(root, ".config/omapilot");
+      await installPiSkill(root);
       await mkdir(agentDir, { recursive: true });
       await writeFile(join(agentDir, "models.json"), JSON.stringify({ providers: { local: {
         baseUrl: `http://127.0.0.1:${String(address.port)}/v1`, api: "openai-completions", apiKey: "test",
@@ -295,4 +444,28 @@ async function until(predicate: () => boolean, timeoutMs: number): Promise<void>
     if (Date.now() - started > timeoutMs) throw new Error("Timed out waiting for broker event");
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 20));
   }
+}
+
+async function installPiSkill(root: string): Promise<void> {
+  const directory = join(root, ".agents/skills/omarchy-omapilot");
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, "SKILL.md"), [
+    "---",
+    "name: omarchy-omapilot",
+    "description: Test OmaPilot skill.",
+    "---",
+    "PI_SKILL_FIXTURE"
+  ].join("\n"));
+}
+
+async function installPiAgent(root: string): Promise<void> {
+  const directory = join(root, ".agents/agents");
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, "reviewer.md"), [
+    "---",
+    "name: reviewer",
+    "description: Reviews delegated work.",
+    "---",
+    "Review carefully."
+  ].join("\n"));
 }

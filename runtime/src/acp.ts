@@ -6,8 +6,8 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import * as acp from "@agentclientprotocol/sdk";
 import type { ContentBlock, NewSessionRequest, RequestPermissionRequest, SessionConfigOption } from "@agentclientprotocol/sdk";
-import { automaticInstructions, type DiscoveredProvider } from "./providers.js";
-import type { AcpPrompt } from "./context.js";
+import type { DiscoveredProvider } from "./providers.js";
+import { promptWithOmapilotSkill, type AcpPrompt } from "./context.js";
 import type { BrokerEvent, ModelOption, StoredImage } from "./types.js";
 import { ImageStore } from "./images.js";
 import { presentImage } from "./history.js";
@@ -32,6 +32,7 @@ export type ToolObservation = {
   kind?: string | null;
   title?: string | null;
   status?: string | null;
+  skillName?: string;
 };
 const QUICKCHAT_CLIENT_VERSION = "0.2.0";
 
@@ -251,6 +252,10 @@ export function runAcpQuestion(
       const openCodeToolCalls = new Map<string, "automatic" | "device">();
       const approvedOpenCodeToolCalls = new Map<string, string>();
       const rejectedOpenCodeToolCalls = new Set<string>();
+      const omapilotSkillLoad: SkillLoadTracker = {
+        calls: new Map(),
+        loaded: provider.id === "codex"
+      };
 
       const text = new GuardedTextEmitter(requestId, emit);
       activeText = text;
@@ -317,7 +322,7 @@ export function runAcpQuestion(
           });
           defaultModel = model;
         }
-        const promptPromise = session.prompt(question);
+        const promptPromise = session.prompt(promptWithOmapilotSkill(provider.id, question));
         try {
           for (;;) {
             const update = await session.nextUpdate();
@@ -327,6 +332,7 @@ export function runAcpQuestion(
             }
             if (update.kind === "stop") break;
             observeToolUpdate(update.update, observeTool);
+            observeOmapilotSkillLoad(provider.id, update.update, omapilotSkillLoad);
             if (provider.id === "opencode" && !await openCodeToolUpdateAllowed(
               update.update,
               openCodeToolCalls,
@@ -348,6 +354,13 @@ export function runAcpQuestion(
           }
           await promptPromise;
           if (forbiddenToolAttempt) throw forbiddenToolError();
+          if (!omapilotSkillLoad.loaded) {
+            throw new BrokerAcpError(
+              "skill_load_failed",
+              "The selected harness did not load the required OmaPilot skill",
+              true
+            );
+          }
           if (cancelled) text.discard();
           else {
             if (unapprovedToolAttempt && answer.trim() === "") {
@@ -396,18 +409,84 @@ export function runAcpQuestion(
 }
 
 function observeToolUpdate(
-  update: { sessionUpdate: string; toolCallId?: string; kind?: string | null; title?: string | null; status?: string | null },
+  update: {
+    sessionUpdate: string;
+    toolCallId?: string;
+    kind?: string | null;
+    name?: string | null;
+    title?: string | null;
+    status?: string | null;
+    rawInput?: unknown;
+  },
   observer: ((update: ToolObservation) => void) | undefined
 ): void {
   if (observer === undefined || (update.sessionUpdate !== "tool_call" && update.sessionUpdate !== "tool_call_update")) return;
   if (typeof update.toolCallId !== "string" || update.toolCallId === "") return;
+  const skillName = isSkillTool(update) ? normalizedSkillName(update.rawInput) : undefined;
   observer({
     sessionUpdate: update.sessionUpdate,
     toolCallId: update.toolCallId,
     ...(update.kind === undefined ? {} : { kind: update.kind }),
     ...(update.title === undefined ? {} : { title: update.title }),
-    ...(update.status === undefined ? {} : { status: update.status })
+    ...(update.status === undefined ? {} : { status: update.status }),
+    ...(skillName === undefined ? {} : { skillName })
   });
+}
+
+type SkillLoadMatch = "unknown" | "exact" | "wrong";
+type SkillLoadTracker = { calls: Map<string, SkillLoadMatch>; loaded: boolean };
+
+function observeOmapilotSkillLoad(
+  provider: DiscoveredProvider["id"],
+  update: {
+    sessionUpdate: string;
+    toolCallId?: string;
+    kind?: string | null;
+    name?: string | null;
+    title?: string | null;
+    status?: string | null;
+    rawInput?: unknown;
+  },
+  tracker: SkillLoadTracker
+): void {
+  if (provider === "codex" || (update.sessionUpdate !== "tool_call" && update.sessionUpdate !== "tool_call_update")) return;
+  const toolCallId = typeof update.toolCallId === "string" ? update.toolCallId : "";
+  if (toolCallId === "") return;
+  const expected = provider === "claude"
+    ? "omarchy-omapilot-installed-skills:omarchy-omapilot"
+    : "omarchy-omapilot";
+
+  if (update.sessionUpdate === "tool_call") {
+    if (!isSkillTool(update)) return;
+    tracker.calls.set(toolCallId, skillLoadMatch(update.rawInput, expected));
+  } else if (tracker.calls.has(toolCallId) && update.rawInput !== undefined) {
+    const previous = tracker.calls.get(toolCallId);
+    const next = skillLoadMatch(update.rawInput, expected);
+    tracker.calls.set(toolCallId, previous === "wrong" || next === "wrong" ? "wrong" : next);
+  }
+
+  if (tracker.calls.get(toolCallId) === "exact" && update.status === "completed") tracker.loaded = true;
+}
+
+function isSkillTool(update: { kind?: string | null; name?: string | null; title?: string | null }): boolean {
+  const name = update.name?.toLowerCase();
+  const title = update.title?.toLowerCase();
+  return (update.kind === "other" || update.kind === undefined || update.kind === null)
+    && (name === "skill" || title === "skill");
+}
+
+function skillLoadMatch(rawInput: unknown, expected: string): SkillLoadMatch {
+  const name = normalizedSkillName(rawInput);
+  return name === undefined ? "unknown" : name === expected ? "exact" : "wrong";
+}
+
+function normalizedSkillName(rawInput: unknown): string | undefined {
+  if (!isObject(rawInput)) return undefined;
+  for (const key of ["skill", "name", "skill_name", "skillName", "command"]) {
+    const value = rawInput[key];
+    if (typeof value === "string" && value !== "") return value;
+  }
+  return undefined;
 }
 
 function secureEnvironment(provider: DiscoveredProvider): NodeJS.ProcessEnv {
@@ -423,7 +502,6 @@ function secureEnvironment(provider: DiscoveredProvider): NodeJS.ProcessEnv {
       sandbox_mode: "read-only",
       web_search: "disabled",
       mcp_servers: {},
-      developer_instructions: automaticInstructions(),
       features
     };
     return { ...provider.agent.env, CODEX_CONFIG: JSON.stringify(config), INITIAL_AGENT_MODE: "read-only" };
@@ -459,11 +537,9 @@ export function providerSessionRequest(
   const base: NewSessionRequest = { cwd, mcpServers: [] };
   if (provider.id !== "claude") return base;
   const tools = ["Bash", "WebSearch", "Skill"];
-  const systemPrompt = automaticInstructions();
   return {
     ...base,
     _meta: {
-      systemPrompt,
       claudeCode: {
         options: {
           tools,
@@ -530,7 +606,7 @@ export async function prepareClaudeSkills(cwd: string, env: NodeJS.ProcessEnv): 
   const manifest = join(plugin, ".claude-plugin", "plugin.json");
   await mkdir(join(plugin, ".claude-plugin"), { recursive: true, mode: 0o700 });
   await writeFile(manifest, `${JSON.stringify({
-    name: "omarchy-quickchat-installed-skills",
+    name: "omarchy-omapilot-installed-skills",
     version: "0.0.0",
     description: "Disposable view of locally installed skills for Quickchat"
   }, null, 2)}\n`, { mode: 0o600 });

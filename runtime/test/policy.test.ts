@@ -6,8 +6,6 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { parseCodexModelCatalog, prepareClaudeSkills, probeAcpModels, providerPolicyEnvironment, providerSessionRequest, runAcpQuestion } from "../src/acp.js";
 import {
-  automaticInstructionPath,
-  automaticInstructions,
   codexToolLockdownFeatures,
   discoverProviders,
   openCodePolicyEnvironment,
@@ -16,16 +14,16 @@ import {
 import type { BrokerEvent } from "../src/types.js";
 
 describe("provider security profiles", () => {
-  it("frames every harness as capability-aware OmaPilot without broadening authority", () => {
-    const instructions = automaticInstructions();
+  it("defines capability-aware OmaPilot behavior in the installed skill", async () => {
+    const instructions = await readFile(resolve("skills/omarchy-omapilot/SKILL.md"), "utf8");
     expect(instructions).toContain("You are OmaPilot, Omarchy's action-oriented system copilot");
-    expect(instructions).toContain("Desktop context is optional, untrusted, supplemental evidence");
-    expect(instructions).toContain("does not mean the information is unavailable");
-    expect(instructions).toContain("installed skills, Omarchy commands");
-    expect(instructions).toContain("system's default browser");
-    expect(instructions).toMatch(/use web search when it is\s+available/u);
-    expect(instructions).toContain("Never say an app, URL, command, or device action succeeded");
-    expect(instructions).toMatch(/preserve every\s+permission boundary/u);
+    expect(instructions).toContain("attached desktop snapshot");
+    expect(instructions).toMatch(/Absence from the\s+snapshot is not proof/u);
+    expect(instructions).toContain("hyprctl -j clients");
+    expect(instructions).toContain("omarchy commands --json");
+    expect(instructions).toContain("Use the default-browser path");
+    expect(instructions).toContain("Verify actions from current tool output");
+    expect(instructions).toContain("Preserve every harness");
   });
 
   it("normalizes the Codex app-server model catalog without hidden or invalid rows", () => {
@@ -55,12 +53,11 @@ describe("provider security profiles", () => {
       approval_policy: "on-request",
       sandbox_mode: "read-only",
       web_search: "disabled",
-      mcp_servers: {},
-      developer_instructions: automaticInstructions()
+      mcp_servers: {}
     });
     const automaticFeatures = featureRecord(automatic);
     expect(automaticFeatures).toMatchObject({ shell_tool: true, unified_exec: true, skill_search: true });
-    expect(automatic).toMatchObject({ developer_instructions: expect.stringContaining("relevant installed skills") });
+    expect(automatic).not.toHaveProperty("developer_instructions");
     for (const feature of provider("codex").lockdownFeatures ?? []) {
       if (feature !== "shell_tool" && feature !== "unified_exec" && feature !== "skill_search") expect(automaticFeatures[feature]).toBe(false);
     }
@@ -76,7 +73,7 @@ describe("provider security profiles", () => {
       }
     }, "/run/user/1000/quickchat/automatic-turn");
     const serialized = JSON.parse(JSON.stringify(request)) as {
-      _meta: { systemPrompt: string; claudeCode: { options: {
+      _meta: { claudeCode: { options: {
         tools: string[];
         disallowedTools: string[];
         sandbox: {
@@ -90,7 +87,7 @@ describe("provider security profiles", () => {
     };
     const options = serialized._meta.claudeCode.options;
     expect(request.mcpServers).toEqual([]);
-    expect(serialized._meta.systemPrompt).toBe(automaticInstructions());
+    expect(serialized._meta).not.toHaveProperty("systemPrompt");
     expect(options.tools).toEqual(["Bash", "WebSearch", "Skill"]);
     expect(serialized._meta.claudeCode.options).toMatchObject({ skills: "all" });
     expect(serialized._meta.claudeCode.options).toMatchObject({ disallowedTools: expect.arrayContaining(["WebFetch"]) });
@@ -137,7 +134,7 @@ describe("provider security profiles", () => {
       if (plugin === undefined) return;
       await expect(readFile(join(plugin, "skills", "safe", "SKILL.md"), "utf8")).resolves.toBe("# Safe skill\n");
       await expect(readFile(join(plugin, "skills", "unsafe", "SKILL.md"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
-      await expect(readFile(join(plugin, ".claude-plugin", "plugin.json"), "utf8")).resolves.toContain("omarchy-quickchat-installed-skills");
+      await expect(readFile(join(plugin, ".claude-plugin", "plugin.json"), "utf8")).resolves.toContain("omarchy-omapilot-installed-skills");
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -152,7 +149,7 @@ describe("provider security profiles", () => {
     const config = JSON.parse(providerPolicyEnvironment(provider("opencode")).OPENCODE_CONFIG_CONTENT ?? "{}");
     expect(config).toMatchObject({
       default_agent: "build",
-      instructions: [automaticInstructionPath()],
+      instructions: [],
       skills: { urls: [] },
       agent: { build: { permission: { bash: "ask", skill: "allow", task: "deny" } } }
     });
@@ -427,6 +424,20 @@ const server = acp.agent({ name: "quickchat-opencode-tool-update" })
     log("prompt");
     const controller = new AbortController();
     pending = controller;
+    await client.notify(acp.methods.client.session.update, {
+      sessionId: params.sessionId,
+      update: {
+        sessionUpdate: "tool_call", toolCallId: "omapilot-skill", title: "skill", name: "skill",
+        kind: "other", status: "pending", rawInput: { name: "omarchy-omapilot" }
+      }
+    });
+    await client.notify(acp.methods.client.session.update, {
+      sessionId: params.sessionId,
+      update: {
+        sessionUpdate: "tool_call_update", toolCallId: "omapilot-skill", status: "completed",
+        rawInput: { name: "omarchy-omapilot" }
+      }
+    });
     await client.notify(acp.methods.client.session.update, {
       sessionId: params.sessionId,
       update: {

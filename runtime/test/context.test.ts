@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { promptWithDesktopContext } from "../src/context.js";
+import { promptWithDesktopContext, promptWithOmapilotSkill } from "../src/context.js";
 import { desktopContextSchema } from "../src/types.js";
 
 describe("submit-time desktop context", () => {
@@ -13,6 +13,17 @@ describe("submit-time desktop context", () => {
 
   it("keeps ordinary questions byte-for-byte when context is absent", () => {
     expect(promptWithDesktopContext("What is open?", undefined)).toBe("What is open?");
+  });
+
+  it.each([
+    ["codex", "$omarchy-omapilot"],
+    ["claude", "Use the Skill tool to load omarchy-omapilot-installed-skills:omarchy-omapilot"],
+    ["opencode", "Use the skill tool to load the installed skill named omarchy-omapilot"]
+  ] as const)("explicitly invokes the OmaPilot skill for %s", (provider, invocation) => {
+    expect(promptWithOmapilotSkill(provider, "What is open?")).toEqual([
+      { type: "text", text: expect.stringContaining(invocation) },
+      { type: "text", text: "What is open?" }
+    ]);
   });
 
   it("frames desktop metadata as untrusted data before the authoritative request", () => {

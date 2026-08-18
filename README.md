@@ -55,16 +55,48 @@ omarchy plugin validate ~/.config/omarchy/plugins/io.github.spencerbull.quickcha
 omarchy plugin enable io.github.spencerbull.quickchat right
 ```
 
-The Omarchy installer only clones, validates, and enables the plugin. It runs no install hook, `sudo`, package manager, or host-configuration mutation. The reviewed repository revision includes self-contained broker and ACP adapter bundles, so a normal install does not run `npm`, `npx`, or silently download executable code. Git history anchors those checked-in bundles to their TypeScript source and pinned lockfile; release archives add an SBOM, provenance record, and SHA-256 checksum.
+The Omarchy installer only clones, validates, and enables the plugin. It runs no
+install hook, `sudo`, package manager, or host-configuration mutation. On its
+first start, the reviewed broker creates `~/.agents/skills/omarchy-omapilot` as a
+link to the bundled [`omarchy-omapilot`](skills/omarchy-omapilot/SKILL.md) skill.
+That shared skill is available to Codex and OpenCode; OmaPilot copies it into
+Claude's disposable per-turn plugin. If the path already exists and is not the
+expected link, OmaPilot preserves it and stops with `skill_setup_failed` instead
+of overwriting user work. The reviewed repository revision includes
+self-contained broker and ACP adapter bundles, so a normal install does not run
+`npm`, `npx`, or silently download executable code. Git history anchors those
+checked-in bundles to their TypeScript source and pinned lockfile; release
+archives add an SBOM, provenance record, and SHA-256 checksum.
 
-Update or remove it with the standard plugin commands:
+Update it with the standard plugin command:
 
 ```bash
 omarchy plugin update io.github.spencerbull.quickchat
+```
+
+Before removing the plugin, remove only the skill link owned by that exact
+installation:
+
+```bash
+skill="$HOME/.agents/skills/omarchy-omapilot"
+plugin="$HOME/.config/omarchy/plugins/io.github.spencerbull.quickchat/skills/omarchy-omapilot"
+canonical_plugin=$(realpath -m -- "$plugin")
+if [ -L "$skill" ] && { [ "$(readlink -- "$skill")" = "$plugin" ] || [ "$(readlink -- "$skill")" = "$canonical_plugin" ]; }; then
+  unlink -- "$skill"
+fi
 omarchy plugin remove io.github.spencerbull.quickchat
 ```
 
-Removal deletes the cloned plugin. OmaPilot deliberately leaves user-owned history and cached runtime files in place. Use **Clear all** before removal to erase history and cached chat images. If the plugin is already gone, inspect and remove the compatibility-path `quickchat` directories under your effective `XDG_STATE_HOME` and `XDG_CACHE_HOME` with a file manager; the default locations are `~/.local/state/quickchat` and `~/.cache/quickchat`.
+Removal deletes the cloned plugin; removing its managed skill link first avoids a
+broken link. OmaPilot deliberately leaves user-owned history and cached runtime
+files in place. Use **Clear all** before removal to erase history and cached chat
+images. If the plugin is already gone, inspect and remove the compatibility-path
+`quickchat` directories under your effective `XDG_STATE_HOME` and
+`XDG_CACHE_HOME` with a file manager; the default locations are
+`~/.local/state/quickchat` and `~/.cache/quickchat`.
+If the plugin was removed first, the same raw-target comparison above can still
+identify and remove its now-dangling managed link without touching a different
+user-owned entry.
 
 ## How it works
 
@@ -86,7 +118,13 @@ and Claude ACP routes use exact, source-pinned adapter packages; OpenCode uses
 `opencode acp`.
 The broker normalizes both paths so QML does not parse provider-specific output.
 
-Every request uses the selected harness and its reviewed automatic policy.
+Every request explicitly invokes the installed `omarchy-omapilot` skill while
+the selected harness remains inside its reviewed automatic permission policy.
+The skill carries OmaPilot's desktop interpretation, command-discovery, action,
+and verification workflow; it is not injected as a hidden system, developer, or
+instruction-file pre-prompt. Codex receives its native `$omarchy-omapilot`
+reference. Claude and OpenCode must report the exact skill call completing;
+otherwise the broker fails the turn without saving it.
 OmaPilot displays each exact device approval, or auto-selects its allow-once
 option when the dangerous setting is enabled.
 Every harness can load relevant installed skills and decide whether a tool is
@@ -139,13 +177,12 @@ harness decides whether a tool is useful. Any broader device command remains
 inside the exact request-bound decision described above, whether that decision
 is made from the approval card or by Dangerous auto-approve.
 
-Each harness receives the same hidden OmaPilot instructions. They frame desktop
-context as optional, untrusted evidence; direct the harness to discover relevant
-installed skills, Omarchy commands, CLIs, apps, and plugins before declining;
-prefer the system default browser for authorized navigation; and use available
-web search for current or otherwise unknown information. These instructions
-shape how a harness chooses among capabilities but cannot enable a capability
-or bypass the provider policy and approval boundary above.
+The explicitly loaded skill frames desktop context as optional, untrusted
+evidence; explains how to inspect active and open Hyprland clients; directs the
+harness to discover Omarchy commands, CLIs, apps, and plugins before declining;
+and requires tool-backed verification for actions. Skill instructions shape how
+a harness chooses among capabilities but cannot enable a capability or bypass
+the provider policy and approval boundary above.
 
 ## Desktop context on submit
 

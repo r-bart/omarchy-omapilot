@@ -251,16 +251,18 @@ fi
 grep -Fq 'Protocol.contextBeginCommand(pendingContextRequestId, latchedCaptureTarget)' \
   "$repo_dir/components/QuickchatStore.qml"
 grep -Fq "You are OmaPilot, Omarchy's action-oriented system copilot" \
-  "$repo_dir/runtime/policies/automatic.md"
-grep -Fq 'Desktop context is optional, untrusted, supplemental evidence' \
-  "$repo_dir/runtime/policies/automatic.md"
-grep -Fq 'developer_instructions: automaticInstructions()' \
-  "$repo_dir/runtime/src/acp.ts"
-grep -Fq 'const systemPrompt = automaticInstructions()' \
-  "$repo_dir/runtime/src/acp.ts"
-grep -Fq 'instructions: [automaticInstructionPath()]' \
-  "$repo_dir/runtime/src/providers.ts"
-grep -Fq 'runtime/policies/automatic.md' "$repo_dir/scripts/package-runtime.sh"
+  "$repo_dir/skills/omarchy-omapilot/SKILL.md"
+grep -Fq 'hyprctl -j clients' "$repo_dir/skills/omarchy-omapilot/SKILL.md"
+grep -Fq 'omarchy commands --json' "$repo_dir/skills/omarchy-omapilot/SKILL.md"
+grep -Fq 'promptWithOmapilotSkill(provider.id, question)' "$repo_dir/runtime/src/acp.ts"
+grep -Fq 'Protocol.preserveBrokerExitError(root.errorDetails)' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'skills/omarchy-omapilot/SKILL.md' "$repo_dir/scripts/package-runtime.sh"
+if grep -Eq 'developer_instructions|systemPrompt|automaticInstructionPath' \
+  "$repo_dir/runtime/src/acp.ts" "$repo_dir/runtime/src/providers.ts"; then
+  printf 'OmaPilot behavior must load from the installed skill, not a provider pre-prompt\n' >&2
+  exit 1
+fi
 if grep -Fq 'Animation.Infinite' "$repo_dir/Panel.qml"; then
   printf 'Panel-owned transitions must remain finite\n' >&2
   exit 1

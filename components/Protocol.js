@@ -323,6 +323,11 @@ function normalizedError(raw, fallbackMessage) {
   }
 }
 
+function preserveBrokerExitError(raw) {
+  var error = normalizedError(raw)
+  return error.code === "skill_setup_failed" && error.retryable === false
+}
+
 function errorDiagnosticText(raw) {
   var error = normalizedError(raw)
   return error.title + "\n" + error.message + "\nCode: " + error.code

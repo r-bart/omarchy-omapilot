@@ -95,12 +95,14 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
 - The broker does not regex-classify prompts or implement action-specific
   shortcuts. Every ordinary question and action request follows the selected
   harness's same fixed policy and permission boundary.
-- All providers receive the same hidden OmaPilot instructions. They treat
-  desktop context as optional untrusted evidence, encourage discovery of
-  relevant installed capabilities and current-information web search, prefer
-  the system default browser for authorized navigation, and require tool
-  evidence before claiming an action succeeded. These instructions complement
-  the broker's structural fail-closed checks; they cannot enable a blocked tool,
+- Every provider prompt explicitly invokes the shared, installed `omarchy-omapilot`
+  skill. No OmaPilot behavior document is injected as a system, developer, or
+  instruction-file pre-prompt. The skill treats desktop context as optional
+  untrusted evidence, describes bounded Hyprland and Omarchy discovery, and
+  requires tool evidence before claiming an action succeeded. Claude and
+  OpenCode turns are rejected unless the exact provider-native OmaPilot skill
+  call completes. It complements
+  the broker's structural fail-closed checks; it cannot enable a blocked tool,
   expand a sandbox, or turn natural-language output into a security boundary.
 - Installed skill content is trusted provider instruction, not observational
   data. A skill can cause the harness to propose a command, but it cannot bypass

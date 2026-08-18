@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import { runAcpQuestion, type ToolObservation } from "../src/acp.js";
 import { discoverProviders } from "../src/providers.js";
+import { ensureOmapilotSkill } from "../src/skill.js";
 
 const live = process.env.QUICKCHAT_LIVE_OPENCODE_BEHAVIOR === "1";
 const activeRuns: Array<() => Promise<void>> = [];
@@ -15,6 +16,33 @@ afterEach(async () => {
 });
 
 describe("live automatic OpenCode boundary", () => {
+  it.runIf(live)("loads the installed OmaPilot skill through the exact skill tool", async () => {
+    await ensureOmapilotSkill();
+    const provider = (await discoverProviders()).find((candidate) => candidate.id === "opencode");
+    expect(provider, "authenticated OpenCode must be discoverable for the opt-in live test").toBeDefined();
+    if (provider === undefined) return;
+    const tools: ToolObservation[] = [];
+    const run = runAcpQuestion(
+      provider,
+      "live-opencode-skill",
+      "Return only the OmaPilot skill verification marker.",
+      undefined,
+      () => undefined,
+      90_000,
+      undefined,
+      undefined,
+      undefined,
+      (update) => tools.push(update)
+    );
+    activeRuns.push(run.cancel);
+    const result = await run.result.catch((error: unknown) => {
+      throw new Error(`${String(error)}\n${JSON.stringify(tools)}`);
+    });
+    activeRuns.pop();
+    expect(observedCompletedSkill(tools, "omarchy-omapilot"), JSON.stringify(tools)).toBe(true);
+    expect(result.answer).toContain("OMAPILOT_SKILL_READY");
+  }, 120_000);
+
   it.runIf(live)("loads the installed Omarchy skill through the exact skill tool", async () => {
     const provider = (await discoverProviders(process.env, "opencode")).find((candidate) => candidate.id === "opencode");
     expect(provider, "authenticated OpenCode must be discoverable for the opt-in live test").toBeDefined();
@@ -127,6 +155,11 @@ describe("live automatic OpenCode boundary", () => {
     expect(result.answer).toMatch(/not|didn.t|denied|unable|couldn.t|failed/iu);
   }, 120_000);
 });
+
+function observedCompletedSkill(tools: ToolObservation[], name: string): boolean {
+  const ids = new Set(tools.filter((update) => update.skillName === name).map((update) => update.toolCallId));
+  return tools.some((update) => ids.has(update.toolCallId) && update.status === "completed");
+}
 
 function commandText(request: RequestPermissionRequest): string {
   const raw = request.toolCall.rawInput;
