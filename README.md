@@ -192,30 +192,52 @@ Remote Markdown images are not fetched automatically. OmaPilot shows the origin 
 
 Both integrations disappear or show a clear unavailable state when their required command is missing.
 
-## Future browser element context
+## Browser element context
 
-The next semantic context source is an optional **OmaPilot Browser Companion**.
-It would be a separately installed browser extension and local native-messaging
-bridge that can provide the active tab URL/title and, only with explicit site
-permission, selected text or bounded visible-page text. The intended rules are:
+The optional **OmaPilot Browser Companion** adds semantic page clipping to the
+same crosshair button. On a site the user has enabled, OmaPilot closes its
+desktop overlay and the page itself highlights the element beneath the pointer.
+Clicking produces bounded **Element**, **Text**, and **Screenshot** choices; on
+an unsupported, restricted, or non-enabled page, the existing desktop capture
+opens instead.
+
+The companion is one WebExtension source with Chromium and Firefox builds plus
+a small local native-messaging relay. It supports Omarchy's Chromium, Chrome,
+Brave, Brave Origin, Edge, Firefox, and Zen browser families. Its rules are:
 
 - the Omarchy plugin remains fully useful without the extension;
-- context is visibly disclosed and captured only when a request is submitted;
+- context is visibly disclosed and captured only after an explicit clip request and page click;
 - page access is opt-in and scoped per site, with no browsing-history collection;
 - the bridge accepts a small versioned schema and does not expose a general command channel; and
 - the extension avoids Chrome's broad `debugger` permission and requests only the minimum tab/site/native-messaging permissions needed for enabled features.
 
-Because native messaging requires browser-host registration outside the
-Omarchy plugin directory, that companion would need its own explicit,
-reversible install and removal flow; the normal OmaPilot plugin install would not
-silently add it.
+Native messaging requires registration outside the plugin directory, so the
+normal OmaPilot plugin install does not add it. Build and register it explicitly:
 
-The shipped attachment contract already models multiple representations and
-labels the semantic browser representation **Element** in the UI. The
-companion will add Element alongside Text and Screenshot without changing the
-submit trust boundary. Other roadmap candidates include AT-SPI native controls
-and richer app-specific adapters. Browser actions would come later, only with their
-own inspectable per-action approval boundary for authenticated sites.
+```bash
+./scripts/install-browser-companion.sh install
+```
+
+Then load `browser-companion/dist/chromium` as an unpacked Chromium extension,
+or `browser-companion/dist/firefox` as a temporary Firefox/Zen extension. For
+local Omarchy Chromium-family development, the installer can add the unpacked
+build to detected browser flag files:
+
+```bash
+./scripts/install-browser-companion.sh install --development
+```
+
+Restart the browser, pin the OmaPilot extension, open its popup on a site, and
+choose **Enable on this site**. Removal is reversible:
+
+```bash
+./scripts/install-browser-companion.sh uninstall
+```
+
+The element representation is a capped semantic tree—not raw `outerHTML`—and
+omits editable values, password content, hidden nodes, scripts, styles, event
+handlers, query strings, and fragments. Browser actions remain out of scope;
+they would need their own inspectable per-action approval boundary.
 
 ## Development
 

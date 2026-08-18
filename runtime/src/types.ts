@@ -198,6 +198,8 @@ export type BrokerEvent =
   | { type: "permission_closed"; id: string; permissionId: string; reason: "decided" | "expired" | "cancelled" }
   | { type: "image"; id: string; image: RenderableImage }
   | { type: "context_ready"; id: string; target: { appId?: string; title?: string; window?: z.infer<typeof captureRectangleSchema>; monitor: z.infer<typeof captureRectangleSchema> & { name?: string } } }
+  | { type: "context_picker"; id: string; browser: string; title: string; url: string }
+  | { type: "context_notice"; id: string; message: string }
   | { type: "context_attachment"; requestId: string; attachment: ContextAttachmentView }
   | { type: "complete"; chat: ChatView }
   | { type: "complete"; id: string; answer: string }

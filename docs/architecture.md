@@ -66,9 +66,34 @@ broker. The broker resolves opaque UUIDs against its in-memory attachment map,
 constructs ACP text/image blocks, and deletes the cached input image after
 submit or explicit removal.
 
-The representation contract reserves `element` for the separately installed
-browser companion. That integration must create a broker-owned bounded semantic
-candidate; the UI must never accept raw DOM in a normal submit command.
+The representation contract implements `element` through the separately
+installed browser companion. The broker owns a mode-0600 Unix socket below
+`$XDG_RUNTIME_DIR/quickchat`; browser-native relay processes connect that socket
+to an allowlisted extension ID through the browser's native-messaging transport.
+The relay exposes only versioned hello, probe, arm, result, cancel, and error
+messages. It is not a general browser command channel.
+
+On `context_begin`, the broker maps the latched app ID to the Chromium or
+Firefox family and probes connected companion sessions. A permitted content
+script returns active-page title and URL only for that explicit request. The
+broker normalizes the compositor title, chooses one matching session, and arms
+only that page. Quickshell closes rather than intercepting the next click; the
+content script performs browser-native hit testing, visibly highlights the
+candidate, and captures on click or cancels on Escape. If no permitted picker
+responds, the normal Quickshell screenshot/OCR overlay remains authoritative.
+
+The broker validates the returned page and semantic-node schema, caps the tree
+again to 80 nodes, depth four, 12 KiB visible text, and a 32 KiB serialized
+element, strips URL credentials/query/fragment, and captures the already
+latched browser window through the existing image policy after the picker has
+disappeared. The attachment therefore offers Element, Text, Screenshot, or a
+supported pair without sending DOM through QML. The UI still submits only an
+opaque attachment UUID and representation IDs.
+
+Site permission is granted from the extension popup because a desktop-shell
+gesture cannot activate browser `activeTab` authority. Permission is optional,
+origin-scoped, and registers the inert picker content script only for enabled
+origins. It does not collect page metadata until an explicit broker probe.
 
 The broker derives one automatic,
 fail-closed policy for that provider. Codex keeps the pinned adapter's read-only,

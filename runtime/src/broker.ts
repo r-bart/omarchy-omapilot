@@ -13,6 +13,7 @@ import { discoverProviders, fallbackModels, type DiscoveredProvider } from "./pr
 import { resolveExecutable, runCommand } from "./process.js";
 import type { BrokerCommand, BrokerEvent, ChatRecord, ProviderId, ProviderInfo } from "./types.js";
 import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
+import { BrowserCompanionServer, type BrowserCapture } from "./browser-companion.js";
 
 type DictationClient = Pick<DictationService, "start" | "stop" | "cancel">;
 type SessionCleaner = (provider: DiscoveredProvider, sessionId: string) => Promise<boolean>;
@@ -33,6 +34,7 @@ export class QuickchatBroker {
   readonly #env: NodeJS.ProcessEnv;
   readonly #permissionTimeoutMs: number;
   readonly #contextAttachments: ContextAttachmentStore;
+  readonly #browserCompanion: BrowserCompanionServer;
   #providers = new Map<string, DiscoveredProvider>();
   #runs = new Map<string, AcpRun>();
   #handoffs = new Map<string, Promise<void>>();
@@ -48,6 +50,14 @@ export class QuickchatBroker {
     this.#history = options.history ?? new HistoryStore();
     this.#images = options.images ?? new ImageStore();
     this.#contextAttachments = options.contextAttachments ?? new ContextAttachmentStore(this.#images, undefined, options.env ?? process.env);
+    this.#browserCompanion = new BrowserCompanionServer(options.env ?? process.env, {
+      capture: (capture) => this.#browserCapture(capture),
+      cancelled: (requestId) => {
+        this.#contextAttachments.cancel(requestId);
+        this.#error("context_cancelled", "Browser element capture was cancelled", false, requestId);
+      },
+      error: (requestId, reason) => this.#browserCaptureError(requestId, reason)
+    });
     this.#dictation = options.dictation ?? new DictationService();
     this.#sessionCleaner = options.sessionCleaner ?? deleteAcpSession;
     this.#herdrContinue = options.herdrContinue ?? continueInHerdr;
@@ -61,7 +71,7 @@ export class QuickchatBroker {
       case "submit": await this.#submit(command); break;
       case "context_begin": await this.#contextBegin(command); break;
       case "context_capture": await this.#contextCapture(command); break;
-      case "context_cancel": this.#contextAttachments.cancel(command.id); break;
+      case "context_cancel": this.#contextAttachments.cancel(command.id); this.#browserCompanion.cancel(command.id); break;
       case "context_discard": await this.#contextAttachments.discard(command.id); break;
       case "cancel": await this.#cancel(command.id); break;
       case "permission_response": this.#respondPermission(command); break;
@@ -85,7 +95,11 @@ export class QuickchatBroker {
       case "load_image": await this.#loadImage(command.url, command.id); break;
       case "open_link": await this.#openLink(command.url); break;
       case "copy": await this.#copy(command.text); break;
-      case "shutdown": await Promise.all([...this.#runs.values()].map((run) => run.cancel())); return false;
+      case "shutdown": {
+        await Promise.all([...this.#runs.values()].map((run) => run.cancel()));
+        await this.#browserCompanion.close();
+        return false;
+      }
     }
     return true;
   }
@@ -96,6 +110,7 @@ export class QuickchatBroker {
       return;
     }
     const discovered = await discoverProviders(this.#env);
+    await this.#browserCompanion.start().catch(() => undefined);
     await Promise.all(discovered.map(async (provider) => {
       const acpModels = await probeAcpModels(provider);
       const models = acpModels.models.length > 0 ? acpModels.models : await fallbackModels(provider);
@@ -192,10 +207,36 @@ export class QuickchatBroker {
   async #contextBegin(command: Extract<BrokerCommand, { type: "context_begin" }>): Promise<void> {
     try {
       const target = await this.#contextAttachments.begin(command.id, command.target);
+      const browser = await this.#browserCompanion.tryArm(command.id, target.appId, target.title);
+      if (browser.status === "armed") {
+        this.#emit({
+          type: "context_picker", id: command.id, browser: browser.browser,
+          title: browser.title, url: browser.url
+        });
+        return;
+      }
+      if (browser.status === "permission-required") this.#emit({
+        type: "context_notice", id: command.id,
+        message: "DOM capture is not enabled for this site; using desktop capture"
+      });
       this.#emit({ type: "context_ready", id: command.id, target });
     } catch (error) {
       this.#contextError(error, command.id);
     }
+  }
+
+  async #browserCapture(capture: BrowserCapture): Promise<void> {
+    try {
+      const attachment = await this.#contextAttachments.captureBrowser(capture.requestId, capture);
+      this.#emit({ type: "context_attachment", requestId: capture.requestId, attachment });
+    } catch (error) {
+      this.#contextError(error, capture.requestId);
+    }
+  }
+
+  #browserCaptureError(requestId: string, reason: string): void {
+    this.#contextAttachments.cancel(requestId);
+    this.#error("context_browser_failed", reason, true, requestId);
   }
 
   async #contextCapture(command: Extract<BrokerCommand, { type: "context_capture" }>): Promise<void> {

@@ -73,6 +73,7 @@ Scope {
   signal ipcToggleRequested()
   signal ipcHistoryRequested()
   signal contextOverlayRequested(string payload)
+  signal contextBrowserPickerRequested()
   signal contextAttachmentAdded()
 
   function routeIpc(method) {
@@ -493,6 +494,17 @@ Scope {
       if (String(event.id || "") !== pendingContextRequestId) return
       statusMessage = ""
       contextOverlayRequested(JSON.stringify({ id: event.id, target: event.target || {} }))
+      return
+    }
+    if (type === "context_picker") {
+      if (String(event.id || "") !== pendingContextRequestId) return
+      statusMessage = "Click an element in " + String(event.browser || "the browser") + "…"
+      contextBrowserPickerRequested()
+      return
+    }
+    if (type === "context_notice") {
+      if (String(event.id || "") !== pendingContextRequestId) return
+      toastRequested(String(event.message || "Browser element capture is unavailable"))
       return
     }
     if (type === "context_attachment") {

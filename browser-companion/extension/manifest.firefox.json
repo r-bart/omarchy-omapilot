@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "OmaPilot Browser Companion",
+  "version": "0.1.0",
+  "description": "Explicitly clip bounded semantic context from the current page into OmaPilot.",
+  "permissions": ["activeTab", "nativeMessaging", "scripting", "storage"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "scripts": ["background.js"] },
+  "action": {
+    "default_title": "OmaPilot page access",
+    "default_popup": "popup.html"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "omapilot-browser-companion@spencerbull.dev",
+      "strict_min_version": "128.0"
+    }
+  }
+}

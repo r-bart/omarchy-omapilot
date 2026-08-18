@@ -6,6 +6,7 @@ import { quickchatPaths, type QuickchatPaths } from "./paths.js";
 import { resolveExecutable, runBinaryCommand, runCommand } from "./process.js";
 import type { ImageBlock, TextBlock } from "./context.js";
 import type { ContextAttachmentSelection, ContextAttachmentView, StoredImage } from "./types.js";
+import type { BrowserCapture, SemanticNode } from "./browser-companion.js";
 
 type Rectangle = { x: number; y: number; width: number; height: number };
 type TargetHint = { appId?: string | undefined; title?: string | undefined; bounds?: Rectangle | undefined };
@@ -19,6 +20,7 @@ type PendingAttachment = {
   view: ContextAttachmentView;
   image: StoredImage;
   text?: string;
+  element?: string;
 };
 
 export class ContextAttachmentError extends Error {
@@ -65,6 +67,10 @@ export class ContextAttachmentStore {
     this.#targets.delete(requestId);
   }
 
+  target(requestId: string): CaptureTarget | undefined {
+    return this.#targets.get(requestId);
+  }
+
   async capture(
     requestId: string,
     mode: "window" | "region",
@@ -87,17 +93,7 @@ export class ContextAttachmentStore {
     if (sensitiveTarget(target))
       throw new ContextAttachmentError("context_sensitive", "OmaPilot will not capture a password or credential window");
 
-    const grim = await resolveExecutable("grim", this.#env);
-    if (grim === undefined) throw new ContextAttachmentError("context_capture_unavailable", "Screen capture requires grim");
-    const geometry = `${bounds.x},${bounds.y} ${bounds.width}x${bounds.height}`;
-    const captured = await runBinaryCommand(grim, ["-g", geometry, "-t", "png", "-l", "9", "-"], {
-      env: this.#env,
-      timeoutMs: 15_000,
-      maxOutput: 5 * 1024 * 1024
-    });
-    if (captured.code !== 0 || captured.stdout.byteLength === 0)
-      throw new ContextAttachmentError("context_capture_failed", "The selected region could not be captured");
-    const image = await this.#images.save(captured.stdout, "image/png");
+    const image = await this.#captureImage(bounds);
     const anchor = localAnchor === undefined ? undefined : {
       x: target.monitor.x + localAnchor.x,
       y: target.monitor.y + localAnchor.y
@@ -135,6 +131,60 @@ export class ContextAttachmentStore {
     return view;
   }
 
+  async captureBrowser(requestId: string, capture: BrowserCapture): Promise<ContextAttachmentView> {
+    const target = this.#targets.get(requestId);
+    if (target === undefined) throw new ContextAttachmentError("context_expired", "That browser context capture has expired");
+    if (target.window === undefined)
+      throw new ContextAttachmentError("context_geometry", "The browser window geometry is unavailable");
+    if (sensitiveTarget(target))
+      throw new ContextAttachmentError("context_sensitive", "OmaPilot will not capture a password or credential window");
+    if (capture.element.attributes?.type?.trim().toLowerCase() === "password") {
+      this.#targets.delete(requestId);
+      throw new ContextAttachmentError("context_sensitive", "OmaPilot will not capture a password field");
+    }
+
+    const image = await this.#captureImage(target.window);
+    this.#targets.delete(requestId);
+    const text = boundedBrowserText(capture.selection ?? capture.element.text);
+    const element = semanticElementText(capture);
+    const title = (capture.element.name ?? capture.title ?? target.title ?? "Browser element").slice(0, 160);
+    const representations: ContextAttachmentView["representations"] = [
+      { id: "element", kind: "element", label: "Element", preview: elementPreview(capture), confidence: elementConfidence(capture) }
+    ];
+    if (text !== undefined) representations.push({
+      id: "text", kind: "text", label: "Text", preview: text.slice(0, 320),
+      confidence: capture.selection === undefined ? 0.86 : 1
+    });
+    representations.push({ id: "image", kind: "image", label: "Screenshot", confidence: imageConfidence(capture) });
+    const selectedRepresentationIds: ContextAttachmentView["selectedRepresentationIds"] =
+      capture.selection !== undefined ? ["text"]
+        : visualElement(capture) ? ["image"]
+          : elementConfidence(capture) >= 0.9 ? ["element"]
+            : text === undefined ? ["image"] : ["text"];
+    const view: ContextAttachmentView = {
+      version: 1,
+      id: image.id,
+      title,
+      origin: {
+        ...(target.appId === undefined ? {} : { appId: target.appId }),
+        windowTitle: capture.title
+      },
+      previewImage: presentImage(image, this.#paths),
+      representations,
+      selectedRepresentationIds
+    };
+    this.#attachments.set(view.id, {
+      view, image, element,
+      ...(text === undefined ? {} : { text })
+    });
+    while (this.#attachments.size > 8) {
+      const oldest = this.#attachments.keys().next().value;
+      if (oldest === undefined) break;
+      await this.discard(oldest);
+    }
+    return view;
+  }
+
   async resolve(selections: ContextAttachmentSelection[]): Promise<{ blocks: Array<TextBlock | ImageBlock>; attachmentIds: string[] }> {
     const blocks: Array<TextBlock | ImageBlock> = [];
     const attachmentIds: string[] = [];
@@ -153,6 +203,18 @@ export class ContextAttachmentStore {
             `Source application: ${attachment.view.origin.appId ?? "unknown"}`,
             "Representation: locally extracted visible text",
             attachment.text,
+            "END CONTEXT CLIP"
+          ].join("\n")
+        });
+      }
+      if (selection.representationIds.includes("element") && attachment.element !== undefined) {
+        blocks.push({
+          type: "text",
+          text: [
+            `CONTEXT CLIP: ${attachment.view.title}`,
+            `Source application: ${attachment.view.origin.appId ?? "browser"}`,
+            "Representation: bounded semantic browser element",
+            attachment.element,
             "END CONTEXT CLIP"
           ].join("\n")
         });
@@ -216,6 +278,89 @@ export class ContextAttachmentStore {
       return undefined;
     }
   }
+
+  async #captureImage(bounds: Rectangle): Promise<StoredImage> {
+    const grim = await resolveExecutable("grim", this.#env);
+    if (grim === undefined) throw new ContextAttachmentError("context_capture_unavailable", "Screen capture requires grim");
+    const geometry = `${bounds.x},${bounds.y} ${bounds.width}x${bounds.height}`;
+    const captured = await runBinaryCommand(grim, ["-g", geometry, "-t", "png", "-l", "9", "-"], {
+      env: this.#env,
+      timeoutMs: 15_000,
+      maxOutput: 5 * 1024 * 1024
+    });
+    if (captured.code !== 0 || captured.stdout.byteLength === 0)
+      throw new ContextAttachmentError("context_capture_failed", "The selected region could not be captured");
+    return this.#images.save(captured.stdout, "image/png");
+  }
+}
+
+function boundedBrowserText(value?: string): string | undefined {
+  const text = value?.replaceAll(/\s+/gu, " ").trim().slice(0, 12_000);
+  return text === undefined || text === "" ? undefined : text;
+}
+
+function semanticElementText(capture: BrowserCapture): string {
+  const nodes = { count: 0 };
+  const tree = boundedSemanticNode(capture.element.tree, 0, nodes);
+  return JSON.stringify({
+    page: { url: safePageUrl(capture.url), title: capture.title },
+    element: {
+      tag: capture.element.tag,
+      ...(capture.element.role === undefined ? {} : { role: capture.element.role }),
+      ...(capture.element.name === undefined ? {} : { name: capture.element.name }),
+      ...(capture.element.text === undefined ? {} : { text: capture.element.text.slice(0, 12_000) }),
+      ...(capture.element.attributes === undefined ? {} : { attributes: capture.element.attributes }),
+      ancestors: capture.element.ancestors,
+      rect: capture.element.rect,
+      tree
+    }
+  }, null, 2).slice(0, 32_000);
+}
+
+function boundedSemanticNode(node: SemanticNode, depth: number, state: { count: number }): SemanticNode {
+  state.count++;
+  const children = depth >= 4 || state.count >= 80 ? undefined
+    : node.children?.slice(0, 20).flatMap((child) => state.count >= 80 ? [] : [boundedSemanticNode(child, depth + 1, state)]);
+  return {
+    tag: node.tag.slice(0, 40),
+    ...(node.role === undefined ? {} : { role: node.role.slice(0, 80) }),
+    ...(node.name === undefined ? {} : { name: node.name.slice(0, 500) }),
+    ...(node.text === undefined ? {} : { text: node.text.slice(0, 4_000) }),
+    ...(node.attributes === undefined ? {} : { attributes: node.attributes }),
+    ...(children === undefined || children.length === 0 ? {} : { children })
+  };
+}
+
+function safePageUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return "restricted";
+    url.username = "";
+    url.password = "";
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch { return "restricted"; }
+}
+
+function elementPreview(capture: BrowserCapture): string {
+  const identity = capture.element.name ?? capture.element.text ?? capture.element.role ?? capture.element.tag;
+  return `${capture.element.role ?? capture.element.tag}: ${identity}`.replaceAll(/\s+/gu, " ").slice(0, 320);
+}
+
+function elementConfidence(capture: BrowserCapture): number {
+  if (capture.element.role !== undefined || /^(?:a|button|code|pre|table|tr|article|main|nav|input|select|textarea)$/u.test(capture.element.tag)) return 0.96;
+  if (capture.element.name !== undefined) return 0.9;
+  return 0.78;
+}
+
+function visualElement(capture: BrowserCapture): boolean {
+  return /^(?:canvas|video|img|svg)$/u.test(capture.element.tag)
+    && (capture.element.text?.trim() ?? "") === "";
+}
+
+function imageConfidence(capture: BrowserCapture): number {
+  return visualElement(capture) ? 1 : 0.82;
 }
 
 export function textAtPointFromTsv(tsv: string, point?: { x: number; y: number }): string | undefined {

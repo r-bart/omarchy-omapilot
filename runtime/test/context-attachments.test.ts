@@ -105,4 +105,43 @@ describe("explicit context attachments", () => {
     await store.discard(attachment.id);
     await expect(readFile(join(paths.images, `${attachment.id}.png`))).rejects.toMatchObject({ code: "ENOENT" });
   });
+
+  it("turns an explicit browser pick into bounded element, text, and image choices", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-browser-context-")); roots.push(root);
+    const fixtureRoot = resolve("runtime/test/fixtures");
+    const env = {
+      ...process.env,
+      HOME: root,
+      XDG_CACHE_HOME: join(root, "cache"),
+      XDG_STATE_HOME: join(root, "state"),
+      XDG_RUNTIME_DIR: join(root, "run"),
+      PATH: `${join(fixtureRoot, "context-bin")}:${join(fixtureRoot, "image-bin")}:${process.env.PATH ?? ""}`
+    };
+    const paths = quickchatPaths(env);
+    const images = new ImageStore(paths, env);
+    const store = new ContextAttachmentStore(images, paths, env);
+    await store.begin("browser-1", {
+      appId: "chromium", title: "Deployments - Chromium",
+      bounds: { x: 100, y: 80, width: 800, height: 600 }
+    });
+    const attachment = await store.captureBrowser("browser-1", {
+      version: 1, type: "capture.result", requestId: "browser-1",
+      title: "Deployments", url: "https://example.test/deployments?token=secret",
+      element: {
+        tag: "button", role: "button", name: "Retry failed deployment", text: "Retry",
+        ancestors: [{ tag: "main", role: "main" }],
+        rect: { x: 50, y: 90, width: 120, height: 36 },
+        tree: { tag: "button", role: "button", name: "Retry failed deployment", text: "Retry" }
+      }
+    });
+    expect(attachment.representations.map((value) => value.id)).toEqual(["element", "text", "image"]);
+    expect(attachment.selectedRepresentationIds).toEqual(["element"]);
+    const resolved = await store.resolve([{ id: attachment.id, representationIds: ["element", "image"] }]);
+    expect(resolved.blocks[0]).toMatchObject({
+      type: "text",
+      text: expect.stringContaining('"name": "Retry failed deployment"')
+    });
+    expect(resolved.blocks[0]).not.toMatchObject({ text: expect.stringContaining("token=secret") });
+    expect(resolved.blocks[1]).toMatchObject({ type: "image", mimeType: "image/png" });
+  });
 });

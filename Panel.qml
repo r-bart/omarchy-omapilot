@@ -188,6 +188,7 @@ Panel {
       if (!hostShell.summon(root.moduleName, payload))
         Quickchat.QuickchatStore.toastRequested("Context capture overlay could not be opened")
     }
+    function onContextBrowserPickerRequested() { root.closeForExternalHandoff() }
   }
 
   Shortcut {
