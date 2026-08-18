@@ -88,6 +88,10 @@ const contextCancelCommand = z.object({ type: z.literal("context_cancel"), id: z
 const browserCompanionCommand = z.object({
   type: z.enum(["browser_companion_status", "browser_companion_install", "browser_companion_uninstall"])
 }).strict();
+const browserCompanionOpenSettingsCommand = z.object({
+  type: z.literal("browser_companion_open_settings"),
+  family: z.enum(["chromium", "firefox"])
+}).strict();
 const cancelCommand = z.object({ type: z.literal("cancel"), id: z.string().min(1).max(120) });
 const permissionResponseCommand = z.object({
   type: z.literal("permission_response"),
@@ -107,6 +111,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   contextCaptureCommand,
   contextCancelCommand,
   browserCompanionCommand,
+  browserCompanionOpenSettingsCommand,
   contextDiscardCommand,
   cancelCommand,
   permissionResponseCommand,
@@ -205,7 +210,7 @@ export type BrokerEvent =
   | { type: "context_picker"; id: string; browser: string; title: string; url: string }
   | { type: "context_notice"; id: string; message: string }
   | { type: "context_attachment"; requestId: string; attachment: ContextAttachmentView }
-  | { type: "browser_companion"; phase: "ready" | "installing" | "removing" | "failed"; relayInstalled: boolean; setupAvailable: boolean; chromiumConnected: boolean; firefoxConnected: boolean; message?: string }
+  | { type: "browser_companion"; phase: "ready" | "installing" | "removing" | "failed"; relayInstalled: boolean; setupAvailable: boolean; chromiumConnected: boolean; firefoxConnected: boolean; chromiumExtensionPath: string; firefoxExtensionPath: string; message?: string }
   | { type: "complete"; chat: ChatView }
   | { type: "complete"; id: string; answer: string }
   | { type: "error"; id?: string; code: string; message: string; retryable: boolean }

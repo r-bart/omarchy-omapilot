@@ -57,7 +57,8 @@ Scope {
   property string pendingContextRequestId: ""
   property var browserCompanionStatus: ({
     phase: "ready", relayInstalled: false, setupAvailable: false,
-    chromiumConnected: false, firefoxConnected: false, message: ""
+    chromiumConnected: false, firefoxConnected: false,
+    chromiumExtensionPath: "", firefoxExtensionPath: "", message: ""
   })
 
   readonly property bool busy: state === "preparing" || state === "dictating" || state === "streaming" || state === "stopping"
@@ -234,6 +235,17 @@ Scope {
   function uninstallBrowserCompanion() {
     if (browserCompanionBusy) return
     sendCommand(Protocol.command("browser_companion_uninstall"))
+  }
+
+  function openBrowserCompanionSettings(family) {
+    var selected = family === "firefox" ? "firefox" : "chromium"
+    sendCommand(Protocol.command("browser_companion_open_settings", { family: selected }))
+  }
+
+  function copyBrowserCompanionPath(family) {
+    var path = family === "firefox" ? browserCompanionStatus.firefoxExtensionPath
+      : browserCompanionStatus.chromiumExtensionPath
+    if (String(path || "") !== "") copyText(path)
   }
 
   function captureContext(requestId, mode, region, anchor) {

@@ -1,12 +1,17 @@
 import { access } from "node:fs/promises";
 import { constants } from "node:fs";
+import { spawn } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { runCommand } from "./process.js";
+import { resolveExecutable, runCommand } from "./process.js";
+
+export type BrowserFamily = "chromium" | "firefox";
 
 export type BrowserCompanionSetupStatus = {
   relayInstalled: boolean;
   setupAvailable: boolean;
+  chromiumExtensionPath: string;
+  firefoxExtensionPath: string;
 };
 
 function repositoryRoot(): string {
@@ -37,7 +42,12 @@ export async function browserCompanionSetupStatus(
   const [relayInstalled, setupAvailable] = await Promise.all([
     executable(relayPath(env)), executable(installer)
   ]);
-  return { relayInstalled, setupAvailable };
+  return {
+    relayInstalled,
+    setupAvailable,
+    chromiumExtensionPath: resolve(root, "browser-companion/dist/chromium"),
+    firefoxExtensionPath: resolve(root, "browser-companion/dist/firefox")
+  };
 }
 
 export async function installBrowserCompanion(
@@ -62,4 +72,28 @@ export async function uninstallBrowserCompanion(
     env, cwd: root, timeoutMs: 30_000, maxOutput: 64_000
   });
   return result.code === 0;
+}
+
+export async function openBrowserCompanionSettings(
+  family: BrowserFamily,
+  env: NodeJS.ProcessEnv
+): Promise<boolean> {
+  const candidates = family === "firefox"
+    ? ["firefox", "zen-browser", "zen", "librewolf"]
+    : ["chromium", "chromium-browser", "google-chrome-stable", "google-chrome", "brave", "brave-browser", "microsoft-edge-stable", "vivaldi-stable", "helium"];
+  let executablePath: string | undefined;
+  for (const candidate of candidates) {
+    executablePath = await resolveExecutable(candidate, env);
+    if (executablePath !== undefined) break;
+  }
+  if (executablePath === undefined) return false;
+  const url = family === "firefox" ? "about:debugging#/runtime/this-firefox" : "chrome://extensions";
+  return new Promise<boolean>((resolveLaunch) => {
+    const child = spawn(executablePath, [url], { env, stdio: "ignore", detached: true });
+    child.once("error", () => resolveLaunch(false));
+    child.once("spawn", () => {
+      child.unref();
+      resolveLaunch(true);
+    });
+  });
 }

@@ -14,7 +14,13 @@ import { resolveExecutable, runCommand } from "./process.js";
 import type { BrokerCommand, BrokerEvent, ChatRecord, ProviderId, ProviderInfo } from "./types.js";
 import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import { BrowserCompanionServer, type BrowserCapture } from "./browser-companion.js";
-import { browserCompanionSetupStatus, installBrowserCompanion, uninstallBrowserCompanion } from "./browser-companion-setup.js";
+import {
+  browserCompanionSetupStatus,
+  installBrowserCompanion,
+  openBrowserCompanionSettings,
+  uninstallBrowserCompanion,
+  type BrowserFamily
+} from "./browser-companion-setup.js";
 
 type DictationClient = Pick<DictationService, "start" | "stop" | "cancel">;
 type SessionCleaner = (provider: DiscoveredProvider, sessionId: string) => Promise<boolean>;
@@ -43,6 +49,8 @@ export class QuickchatBroker {
   #submissions = new Set<string>();
   #dictationGeneration = 0;
   #browserCompanionSetupBusy = false;
+  #browserCompanionSetupPhase: "installing" | "removing" | undefined;
+  #browserCompanionStatusRevision = 0;
 
   constructor(
     emit: (event: BrokerEvent) => void,
@@ -79,6 +87,7 @@ export class QuickchatBroker {
       case "browser_companion_status": await this.#emitBrowserCompanionStatus(); break;
       case "browser_companion_install": await this.#installBrowserCompanion(); break;
       case "browser_companion_uninstall": await this.#uninstallBrowserCompanion(); break;
+      case "browser_companion_open_settings": await this.#openBrowserCompanionSettings(command.family); break;
       case "cancel": await this.#cancel(command.id); break;
       case "permission_response": this.#respondPermission(command); break;
       case "history_list": await this.#emitHistory(); break;
@@ -263,20 +272,23 @@ export class QuickchatBroker {
   }
 
   async #emitBrowserCompanionStatus(
-    phase: "ready" | "installing" | "removing" | "failed" = "ready",
+    phase?: "ready" | "installing" | "removing" | "failed",
     message?: string
   ): Promise<void> {
+    const revision = ++this.#browserCompanionStatusRevision;
     const setup = await browserCompanionSetupStatus(this.#env);
+    if (revision !== this.#browserCompanionStatusRevision) return;
     const connected = this.#browserCompanion.status();
-    this.#emit({ type: "browser_companion", phase, ...setup, ...connected,
+    this.#emit({ type: "browser_companion", phase: phase ?? this.#browserCompanionSetupPhase ?? "ready", ...setup, ...connected,
       ...(message === undefined ? {} : { message }) });
   }
 
   async #installBrowserCompanion(): Promise<void> {
     if (this.#browserCompanionSetupBusy) return;
     this.#browserCompanionSetupBusy = true;
-    await this.#emitBrowserCompanionStatus("installing");
+    this.#browserCompanionSetupPhase = "installing";
     try {
+      await this.#emitBrowserCompanionStatus();
       const installed = await installBrowserCompanion(this.#env);
       await this.#emitBrowserCompanionStatus(installed ? "ready" : "failed", installed
         ? "Browser companion installed. Restart your browser, then enable access from its OmaPilot extension icon."
@@ -285,14 +297,16 @@ export class QuickchatBroker {
       await this.#emitBrowserCompanionStatus("failed", "Browser companion setup could not finish. Retry from Settings; no terminal setup is required.");
     } finally {
       this.#browserCompanionSetupBusy = false;
+      this.#browserCompanionSetupPhase = undefined;
     }
   }
 
   async #uninstallBrowserCompanion(): Promise<void> {
     if (this.#browserCompanionSetupBusy) return;
     this.#browserCompanionSetupBusy = true;
-    await this.#emitBrowserCompanionStatus("removing");
+    this.#browserCompanionSetupPhase = "removing";
     try {
+      await this.#emitBrowserCompanionStatus();
       const removed = await uninstallBrowserCompanion(this.#env);
       if (removed) this.#browserCompanion.disconnect();
       await this.#emitBrowserCompanionStatus(removed ? "ready" : "failed", removed
@@ -302,7 +316,15 @@ export class QuickchatBroker {
       await this.#emitBrowserCompanionStatus("failed", "Browser context removal could not finish. Retry from Settings before removing OmaPilot.");
     } finally {
       this.#browserCompanionSetupBusy = false;
+      this.#browserCompanionSetupPhase = undefined;
     }
+  }
+
+  async #openBrowserCompanionSettings(family: BrowserFamily): Promise<void> {
+    const opened = await openBrowserCompanionSettings(family, this.#env);
+    await this.#emitBrowserCompanionStatus(undefined, opened
+      ? `${family === "firefox" ? "Firefox" : "Chromium"} extension settings opened.`
+      : `No supported ${family === "firefox" ? "Firefox" : "Chromium"} browser was found.`);
   }
 
   #contextError(error: unknown, id: string): void {

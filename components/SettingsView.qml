@@ -15,10 +15,16 @@ Item {
   property color accent: Color.accent
   property string fontFamily: Style.font.family
   readonly property var modeProviders: backend ? backend.providers : []
-  readonly property var browserCompanion: backend ? backend.browserCompanionStatus : ({})
-  readonly property bool browserCompanionConnected: backend && backend.browserCompanionConnected
-  readonly property bool browserCompanionBusy: backend && backend.browserCompanionBusy
+  readonly property var browserCompanion: backend && backend.browserCompanionStatus
+    ? backend.browserCompanionStatus : ({
+      phase: "ready", relayInstalled: false, setupAvailable: false,
+      chromiumConnected: false, firefoxConnected: false,
+      chromiumExtensionPath: "", firefoxExtensionPath: "", message: ""
+    })
+  readonly property bool browserCompanionConnected: backend ? backend.browserCompanionConnected === true : false
+  readonly property bool browserCompanionBusy: backend ? backend.browserCompanionBusy === true : false
   property bool browserRemoveConfirmation: false
+  property bool browserSetupExpanded: false
   readonly property bool popupOpen: providerPicker.popupOpen || modelPicker.popupOpen
 
   signal dangerousAutoApproveRequested(bool enabled)
@@ -28,6 +34,8 @@ Item {
   signal browserCompanionInstallRequested()
   signal browserCompanionUninstallRequested()
   signal browserCompanionRefreshRequested()
+  signal browserCompanionOpenSettingsRequested(string family)
+  signal browserCompanionCopyPathRequested(string family)
   signal recentChatsRequested()
   signal dismissed()
 
@@ -260,7 +268,10 @@ Item {
               enabled: root.backend && !root.browserCompanionBusy
                 && root.browserCompanion.setupAvailable === true
               Accessible.name: tooltipText
-              onClicked: root.browserCompanionInstallRequested()
+              onClicked: {
+                root.browserSetupExpanded = true
+                root.browserCompanionInstallRequested()
+              }
             }
 
             Button {
@@ -274,6 +285,116 @@ Item {
               enabled: root.backend && !root.browserCompanionBusy
               Accessible.name: tooltipText
               onClicked: root.browserCompanionRefreshRequested()
+            }
+          }
+
+          Button {
+            Layout.fillWidth: true
+            visible: root.browserCompanion.relayInstalled === true
+            text: root.browserSetupExpanded ? "Hide setup details" : (root.browserCompanionConnected ? "Browser setup details" : "Finish browser setup")
+            tooltipText: "Open browser extension settings and show the bundled extension folders"
+            foreground: root.foreground
+            background: root.background
+            bordered: true
+            focusable: true
+            enabled: !root.browserCompanionBusy
+            Accessible.name: tooltipText
+            onClicked: root.browserSetupExpanded = !root.browserSetupExpanded
+          }
+
+          ColumnLayout {
+            Layout.fillWidth: true
+            visible: root.browserSetupExpanded && root.browserCompanion.relayInstalled === true
+            spacing: Style.spacing.lg
+
+            Text {
+              Layout.fillWidth: true
+              text: "Chromium-family browsers"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.bold: true
+            }
+
+            Text {
+              Layout.fillWidth: true
+              text: "Restart the browser first. If the extension is not loaded, open Extensions, enable Developer mode, choose Load unpacked, and select the bundled Chromium folder."
+              color: Qt.darker(root.foreground, 1.45)
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.Wrap
+            }
+
+            RowLayout {
+              Layout.fillWidth: true
+              spacing: Style.spacing.md
+
+              Button {
+                Layout.fillWidth: true
+                text: "Open Chromium extensions"
+                foreground: root.foreground
+                background: root.background
+                bordered: true
+                focusable: true
+                Accessible.name: text
+                onClicked: root.browserCompanionOpenSettingsRequested("chromium")
+              }
+
+              Button {
+                text: "Copy folder"
+                foreground: root.foreground
+                background: root.background
+                bordered: true
+                focusable: true
+                enabled: root.browserCompanion.chromiumExtensionPath !== ""
+                Accessible.name: "Copy Chromium extension folder path"
+                onClicked: root.browserCompanionCopyPathRequested("chromium")
+              }
+            }
+
+            Text {
+              Layout.fillWidth: true
+              text: "Firefox and Zen"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.bold: true
+            }
+
+            Text {
+              Layout.fillWidth: true
+              text: "Open This Firefox, choose Load Temporary Add-on, then select manifest.json from the bundled Firefox folder. Repeat after each browser restart until a signed store build is available."
+              color: Qt.darker(root.foreground, 1.45)
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.Wrap
+            }
+
+            RowLayout {
+              Layout.fillWidth: true
+              spacing: Style.spacing.md
+
+              Button {
+                Layout.fillWidth: true
+                text: "Open Firefox debugging"
+                foreground: root.foreground
+                background: root.background
+                bordered: true
+                focusable: true
+                Accessible.name: text
+                onClicked: root.browserCompanionOpenSettingsRequested("firefox")
+              }
+
+              Button {
+                text: "Copy folder"
+                foreground: root.foreground
+                background: root.background
+                bordered: true
+                focusable: true
+                enabled: root.browserCompanion.firefoxExtensionPath !== ""
+                Accessible.name: "Copy Firefox extension folder path"
+                onClicked: root.browserCompanionCopyPathRequested("firefox")
+              }
             }
           }
 

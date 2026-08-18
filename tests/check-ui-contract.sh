@@ -141,9 +141,20 @@ grep -Fq 'text: root.browserCompanion.relayInstalled === true ? "Repair browser 
 grep -Fq 'onBrowserCompanionInstallRequested:' "$repo_dir/Panel.qml"
 grep -Fq 'Protocol.command("browser_companion_install")' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'Protocol.command("browser_companion_uninstall")' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'Protocol.command("browser_companion_open_settings", { family: selected })' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'text: "Open Firefox debugging"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'Accessible.name: "Copy Firefox extension folder path"' \
+  "$repo_dir/components/SettingsView.qml"
 grep -Fq 'text: root.browserRemoveConfirmation ? "Confirm removal" : "Remove browser context"' \
   "$repo_dir/components/SettingsView.qml"
 grep -Fq 'onDangerousAutoApproveRequested:' "$repo_dir/Panel.qml"
+awk '
+  /function close\(\)/ { inside = 1; cleared = 0 }
+  inside && /Quickchat\.QuickchatStore\.clearContextAttachments\(\)/ { cleared = 1 }
+  inside && /root\.controller\.hide\(\)/ { if (!cleared) exit 1; found = 1; exit }
+  END { if (!found) exit 1 }
+' "$repo_dir/Panel.qml"
 grep -Fq 'backend.submit(draftText)' \
   "$repo_dir/components/Composer.qml"
 grep -Fq 'var autoApprove = configuredDangerousAutoApprove' \

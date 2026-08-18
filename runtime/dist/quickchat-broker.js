@@ -10,7 +10,7 @@ import { createInterface as createInterface2 } from "node:readline";
 
 // runtime/src/broker.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
-import { spawn as spawn4 } from "node:child_process";
+import { spawn as spawn5 } from "node:child_process";
 
 // runtime/src/acp.ts
 import { spawn as spawn2 } from "node:child_process";
@@ -20271,8 +20271,10 @@ var BrowserCompanionServer = class {
   #sockets = /* @__PURE__ */ new Set();
   #sessions = /* @__PURE__ */ new Set();
   #pendingProbes = /* @__PURE__ */ new Map();
+  #armedCaptures = /* @__PURE__ */ new Map();
   #server;
   #ready;
+  #closing = false;
   constructor(env, callbacks) {
     const configuredRuntimeRoot = env.XDG_RUNTIME_DIR?.trim();
     const runtimeRoot = configuredRuntimeRoot === void 0 || configuredRuntimeRoot === "" ? join7(env.HOME ?? "/tmp", ".cache") : configuredRuntimeRoot;
@@ -20316,7 +20318,10 @@ var BrowserCompanionServer = class {
       this.#pendingProbes.delete(requestId);
       pending.resolve({ status: "unavailable" });
     }
-    for (const session of this.#sessions)
+    const armed = this.#armedCaptures.get(requestId);
+    this.#armedCaptures.delete(requestId);
+    if (armed !== void 0) this.#send(armed.socket, { version: 1, type: "capture.cancel", requestId });
+    else for (const session of this.#sessions)
       this.#send(session.socket, { version: 1, type: "capture.cancel", requestId });
   }
   disconnect() {
@@ -20325,12 +20330,14 @@ var BrowserCompanionServer = class {
       pending.resolve({ status: "unavailable" });
     }
     this.#pendingProbes.clear();
+    this.#armedCaptures.clear();
     for (const socket of this.#sockets) socket.destroy();
     this.#sockets.clear();
     this.#sessions.clear();
-    this.#callbacks.statusChanged?.();
+    if (!this.#closing) this.#callbacks.statusChanged?.();
   }
   async close() {
+    this.#closing = true;
     this.disconnect();
     const server = this.#server;
     this.#server = void 0;
@@ -20388,7 +20395,7 @@ var BrowserCompanionServer = class {
           session = { socket, family: message.family, browser: message.browser };
           this.#sessions.add(session);
           this.#send(socket, { version: 1, type: "hello.ack" });
-          this.#callbacks.statusChanged?.();
+          if (!this.#closing) this.#callbacks.statusChanged?.();
           continue;
         }
         if (session === void 0) {
@@ -20402,7 +20409,13 @@ var BrowserCompanionServer = class {
       this.#sockets.delete(socket);
       if (session !== void 0) {
         this.#sessions.delete(session);
-        this.#callbacks.statusChanged?.();
+        for (const [requestId, armed] of this.#armedCaptures) {
+          if (armed !== session) continue;
+          this.#armedCaptures.delete(requestId);
+          if (!this.#closing)
+            this.#callbacks.error(requestId, "The browser companion disconnected before capture completed");
+        }
+        if (!this.#closing) this.#callbacks.statusChanged?.();
       }
     });
     socket.on("error", () => socket.destroy());
@@ -20414,9 +20427,13 @@ var BrowserCompanionServer = class {
       pending.responses.push({ session, probe: message });
       return;
     }
-    if (message.type === "capture.result") void this.#callbacks.capture(message);
-    else if (message.type === "capture.cancelled") this.#callbacks.cancelled(message.requestId);
-    else if (message.type === "capture.error") this.#callbacks.error(message.requestId, message.reason);
+    if (message.type === "capture.result" || message.type === "capture.cancelled" || message.type === "capture.error") {
+      if (this.#armedCaptures.get(message.requestId) !== session) return;
+      this.#armedCaptures.delete(message.requestId);
+      if (message.type === "capture.result") void this.#callbacks.capture(message);
+      else if (message.type === "capture.cancelled") this.#callbacks.cancelled(message.requestId);
+      else this.#callbacks.error(message.requestId, message.reason);
+    }
   }
   #finishProbe(requestId) {
     const pending = this.#pendingProbes.get(requestId);
@@ -20429,10 +20446,17 @@ var BrowserCompanionServer = class {
     }
     available.sort((left, right) => titleScore(right.probe.title, pending.targetTitle) - titleScore(left.probe.title, pending.targetTitle));
     const selected = available[0];
-    if (selected === void 0 || selected.probe.title === void 0 || selected.probe.url === void 0) {
+    if (selected === void 0 || selected.session.socket.destroyed || selected.probe.title === void 0 || selected.probe.url === void 0) {
       pending.resolve({ status: "unavailable" });
       return;
     }
+    const cancelledSessions = /* @__PURE__ */ new Set();
+    for (const candidate of available) {
+      if (candidate.session === selected.session || cancelledSessions.has(candidate.session)) continue;
+      cancelledSessions.add(candidate.session);
+      this.#send(candidate.session.socket, { version: 1, type: "capture.cancel", requestId });
+    }
+    this.#armedCaptures.set(requestId, selected.session);
     this.#send(selected.session.socket, { version: 1, type: "capture.arm", requestId });
     pending.resolve({
       status: "armed",
@@ -20468,6 +20492,7 @@ function titleScore(candidate, target) {
 // runtime/src/browser-companion-setup.ts
 import { access as access3 } from "node:fs/promises";
 import { constants as constants3 } from "node:fs";
+import { spawn as spawn4 } from "node:child_process";
 import { dirname as dirname3, join as join8, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 function repositoryRoot() {
@@ -20491,7 +20516,12 @@ async function browserCompanionSetupStatus(env, root = repositoryRoot()) {
     executable(relayPath(env)),
     executable(installer)
   ]);
-  return { relayInstalled, setupAvailable };
+  return {
+    relayInstalled,
+    setupAvailable,
+    chromiumExtensionPath: resolve2(root, "browser-companion/dist/chromium"),
+    firefoxExtensionPath: resolve2(root, "browser-companion/dist/firefox")
+  };
 }
 async function installBrowserCompanion(env, root = repositoryRoot()) {
   const installer = resolve2(root, "scripts/install-browser-companion.sh");
@@ -20515,6 +20545,24 @@ async function uninstallBrowserCompanion(env, root = repositoryRoot()) {
   });
   return result.code === 0;
 }
+async function openBrowserCompanionSettings(family, env) {
+  const candidates = family === "firefox" ? ["firefox", "zen-browser", "zen", "librewolf"] : ["chromium", "chromium-browser", "google-chrome-stable", "google-chrome", "brave", "brave-browser", "microsoft-edge-stable", "vivaldi-stable", "helium"];
+  let executablePath;
+  for (const candidate of candidates) {
+    executablePath = await resolveExecutable(candidate, env);
+    if (executablePath !== void 0) break;
+  }
+  if (executablePath === void 0) return false;
+  const url2 = family === "firefox" ? "about:debugging#/runtime/this-firefox" : "chrome://extensions";
+  return new Promise((resolveLaunch) => {
+    const child = spawn4(executablePath, [url2], { env, stdio: "ignore", detached: true });
+    child.once("error", () => resolveLaunch(false));
+    child.once("spawn", () => {
+      child.unref();
+      resolveLaunch(true);
+    });
+  });
+}
 
 // runtime/src/broker.ts
 var QuickchatBroker = class {
@@ -20535,6 +20583,8 @@ var QuickchatBroker = class {
   #submissions = /* @__PURE__ */ new Set();
   #dictationGeneration = 0;
   #browserCompanionSetupBusy = false;
+  #browserCompanionSetupPhase;
+  #browserCompanionStatusRevision = 0;
   constructor(emit2, options = {}) {
     this.#emit = emit2;
     this.#history = options.history ?? new HistoryStore();
@@ -20586,6 +20636,9 @@ var QuickchatBroker = class {
         break;
       case "browser_companion_uninstall":
         await this.#uninstallBrowserCompanion();
+        break;
+      case "browser_companion_open_settings":
+        await this.#openBrowserCompanionSettings(command.family);
         break;
       case "cancel":
         await this.#cancel(command.id);
@@ -20798,12 +20851,14 @@ var QuickchatBroker = class {
       this.#contextError(error48, command.id);
     }
   }
-  async #emitBrowserCompanionStatus(phase = "ready", message) {
+  async #emitBrowserCompanionStatus(phase, message) {
+    const revision = ++this.#browserCompanionStatusRevision;
     const setup = await browserCompanionSetupStatus(this.#env);
+    if (revision !== this.#browserCompanionStatusRevision) return;
     const connected = this.#browserCompanion.status();
     this.#emit({
       type: "browser_companion",
-      phase,
+      phase: phase ?? this.#browserCompanionSetupPhase ?? "ready",
       ...setup,
       ...connected,
       ...message === void 0 ? {} : { message }
@@ -20812,21 +20867,24 @@ var QuickchatBroker = class {
   async #installBrowserCompanion() {
     if (this.#browserCompanionSetupBusy) return;
     this.#browserCompanionSetupBusy = true;
-    await this.#emitBrowserCompanionStatus("installing");
+    this.#browserCompanionSetupPhase = "installing";
     try {
+      await this.#emitBrowserCompanionStatus();
       const installed = await installBrowserCompanion(this.#env);
       await this.#emitBrowserCompanionStatus(installed ? "ready" : "failed", installed ? "Browser companion installed. Restart your browser, then enable access from its OmaPilot extension icon." : "Browser companion setup failed. Check that Node.js and jq are installed, then try again.");
     } catch {
       await this.#emitBrowserCompanionStatus("failed", "Browser companion setup could not finish. Retry from Settings; no terminal setup is required.");
     } finally {
       this.#browserCompanionSetupBusy = false;
+      this.#browserCompanionSetupPhase = void 0;
     }
   }
   async #uninstallBrowserCompanion() {
     if (this.#browserCompanionSetupBusy) return;
     this.#browserCompanionSetupBusy = true;
-    await this.#emitBrowserCompanionStatus("removing");
+    this.#browserCompanionSetupPhase = "removing";
     try {
+      await this.#emitBrowserCompanionStatus();
       const removed = await uninstallBrowserCompanion(this.#env);
       if (removed) this.#browserCompanion.disconnect();
       await this.#emitBrowserCompanionStatus(removed ? "ready" : "failed", removed ? "Browser context removed. Restart open browsers to unload the extension." : "Browser context removal could not finish. Retry from Settings before removing OmaPilot.");
@@ -20834,7 +20892,12 @@ var QuickchatBroker = class {
       await this.#emitBrowserCompanionStatus("failed", "Browser context removal could not finish. Retry from Settings before removing OmaPilot.");
     } finally {
       this.#browserCompanionSetupBusy = false;
+      this.#browserCompanionSetupPhase = void 0;
     }
+  }
+  async #openBrowserCompanionSettings(family) {
+    const opened = await openBrowserCompanionSettings(family, this.#env);
+    await this.#emitBrowserCompanionStatus(void 0, opened ? `${family === "firefox" ? "Firefox" : "Chromium"} extension settings opened.` : `No supported ${family === "firefox" ? "Firefox" : "Chromium"} browser was found.`);
   }
   #contextError(error48, id) {
     if (error48 instanceof ContextAttachmentError || error48 instanceof ImagePolicyError) {
@@ -20968,7 +21031,7 @@ var QuickchatBroker = class {
       return;
     }
     const copied = await new Promise((resolveCopy) => {
-      const child = spawn4(copy, [], { env: this.#env, stdio: ["pipe", "ignore", "ignore"] });
+      const child = spawn5(copy, [], { env: this.#env, stdio: ["pipe", "ignore", "ignore"] });
       child.stdin.end(text2);
       child.once("error", () => resolveCopy(false));
       child.once("close", (code) => resolveCopy(code === 0));
@@ -21079,6 +21142,10 @@ var contextCancelCommand = external_exports.object({ type: external_exports.lite
 var browserCompanionCommand = external_exports.object({
   type: external_exports.enum(["browser_companion_status", "browser_companion_install", "browser_companion_uninstall"])
 }).strict();
+var browserCompanionOpenSettingsCommand = external_exports.object({
+  type: external_exports.literal("browser_companion_open_settings"),
+  family: external_exports.enum(["chromium", "firefox"])
+}).strict();
 var cancelCommand = external_exports.object({ type: external_exports.literal("cancel"), id: external_exports.string().min(1).max(120) });
 var permissionResponseCommand = external_exports.object({
   type: external_exports.literal("permission_response"),
@@ -21097,6 +21164,7 @@ var commandSchema = external_exports.discriminatedUnion("type", [
   contextCaptureCommand,
   contextCancelCommand,
   browserCompanionCommand,
+  browserCompanionOpenSettingsCommand,
   contextDiscardCommand,
   cancelCommand,
   permissionResponseCommand,

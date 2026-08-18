@@ -4,6 +4,7 @@ const SCRIPT_PREFIX = "omapilot-site-";
 let nativePort;
 let reconnectTimer;
 const registrationJobs = new Map();
+const captureTabs = new Map();
 
 function browserFamily() {
   // Chromium may expose a `browser` compatibility namespace and user-agent
@@ -63,6 +64,7 @@ async function sendToPicker(tabId, message) {
 async function handleNativeMessage(message) {
   if (!message || message.version !== 1 || typeof message.requestId !== "string") return;
   if (message.type === "probe") {
+    captureTabs.delete(message.requestId);
     const tab = await activeTab();
     if (!tab || typeof tab.id !== "number" || tab.incognito) {
       sendNative({ version: 1, type: "probe.result", requestId: message.requestId, available: false, reason: "No eligible active tab" });
@@ -70,6 +72,10 @@ async function handleNativeMessage(message) {
     }
     try {
       const result = await sendToPicker(tab.id, { version: 1, type: "probe", requestId: message.requestId });
+      if (result?.available === true) captureTabs.set(message.requestId, {
+        tabId: tab.id,
+        url: typeof result.url === "string" ? result.url.slice(0, 8192) : undefined
+      });
       sendNative({
         version: 1, type: "probe.result", requestId: message.requestId,
         available: result?.available === true,
@@ -83,11 +89,19 @@ async function handleNativeMessage(message) {
     return;
   }
   if (message.type === "capture.arm" || message.type === "capture.cancel") {
-    const tab = await activeTab();
-    if (!tab || typeof tab.id !== "number") return;
+    const capture = captureTabs.get(message.requestId);
+    if (!capture) {
+      if (message.type === "capture.arm") sendNative({
+        version: 1, type: "capture.error", requestId: message.requestId,
+        reason: "The probed browser tab is no longer available"
+      });
+      return;
+    }
     try {
-      await sendToPicker(tab.id, message);
+      await sendToPicker(capture.tabId, message);
+      if (message.type === "capture.cancel") captureTabs.delete(message.requestId);
     } catch {
+      captureTabs.delete(message.requestId);
       if (message.type === "capture.arm") sendNative({
         version: 1, type: "capture.error", requestId: message.requestId,
         reason: "The page picker is unavailable on this tab"
@@ -96,9 +110,15 @@ async function handleNativeMessage(message) {
   }
 }
 
-api.runtime.onMessage.addListener((message) => {
+api.runtime.onMessage.addListener((message, sender) => {
   if (!message || message.version !== 1) return undefined;
   if (message.type === "picker.result" || message.type === "picker.cancelled" || message.type === "picker.error") {
+    const capture = typeof message.requestId === "string" ? captureTabs.get(message.requestId) : undefined;
+    if (!capture || sender?.tab?.id !== capture.tabId || (sender.frameId !== undefined && sender.frameId !== 0))
+      return Promise.resolve({ accepted: false });
+    if (message.type === "picker.result" && capture.url !== undefined && message.url !== capture.url)
+      return Promise.resolve({ accepted: false });
+    captureTabs.delete(message.requestId);
     const type = message.type === "picker.result" ? "capture.result"
       : message.type === "picker.cancelled" ? "capture.cancelled" : "capture.error";
     sendNative({ ...message, type });

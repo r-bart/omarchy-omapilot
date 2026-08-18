@@ -58,12 +58,15 @@ TestCase {
   function test_browserCompanionStatusDefaultsFailClosed() {
     var status = Protocol.normalizedBrowserCompanion({
       phase: "installing", relayInstalled: true, chromiumConnected: true,
-      firefoxConnected: "yes", message: "Restart\nthe browser"
+      firefoxConnected: "yes", chromiumExtensionPath: "/plugin/chromium",
+      firefoxExtensionPath: "/plugin/firefox", message: "Restart\nthe browser"
     })
     compare(status.phase, "installing")
     verify(status.relayInstalled)
     verify(status.chromiumConnected)
     verify(!status.firefoxConnected)
+    compare(status.chromiumExtensionPath, "/plugin/chromium")
+    compare(status.firefoxExtensionPath, "/plugin/firefox")
     compare(status.message, "Restart the browser")
     compare(Protocol.normalizedBrowserCompanion({ phase: "unknown" }).phase, "ready")
     compare(Protocol.normalizedBrowserCompanion({ phase: "removing" }).phase, "removing")

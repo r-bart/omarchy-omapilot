@@ -60,16 +60,19 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
   UUID and selected representation IDs. It cannot provide an image path,
   base64 payload, OCR text, or raw DOM. The broker resolves the retained value,
   frames text and pixels as untrusted observational data, and deletes input
-  images after submission or removal. Provider-native sessions may retain the
+  images after submission, explicit removal, new chat, or ordinary panel
+  dismissal. Provider-native sessions may retain the
   selected clip even though OmaPilot does not add it to chat JSON.
 - The optional browser companion is separately and reversibly installed. Its
   extension has no `tabs`, `history`, `debugger`, cookie, or web-request
   permission and exposes no page-mutation command. A browser-side user gesture grants an optional origin;
   an inert picker is registered only there. During an explicit context request,
-  the broker probes permitted active pages, arms one title-matched page, and
-  receives one clicked result through an extension-ID-allowlisted native host
+  the broker probes permitted active pages, binds the request to one exact tab
+  and title-matched native-relay session, and accepts the clicked result only
+  from those same endpoints through an extension-ID-allowlisted native host
   and a mode-0600 per-login Unix socket. It never streams tab changes or browsing
-  history. The extension strips editable and password values, hidden nodes,
+  history. The extension strips editable subtrees, their accessible-name and
+  selection fallbacks, password values, hidden nodes,
   scripts, styles, event attributes, URL credentials, query strings, and
   fragments. The broker independently validates and caps the semantic tree,
   frames it as untrusted observational data, and exposes no browser action or

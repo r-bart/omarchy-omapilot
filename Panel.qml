@@ -130,6 +130,7 @@ Panel {
   function close() {
     setCenterHoverRevealSuppressed(false)
     previewSource = ""
+    Quickchat.QuickchatStore.clearContextAttachments()
     Quickchat.QuickchatStore.clearDesktopContextLatch()
     root.controller.hide()
     if (hostWidget) Qt.callLater(function() {
@@ -683,6 +684,8 @@ Panel {
         onBrowserCompanionInstallRequested: Quickchat.QuickchatStore.installBrowserCompanion()
         onBrowserCompanionUninstallRequested: Quickchat.QuickchatStore.uninstallBrowserCompanion()
         onBrowserCompanionRefreshRequested: Quickchat.QuickchatStore.requestBrowserCompanionStatus()
+        onBrowserCompanionOpenSettingsRequested: function(family) { Quickchat.QuickchatStore.openBrowserCompanionSettings(family) }
+        onBrowserCompanionCopyPathRequested: function(family) { Quickchat.QuickchatStore.copyBrowserCompanionPath(family) }
         onRecentChatsRequested: root.openHistory()
         onDismissed: root.showChat()
       }

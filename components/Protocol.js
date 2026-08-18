@@ -128,6 +128,8 @@ function normalizedBrowserCompanion(raw) {
     setupAvailable: source.setupAvailable === true,
     chromiumConnected: source.chromiumConnected === true,
     firefoxConnected: source.firefoxConnected === true,
+    chromiumExtensionPath: safeContextText(source.chromiumExtensionPath, 4096),
+    firefoxExtensionPath: safeContextText(source.firefoxExtensionPath, 4096),
     message: safeContextText(source.message, 240)
   }
 }

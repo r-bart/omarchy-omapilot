@@ -226,7 +226,11 @@ on this site** once for each site where DOM capture should be available.
 
 Firefox and Zen development builds still require browser confirmation to load
 `browser-companion/dist/firefox` temporarily; browsers do not allow another
-application to silently install an unsigned temporary extension.
+application to silently install an unsigned temporary extension. Expand
+**Finish browser setup** in OmaPilot settings to open the correct Chromium or
+Firefox extension page and copy the matching bundled folder path. The same
+controls remain available as a manual fallback when a Chromium-family browser
+does not honor its unpacked-extension flag.
 
 The script remains available for development, diagnostics, and removal:
 
@@ -273,9 +277,11 @@ wire contract and release from the existing source; they do not require a
 separate source repository.
 
 The element representation is a capped semantic tree—not raw `outerHTML`—and
-omits editable values, password content, hidden nodes, scripts, styles, event
-handlers, query strings, and fragments. Browser actions remain out of scope;
-they would need their own inspectable per-action approval boundary.
+omits editable values, editable accessible-name fallbacks, selections rooted in
+editable content, password content, hidden nodes, scripts, styles, event
+handlers, query strings, and fragments. Each capture remains bound to the exact
+tab and native-relay session that answered its probe. Browser actions remain
+out of scope; they would need their own inspectable per-action approval boundary.
 
 ## Development
 

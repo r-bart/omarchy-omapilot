@@ -107,8 +107,10 @@ export class BrowserCompanionServer {
   readonly #sockets = new Set<Socket>();
   readonly #sessions = new Set<BrowserSession>();
   readonly #pendingProbes = new Map<string, PendingProbe>();
+  readonly #armedCaptures = new Map<string, BrowserSession>();
   #server: Server | undefined;
   #ready?: Promise<void>;
+  #closing = false;
 
   constructor(env: NodeJS.ProcessEnv, callbacks: BrowserCompanionCallbacks) {
     const configuredRuntimeRoot = env.XDG_RUNTIME_DIR?.trim();
@@ -156,7 +158,10 @@ export class BrowserCompanionServer {
       this.#pendingProbes.delete(requestId);
       pending.resolve({ status: "unavailable" });
     }
-    for (const session of this.#sessions)
+    const armed = this.#armedCaptures.get(requestId);
+    this.#armedCaptures.delete(requestId);
+    if (armed !== undefined) this.#send(armed.socket, { version: 1, type: "capture.cancel", requestId });
+    else for (const session of this.#sessions)
       this.#send(session.socket, { version: 1, type: "capture.cancel", requestId });
   }
 
@@ -166,13 +171,15 @@ export class BrowserCompanionServer {
       pending.resolve({ status: "unavailable" });
     }
     this.#pendingProbes.clear();
+    this.#armedCaptures.clear();
     for (const socket of this.#sockets) socket.destroy();
     this.#sockets.clear();
     this.#sessions.clear();
-    this.#callbacks.statusChanged?.();
+    if (!this.#closing) this.#callbacks.statusChanged?.();
   }
 
   async close(): Promise<void> {
+    this.#closing = true;
     this.disconnect();
     const server = this.#server;
     this.#server = undefined;
@@ -218,7 +225,7 @@ export class BrowserCompanionServer {
           session = { socket, family: message.family, browser: message.browser };
           this.#sessions.add(session);
           this.#send(socket, { version: 1, type: "hello.ack" });
-          this.#callbacks.statusChanged?.();
+          if (!this.#closing) this.#callbacks.statusChanged?.();
           continue;
         }
         if (session === undefined) { socket.destroy(); return; }
@@ -229,7 +236,13 @@ export class BrowserCompanionServer {
       this.#sockets.delete(socket);
       if (session !== undefined) {
         this.#sessions.delete(session);
-        this.#callbacks.statusChanged?.();
+        for (const [requestId, armed] of this.#armedCaptures) {
+          if (armed !== session) continue;
+          this.#armedCaptures.delete(requestId);
+          if (!this.#closing)
+            this.#callbacks.error(requestId, "The browser companion disconnected before capture completed");
+        }
+        if (!this.#closing) this.#callbacks.statusChanged?.();
       }
     });
     socket.on("error", () => socket.destroy());
@@ -242,9 +255,13 @@ export class BrowserCompanionServer {
       pending.responses.push({ session, probe: message });
       return;
     }
-    if (message.type === "capture.result") void this.#callbacks.capture(message);
-    else if (message.type === "capture.cancelled") this.#callbacks.cancelled(message.requestId);
-    else if (message.type === "capture.error") this.#callbacks.error(message.requestId, message.reason);
+    if (message.type === "capture.result" || message.type === "capture.cancelled" || message.type === "capture.error") {
+      if (this.#armedCaptures.get(message.requestId) !== session) return;
+      this.#armedCaptures.delete(message.requestId);
+      if (message.type === "capture.result") void this.#callbacks.capture(message);
+      else if (message.type === "capture.cancelled") this.#callbacks.cancelled(message.requestId);
+      else this.#callbacks.error(message.requestId, message.reason);
+    }
   }
 
   #finishProbe(requestId: string): void {
@@ -259,10 +276,18 @@ export class BrowserCompanionServer {
     available.sort((left, right) =>
       titleScore(right.probe.title, pending.targetTitle) - titleScore(left.probe.title, pending.targetTitle));
     const selected = available[0];
-    if (selected === undefined || selected.probe.title === undefined || selected.probe.url === undefined) {
+    if (selected === undefined || selected.session.socket.destroyed
+        || selected.probe.title === undefined || selected.probe.url === undefined) {
       pending.resolve({ status: "unavailable" });
       return;
     }
+    const cancelledSessions = new Set<BrowserSession>();
+    for (const candidate of available) {
+      if (candidate.session === selected.session || cancelledSessions.has(candidate.session)) continue;
+      cancelledSessions.add(candidate.session);
+      this.#send(candidate.session.socket, { version: 1, type: "capture.cancel", requestId });
+    }
+    this.#armedCaptures.set(requestId, selected.session);
     this.#send(selected.session.socket, { version: 1, type: "capture.arm", requestId });
     pending.resolve({
       status: "armed", browser: selected.session.browser,

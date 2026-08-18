@@ -85,6 +85,13 @@ testing, visibly highlights the candidate, and captures on click or cancels on
 Escape. If no permitted picker responds, the normal Quickshell screenshot/OCR
 capture remains authoritative.
 
+The extension records the exact tab ID that answered each probe and rejects a
+result from another tab or frame. The broker independently records the selected
+native-relay session and ignores a result with the same request ID from any
+other session. Editable roots and descendants are pruned before serialization;
+editable accessible-name fallbacks and selections rooted in editable content
+are not collected.
+
 The broker validates the returned page and semantic-node schema, caps the tree
 again to 80 nodes, depth four, 12 KiB visible text, and a 32 KiB serialized
 element, strips URL credentials/query/fragment, and captures the already
@@ -104,7 +111,10 @@ repository-owned companion installer; QML never constructs a command or edits
 browser configuration. The action registers a user-local native-messaging host
 and enables the bundled unpacked Chromium build in detected Omarchy browser flag
 files. It remains separate from normal plugin installation, requires a browser
-restart, and cannot grant origin permission on the user's behalf.
+restart, and cannot grant origin permission on the user's behalf. An expandable
+setup section opens the fixed Chromium extensions or Firefox debugging page and
+copies the broker-reported bundled folder path, so Firefox/Zen and Chromium
+fallback setup can be completed without reconstructing a shell command.
 
 The matching two-step **Remove browser context** action asks the broker to run
 the repository-owned uninstaller, disconnect active relay sessions, and remove

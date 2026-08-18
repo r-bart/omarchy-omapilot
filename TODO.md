@@ -894,3 +894,37 @@ turn per provider.
   release package dry-run succeeds. Draft PR 4 is the single open consolidated
   review surface and provider-only PR 3 is closed as superseded. Owner-run live
   interaction remains the next gate; no live desktop state was changed here.
+
+## Browser companion PR remediation checkpoint 9 (2026-08-17)
+
+- Goal: take Jacob's latest PR 6 onboarding/removal work, resolve the verified
+  security, setup-completion, lifecycle, preview, and transient-data findings,
+  and push the reviewed result back to the existing PR branch.
+- Done criteria: editable DOM and selections cannot escape redaction; capture
+  results are bound to the exact probed tab and selected relay session; Settings
+  can open/copy the Chromium and Firefox setup targets; ordinary dismissal
+  discards unsent clips without breaking external picker handoff; setup status
+  remains ordered and quiet during shutdown; full runtime/UI gates and diff
+  checks pass; the exact commit is pushed to PR 6.
+- Branch/worktree: `jacob-pr6-review-20260817` at
+  `/home/sbull/worktrees/omarchy-omapilot-browser-setup`, based on PR head
+  `3cdcfd04eaef823f79bfe292cf66c180e8c497a3`. Rollback checkpoint remains
+  `browser-companion-setup` at `f2e088c829ebf8c077e195f0fff3942f294dc298`.
+- Allowed: scoped source/QML/docs/tests/generated bundle edits, local static and
+  headless verification, commit, and push to
+  `jacob-vincent-mink/omarchy-omapilot:feature/contextual-attachment-choices`
+  through PR 6's maintainer-edit permission.
+- Forbidden: merge, release, plugin installation, browser extension/relay
+  installation, browser or shell restart, live desktop mutation, edits to other
+  worktrees, provider-policy changes, or deletion of the rollback checkpoint.
+- Verification gates:
+  - [x] Reproduce the PR-head visual-preview failure and inventory all five
+    verified findings against Jacob's three onboarding commits.
+  - [x] Implement source-level redaction, tab/session binding, guided setup,
+    status lifecycle protection, and dismissal cleanup.
+  - [x] Add focused extension, broker, setup, protocol, and QML contract coverage.
+  - [x] Pass full validation, UI/headless contracts, deterministic generated
+    artifacts, and Git whitespace checks.
+  - [x] Inspect the complete diff, commit, push, and verify PR 6 exact-head state.
+- Current checkpoint: the reviewed commit is the PR 6 publication artifact; all
+  source/static/headless gates pass. No installed or live state has been changed.

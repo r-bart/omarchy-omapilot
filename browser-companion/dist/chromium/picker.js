@@ -6,6 +6,7 @@
   let highlight;
   let label;
   let lastSelection = "";
+  const editableSelector = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="searchbox"], [role="combobox"]';
 
   function cleanText(value, max = 4_000) {
     const text = String(value ?? "").replace(/\s+/gu, " ").trim();
@@ -28,13 +29,18 @@
   }
 
   function accessibleName(element) {
+    if (containsSensitive(element)) return undefined;
     const labelledBy = cleanText(element.getAttribute?.("aria-labelledby"), 300);
     if (labelledBy) {
-      const labels = labelledBy.split(/\s+/u).map((id) => document.getElementById(id)?.innerText).filter(Boolean).join(" ");
+      const labels = labelledBy.split(/\s+/u).map((id) => document.getElementById(id))
+        .filter((labelElement) => labelElement && !containsSensitive(labelElement))
+        .map((labelElement) => labelElement.innerText).filter(Boolean).join(" ");
       const value = cleanText(labels, 500);
       if (value) return value;
     }
-    for (const value of [element.getAttribute?.("aria-label"), element.getAttribute?.("alt"), element.getAttribute?.("title"), element.innerText]) {
+    const candidates = [element.getAttribute?.("aria-label"), element.getAttribute?.("alt"), element.getAttribute?.("title")];
+    if (!containsSensitive(element)) candidates.push(element.innerText);
+    for (const value of candidates) {
       const name = cleanText(value, 500);
       if (name) return name;
     }
@@ -43,7 +49,8 @@
 
   function safeAttributes(element) {
     const result = {};
-    const allow = ["aria-label", "aria-description", "alt", "title", "type", "placeholder"];
+    const allow = sensitive(element) ? ["type"] : containsSensitive(element)
+      ? [] : ["aria-label", "aria-description", "alt", "title", "type", "placeholder"];
     for (const name of allow) {
       const value = cleanText(element.getAttribute?.(name), 500);
       if (value) result[name] = value;
@@ -59,22 +66,33 @@
   }
 
   function sensitive(element) {
-    if (element.closest?.('input[type="password"]')) return true;
-    if (element.matches?.("input, textarea, [contenteditable=true], [contenteditable=plaintext-only]")) return true;
-    return false;
+    return element?.closest?.(editableSelector) != null;
+  }
+
+  function containsSensitive(element) {
+    return sensitive(element) || element?.querySelector?.(editableSelector) != null;
+  }
+
+  function safeSelection() {
+    const selection = globalThis.getSelection?.();
+    if (!selection || selection.rangeCount < 1) return "";
+    const container = selection.getRangeAt(0).commonAncestorContainer;
+    const element = container instanceof Element ? container : container?.parentElement;
+    return element && containsSensitive(element) ? "" : (cleanText(selection.toString(), 12_000) ?? "");
   }
 
   function semanticNode(element, depth, state) {
     state.count++;
     const node = { tag: element.tagName.toLowerCase() };
-    const role = explicitRole(element); const name = accessibleName(element);
-    const text = sensitive(element) ? "[redacted editable content]" : cleanText(element.childElementCount === 0 ? element.textContent : "", 4_000);
+    const isSensitive = sensitive(element);
+    const role = explicitRole(element); const name = isSensitive ? undefined : accessibleName(element);
+    const text = isSensitive ? "[redacted editable content]" : cleanText(element.childElementCount === 0 ? element.textContent : "", 4_000);
     const attributes = safeAttributes(element);
     if (role) node.role = role;
     if (name) node.name = name;
     if (text) node.text = text;
     if (attributes) node.attributes = attributes;
-    if (depth < 4 && state.count < 80) {
+    if (!isSensitive && depth < 4 && state.count < 80) {
       const children = [...element.children].slice(0, 20).filter((child) => {
         const style = getComputedStyle(child);
         return style.display !== "none" && style.visibility !== "hidden";
@@ -97,7 +115,7 @@
   }
 
   function visibleText(element, max = 12_000) {
-    return sensitive(element) ? undefined : cleanText(element.innerText || element.textContent, max);
+    return containsSensitive(element) ? undefined : cleanText(element.innerText || element.textContent, max);
   }
 
   function contextSnapshot(element) {
@@ -194,7 +212,7 @@
   function arm(requestId) {
     cleanup();
     active = requestId;
-    lastSelection = cleanText(globalThis.getSelection?.()?.toString(), 12_000) ?? "";
+    lastSelection = safeSelection();
     ensureOverlay();
     addEventListener("pointermove", onMove, true);
     addEventListener("click", onClick, true);

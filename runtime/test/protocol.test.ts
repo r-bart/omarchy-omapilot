@@ -53,6 +53,8 @@ describe("NDJSON protocol", () => {
     expect(commandSchema.safeParse({ type: "browser_companion_status" }).success).toBe(true);
     expect(commandSchema.safeParse({ type: "browser_companion_install" }).success).toBe(true);
     expect(commandSchema.safeParse({ type: "browser_companion_uninstall" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "browser_companion_open_settings", family: "firefox" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "browser_companion_open_settings", family: "other" }).success).toBe(false);
     expect(commandSchema.safeParse({ type: "browser_companion_install", command: "anything" }).success).toBe(false);
   });
 
