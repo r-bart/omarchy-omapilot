@@ -32,6 +32,7 @@ jobs:
           sudo apt-get install --yes \
             qml6-module-qtquick \
             qml6-module-qtquick-controls \
+            qml6-module-qtqml-workerscript \
             qml6-module-qttest \
             qt6-declarative-dev-tools
       - name: Run keyboard QML tests
