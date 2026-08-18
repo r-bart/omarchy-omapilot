@@ -19837,10 +19837,12 @@ async function continueInHerdr(chat, env = process.env, dependencies = {}) {
   }));
   const launch = dependencies.launch ?? launchDetached;
   const wait = dependencies.delay ?? delay;
-  await openOrFocusHerdr(commands, env, launch, "launch_spawn_failed");
+  const existingWindowAddress = await findHerdrWindow(commands.hyprctl, run);
+  if (existingWindowAddress === void 0)
+    await openOrFocusHerdr(commands, env, launch, "launch_spawn_failed");
   const listed = await waitForHerdr(run, commands.herdr, wait);
   if (listed.code !== 0) throw new HerdrHandoffError("launch", herdrCliErrorCode(listed) ?? "api_unavailable");
-  const windowAddress = await waitForHerdrWindow(commands.hyprctl, run, wait);
+  const windowAddress = existingWindowAddress ?? await waitForHerdrWindow(commands.hyprctl, run, wait);
   if (windowAddress === void 0)
     throw new HerdrHandoffError("launch", "window_not_mapped");
   const agentName = `quickchat-${chat.id.slice(0, 8)}`;
@@ -19945,15 +19947,18 @@ async function waitForHerdr(run, herdr, wait) {
 }
 async function waitForHerdrWindow(hyprctl, run, wait) {
   for (let attempt = 0; attempt < 48; attempt += 1) {
-    const active = await run(hyprctl, ["activewindow", "-j"]);
-    const address = active.code === 0 ? herdrWindowAddress(parseJson(active.stdout)) : void 0;
+    const address = await findHerdrWindow(hyprctl, run);
     if (address !== void 0) return address;
-    const clients = await run(hyprctl, ["clients", "-j"]);
-    const mappedAddress = clients.code === 0 ? herdrClientAddress(parseJson(clients.stdout)) : void 0;
-    if (mappedAddress !== void 0) return mappedAddress;
     if (attempt < 47) await wait(250);
   }
   return void 0;
+}
+async function findHerdrWindow(hyprctl, run) {
+  const active = await run(hyprctl, ["activewindow", "-j"]);
+  const address = active.code === 0 ? herdrWindowAddress(parseJson(active.stdout)) : void 0;
+  if (address !== void 0) return address;
+  const clients = await run(hyprctl, ["clients", "-j"]);
+  return clients.code === 0 ? herdrClientAddress(parseJson(clients.stdout)) : void 0;
 }
 async function waitForActiveHerdrWindow(hyprctl, address, run, wait) {
   for (let attempt = 0; attempt < 20; attempt += 1) {

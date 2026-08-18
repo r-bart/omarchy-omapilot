@@ -58,6 +58,8 @@ describe("Herdr handoff", () => {
     const launch = vi.fn(() => new Promise<void>((resolve) => { releaseLaunch = resolve; }));
     const promise = continueInHerdr(chat({ provider: "opencode", resumable: true }), env, harness({
       launch,
+      activeWindowMisses: 1,
+      clientWindowMisses: 1,
       agents: [existingAgent("quickchat-11111111")]
     }));
     await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
@@ -68,19 +70,25 @@ describe("Herdr handoff", () => {
   });
 
   it.each(["org.omarchy.herdr", "kitty"])("continues against a mapped %s Herdr window", async (windowClass) => {
-    const fixture = harness({ agents: [existingAgent("quickchat-11111111")], windowClass });
+    const fixture = harness({ agents: [existingAgent("quickchat-11111111")], windowClass, activeWindowMisses: 1 });
     await expect(continueInHerdr(chat({ resumable: true }), env, fixture)).resolves.toEqual({ mode: "native", reused: true });
-    expect(fixture.launch).toHaveBeenCalledTimes(1);
+    expect(fixture.launch).not.toHaveBeenCalled();
   });
 
   it("waits for the cold-launched Herdr client before requiring a mapped window", async () => {
-    const fixture = harness({ activeWindowMisses: 7, workspaceMisses: 3, agents: [existingAgent("quickchat-11111111")] });
+    const fixture = harness({
+      activeWindowMisses: 7,
+      clientWindowMisses: 1,
+      workspaceMisses: 3,
+      agents: [existingAgent("quickchat-11111111")]
+    });
     await expect(continueInHerdr(chat({ resumable: true }), env, fixture)).resolves.toEqual({ mode: "native", reused: true });
+    expect(fixture.launch).toHaveBeenCalledTimes(1);
     expect(callsContaining(fixture.calls, ["workspace", "list"])).toHaveLength(4);
     // The panel retains focus, so discovery succeeds from the mapped client
     // list; focus verification then keeps polling until Herdr is active.
     expect(callsContaining(fixture.calls, ["activewindow", "-j"])).toHaveLength(9);
-    expect(callsContaining(fixture.calls, ["clients", "-j"])).toHaveLength(1);
+    expect(callsContaining(fixture.calls, ["clients", "-j"])).toHaveLength(2);
   });
 
   it("reuses an existing same-chat agent without creating another tab", async () => {
@@ -91,6 +99,7 @@ describe("Herdr handoff", () => {
     expect(callArgs(fixture.calls)).toEqual(expect.arrayContaining([
       ["workspace", "focus", "w11"], ["tab", "focus", "w11:t4"], ["agent", "focus", "quickchat-11111111"]
     ]));
+    expect(fixture.launch).not.toHaveBeenCalled();
   });
 
   it.each<ProviderId>(["codex", "claude", "opencode"])("starts a native %s resume and leaves Herdr focused", async (provider) => {
@@ -99,7 +108,7 @@ describe("Herdr handoff", () => {
     const start = callsContaining(fixture.calls, ["agent", "start"])[0]?.args ?? [];
     expect(start).toContain("--");
     expect(start.slice(start.indexOf("--") + 1)).toEqual(nativeResumeArgs(provider, "session-1", "/home/test"));
-    expect(fixture.launch).toHaveBeenCalledTimes(1);
+    expect(fixture.launch).not.toHaveBeenCalled();
   });
 
   it("uses a fresh tab/name for transcript fallback, accepts blocked, and cleans the failed native tab", async () => {
@@ -191,6 +200,7 @@ function harness(options: {
   failTranscript?: boolean;
   busyStarts?: number;
   activeWindowMisses?: number;
+  clientWindowMisses?: number;
   workspaceMisses?: number;
   enforceNamedAgents?: boolean;
   failTabClose?: boolean;
@@ -199,6 +209,7 @@ function harness(options: {
   let tab = 3;
   let busyStarts = options.busyStarts ?? 0;
   let activeWindowMisses = options.activeWindowMisses ?? 0;
+  let clientWindowMisses = options.clientWindowMisses ?? 0;
   let workspaceMisses = options.workspaceMisses ?? 0;
   const runningAgents = new Set<string>();
   const launch = options.launch === undefined ? vi.fn(() => Promise.resolve()) : vi.fn(options.launch);
@@ -209,11 +220,14 @@ function harness(options: {
         if (activeWindowMisses > 0) { activeWindowMisses -= 1; return { code: 0, stdout: JSON.stringify({ address: "0xother", class: "kitty", title: "~" }), stderr: "" }; }
         return Promise.resolve({ code: 0, stdout: JSON.stringify({ address: "0xabc", class: options.windowClass ?? "org.omarchy.herdr", title: "herdr" }), stderr: "" });
       }
-      if (args[0] === "clients") return {
-        code: 0,
-        stdout: JSON.stringify([{ address: "0xabc", class: options.windowClass ?? "org.omarchy.herdr", title: "herdr", mapped: true }]),
-        stderr: ""
-      };
+      if (args[0] === "clients") {
+        if (clientWindowMisses > 0) { clientWindowMisses -= 1; return { code: 0, stdout: "[]", stderr: "" }; }
+        return {
+          code: 0,
+          stdout: JSON.stringify([{ address: "0xabc", class: options.windowClass ?? "org.omarchy.herdr", title: "herdr", mapped: true }]),
+          stderr: ""
+        };
+      }
       return ok();
     }
     if (args[0] === "workspace" && args[1] === "list") {

@@ -113,10 +113,12 @@ export async function continueInHerdr(
   const launch = dependencies.launch ?? launchDetached;
   const wait = dependencies.delay ?? delay;
 
-  await openOrFocusHerdr(commands, env, launch, "launch_spawn_failed");
+  const existingWindowAddress = await findHerdrWindow(commands.hyprctl, run);
+  if (existingWindowAddress === undefined)
+    await openOrFocusHerdr(commands, env, launch, "launch_spawn_failed");
   const listed = await waitForHerdr(run, commands.herdr, wait);
   if (listed.code !== 0) throw new HerdrHandoffError("launch", herdrCliErrorCode(listed) ?? "api_unavailable");
-  const windowAddress = await waitForHerdrWindow(commands.hyprctl, run, wait);
+  const windowAddress = existingWindowAddress ?? await waitForHerdrWindow(commands.hyprctl, run, wait);
   if (windowAddress === undefined)
     throw new HerdrHandoffError("launch", "window_not_mapped");
 
@@ -229,18 +231,22 @@ async function waitForHerdr(run: CommandRunner, herdr: string, wait: Delay): Pro
 
 async function waitForHerdrWindow(hyprctl: string, run: CommandRunner, wait: Delay): Promise<string | undefined> {
   for (let attempt = 0; attempt < 48; attempt += 1) {
-    const active = await run(hyprctl, ["activewindow", "-j"]);
-    const address = active.code === 0 ? herdrWindowAddress(parseJson(active.stdout)) : undefined;
+    const address = await findHerdrWindow(hyprctl, run);
     if (address !== undefined) return address;
-    // A Quickshell layer surface can retain keyboard focus while the Herdr
-    // client is already mapped. Discover the client list instead of treating
-    // "not active yet" as a launch failure.
-    const clients = await run(hyprctl, ["clients", "-j"]);
-    const mappedAddress = clients.code === 0 ? herdrClientAddress(parseJson(clients.stdout)) : undefined;
-    if (mappedAddress !== undefined) return mappedAddress;
     if (attempt < 47) await wait(250);
   }
   return undefined;
+}
+
+async function findHerdrWindow(hyprctl: string, run: CommandRunner): Promise<string | undefined> {
+  const active = await run(hyprctl, ["activewindow", "-j"]);
+  const address = active.code === 0 ? herdrWindowAddress(parseJson(active.stdout)) : undefined;
+  if (address !== undefined) return address;
+  // A Quickshell layer surface can retain keyboard focus while Herdr is
+  // already mapped. Check all clients before invoking the launcher so an
+  // existing Herdr window is focused instead of opening a duplicate.
+  const clients = await run(hyprctl, ["clients", "-j"]);
+  return clients.code === 0 ? herdrClientAddress(parseJson(clients.stdout)) : undefined;
 }
 
 async function waitForActiveHerdrWindow(hyprctl: string, address: string, run: CommandRunner, wait: Delay): Promise<boolean> {
