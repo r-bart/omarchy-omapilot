@@ -1,0 +1,13 @@
+#!/usr/bin/env node
+
+const command = process.argv.slice(2).join(" ");
+if (command === "-j monitors") process.stdout.write(JSON.stringify([{
+  id: 0, name: "TEST-1", x: 0, y: 0, width: 1920, height: 1080, scale: 1, focused: true
+}]));
+else if (command === "-j cursorpos") process.stdout.write(JSON.stringify({ x: 960, y: 540 }));
+else if (command === "-j clients") process.stdout.write(JSON.stringify([{
+  address: "0xfixture", class: "chromium", title: "Documentation",
+  at: [100, 80], size: [800, 600], mapped: true, focusHistoryID: 2
+}]));
+else if (command === "dispatch focuswindow address:0xfixture") process.stdout.write("ok");
+else process.exit(2);

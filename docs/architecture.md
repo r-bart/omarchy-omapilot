@@ -28,13 +28,14 @@ The reviewed plugin revision contains self-contained broker and adapter bundles 
 
 One compact JSON object is sent per line; embedded newlines remain JSON escapes. Each command has an `id`. Every correlated event repeats that `id`; asynchronous readiness events may omit it.
 
-The UI sends commands whose `type` is one of `initialize`, `submit`, `cancel`, `permission_response`, `dictation_start`, `dictation_stop`, `dictation_cancel`, `copy`, `open_link`, `load_image`, `continue_in_herdr`, `history_list`, `history_delete`, `history_clear`, or `shutdown`.
+The UI sends commands whose `type` is one of `initialize`, `submit`, `context_begin`, `context_capture`, `context_cancel`, `context_discard`, `cancel`, `permission_response`, `dictation_start`, `dictation_stop`, `dictation_cancel`, `copy`, `open_link`, `load_image`, `continue_in_herdr`, `history_list`, `history_delete`, `history_clear`, or `shutdown`.
 
-The broker emits events whose `type` is one of `ready`, `providers`, `state`, `content`, `permission`, `permission_closed`, `image`, `complete`, `error`, `dictation`, `history`, `herdr`, `link`, or `copied`. The broker's protocol tests are authoritative for exact fields and version negotiation.
+The broker emits events whose `type` is one of `ready`, `providers`, `state`, `content`, `context_ready`, `context_attachment`, `permission`, `permission_closed`, `image`, `complete`, `error`, `dictation`, `history`, `herdr`, `link`, or `copied`. The broker's protocol tests are authoritative for exact fields and version negotiation.
 
 ACP is the broker's normalization boundary, not the policy boundary. The submit
 command contains provider/model/question plus an optional versioned desktop
-snapshot. QML latches the active app immediately before the panel takes focus
+snapshot and up to four opaque context-attachment selections. QML latches the active app and
+its capture rectangle immediately before the panel takes focus
 and synchronously reads the current app/workspace/media inventory from
 Quickshell's public Hyprland and MPRIS objects at submit time; it does not poll
 `hyprctl` or create a second desktop service. The broker independently validates
@@ -44,6 +45,85 @@ the combined prompt to the selected ACP session but stores only the original
 question in Quickchat history. Provider-native session retention still applies.
 Native Herdr resume therefore inherits provider-retained context, while the
 transcript fallback contains only the stored question and answer.
+
+## Explicit context clips
+
+OmaPilot is a multi-kind `bar-widget` and `overlay` plugin. The panel asks the
+broker to begin a capture, and the broker selects the monitor containing the
+current compositor cursor. A click is resolved against the current Hyprland
+client geometries, excluding OmaPilot's own Quickshell surface, so panel focus
+cannot replace the user's intended target. The broker focuses that resolved
+window and either arms its browser companion or captures the validated window
+geometry. A drag remains an exact monitor-local region. The overlay hides for
+two compositor frames before asking the broker to invoke `grim`, so OmaPilot
+chrome is not present in the pixels.
+
+The broker fully decodes and normalizes every image through the existing image
+policy. If local Tesseract is available, word boxes are hit-tested at the click
+point and expanded to their OCR paragraph. The resulting attachment may offer
+Text, Screenshot, or Text + screenshot. The thumbnail remains a local preview;
+only the representation IDs selected in the composer cross the submit boundary.
+QML never sends image paths, base64, OCR payloads, or arbitrary HTML back to the
+broker. The broker resolves opaque UUIDs against its in-memory attachment map,
+constructs ACP text/image blocks, and deletes the cached input image after
+submit or explicit removal.
+
+The representation contract implements `element` through the separately
+installed browser companion. The broker owns a mode-0600 Unix socket below
+`$XDG_RUNTIME_DIR/quickchat`; browser-native relay processes connect that socket
+to an allowlisted extension ID through the browser's native-messaging transport.
+The relay exposes only versioned hello, probe, arm, result, cancel, and error
+messages. It is not a general browser command channel.
+
+After the overlay click resolves a browser window beneath the cursor, the broker
+maps its app ID to the Chromium or Firefox family and probes connected companion
+sessions. A permitted content script returns active-page title and URL only for
+that explicit request. The broker normalizes the compositor title, chooses one
+matching session, and arms only that page. Quickshell closes rather than
+intercepting the next click; the content script performs browser-native hit
+testing, visibly highlights the candidate, and captures on click or cancels on
+Escape. If no permitted picker responds, the normal Quickshell screenshot/OCR
+capture remains authoritative.
+
+The extension records the exact tab ID that answered each probe and rejects a
+result from another tab or frame. The broker independently records the selected
+native-relay session and ignores a result with the same request ID from any
+other session. Editable roots and descendants are pruned before serialization;
+editable accessible-name fallbacks and selections rooted in editable content
+are not collected.
+
+The broker validates the returned page and semantic-node schema, caps the tree
+again to 80 nodes, depth four, 12 KiB visible text, and a 32 KiB serialized
+element, strips URL credentials/query/fragment, and captures the already
+latched browser window through the existing image policy after the picker has
+disappeared. The attachment therefore offers Element, Text, Screenshot, or a
+supported pair without sending DOM through QML. The UI still submits only an
+opaque attachment UUID and representation IDs.
+
+Site permission is granted from the extension popup because a desktop-shell
+gesture cannot activate browser `activeTab` authority. Permission is optional,
+origin-scoped, and registers the inert picker content script only for enabled
+origins. It does not collect page metadata until an explicit broker probe.
+
+Settings exposes broker-reported relay and per-family connection readiness. An
+explicit **Enable browser context** action asks the broker to run only the
+repository-owned companion installer; QML never constructs a command or edits
+browser configuration. The action registers a user-local native-messaging host
+and enables the bundled unpacked Chromium build in detected Omarchy browser flag
+files. It remains separate from normal plugin installation, requires a browser
+restart, and cannot grant origin permission on the user's behalf. An expandable
+setup section opens the fixed Chromium extensions or Firefox debugging page and
+copies the broker-reported bundled folder path, so Firefox/Zen and Chromium
+fallback setup can be completed without reconstructing a shell command.
+
+The matching two-step **Remove browser context** action asks the broker to run
+the repository-owned uninstaller, disconnect active relay sessions, and remove
+the user-local host, browser registrations, and extension flags. Open browsers
+must restart to unload an extension process already in memory. Omarchy's plugin
+manager intentionally executes no plugin lifecycle hooks, so this cleanup must
+run before the plugin directory is removed; automatic cleanup on
+`omarchy plugin remove` requires a future host-owned lifecycle contract.
+
 The broker derives one automatic,
 fail-closed policy for that provider. Codex keeps the pinned adapter's read-only,
 on-request mode, disables native web search, and exposes only its strictly validated

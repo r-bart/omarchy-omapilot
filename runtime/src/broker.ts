@@ -3,7 +3,8 @@ import { spawn } from "node:child_process";
 import type { AcpRun, PermissionDecision } from "./acp.js";
 import { BrokerAcpError, deleteAcpSession, probeAcpModels, runAcpQuestion } from "./acp.js";
 import { DictationService } from "./dictation.js";
-import { promptWithDesktopContext } from "./context.js";
+import { promptWithContextAttachments } from "./context.js";
+import { ContextAttachmentError, ContextAttachmentStore } from "./context-attachments.js";
 import { HistoryStore, presentChat, presentImage } from "./history.js";
 import { continueInHerdr, describeHerdrError } from "./herdr.js";
 import { ImagePolicyError, ImageStore, isAllowedExternalLink } from "./images.js";
@@ -12,6 +13,14 @@ import { discoverProviders, fallbackModels, type DiscoveredProvider } from "./pr
 import { resolveExecutable, runCommand } from "./process.js";
 import type { BrokerCommand, BrokerEvent, ChatRecord, ProviderId, ProviderInfo } from "./types.js";
 import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
+import { BrowserCompanionServer, type BrowserCapture } from "./browser-companion.js";
+import {
+  browserCompanionSetupStatus,
+  installBrowserCompanion,
+  openBrowserCompanionSettings,
+  uninstallBrowserCompanion,
+  type BrowserFamily
+} from "./browser-companion-setup.js";
 
 type DictationClient = Pick<DictationService, "start" | "stop" | "cancel">;
 type SessionCleaner = (provider: DiscoveredProvider, sessionId: string) => Promise<boolean>;
@@ -31,20 +40,35 @@ export class QuickchatBroker {
   readonly #herdrContinue: HerdrContinue;
   readonly #env: NodeJS.ProcessEnv;
   readonly #permissionTimeoutMs: number;
+  readonly #contextAttachments: ContextAttachmentStore;
+  readonly #browserCompanion: BrowserCompanionServer;
   #providers = new Map<string, DiscoveredProvider>();
   #runs = new Map<string, AcpRun>();
   #handoffs = new Map<string, Promise<void>>();
   #permissions = new Map<string, PermissionWaiter>();
   #submissions = new Set<string>();
   #dictationGeneration = 0;
+  #browserCompanionSetupBusy = false;
+  #browserCompanionSetupPhase: "installing" | "removing" | undefined;
+  #browserCompanionStatusRevision = 0;
 
   constructor(
     emit: (event: BrokerEvent) => void,
-    options: { history?: HistoryStore; images?: ImageStore; dictation?: DictationClient; sessionCleaner?: SessionCleaner; herdrContinue?: HerdrContinue; env?: NodeJS.ProcessEnv; permissionTimeoutMs?: number } = {}
+    options: { history?: HistoryStore; images?: ImageStore; contextAttachments?: ContextAttachmentStore; dictation?: DictationClient; sessionCleaner?: SessionCleaner; herdrContinue?: HerdrContinue; env?: NodeJS.ProcessEnv; permissionTimeoutMs?: number } = {}
   ) {
     this.#emit = emit;
     this.#history = options.history ?? new HistoryStore();
     this.#images = options.images ?? new ImageStore();
+    this.#contextAttachments = options.contextAttachments ?? new ContextAttachmentStore(this.#images, undefined, options.env ?? process.env);
+    this.#browserCompanion = new BrowserCompanionServer(options.env ?? process.env, {
+      capture: (capture) => this.#browserCapture(capture),
+      cancelled: (requestId) => {
+        this.#contextAttachments.cancel(requestId);
+        this.#error("context_cancelled", "Browser element capture was cancelled", false, requestId);
+      },
+      error: (requestId, reason) => this.#browserCaptureError(requestId, reason),
+      statusChanged: () => { void this.#emitBrowserCompanionStatus(); }
+    });
     this.#dictation = options.dictation ?? new DictationService();
     this.#sessionCleaner = options.sessionCleaner ?? deleteAcpSession;
     this.#herdrContinue = options.herdrContinue ?? continueInHerdr;
@@ -56,6 +80,14 @@ export class QuickchatBroker {
     switch (command.type) {
       case "initialize": await this.#initialize(command); break;
       case "submit": await this.#submit(command); break;
+      case "context_begin": await this.#contextBegin(command); break;
+      case "context_capture": await this.#contextCapture(command); break;
+      case "context_cancel": this.#contextAttachments.cancel(command.id); this.#browserCompanion.cancel(command.id); break;
+      case "context_discard": await this.#contextAttachments.discard(command.id); break;
+      case "browser_companion_status": await this.#emitBrowserCompanionStatus(); break;
+      case "browser_companion_install": await this.#installBrowserCompanion(); break;
+      case "browser_companion_uninstall": await this.#uninstallBrowserCompanion(); break;
+      case "browser_companion_open_settings": await this.#openBrowserCompanionSettings(command.family); break;
       case "cancel": await this.#cancel(command.id); break;
       case "permission_response": this.#respondPermission(command); break;
       case "history_list": await this.#emitHistory(); break;
@@ -78,7 +110,11 @@ export class QuickchatBroker {
       case "load_image": await this.#loadImage(command.url, command.id); break;
       case "open_link": await this.#openLink(command.url); break;
       case "copy": await this.#copy(command.text); break;
-      case "shutdown": await Promise.all([...this.#runs.values()].map((run) => run.cancel())); return false;
+      case "shutdown": {
+        await Promise.all([...this.#runs.values()].map((run) => run.cancel()));
+        await this.#browserCompanion.close();
+        return false;
+      }
     }
     return true;
   }
@@ -89,6 +125,8 @@ export class QuickchatBroker {
       return;
     }
     const discovered = await discoverProviders(this.#env);
+    await this.#browserCompanion.start().catch(() => undefined);
+    await this.#emitBrowserCompanionStatus();
     await Promise.all(discovered.map(async (provider) => {
       const acpModels = await probeAcpModels(provider);
       const models = acpModels.models.length > 0 ? acpModels.models : await fallbackModels(provider);
@@ -97,7 +135,7 @@ export class QuickchatBroker {
     }));
     this.#providers = new Map(discovered.map((provider) => [provider.id, provider]));
     const history = (await this.#history.list()).map((chat) => presentChat(chat));
-    this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context"], providers: discovered.map(publicProvider), history });
+    this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context", "context-attachments"], providers: discovered.map(publicProvider), history });
   }
 
   async #submit(command: Extract<BrokerCommand, { type: "submit" }>): Promise<void> {
@@ -112,12 +150,30 @@ export class QuickchatBroker {
 
   async #submitOnce(command: Extract<BrokerCommand, { type: "submit" }>): Promise<void> {
     const provider = this.#providers.get(command.provider);
-    if (provider === undefined) { this.#error("provider_unavailable", "The selected harness is not installed and authenticated", false, command.id); return; }
+    if (provider === undefined) {
+      await this.#contextAttachments.discardMany((command.contextAttachments ?? []).map((value) => value.id));
+      this.#error("provider_unavailable", "The selected harness is not installed and authenticated", false, command.id);
+      return;
+    }
     const dangerousAutoApprove = command.dangerousAutoApprove === true
       && provider.policy.tools === "device-approval";
     this.#emit({ type: "state", id: command.id, state: "preparing", message: `Preparing ${provider.name}…` });
+    let selectedAttachmentIds: string[] = [];
+    let attachmentBlocks: Awaited<ReturnType<ContextAttachmentStore["resolve"]>>["blocks"] = [];
+    try {
+      const resolved = await this.#contextAttachments.resolve(command.contextAttachments ?? []);
+      attachmentBlocks = resolved.blocks;
+      selectedAttachmentIds = resolved.attachmentIds;
+    } catch (error) {
+      if (error instanceof ContextAttachmentError) {
+        await this.#contextAttachments.discardMany((command.contextAttachments ?? []).map((value) => value.id));
+        this.#error(error.code, error.message, false, command.id);
+        return;
+      }
+      throw error;
+    }
     const run = runAcpQuestion(
-      provider, command.id, promptWithDesktopContext(command.question, command.desktopContext), command.model,
+      provider, command.id, promptWithContextAttachments(command.question, command.desktopContext, attachmentBlocks), command.model,
       this.#emit, 180_000, this.#images,
       (request) => this.#requestToolPermission(
         command.id, provider.id, request, dangerousAutoApprove),
@@ -160,7 +216,123 @@ export class QuickchatBroker {
     } finally {
       this.#cancelPermissions(command.id);
       this.#runs.delete(command.id);
+      await this.#contextAttachments.discardMany(selectedAttachmentIds);
     }
+  }
+
+  async #contextBegin(command: Extract<BrokerCommand, { type: "context_begin" }>): Promise<void> {
+    try {
+      const target = await this.#contextAttachments.begin(command.id, command.target);
+      this.#emit({ type: "context_ready", id: command.id, target });
+    } catch (error) {
+      this.#contextError(error, command.id);
+    }
+  }
+
+  async #browserCapture(capture: BrowserCapture): Promise<void> {
+    try {
+      const attachment = await this.#contextAttachments.captureBrowser(capture.requestId, capture);
+      this.#emit({ type: "context_attachment", requestId: capture.requestId, attachment });
+    } catch (error) {
+      this.#contextError(error, capture.requestId);
+    }
+  }
+
+  #browserCaptureError(requestId: string, reason: string): void {
+    this.#contextAttachments.cancel(requestId);
+    this.#error("context_browser_failed", reason, true, requestId);
+  }
+
+  async #contextCapture(command: Extract<BrokerCommand, { type: "context_capture" }>): Promise<void> {
+    try {
+      if (command.mode === "window" && command.anchor !== undefined) {
+        const target = await this.#contextAttachments.selectWindow(command.id, command.anchor);
+        const browser = await this.#browserCompanion.tryArm(command.id, target.appId, target.title);
+        if (browser.status === "armed") {
+          this.#emit({
+            type: "context_picker", id: command.id, browser: browser.browser,
+            title: browser.title, url: browser.url
+          });
+          return;
+        }
+        if (browser.status === "permission-required") this.#emit({
+          type: "context_notice", id: command.id,
+          message: "DOM capture is not enabled for this site; using OCR and screenshot"
+        });
+        else if (browser.status === "unavailable") this.#emit({
+          type: "context_notice", id: command.id,
+          message: "Browser companion is not connected; using OCR and screenshot. Enable it in OmaPilot settings."
+        });
+      }
+      const attachment = await this.#contextAttachments.capture(command.id, command.mode, command.region, command.anchor);
+      this.#emit({ type: "context_attachment", requestId: command.id, attachment });
+    } catch (error) {
+      this.#contextError(error, command.id);
+    }
+  }
+
+  async #emitBrowserCompanionStatus(
+    phase?: "ready" | "installing" | "removing" | "failed",
+    message?: string
+  ): Promise<void> {
+    const revision = ++this.#browserCompanionStatusRevision;
+    const setup = await browserCompanionSetupStatus(this.#env);
+    if (revision !== this.#browserCompanionStatusRevision) return;
+    const connected = this.#browserCompanion.status();
+    this.#emit({ type: "browser_companion", phase: phase ?? this.#browserCompanionSetupPhase ?? "ready", ...setup, ...connected,
+      ...(message === undefined ? {} : { message }) });
+  }
+
+  async #installBrowserCompanion(): Promise<void> {
+    if (this.#browserCompanionSetupBusy) return;
+    this.#browserCompanionSetupBusy = true;
+    this.#browserCompanionSetupPhase = "installing";
+    try {
+      await this.#emitBrowserCompanionStatus();
+      const installed = await installBrowserCompanion(this.#env);
+      await this.#emitBrowserCompanionStatus(installed ? "ready" : "failed", installed
+        ? "Browser companion installed. Restart your browser, then enable access from its OmaPilot extension icon."
+        : "Browser companion setup failed. Check that Node.js and jq are installed, then try again.");
+    } catch {
+      await this.#emitBrowserCompanionStatus("failed", "Browser companion setup could not finish. Retry from Settings; no terminal setup is required.");
+    } finally {
+      this.#browserCompanionSetupBusy = false;
+      this.#browserCompanionSetupPhase = undefined;
+    }
+  }
+
+  async #uninstallBrowserCompanion(): Promise<void> {
+    if (this.#browserCompanionSetupBusy) return;
+    this.#browserCompanionSetupBusy = true;
+    this.#browserCompanionSetupPhase = "removing";
+    try {
+      await this.#emitBrowserCompanionStatus();
+      const removed = await uninstallBrowserCompanion(this.#env);
+      if (removed) this.#browserCompanion.disconnect();
+      await this.#emitBrowserCompanionStatus(removed ? "ready" : "failed", removed
+        ? "Browser context removed. Restart open browsers to unload the extension."
+        : "Browser context removal could not finish. Retry from Settings before removing OmaPilot.");
+    } catch {
+      await this.#emitBrowserCompanionStatus("failed", "Browser context removal could not finish. Retry from Settings before removing OmaPilot.");
+    } finally {
+      this.#browserCompanionSetupBusy = false;
+      this.#browserCompanionSetupPhase = undefined;
+    }
+  }
+
+  async #openBrowserCompanionSettings(family: BrowserFamily): Promise<void> {
+    const opened = await openBrowserCompanionSettings(family, this.#env);
+    await this.#emitBrowserCompanionStatus(undefined, opened
+      ? `${family === "firefox" ? "Firefox" : "Chromium"} extension settings opened.`
+      : `No supported ${family === "firefox" ? "Firefox" : "Chromium"} browser was found.`);
+  }
+
+  #contextError(error: unknown, id: string): void {
+    if (error instanceof ContextAttachmentError || error instanceof ImagePolicyError) {
+      this.#error(error.code, error.message, false, id);
+      return;
+    }
+    this.#error("context_capture_failed", "The selected context could not be captured", true, id);
   }
 
   async #requestToolPermission(

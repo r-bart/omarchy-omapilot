@@ -24,6 +24,73 @@ TestCase {
     verify(!Protocol.hasFeature(undefined, "desktop-context"))
   }
 
+  function test_contextAttachmentKeepsAlternativesLocalUntilSubmit() {
+    var id = "11111111-1111-4111-8111-111111111111"
+    var attachment = Protocol.normalizedContextAttachment({
+      version: 1,
+      id: id,
+      title: "Article section",
+      origin: { appId: "chromium", windowTitle: "Docs" },
+      previewImage: { id: id, localUrl: "file:///tmp/context.png" },
+      representations: [
+        { id: "text", kind: "text", label: "Text", preview: "Visible page text", confidence: 0.9 },
+        { id: "image", kind: "image", label: "Screenshot", confidence: 1 }
+      ],
+      selectedRepresentationIds: ["text"]
+    })
+    compare(attachment.title, "Article section")
+    compare(attachment.previewImage.source, "file:///tmp/context.png")
+    compare(Protocol.contextRepresentationMode(attachment), "text")
+    var options = Protocol.contextRepresentationOptions(attachment)
+    compare(options.length, 3)
+    compare(options[2].value, "text+image")
+
+    var payload = Protocol.submitCommand("turn", "Explain", "codex", "", null, false, [{
+      id: id, representationIds: ["text", "image", "text", "bogus"]
+    }])
+    compare(payload.contextAttachments.length, 1)
+    compare(payload.contextAttachments[0].representationIds.length, 2)
+    compare(payload.contextAttachments[0].representationIds[0], "text")
+    compare(payload.contextAttachments[0].representationIds[1], "image")
+    verify(payload.contextAttachments[0].payload === undefined)
+  }
+
+  function test_contextCaptureBeginKeepsLatchedPreFocusTarget() {
+    var payload = Protocol.contextBeginCommand("capture-1", {
+      appId: "chromium",
+      title: "Omarchy docs",
+      address: "0x1234",
+      bounds: { x: 1920, y: 40, width: 1200, height: 800 }
+    })
+    compare(payload.type, "context_begin")
+    compare(payload.id, "capture-1")
+    compare(payload.target.appId, "chromium")
+    compare(payload.target.title, "Omarchy docs")
+    compare(payload.target.bounds.x, 1920)
+    compare(payload.target.bounds.width, 1200)
+    verify(payload.target.address === undefined)
+
+    var withoutTarget = Protocol.contextBeginCommand("capture-2", null)
+    verify(withoutTarget.target === undefined)
+  }
+
+  function test_browserCompanionStatusDefaultsFailClosed() {
+    var status = Protocol.normalizedBrowserCompanion({
+      phase: "installing", relayInstalled: true, chromiumConnected: true,
+      firefoxConnected: "yes", chromiumExtensionPath: "/plugin/chromium",
+      firefoxExtensionPath: "/plugin/firefox", message: "Restart\nthe browser"
+    })
+    compare(status.phase, "installing")
+    verify(status.relayInstalled)
+    verify(status.chromiumConnected)
+    verify(!status.firefoxConnected)
+    compare(status.chromiumExtensionPath, "/plugin/chromium")
+    compare(status.firefoxExtensionPath, "/plugin/firefox")
+    compare(status.message, "Restart the browser")
+    compare(Protocol.normalizedBrowserCompanion({ phase: "unknown" }).phase, "ready")
+    compare(Protocol.normalizedBrowserCompanion({ phase: "removing" }).phase, "removing")
+  }
+
   function test_desktopContextFiltersShellSurfaces() {
     verify(Protocol.isShellAppId("org.omarchy.quickshell"))
     var context = Protocol.normalizedDesktopContext({

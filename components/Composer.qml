@@ -22,7 +22,8 @@ Item {
   signal escapeRequested()
 
   readonly property bool inputActive: inlineMode ? inlineInput.activeFocus : promptInput.activeFocus
-  readonly property bool popupOpen: inlineProvider.popupOpen
+  property bool attachmentPopupOpen: false
+  readonly property bool popupOpen: inlineProvider.popupOpen || attachmentPopupOpen
 
   implicitWidth: inlineMode ? Style.space(360) : Style.space(520)
   implicitHeight: inlineMode ? Style.bar.sizeHorizontal : panelComposer.implicitHeight
@@ -49,7 +50,20 @@ Item {
 
   function closePopups() {
     inlineProvider.close()
+    for (var i = 0; i < attachmentRepeater.count; i++) {
+      var preview = attachmentRepeater.itemAt(i)
+      if (preview) preview.closePopup()
+    }
     forceInputFocus()
+  }
+
+  function refreshAttachmentPopupState() {
+    var anyOpen = false
+    for (var i = 0; i < attachmentRepeater.count; i++) {
+      var preview = attachmentRepeater.itemAt(i)
+      if (preview && preview.popupOpen) anyOpen = true
+    }
+    attachmentPopupOpen = anyOpen
   }
 
   function acceptTranscript() {
@@ -149,6 +163,26 @@ Item {
     visible: !root.inlineMode
     spacing: Style.spacing.md
 
+    Repeater {
+      id: attachmentRepeater
+      model: root.backend && Array.isArray(root.backend.contextAttachments)
+        ? root.backend.contextAttachments : []
+      onItemAdded: Qt.callLater(root.refreshAttachmentPopupState)
+      onItemRemoved: Qt.callLater(root.refreshAttachmentPopupState)
+
+      ContextAttachmentPreview {
+        required property var modelData
+        Layout.fillWidth: true
+        backend: root.backend
+        attachment: modelData
+        foreground: root.foreground
+        background: root.background
+        accent: root.accent
+        fontFamily: root.fontFamily
+        onPopupOpenChanged: root.refreshAttachmentPopupState()
+      }
+    }
+
     Text {
       Layout.fillWidth: true
       visible: root.backend && root.backend.desktopContextActive
@@ -232,6 +266,20 @@ Item {
           Layout.topMargin: Style.spacing.sm
           Layout.bottomMargin: Style.spacing.sm
           spacing: Style.spacing.sm
+
+          Button {
+            iconText: "󰹑"
+            tooltipText: "Clip context from the desktop"
+            foreground: root.foreground
+            background: root.background
+            bordered: true
+            focusable: true
+            horizontalPadding: Style.spacing.md
+            verticalPadding: Style.spacing.md
+            enabled: root.backend && root.backend.contextCaptureAvailable
+            Accessible.name: tooltipText
+            onClicked: root.backend.beginContextCapture()
+          }
 
           Text {
             Layout.fillWidth: true

@@ -6,10 +6,12 @@
   "author": "Spencer Bull",
   "license": "MIT",
   "description": "Use authenticated AI harnesses from a native Omarchy desktop surface.",
-  "kinds": ["bar-widget"],
+  "kinds": ["bar-widget", "overlay"],
+  "keepLoaded": true,
   "activation": "on-demand",
   "entryPoints": {
-    "barWidget": "BarWidget.qml"
+    "barWidget": "BarWidget.qml",
+    "overlay": "ContextCaptureOverlay.qml"
   },
   "barWidget": {
     "displayName": "OmaPilot",

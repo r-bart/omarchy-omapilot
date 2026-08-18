@@ -5,13 +5,20 @@ repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo_root"
 
 ./scripts/check-manifest.sh
+node ./browser-companion/scripts/check.mjs
 
 if command -v shellcheck >/dev/null && shellcheck --version >/dev/null 2>&1; then
-  mapfile -t shell_files < <(find scripts -type f -name '*.sh' -print | sort)
+  mapfile -t shell_files < <(find scripts browser-companion -type f \
+    \( -name '*.sh' -o -name 'omapilot-browser-companion-host' \) -print | sort)
   shellcheck "${shell_files[@]}"
 else
   printf 'validate: shellcheck unavailable; skipping shell lint\n' >&2
 fi
+
+node --check browser-companion/extension/background.js
+node --check browser-companion/extension/picker.js
+node --check browser-companion/extension/popup.js
+node --check browser-companion/native-host/host.mjs
 
 if command -v qmllint >/dev/null; then
   mapfile -t qml_files < <(find . -path './node_modules' -prune -o -path './dist' -prune -o -type f -name '*.qml' -print | sort)

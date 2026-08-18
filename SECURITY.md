@@ -49,6 +49,34 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
 - Provider authentication remains in the installed harness. OmaPilot must not log, copy, or persist credential output.
 - Adapter bundles are generated from exact package-lock versions and reviewed as tracked files in the same Git commit as their source. Published release archives add SHA-256 verification, provenance, and an SBOM; the runtime does not download or replace adapters.
 - Remote images require a user action and are subject to scheme, redirect, address, MIME, byte-size, complete decode, pixel-area, and cache-quota checks before Quickshell sees them.
+- Context capture is an explicit overlay gesture. The active target is latched
+  before OmaPilot takes focus, monitor and region geometry are validated by the
+  broker, and the overlay is hidden before `grim` runs. Captured images pass the
+  same complete-decode, byte, dimension, pixel-area, and cache policy as remote
+  images. Optional OCR is local and bounded; only the paragraph hit beneath the
+  pointer is offered. Password-like targets are blocked conservatively.
+- The composer receives only an opaque attachment UUID, bounded presentation
+  metadata, and a broker-issued local thumbnail URL. Submit carries only that
+  UUID and selected representation IDs. It cannot provide an image path,
+  base64 payload, OCR text, or raw DOM. The broker resolves the retained value,
+  frames text and pixels as untrusted observational data, and deletes input
+  images after submission, explicit removal, new chat, or ordinary panel
+  dismissal. Provider-native sessions may retain the
+  selected clip even though OmaPilot does not add it to chat JSON.
+- The optional browser companion is separately and reversibly installed. Its
+  extension has no `tabs`, `history`, `debugger`, cookie, or web-request
+  permission and exposes no page-mutation command. A browser-side user gesture grants an optional origin;
+  an inert picker is registered only there. During an explicit context request,
+  the broker probes permitted active pages, binds the request to one exact tab
+  and title-matched native-relay session, and accepts the clicked result only
+  from those same endpoints through an extension-ID-allowlisted native host
+  and a mode-0600 per-login Unix socket. It never streams tab changes or browsing
+  history. The extension strips editable subtrees, their accessible-name and
+  selection fallbacks, password values, hidden nodes,
+  scripts, styles, event attributes, URL credentials, query strings, and
+  fragments. The broker independently validates and caps the semantic tree,
+  frames it as untrusted observational data, and exposes no browser action or
+  arbitrary-script command.
 - External links are allowlisted by scheme and are never passed through shell interpolation.
 - The broker does not regex-classify prompts or implement action-specific
   shortcuts. Every ordinary question and action request follows the selected

@@ -18,8 +18,9 @@ jq -e '
   and .name == "OmaPilot"
   and (.version | type == "string" and test("^[0-9]+\\.[0-9]+\\.[0-9]+([.-][A-Za-z0-9.-]+)?$"))
   and .license == "MIT"
-  and .kinds == ["bar-widget"]
-  and .entryPoints == {"barWidget":"BarWidget.qml"}
+  and .kinds == ["bar-widget", "overlay"]
+  and .keepLoaded == true
+  and .entryPoints == {"barWidget":"BarWidget.qml", "overlay":"ContextCaptureOverlay.qml"}
   and .barWidget.category == "AI"
   and .barWidget.displayName == "OmaPilot"
   and (.barWidget.aliases | index("omapilot") != null)
@@ -46,6 +47,7 @@ jq -e '
 ' "$manifest" >/dev/null || fail "manifest contract drifted from the Quickchat v0.1 schema"
 
 [[ -f "$repo_root/BarWidget.qml" ]] || fail "manifest entry point is missing: BarWidget.qml"
+[[ -f "$repo_root/ContextCaptureOverlay.qml" ]] || fail "manifest entry point is missing: ContextCaptureOverlay.qml"
 
 while IFS= read -r path; do
   [[ $path != /* && $path != *..* ]] || fail "unsafe manifest entry point: $path"
