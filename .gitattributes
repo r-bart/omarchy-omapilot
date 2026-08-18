@@ -1,0 +1,3 @@
+runtime/dist/quickchat-broker.js -whitespace
+runtime/dist/quickchat-broker.js.map -diff -whitespace
+runtime/dist/quickchat-broker.THIRD_PARTY_LICENSES.txt -whitespace

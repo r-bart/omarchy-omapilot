@@ -2,6 +2,7 @@ import { chmod, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { generateThirdPartyLicenses } from "./generate-third-party-licenses.mjs";
 
 const runtimeRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const output = resolve(runtimeRoot, "dist/quickchat-broker.js");
@@ -16,7 +17,7 @@ await build({
   target: "node22",
   format: "esm",
   sourcemap: true,
-  banner: { js: "#!/usr/bin/env node" },
+  banner: { js: "#!/usr/bin/env node\nimport { createRequire as __quickchatCreateRequire } from \"node:module\";\nvar require = __quickchatCreateRequire(import.meta.url);" },
   legalComments: "external",
   absWorkingDir: projectRoot
 });
@@ -32,6 +33,12 @@ sourceMap.sources = sourceMap.sources.map((source) => {
   return nodeModules < 0 ? source : `../../${source.slice(nodeModules)}`;
 });
 await writeFile(mapPath, `${JSON.stringify(sourceMap)}\n`);
+await generateThirdPartyLicenses({
+  projectRoot,
+  sourceMap,
+  lockPath: resolve(projectRoot, "package-lock.json"),
+  outputPath: resolve(runtimeRoot, "dist/quickchat-broker.THIRD_PARTY_LICENSES.txt")
+});
 await chmod(output, 0o755);
 
 for (const adapter of [
