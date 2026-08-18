@@ -137,15 +137,35 @@ describe("explicit context attachments", () => {
         tag: "button", role: "button", name: "Retry failed deployment", text: "Retry",
         ancestors: [{ tag: "main", role: "main" }],
         rect: { x: 50, y: 90, width: 120, height: 36 },
-        tree: { tag: "button", role: "button", name: "Retry failed deployment", text: "Retry" }
+        tree: { tag: "button", role: "button", name: "Retry failed deployment", text: "Retry" },
+        context: {
+          tag: "article", role: "article", name: "Semantic clipping works",
+          text: "Semantic clipping works This paragraph is exact browser text and should not require OCR. Retry",
+          rect: { x: 20, y: 30, width: 700, height: 400 },
+          tree: {
+            tag: "article", role: "article", name: "Semantic clipping works",
+            children: [
+              { tag: "h1", name: "Semantic clipping works", text: "Semantic clipping works" },
+              { tag: "p", name: "This paragraph is exact browser text and should not require OCR.", text: "This paragraph is exact browser text and should not require OCR." },
+              { tag: "button", role: "button", name: "Retry failed deployment", text: "Retry" }
+            ]
+          }
+        }
       }
     });
+    expect(attachment.title).toBe("Retry");
+    expect(attachment.representations[0]?.preview).toContain("in article: Semantic clipping works");
+    expect(attachment.representations[1]?.preview).toContain("This paragraph is exact browser text");
     expect(attachment.representations.map((value) => value.id)).toEqual(["element", "text", "image"]);
     expect(attachment.selectedRepresentationIds).toEqual(["element"]);
     const resolved = await store.resolve([{ id: attachment.id, representationIds: ["element", "image"] }]);
     expect(resolved.blocks[0]).toMatchObject({
       type: "text",
       text: expect.stringContaining('"name": "Retry failed deployment"')
+    });
+    expect(resolved.blocks[0]).toMatchObject({
+      type: "text",
+      text: expect.stringContaining('"name": "Semantic clipping works"')
     });
     expect(resolved.blocks[0]).not.toMatchObject({ text: expect.stringContaining("token=secret") });
     expect(resolved.blocks[1]).toMatchObject({ type: "image", mimeType: "image/png" });

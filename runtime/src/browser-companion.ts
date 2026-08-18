@@ -14,6 +14,17 @@ const semanticNodeSchema: z.ZodType<SemanticNode> = z.lazy(() => z.object({
   children: z.array(semanticNodeSchema).max(40).optional()
 }).strict());
 
+const contextElementSchema = z.object({
+  tag: text(40), role: optionalText(80), name: optionalText(500),
+  text: optionalText(12_000), tree: semanticNodeSchema,
+  rect: z.object({
+    x: z.number().finite().min(-20_000).max(20_000),
+    y: z.number().finite().min(-20_000).max(20_000),
+    width: z.number().finite().min(0).max(20_000),
+    height: z.number().finite().min(0).max(20_000)
+  }).strict()
+}).strict();
+
 const browserMessageSchema = z.discriminatedUnion("type", [
   z.object({
     version: z.literal(1), type: z.literal("hello"),
@@ -35,6 +46,7 @@ const browserMessageSchema = z.discriminatedUnion("type", [
       attributes: z.record(z.string().max(80), z.string().max(2_000)).optional(),
       ancestors: z.array(z.object({ tag: text(40), role: optionalText(80), name: optionalText(300) }).strict()).max(8),
       tree: semanticNodeSchema,
+      context: contextElementSchema.optional(),
       rect: z.object({
         x: z.number().finite().min(-20_000).max(20_000),
         y: z.number().finite().min(-20_000).max(20_000),

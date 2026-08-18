@@ -159,9 +159,10 @@ export class ContextAttachmentStore {
 
     const image = await this.#captureImage(target.window);
     this.#targets.delete(requestId);
-    const text = boundedBrowserText(capture.selection ?? capture.element.text);
+    const text = boundedBrowserText(capture.selection ?? capture.element.context?.text ?? capture.element.text);
     const element = semanticElementText(capture);
-    const title = (capture.element.name ?? capture.title ?? target.title ?? "Browser element").slice(0, 160);
+    const title = (capture.element.text ?? capture.element.name ?? capture.element.context?.name
+      ?? capture.title ?? target.title ?? "Browser element").slice(0, 160);
     const representations: ContextAttachmentView["representations"] = [
       { id: "element", kind: "element", label: "Element", preview: elementPreview(capture), confidence: elementConfidence(capture) }
     ];
@@ -316,9 +317,11 @@ function boundedBrowserText(value?: string): string | undefined {
 function semanticElementText(capture: BrowserCapture): string {
   const nodes = { count: 0 };
   const tree = boundedSemanticNode(capture.element.tree, 0, nodes);
+  const context = capture.element.context;
+  const contextTree = context === undefined ? undefined : boundedSemanticNode(context.tree, 0, { count: 0 });
   return JSON.stringify({
     page: { url: safePageUrl(capture.url), title: capture.title },
-    element: {
+    target: {
       tag: capture.element.tag,
       ...(capture.element.role === undefined ? {} : { role: capture.element.role }),
       ...(capture.element.name === undefined ? {} : { name: capture.element.name }),
@@ -327,7 +330,15 @@ function semanticElementText(capture: BrowserCapture): string {
       ancestors: capture.element.ancestors,
       rect: capture.element.rect,
       tree
-    }
+    },
+    ...(context === undefined ? {} : { context: {
+      tag: context.tag,
+      ...(context.role === undefined ? {} : { role: context.role }),
+      ...(context.name === undefined ? {} : { name: context.name }),
+      ...(context.text === undefined ? {} : { text: context.text.slice(0, 12_000) }),
+      rect: context.rect,
+      tree: contextTree
+    } })
   }, null, 2).slice(0, 32_000);
 }
 
@@ -358,8 +369,10 @@ function safePageUrl(value: string): string {
 }
 
 function elementPreview(capture: BrowserCapture): string {
-  const identity = capture.element.name ?? capture.element.text ?? capture.element.role ?? capture.element.tag;
-  return `${capture.element.role ?? capture.element.tag}: ${identity}`.replaceAll(/\s+/gu, " ").slice(0, 320);
+  const identity = capture.element.text ?? capture.element.name ?? capture.element.role ?? capture.element.tag;
+  const context = capture.element.context;
+  const scope = context === undefined ? "" : ` · in ${context.role ?? context.tag}: ${context.name ?? context.text ?? context.tag}`;
+  return `${capture.element.role ?? capture.element.tag}: ${identity}${scope}`.replaceAll(/\s+/gu, " ").slice(0, 320);
 }
 
 function elementConfidence(capture: BrowserCapture): number {

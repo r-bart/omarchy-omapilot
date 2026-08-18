@@ -86,10 +86,36 @@
 
   function chooseTarget(target) {
     if (!(target instanceof Element)) return document.body;
-    return target.closest("a,button,input,select,textarea,code,pre,tr,li,article,section,nav,main,[role]") ?? target;
+    return target.closest("a,button,input,select,textarea,code,pre,img,svg,canvas,video,tr,li,[role]") ?? target;
   }
 
-  function snapshot(element) {
+  function chooseContext(element) {
+    if (!(element instanceof Element)) return document.body;
+    const container = element.closest("article,section,form,fieldset,figure,blockquote,li,tr,[role=article],[role=region],[role=dialog],[role=group]");
+    if (container) return container;
+    return element.closest("main,[role=main]") ?? element;
+  }
+
+  function visibleText(element, max = 12_000) {
+    return sensitive(element) ? undefined : cleanText(element.innerText || element.textContent, max);
+  }
+
+  function contextSnapshot(element) {
+    const rect = element.getBoundingClientRect();
+    const value = {
+      tag: element.tagName.toLowerCase(),
+      tree: semanticNode(element, 0, { count: 0 }),
+      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+    };
+    const role = explicitRole(element); const name = accessibleName(element);
+    const text = visibleText(element);
+    if (role) value.role = role;
+    if (name) value.name = name;
+    if (text) value.text = text;
+    return value;
+  }
+
+  function snapshot(element, context) {
     const rect = element.getBoundingClientRect();
     const ancestors = [];
     for (let current = element.parentElement; current && ancestors.length < 8; current = current.parentElement) {
@@ -103,10 +129,11 @@
       tag: element.tagName.toLowerCase(),
       ancestors,
       tree: semanticNode(element, 0, { count: 0 }),
-      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      ...(context === element ? {} : { context: contextSnapshot(context) })
     };
     const role = explicitRole(element); const name = accessibleName(element);
-    const text = sensitive(element) ? undefined : cleanText(element.innerText || element.textContent, 12_000);
+    const text = visibleText(element);
     const attributes = safeAttributes(element);
     if (role) value.role = role;
     if (name) value.name = name;
@@ -127,9 +154,12 @@
 
   function updateOverlay(element) {
     ensureOverlay();
-    const rect = element.getBoundingClientRect();
+    const context = chooseContext(element);
+    const rect = context.getBoundingClientRect();
     Object.assign(highlight.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
-    label.textContent = `OmaPilot · ${explicitRole(element) ?? element.tagName.toLowerCase()} · click to clip · Esc to cancel`;
+    const targetLabel = visibleText(element, 80) ?? accessibleName(element) ?? element.tagName.toLowerCase();
+    const contextLabel = accessibleName(context) ?? context.tagName.toLowerCase();
+    label.textContent = `OmaPilot · ${contextLabel} · target ${targetLabel} · click to clip · Esc to cancel`;
     const top = rect.top >= 32 ? rect.top - 28 : Math.min(innerHeight - 28, rect.bottom + 4);
     Object.assign(label.style, { left: `${Math.max(4, Math.min(innerWidth - 324, rect.left))}px`, top: `${Math.max(4, top)}px` });
   }
@@ -144,14 +174,14 @@
   function onMove(event) { updateOverlay(chooseTarget(event.target)); }
   function onClick(event) {
     event.preventDefault(); event.stopImmediatePropagation();
-    const requestId = active; const element = chooseTarget(event.target);
+    const requestId = active; const element = chooseTarget(event.target); const context = chooseContext(element);
     cleanup();
     if (!requestId) return;
     api.runtime.sendMessage({
       version: 1, type: "picker.result", requestId,
       title: document.title.slice(0, 500), url: safePageUrl(),
       ...(lastSelection ? { selection: lastSelection } : {}),
-      element: snapshot(element)
+      element: snapshot(element, context)
     });
   }
   function onKey(event) {

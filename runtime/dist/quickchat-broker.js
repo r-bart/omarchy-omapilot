@@ -19385,9 +19385,9 @@ var ContextAttachmentStore = class {
     }
     const image = await this.#captureImage(target.window);
     this.#targets.delete(requestId);
-    const text2 = boundedBrowserText(capture.selection ?? capture.element.text);
+    const text2 = boundedBrowserText(capture.selection ?? capture.element.context?.text ?? capture.element.text);
     const element = semanticElementText(capture);
-    const title = (capture.element.name ?? capture.title ?? target.title ?? "Browser element").slice(0, 160);
+    const title = (capture.element.text ?? capture.element.name ?? capture.element.context?.name ?? capture.title ?? target.title ?? "Browser element").slice(0, 160);
     const representations = [
       { id: "element", kind: "element", label: "Element", preview: elementPreview(capture), confidence: elementConfidence(capture) }
     ];
@@ -19544,9 +19544,11 @@ function boundedBrowserText(value) {
 function semanticElementText(capture) {
   const nodes = { count: 0 };
   const tree = boundedSemanticNode(capture.element.tree, 0, nodes);
+  const context = capture.element.context;
+  const contextTree = context === void 0 ? void 0 : boundedSemanticNode(context.tree, 0, { count: 0 });
   return JSON.stringify({
     page: { url: safePageUrl(capture.url), title: capture.title },
-    element: {
+    target: {
       tag: capture.element.tag,
       ...capture.element.role === void 0 ? {} : { role: capture.element.role },
       ...capture.element.name === void 0 ? {} : { name: capture.element.name },
@@ -19555,7 +19557,15 @@ function semanticElementText(capture) {
       ancestors: capture.element.ancestors,
       rect: capture.element.rect,
       tree
-    }
+    },
+    ...context === void 0 ? {} : { context: {
+      tag: context.tag,
+      ...context.role === void 0 ? {} : { role: context.role },
+      ...context.name === void 0 ? {} : { name: context.name },
+      ...context.text === void 0 ? {} : { text: context.text.slice(0, 12e3) },
+      rect: context.rect,
+      tree: contextTree
+    } }
   }, null, 2).slice(0, 32e3);
 }
 function boundedSemanticNode(node, depth, state) {
@@ -19584,8 +19594,10 @@ function safePageUrl(value) {
   }
 }
 function elementPreview(capture) {
-  const identity = capture.element.name ?? capture.element.text ?? capture.element.role ?? capture.element.tag;
-  return `${capture.element.role ?? capture.element.tag}: ${identity}`.replaceAll(/\s+/gu, " ").slice(0, 320);
+  const identity = capture.element.text ?? capture.element.name ?? capture.element.role ?? capture.element.tag;
+  const context = capture.element.context;
+  const scope = context === void 0 ? "" : ` \xB7 in ${context.role ?? context.tag}: ${context.name ?? context.text ?? context.tag}`;
+  return `${capture.element.role ?? capture.element.tag}: ${identity}${scope}`.replaceAll(/\s+/gu, " ").slice(0, 320);
 }
 function elementConfidence(capture) {
   if (capture.element.role !== void 0 || /^(?:a|button|code|pre|table|tr|article|main|nav|input|select|textarea)$/u.test(capture.element.tag)) return 0.96;
@@ -20118,6 +20130,19 @@ var semanticNodeSchema = external_exports.lazy(() => external_exports.object({
   attributes: external_exports.record(external_exports.string().max(80), external_exports.string().max(2e3)).optional(),
   children: external_exports.array(semanticNodeSchema).max(40).optional()
 }).strict());
+var contextElementSchema = external_exports.object({
+  tag: text(40),
+  role: optionalText(80),
+  name: optionalText(500),
+  text: optionalText(12e3),
+  tree: semanticNodeSchema,
+  rect: external_exports.object({
+    x: external_exports.number().finite().min(-2e4).max(2e4),
+    y: external_exports.number().finite().min(-2e4).max(2e4),
+    width: external_exports.number().finite().min(0).max(2e4),
+    height: external_exports.number().finite().min(0).max(2e4)
+  }).strict()
+}).strict();
 var browserMessageSchema = external_exports.discriminatedUnion("type", [
   external_exports.object({
     version: external_exports.literal(1),
@@ -20150,6 +20175,7 @@ var browserMessageSchema = external_exports.discriminatedUnion("type", [
       attributes: external_exports.record(external_exports.string().max(80), external_exports.string().max(2e3)).optional(),
       ancestors: external_exports.array(external_exports.object({ tag: text(40), role: optionalText(80), name: optionalText(300) }).strict()).max(8),
       tree: semanticNodeSchema,
+      context: contextElementSchema.optional(),
       rect: external_exports.object({
         x: external_exports.number().finite().min(-2e4).max(2e4),
         y: external_exports.number().finite().min(-2e4).max(2e4),
