@@ -18,6 +18,7 @@ Item {
   property int deletedCount: 0
   property string deletedChatId: ""
   property int closeCount: 0
+  property int cancelledCount: 0
 
   ListView {
     id: historyList
@@ -42,6 +43,10 @@ Item {
         root.deletedChatId = chatId
       }
       onCloseRequested: root.closeCount += 1
+      onConfirmationCancelled: {
+        root.cancelledCount += 1
+        root.confirmingClear = false
+      }
     }
   }
 
@@ -56,6 +61,7 @@ Item {
       root.deletedCount = 0
       root.deletedChatId = ""
       root.closeCount = 0
+      root.cancelledCount = 0
       historyList.currentIndex = 0
       historyList.forceActiveFocus()
       wait(0)
@@ -69,12 +75,23 @@ Item {
       compare(historyList.currentIndex, 1)
 
       root.confirmingClear = true
-      var guardedKeys = [Qt.Key_Up, Qt.Key_K, Qt.Key_Down, Qt.Key_J]
+      var guardedKeys = [
+        Qt.Key_Up, Qt.Key_K, Qt.Key_Down, Qt.Key_J,
+        Qt.Key_Return, Qt.Key_Enter, Qt.Key_Delete
+      ]
       for (var i = 0; i < guardedKeys.length; i++) {
         keyClick(guardedKeys[i])
         compare(historyList.currentIndex, 1)
         verify(historyList.activeFocus)
+        compare(root.selectedCount, 0)
+        compare(root.deletedCount, 0)
+        compare(root.closeCount, 0)
       }
+
+      keyClick(Qt.Key_Escape)
+      compare(root.cancelledCount, 1)
+      verify(!root.confirmingClear)
+      compare(root.closeCount, 0)
     }
 
     function test_keypadModifierRemainsSupported() {

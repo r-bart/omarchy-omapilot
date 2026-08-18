@@ -43,6 +43,7 @@ Item {
       }
 
       Button {
+        id: clearHistory
         text: root.confirmingClear ? "Confirm clear" : "Clear all"
         visible: root.history.length > 0
         foreground: root.confirmingClear ? Color.urgent : root.foreground
@@ -105,6 +106,10 @@ Item {
           onChatSelected: function(chat) { root.chatSelected(chat) }
           onDeleteRequested: function(chatId) { root.deleteRequested(chatId) }
           onCloseRequested: root.closeRequested()
+          onConfirmationCancelled: {
+            root.confirmingClear = false
+            clearHistory.forceActiveFocus()
+          }
         }
 
         delegate: BorderSurface {
