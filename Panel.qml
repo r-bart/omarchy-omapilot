@@ -54,6 +54,15 @@ Panel {
   readonly property bool responseActivityActive:
     Quickchat.QuickchatStore.state === "preparing"
     || Quickchat.QuickchatStore.state === "streaming"
+  readonly property bool panelWindowActive: panelFocus.Window.window
+    ? panelFocus.Window.window.active : false
+  readonly property bool modalInteractionActive: composer.popupOpen
+    || Quickchat.QuickchatStore.pendingPermission !== null
+    || root.previewSource !== ""
+    || (root.viewMode === "settings" && settingsView.modalInteractionActive)
+    || (root.viewMode === "history" && historyView.modalInteractionActive)
+  readonly property bool workInAppActionAvailable:
+    ActionCatalog.promptFor(root.quickActionItems, "work-in-app") !== ""
 
   function persistSettings(values) {
     var entry = { id: root.moduleName }
@@ -79,6 +88,12 @@ Panel {
 
   function setQuickActions(actions) {
     persistSettings({ quickActionsJson: ActionCatalog.serializedActions(actions) })
+  }
+
+  function prepareWorkInAppDraft() {
+    var prompt = ActionCatalog.promptFor(root.quickActionItems, "work-in-app")
+    if (prompt === "" || root.viewMode !== "chat" || Quickchat.QuickchatStore.busy) return
+    composer.setDraft(prompt)
   }
 
   function open() {
@@ -235,6 +250,20 @@ Panel {
       id: panelFocus
       anchors.fill: parent
       focus: true
+      Keys.onPressed: function(event) { panelKeyboardNavigation.handleKey(event) }
+
+      QuickchatInternal.PanelKeyboardNavigation {
+        id: panelKeyboardNavigation
+        focusRoot: panelFocus
+        activeFocusItem: panelFocus.Window.window
+          ? panelFocus.Window.window.activeFocusItem : null
+        panelActive: root.opened && root.panelWindowActive
+        modalInteractionActive: root.modalInteractionActive
+        workInAppShortcutEnabled: root.viewMode === "chat"
+          && root.workInAppActionAvailable
+          && !Quickchat.QuickchatStore.busy
+        onWorkInAppRequested: root.prepareWorkInAppDraft()
+      }
 
       ColumnLayout {
         id: chatView
@@ -686,6 +715,7 @@ Panel {
           background: root.surface
           accent: root.accent
           fontFamily: root.fontFamily
+          workInAppShortcutText: "Ctrl+Shift+A"
           onActionRequested: function(actionId, prompt) { composer.setDraft(prompt) }
         }
       }

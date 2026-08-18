@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 import "Protocol.js" as Protocol
+import "internal" as QuickchatInternal
 
 Item {
   id: root
@@ -13,6 +14,7 @@ Item {
   property color accent: Color.accent
   property string fontFamily: Style.font.family
   property bool confirmingClear: false
+  readonly property bool modalInteractionActive: confirmingClear
 
   signal chatSelected(var chat)
   signal deleteRequested(string chatId)
@@ -93,19 +95,16 @@ Item {
         activeFocusOnTab: true
         currentIndex: count > 0 ? 0 : -1
 
-        Keys.onPressed: function(event) {
-          if (event.key === Qt.Key_Down) {
-            currentIndex = Math.min(count - 1, currentIndex + 1); event.accepted = true
-          } else if (event.key === Qt.Key_Up) {
-            currentIndex = Math.max(0, currentIndex - 1); event.accepted = true
-          } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (currentIndex >= 0) root.chatSelected(root.history[currentIndex])
-            event.accepted = true
-          } else if (event.key === Qt.Key_Delete && currentIndex >= 0) {
-            root.deleteRequested(String(root.history[currentIndex].id)); event.accepted = true
-          } else if (event.key === Qt.Key_Escape) {
-            root.closeRequested(); event.accepted = true
-          }
+        Keys.onPressed: function(event) { historyKeyboard.handleKey(event) }
+
+        QuickchatInternal.HistoryListKeyboardHandler {
+          id: historyKeyboard
+          list: list
+          history: root.history
+          confirmingClear: root.confirmingClear
+          onChatSelected: function(chat) { root.chatSelected(chat) }
+          onDeleteRequested: function(chatId) { root.deleteRequested(chatId) }
+          onCloseRequested: root.closeRequested()
         }
 
         delegate: BorderSurface {
