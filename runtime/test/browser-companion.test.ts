@@ -37,7 +37,7 @@ describe("browser companion broker", () => {
     client.write(`${JSON.stringify({ version: 1, type: "hello", family: "chromium", browser: "Chromium", extensionVersion: "0.1.0" })}\n`);
     await until(() => lines.some((line) => line.type === "hello.ack"));
 
-    const arm = server.tryArm("clip-1", "chromium", "Documentation - Chromium");
+    const arm = server.tryArm("clip-1", "chromium-browser", "Documentation - Chromium");
     await until(() => lines.some((line) => line.type === "probe"));
     client.write(`${JSON.stringify({
       version: 1, type: "probe.result", requestId: "clip-1", available: true,

@@ -19284,7 +19284,7 @@ var ContextAttachmentStore = class {
   }
   async begin(id, hint) {
     const monitors = await this.#monitors();
-    const window = hint?.bounds;
+    const window = hint?.bounds ?? await this.#activeWindowBounds(hint?.appId);
     const monitor = monitorFor(window, monitors) ?? monitors.find((value) => value.focused) ?? monitors[0];
     if (monitor === void 0) throw new ContextAttachmentError("context_monitor", "No active monitor is available for capture");
     const target = {
@@ -19300,6 +19300,21 @@ var ContextAttachmentStore = class {
       this.#targets.delete(oldest);
     }
     return target;
+  }
+  async #activeWindowBounds(expectedAppId) {
+    try {
+      const hyprctl = await resolveExecutable("hyprctl", this.#env);
+      if (hyprctl === void 0) return void 0;
+      const result = await runCommand(hyprctl, ["-j", "activewindow"], {
+        env: this.#env,
+        timeoutMs: 5e3,
+        maxOutput: 256e3
+      });
+      if (result.code !== 0) return void 0;
+      return windowBoundsFromHyprland(JSON.parse(result.stdout), expectedAppId);
+    } catch {
+      return void 0;
+    }
   }
   cancel(requestId) {
     this.#targets.delete(requestId);
@@ -19638,6 +19653,20 @@ function intersects(left, right) {
 }
 function sensitiveTarget(target) {
   return /(?:password|passphrase|credential|1password|bitwarden|keepass)/iu.test(`${target.appId ?? ""} ${target.title ?? ""}`);
+}
+function windowBoundsFromHyprland(value, expectedAppId) {
+  if (!isObject4(value)) return void 0;
+  const appId = typeof value.class === "string" ? value.class : typeof value.initialClass === "string" ? value.initialClass : "";
+  if (expectedAppId !== void 0 && appId.trim().toLowerCase() !== expectedAppId.trim().toLowerCase()) return void 0;
+  const at = Array.isArray(value.at) ? value.at : [];
+  const size = Array.isArray(value.size) ? value.size : [];
+  const x = integer2(at[0]);
+  const y = integer2(at[1]);
+  const width = integer2(size[0]);
+  const height = integer2(size[1]);
+  if (x === void 0 || y === void 0 || width === void 0 || height === void 0 || width < 1 || height < 1)
+    return void 0;
+  return { x, y, width, height };
 }
 function rectangleDistance(point, row) {
   const dx = Math.max(row.x - point.x, 0, point.x - (row.x + row.width));
@@ -20309,7 +20338,7 @@ var BrowserCompanionServer = class {
 };
 function browserFamily(appId) {
   const value = appId?.trim().toLowerCase() ?? "";
-  if (/^(?:chromium|google-chrome(?:-stable)?|chrome|brave-browser|brave-browser-beta|microsoft-edge(?:-stable|-dev)?|vivaldi-stable|helium)$/.test(value))
+  if (/^(?:chromium(?:-browser)?|google-chrome(?:-stable)?|chrome|brave-browser|brave-browser-beta|microsoft-edge(?:-stable|-dev)?|vivaldi-stable|helium)$/.test(value))
     return "chromium";
   if (/^(?:firefox|zen|zen-browser|librewolf)$/.test(value)) return "firefox";
   return void 0;

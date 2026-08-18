@@ -247,7 +247,7 @@ export class BrowserCompanionServer {
 
 function browserFamily(appId?: string): BrowserFamily | undefined {
   const value = appId?.trim().toLowerCase() ?? "";
-  if (/^(?:chromium|google-chrome(?:-stable)?|chrome|brave-browser|brave-browser-beta|microsoft-edge(?:-stable|-dev)?|vivaldi-stable|helium)$/.test(value))
+  if (/^(?:chromium(?:-browser)?|google-chrome(?:-stable)?|chrome|brave-browser|brave-browser-beta|microsoft-edge(?:-stable|-dev)?|vivaldi-stable|helium)$/.test(value))
     return "chromium";
   if (/^(?:firefox|zen|zen-browser|librewolf)$/.test(value)) return "firefox";
   return undefined;

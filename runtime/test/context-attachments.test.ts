@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { ContextAttachmentStore, textAtPointFromTsv } from "../src/context-attachments.js";
+import { ContextAttachmentStore, textAtPointFromTsv, windowBoundsFromHyprland } from "../src/context-attachments.js";
 import { promptWithContextAttachments } from "../src/context.js";
 import { ImageStore } from "../src/images.js";
 import { quickchatPaths } from "../src/paths.js";
@@ -13,6 +13,12 @@ const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
 describe("explicit context attachments", () => {
+  it("recovers focused window geometry when Quickshell omits it", () => {
+    const active = { class: "chromium-browser", at: [807, 38], size: [781, 950] };
+    expect(windowBoundsFromHyprland(active, "chromium-browser")).toEqual({ x: 807, y: 38, width: 781, height: 950 });
+    expect(windowBoundsFromHyprland(active, "firefox")).toBeUndefined();
+  });
+
   it("selects the OCR paragraph beneath the pointer instead of unrelated visible text", () => {
     const tsv = [
       header,

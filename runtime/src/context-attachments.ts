@@ -45,7 +45,7 @@ export class ContextAttachmentStore {
 
   async begin(id: string, hint?: TargetHint): Promise<CaptureTarget> {
     const monitors = await this.#monitors();
-    const window = hint?.bounds;
+    const window = hint?.bounds ?? await this.#activeWindowBounds(hint?.appId);
     const monitor = monitorFor(window, monitors) ?? monitors.find((value) => value.focused) ?? monitors[0];
     if (monitor === undefined) throw new ContextAttachmentError("context_monitor", "No active monitor is available for capture");
     const target: CaptureTarget = {
@@ -61,6 +61,20 @@ export class ContextAttachmentStore {
       this.#targets.delete(oldest);
     }
     return target;
+  }
+
+  async #activeWindowBounds(expectedAppId?: string): Promise<Rectangle | undefined> {
+    try {
+      const hyprctl = await resolveExecutable("hyprctl", this.#env);
+      if (hyprctl === undefined) return undefined;
+      const result = await runCommand(hyprctl, ["-j", "activewindow"], {
+        env: this.#env, timeoutMs: 5_000, maxOutput: 256_000
+      });
+      if (result.code !== 0) return undefined;
+      return windowBoundsFromHyprland(JSON.parse(result.stdout), expectedAppId);
+    } catch {
+      return undefined;
+    }
   }
 
   cancel(requestId: string): void {
@@ -433,6 +447,20 @@ function intersects(left: Rectangle, right: Rectangle): boolean {
 
 function sensitiveTarget(target: CaptureTarget): boolean {
   return /(?:password|passphrase|credential|1password|bitwarden|keepass)/iu.test(`${target.appId ?? ""} ${target.title ?? ""}`);
+}
+
+export function windowBoundsFromHyprland(value: unknown, expectedAppId?: string): Rectangle | undefined {
+  if (!isObject(value)) return undefined;
+  const appId = typeof value.class === "string" ? value.class
+    : typeof value.initialClass === "string" ? value.initialClass : "";
+  if (expectedAppId !== undefined && appId.trim().toLowerCase() !== expectedAppId.trim().toLowerCase()) return undefined;
+  const at = Array.isArray(value.at) ? value.at : [];
+  const size = Array.isArray(value.size) ? value.size : [];
+  const x = integer(at[0]); const y = integer(at[1]);
+  const width = integer(size[0]); const height = integer(size[1]);
+  if (x === undefined || y === undefined || width === undefined || height === undefined || width < 1 || height < 1)
+    return undefined;
+  return { x, y, width, height };
 }
 
 function rectangleDistance(point: { x: number; y: number }, row: Rectangle): number {

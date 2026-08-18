@@ -23,14 +23,17 @@ function browserName() {
 
 function connectNative() {
   clearTimeout(reconnectTimer);
+  if (nativePort) return;
   try {
-    nativePort = api.runtime.connectNative(HOST);
-    nativePort.onMessage.addListener(handleNativeMessage);
-    nativePort.onDisconnect.addListener(() => {
+    const port = api.runtime.connectNative(HOST);
+    nativePort = port;
+    port.onMessage.addListener(handleNativeMessage);
+    port.onDisconnect.addListener(() => {
+      if (nativePort !== port) return;
       nativePort = undefined;
       reconnectTimer = setTimeout(connectNative, 2_000);
     });
-    nativePort.postMessage({
+    port.postMessage({
       version: 1,
       type: "hello",
       family: browserFamily(),
