@@ -18,6 +18,37 @@ TestCase {
     verify(!Protocol.isCompatibleEvent({}))
   }
 
+  function test_readyProviderUpdateClearsStaleUnavailableState() {
+    compare(Protocol.providerReadyState("unavailable", 1), "composing")
+    compare(Protocol.providerReadyState("preparing", 1), "composing")
+    compare(Protocol.providerReadyState("complete", 1), "complete")
+    compare(Protocol.providerReadyState("unavailable", 0), "unavailable")
+  }
+
+  function test_builtinAuthNormalizesMethodsAndProviderPrompts() {
+    var methods = Protocol.normalizedAuthMethods([
+      { id: "openai-codex::oauth", providerId: "openai-codex", authType: "oauth",
+        label: "ChatGPT", description: "Subscription" },
+      { id: "bad method", providerId: "bad", authType: "shell", label: "Bad" }
+    ])
+    compare(methods.length, 1)
+    compare(methods[0].value, "openai-codex::oauth")
+    var event = Protocol.normalizedAuthEvent({
+      phase: "prompt", flowId: "flow", methodId: "openai-codex::oauth",
+      prompt: { id: "prompt", kind: "select", message: "Choose sign-in method", options: [
+        { id: "browser", label: "Browser" }, { id: "device_code", label: "Device code" }
+      ] }
+    })
+    compare(event.prompt.kind, "select")
+    compare(event.prompt.options.length, 2)
+    compare(event.prompt.options[1].value, "device_code")
+    compare(Protocol.normalizedAuthEvent({
+      phase: "prompt", flowId: "flow", methodId: "openai-codex::oauth",
+      prompt: { id: "manual", kind: "manual_code", message: "Paste callback URL" }
+    }).prompt, null)
+    compare(Protocol.normalizedAuthEvent({ phase: "credential_dump" }), null)
+  }
+
   function test_desktopContextRequiresBrokerFeatureAdvertisement() {
     verify(Protocol.hasFeature(["desktop-context"], "desktop-context"))
     verify(!Protocol.hasFeature([], "desktop-context"))
@@ -193,6 +224,12 @@ TestCase {
     verify(payload.capability === undefined)
     payload = Protocol.submitCommand("3", "Act", "codex", "", null, true)
     verify(payload.dangerousAutoApprove)
+  }
+
+  function test_followUpSubmitCarriesOnlyAValidSavedChatId() {
+    var saved = "11111111-1111-4111-8111-111111111111"
+    compare(Protocol.submitCommand("turn", "Follow up", "builtin", "", null, false, [], saved).resumeChatId, saved)
+    verify(Protocol.submitCommand("turn", "Follow up", "builtin", "", null, false, [], "not-a-chat").resumeChatId === undefined)
   }
 
   function test_submitIncludesOnlyBoundedSanitizedDesktopContext() {

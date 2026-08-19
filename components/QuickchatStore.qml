@@ -21,7 +21,6 @@ Scope {
     return url
   }
   readonly property string brokerPath: Quickshell.env("QUICKCHAT_BROKER_PATH") || bundledBrokerPath
-
   property string state: "preparing"
   property string statusMessage: "Starting OmaPilot…"
   property string currentId: ""
@@ -31,6 +30,9 @@ Scope {
   property var errorDetails: null
   property var images: []
   property var providers: []
+  property var builtinAuthMethods: []
+  property var builtinAuth: ({ phase: "idle", flowId: "", methodId: "", message: "", url: "",
+    verificationUri: "", userCode: "", prompt: null })
   property var history: []
   property string provider: "builtin"
   property string model: ""
@@ -73,6 +75,8 @@ Scope {
     || browserCompanionStatus.firefoxConnected === true
   readonly property bool browserCompanionBusy: browserCompanionStatus.phase === "installing"
     || browserCompanionStatus.phase === "removing"
+  readonly property bool builtinAuthBusy: ["starting", "prompt", "info", "browser", "device_code"]
+    .indexOf(String(builtinAuth.phase || "")) >= 0
 
   signal answerChanged()
   signal focusComposerRequested()
@@ -206,6 +210,7 @@ Scope {
   function submit(text) {
     var prompt = String(text || "").trim()
     if (!prompt || !canSubmit) return false
+    var resumeChatId = currentChatId
     currentId = "qml-" + Date.now() + "-" + Math.floor(Math.random() * 100000)
     currentChatId = ""
     question = prompt
@@ -224,7 +229,7 @@ Scope {
     }
     var autoApprove = configuredDangerousAutoApprove
     sendCommand(Protocol.submitCommand(
-      currentId, prompt, provider, model, context, autoApprove, attachmentSelections))
+      currentId, prompt, provider, model, context, autoApprove, attachmentSelections, resumeChatId))
     contextAttachments = []
     answerChanged()
     return true
@@ -407,6 +412,34 @@ Scope {
     } else broker.running = true
   }
 
+  function authenticateBuiltIn(methodId) {
+    if (provider !== "builtin" || builtinAuthBusy) return
+    var selected = String(methodId || "")
+    if (selected === "" && builtinAuthMethods.length > 0) selected = String(builtinAuthMethods[0].value || "")
+    if (selected === "") return
+    builtinAuth = ({ phase: "starting", flowId: "", methodId: selected,
+      message: "Starting secure authentication…", url: "", verificationUri: "", userCode: "", prompt: null })
+    sendCommand(Protocol.command("auth_begin", { methodId: selected }))
+  }
+
+  function respondBuiltInAuth(value) {
+    var prompt = builtinAuth.prompt
+    if (!prompt || !builtinAuth.flowId) return
+    sendCommand(Protocol.command("auth_response", {
+      flowId: String(builtinAuth.flowId), promptId: String(prompt.id || ""), value: String(value || "")
+    }))
+    var next = {}
+    for (var key in builtinAuth) next[key] = builtinAuth[key]
+    next.prompt = null
+    next.phase = "info"
+    next.message = "Continuing authentication…"
+    builtinAuth = next
+  }
+
+  function cancelBuiltInAuth() {
+    if (!builtinAuth.flowId) return
+    sendCommand(Protocol.command("auth_cancel", { flowId: String(builtinAuth.flowId) }))
+  }
   function activateLink(url) {
     var value = String(url || "")
     if (Protocol.isImageLink(value)) {
@@ -451,12 +484,11 @@ Scope {
     providers = Protocol.exactHarnessProviders(raw, configuredProvider)
     if (providers.length === 0) {
       state = "unavailable"
-      var configHome = Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")
       var mismatched = discovered.length > 0
       statusMessage = mismatched
         ? "OmaPilot refused an unexpected harness response. Restart the selected harness and try again."
         : configuredProvider === "builtin"
-          ? "Built-in (OmaPilot) needs authentication. In a terminal run PI_CODING_AGENT_DIR=\"" + configHome + "/omapilot\" pi, choose /login, then Retry."
+          ? "Built-in (OmaPilot) needs authentication. Finish the secure setup in Settings."
           : Protocol.providerLabel(configuredProvider) + " is unavailable. Install and sign in to it, then retry or choose another harness in Settings."
       errorDetails = Protocol.normalizedError({
         unavailable: true,
@@ -468,6 +500,12 @@ Scope {
     }
     provider = configuredProvider
     selectProvider(configuredProvider)
+    var readyState = Protocol.providerReadyState(state, providers.length)
+    if (readyState !== state) {
+      state = readyState
+      statusMessage = ""
+      errorDetails = null
+    }
   }
 
   function prependHistory(chat) {
@@ -500,15 +538,36 @@ Scope {
       brokerContextAttachmentsSupported = Protocol.hasFeature(event.features, "context-attachments")
       applyProviders(event.providers || [])
       history = Protocol.normalizedHistory(event.history || [])
-      if (providers.length > 0 && (state === "preparing" || state === "unavailable")) {
-        state = "composing"
-        statusMessage = ""
-        errorDetails = null
-      }
       return
     }
     if (type === "providers") {
       applyProviders(event.providers || [])
+      return
+    }
+    if (type === "auth_methods") {
+      builtinAuthMethods = Protocol.normalizedAuthMethods(event.methods || [])
+      return
+    }
+    if (type === "auth") {
+      var authEvent = Protocol.normalizedAuthEvent(event)
+      if (!authEvent) return
+      if (authEvent.phase !== "starting" && builtinAuth.flowId
+          && authEvent.flowId !== String(builtinAuth.flowId)) return
+      if (!builtinAuth.flowId && authEvent.phase !== "starting" && builtinAuth.methodId
+          && authEvent.methodId !== String(builtinAuth.methodId)) return
+      var merged = {}
+      for (var authKey in builtinAuth) merged[authKey] = builtinAuth[authKey]
+      for (var eventKey in authEvent) {
+        if (eventKey === "prompt" && authEvent.prompt === null && authEvent.phase !== "complete"
+            && authEvent.phase !== "cancelled" && authEvent.phase !== "error") continue
+        if ((eventKey === "url" || eventKey === "verificationUri" || eventKey === "userCode")
+            && String(authEvent[eventKey] || "") === "") continue
+        merged[eventKey] = authEvent[eventKey]
+      }
+      builtinAuth = merged
+      if (authEvent.phase === "browser" && authEvent.url) activateLink(authEvent.url)
+      else if (authEvent.phase === "device_code" && authEvent.verificationUri) activateLink(authEvent.verificationUri)
+      if (authEvent.phase === "complete") toastRequested("Built-in authentication complete")
       return
     }
     if (type === "state") {

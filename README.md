@@ -17,6 +17,9 @@ The compact composer expands from the right side of the bar. Its result panel
 supports selectable Markdown, code blocks, tables, safe clickable links,
 bounded images, Copy, New chat, History, and Continue in Herdr. The in-panel
 settings pane can add, edit, remove, and reorder up to five quick actions.
+Built-in follow-ups resume the same durable Pi conversation until **New chat**
+is selected, including after the shell restarts. **Continue in Herdr** opens
+that same Pi session with OmaPilot's private auth and session directories.
 Waiting and streaming use one theme-native perimeter runner around the response
 surface. One GPU-blurred accent form replaces the old route glyph without a
 separate hard stroke or fake progress; phase changes never restart the runner,
@@ -44,6 +47,12 @@ coding tools behind OmaPilot's approval broker. See [Native Pi harness configura
 The Harness setting explicitly selects **Built-in (OmaPilot)**, **Codex**,
 **Claude**, or **OpenCode**. The latter three are ACP harnesses and must already
 be installed and signed in. OmaPilot never substitutes one harness for another.
+When Built-in has no configured credential, its settings card offers
+subscription and API-key sign-in methods. OmaPilot runs Pi's typed login flow
+inside the broker, opens the provider's browser page for OAuth when needed, and
+renders provider choices, device codes, progress, and errors in Settings.
+Browser OAuth completes through a broker-owned localhost callback; callback
+URLs are never user input. It never opens the Pi terminal.
 
 ## Install
 
@@ -205,7 +214,7 @@ invalid entries, and caps it at five.
 
 | Path | Purpose |
 | --- | --- |
-| `${XDG_STATE_HOME:-~/.local/state}/quickchat/` | Atomic local history and resumable session metadata |
+| `${XDG_STATE_HOME:-~/.local/state}/quickchat/` | Atomic local history and durable Pi conversation sessions |
 | `${XDG_CACHE_HOME:-~/.cache}/quickchat/` | Bounded, validated image cache |
 | `${XDG_RUNTIME_DIR}/quickchat/` | Per-login sockets, temporary dictation, and in-flight data |
 

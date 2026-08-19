@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 import { afterEach, describe, expect, it } from "vitest";
-import { agentDirectory, configDirectory, discoverAgentProfiles, discoverPiProviders, existingSkillPaths, PiApprovalState, runNestedAgentPrompt, runPiQuestion } from "../src/pi-harness.js";
+import { agentDirectory, configDirectory, discoverAgentProfiles, discoverPiAuthMethods, discoverPiProviders, existingSkillPaths, loginPiProvider, PiApprovalState, runNestedAgentPrompt, runPiQuestion } from "../src/pi-harness.js";
 import type { BrokerEvent } from "../src/types.js";
 
 const roots: string[] = [];
@@ -19,6 +19,36 @@ describe("native Pi harness", () => {
     expect(agentDirectory(env)).toBe("/home/test/.agents");
     expect(configDirectory({ ...env, OMAPILOT_CONFIG_DIR: "/custom/config" })).toBe("/custom/config");
     expect(agentDirectory({ ...env, OMAPILOT_AGENTS_DIR: "/custom/agents" })).toBe("/custom/agents");
+  });
+
+  it("offers native subscription and API-key login methods without launching Pi", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-pi-auth-methods-"));
+    roots.push(root);
+    const agentDir = join(root, ".config/omapilot");
+    const methods = await discoverPiAuthMethods({ HOME: root, OMAPILOT_CONFIG_DIR: agentDir });
+    expect(methods).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "openai-codex::oauth", authType: "oauth" }),
+      expect.objectContaining({ id: "openai::api_key", authType: "api_key" }),
+      expect.objectContaining({ id: "anthropic::oauth", authType: "oauth" }),
+      expect.objectContaining({ id: "anthropic::api_key", authType: "api_key" })
+    ]));
+  });
+
+  it("persists an API key through Pi's typed background login interaction", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-pi-auth-login-"));
+    roots.push(root);
+    const agentDir = join(root, ".config/omapilot");
+    const prompts: Array<{ type: string; message: string }> = [];
+    await loginPiProvider({ HOME: root, OMAPILOT_CONFIG_DIR: agentDir }, "openai::api_key", {
+      signal: new AbortController().signal,
+      prompt: (prompt) => { prompts.push({ type: prompt.type, message: prompt.message }); return Promise.resolve("test-secret-key"); },
+      notify: () => undefined
+    });
+    expect(prompts).toEqual([expect.objectContaining({ type: "secret" })]);
+    const stored: unknown = JSON.parse(await readFile(join(agentDir, "auth.json"), "utf8"));
+    expect(stored).toMatchObject({ openai: { type: "api_key", key: "test-secret-key" } });
+    const providers = await discoverPiProviders({ HOME: root, OMAPILOT_CONFIG_DIR: agentDir });
+    expect(providers[0]?.models.some((model) => model.id.startsWith("openai::"))).toBe(true);
   });
 
   it("keeps session grants ephemeral and durable grants as command-free fingerprints", async () => {
@@ -135,8 +165,14 @@ describe("native Pi harness", () => {
   it("runs and streams a complete turn through an OpenAI-compatible endpoint", async () => {
     const root = await mkdtemp(join(tmpdir(), "omapilot-pi-run-"));
     roots.push(root);
-    const server = createServer((_request, response) => {
-      response.writeHead(200, { "content-type": "text/event-stream" });
+    const requests: unknown[] = [];
+    const server = createServer((request, response) => {
+      let body = "";
+      request.setEncoding("utf8");
+      request.on("data", (chunk: string) => { body += chunk; });
+      request.on("end", () => {
+        requests.push(JSON.parse(body));
+        response.writeHead(200, { "content-type": "text/event-stream" });
       response.write(`data: ${JSON.stringify({
         id: "chatcmpl-test", object: "chat.completion.chunk", created: 1, model: "coder",
         choices: [{ index: 0, delta: { role: "assistant", content: "Hello " }, finish_reason: null }]
@@ -150,7 +186,8 @@ describe("native Pi harness", () => {
         choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
         usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 }
       })}\n\ndata: [DONE]\n\n`);
-      response.end();
+        response.end();
+      });
     });
     await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
     try {
@@ -166,11 +203,26 @@ describe("native Pi harness", () => {
       if (provider === undefined) throw new Error("compatible provider was not discovered");
       const events: BrokerEvent[] = [];
       const run = runPiQuestion(provider, "pi-turn", "Say hello", "local::coder", (event) => events.push(event), 5_000);
-      await expect(run.result).resolves.toMatchObject({ answer: "Hello from Pi.", resumable: false });
+      const first = await run.result;
+      expect(first).toMatchObject({ answer: "Hello from Pi.", resumable: true });
+      const resumed = runPiQuestion(
+        provider, "pi-follow-up", "What did I ask?", "local::coder", (event) => events.push(event), 5_000,
+        undefined, undefined, first.sessionId
+      );
+      await expect(resumed.result).resolves.toMatchObject({ sessionId: first.sessionId, resumable: true });
       expect(events.filter((event) => event.type === "content")).toEqual([
         { type: "content", id: "pi-turn", delta: "Hello " },
-        { type: "content", id: "pi-turn", delta: "from Pi." }
+        { type: "content", id: "pi-turn", delta: "from Pi." },
+        { type: "content", id: "pi-follow-up", delta: "Hello " },
+        { type: "content", id: "pi-follow-up", delta: "from Pi." }
       ]);
+      expect(JSON.stringify(requests[1])).toContain("Say hello");
+      expect(JSON.stringify(requests[1])).toContain("Hello from Pi.");
+      expect(JSON.stringify(requests[1])).toContain("What did I ask?");
+      const sessionDir = join(root, ".local/state/quickchat/pi-sessions");
+      const sessionFiles = await readdir(sessionDir);
+      expect(sessionFiles).toHaveLength(1);
+      expect(await readFile(join(sessionDir, sessionFiles[0] ?? "missing"), "utf8")).toContain("What did I ask?");
     } finally {
       await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
     }
@@ -232,14 +284,20 @@ describe("native Pi harness", () => {
   it("ships the Pi harness in the self-contained broker bundle", async () => {
     const root = await mkdtemp(join(tmpdir(), "omapilot-pi-bundle-"));
     roots.push(root);
+    const requests: unknown[] = [];
     const server = createServer((request, response) => {
-      request.resume();
-      response.writeHead(200, { "content-type": "text/event-stream" });
-      response.end(`data: ${JSON.stringify({
-        id: "chatcmpl-bundle", object: "chat.completion.chunk", created: 1, model: "coder",
-        choices: [{ index: 0, delta: { role: "assistant", content: "Bundled Pi works." }, finish_reason: "stop" }],
-        usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 }
-      })}\n\ndata: [DONE]\n\n`);
+      let body = "";
+      request.setEncoding("utf8");
+      request.on("data", (chunk: string) => { body += chunk; });
+      request.on("end", () => {
+        requests.push(JSON.parse(body));
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        response.end(`data: ${JSON.stringify({
+          id: "chatcmpl-bundle", object: "chat.completion.chunk", created: 1, model: "coder",
+          choices: [{ index: 0, delta: { role: "assistant", content: "Bundled Pi works." }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 }
+        })}\n\ndata: [DONE]\n\n`);
+      });
     });
     await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
     let child: ChildProcessWithoutNullStreams | undefined;
@@ -279,6 +337,22 @@ describe("native Pi harness", () => {
       running.stdin.write('{"type":"submit","id":"bundle-turn","question":"hello","provider":"builtin","model":"local::coder"}\n');
       await until(() => events.some((event) => event.type === "complete"), 10_000);
       expect(events).toContainEqual({ type: "content", id: "bundle-turn", delta: "Bundled Pi works." });
+      const firstComplete = events.find((event) => event.type === "complete");
+      const firstChat = firstComplete?.chat as Record<string, unknown> | undefined;
+      const firstSession = firstChat?.session as Record<string, unknown> | undefined;
+      if (typeof firstChat?.id !== "string" || typeof firstSession?.acpId !== "string")
+        throw new Error("persisted Pi chat session missing");
+      running.stdin.write(`${JSON.stringify({
+        type: "submit", id: "bundle-follow-up", question: "what did I say?", provider: "builtin",
+        model: "local::coder", resumeChatId: firstChat.id
+      })}\n`);
+      await until(() => events.filter((event) => event.type === "complete").length === 2, 10_000);
+      const secondComplete = events.filter((event) => event.type === "complete")[1];
+      const secondSession = (secondComplete?.chat as Record<string, unknown> | undefined)?.session as Record<string, unknown> | undefined;
+      expect(secondSession?.acpId).toBe(firstSession.acpId);
+      expect(JSON.stringify(requests[1])).toContain("hello");
+      expect(JSON.stringify(requests[1])).toContain("Bundled Pi works.");
+      expect(JSON.stringify(requests[1])).toContain("what did I say?");
       running.stdin.end('{"type":"shutdown"}\n');
       await new Promise<void>((resolveExit) => running.once("close", () => resolveExit()));
       child = undefined;

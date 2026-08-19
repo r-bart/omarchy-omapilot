@@ -57,6 +57,7 @@ function quickchatPaths(env2 = process.env) {
     config: join(configRoot, "omapilot"),
     state: join(stateRoot, "quickchat"),
     records: join(stateRoot, "quickchat/chats"),
+    piSessions: join(stateRoot, "quickchat/pi-sessions"),
     cache: join(cacheRoot, "quickchat"),
     images: join(cacheRoot, "quickchat/images"),
     adapters: join(cacheRoot, "quickchat/adapters"),
@@ -74,6 +75,27 @@ import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { delimiter, isAbsolute } from "node:path";
+function launchDetached(executable2, args, options = {}) {
+  return new Promise((resolveLaunch) => {
+    let settled = false;
+    const finish = (opened) => {
+      if (settled) return;
+      settled = true;
+      resolveLaunch(opened);
+    };
+    const child = spawn(executable2, args, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: "ignore",
+      detached: process.platform !== "win32"
+    });
+    child.once("error", () => finish(false));
+    child.once("spawn", () => {
+      child.unref();
+      finish(true);
+    });
+  });
+}
 async function runCommand(executable2, args, options = {}) {
   const maxOutput = options.maxOutput ?? 1e6;
   return new Promise((resolve17, reject) => {
@@ -276397,8 +276419,10 @@ __export(pi_harness_exports, {
   agentDirectory: () => agentDirectory,
   configDirectory: () => configDirectory,
   discoverAgentProfiles: () => discoverAgentProfiles,
+  discoverPiAuthMethods: () => discoverPiAuthMethods,
   discoverPiProviders: () => discoverPiProviders,
   existingSkillPaths: () => existingSkillPaths,
+  loginPiProvider: () => loginPiProvider,
   runNestedAgentPrompt: () => runNestedAgentPrompt,
   runPiQuestion: () => runPiQuestion
 });
@@ -276431,6 +276455,38 @@ async function createRuntime(env2, directory) {
     if (key?.trim()) await runtime.setRuntimeApiKey(provider, key.trim());
   }
   return runtime;
+}
+async function discoverPiAuthMethods(env2 = process.env) {
+  const directory = configDirectory(env2);
+  const runtime = await createRuntime(env2, directory);
+  const configured = new Set(configuredProviderIds(directory));
+  const allowed = /* @__PURE__ */ new Set([...BUILTIN_PROVIDER_IDS, ...configured]);
+  const methods2 = [];
+  for (const provider of runtime.getProviders()) {
+    if (!allowed.has(provider.id)) continue;
+    if (provider.auth.oauth !== void 0) methods2.push({
+      id: `${provider.id}::oauth`,
+      providerId: provider.id,
+      authType: "oauth",
+      label: provider.auth.oauth.name,
+      description: provider.auth.oauth.isSubscription === true ? `Use your ${provider.name} subscription in OmaPilot.` : `Sign in to ${provider.name} in your browser.`
+    });
+    if (provider.auth.apiKey?.login !== void 0) methods2.push({
+      id: `${provider.id}::api_key`,
+      providerId: provider.id,
+      authType: "api_key",
+      label: provider.auth.apiKey.name,
+      description: `Store this credential only in OmaPilot's private configuration.`
+    });
+  }
+  return methods2;
+}
+async function loginPiProvider(env2, methodId, interaction) {
+  const methods2 = await discoverPiAuthMethods(env2);
+  const method = methods2.find((candidate) => candidate.id === methodId);
+  if (method === void 0) throw new BrokerPiError("auth_method_unavailable", "That authentication method is unavailable", false);
+  const runtime = await createRuntime(env2, configDirectory(env2));
+  await runtime.login(method.providerId, method.authType, interaction);
 }
 function optionId(providerId, modelId, grouped) {
   return grouped ? `${providerId}::${modelId}` : modelId;
@@ -276493,7 +276549,7 @@ function configuredProviderIds(directory) {
     return [];
   }
 }
-function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeoutMs = 18e4, requestPermission, cancelPermissions) {
+function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeoutMs = 18e4, requestPermission, cancelPermissions, resumeSessionId) {
   const controller = new AbortController();
   let activeSession;
   const cancel = async () => {
@@ -276505,8 +276561,14 @@ function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeou
   const result = (async () => {
     const model = resolveModel(provider, selectedModel);
     if (model === void 0) throw new BrokerPiError("model_unavailable", "The selected model is not available", false);
+    const sessionManager = piSessionManager(provider, resumeSessionId);
     const profiles = discoverAgentProfiles(provider.sharedAgentsDir, provider.cwd);
-    const approvals = new PiApprovalState(join41(provider.agentDir, "approvals.json"), provider.cwd);
+    const approvalStateKey = `${provider.agentDir}\0${provider.cwd}\0${sessionManager.getSessionId()}`;
+    let approvals = sessionApprovals.get(approvalStateKey);
+    if (approvals === void 0) {
+      approvals = new PiApprovalState(join41(provider.agentDir, "approvals.json"), provider.cwd);
+      sessionApprovals.set(approvalStateKey, approvals);
+    }
     const permissionExtension = createPermissionExtension(requestId, requestPermission, approvals);
     const loader = new DefaultResourceLoader({
       cwd: provider.cwd,
@@ -276529,7 +276591,7 @@ function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeou
       model,
       modelRuntime: provider.runtime,
       resourceLoader: loader,
-      sessionManager: SessionManager.inMemory(provider.cwd),
+      sessionManager,
       settingsManager: settings3,
       tools: BASIC_TOOLS,
       customTools: [agentTool]
@@ -276564,7 +276626,7 @@ function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeou
         sessionId: session.sessionId,
         models: provider.models,
         defaultModel: optionId(model.provider, model.id, provider.id === "builtin"),
-        resumable: false
+        resumable: true
       };
     } catch (error48) {
       if (error48 instanceof BrokerPiError) throw error48;
@@ -276580,6 +276642,18 @@ function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeou
     }
   })();
   return { result, cancel };
+}
+function piSessionManager(provider, resumeSessionId) {
+  const sessionDir = quickchatPaths(provider.agent.env).piSessions;
+  mkdirSync13(sessionDir, { recursive: true, mode: 448 });
+  if (resumeSessionId === void 0) return SessionManager.create(provider.cwd, sessionDir);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(resumeSessionId))
+    throw new BrokerPiError("session_unavailable", "The saved Pi conversation is unavailable", false);
+  const suffix = `_${resumeSessionId}.jsonl`;
+  const file2 = readdirSync11(sessionDir).find((name) => name.endsWith(suffix));
+  if (file2 === void 0)
+    throw new BrokerPiError("session_unavailable", "The saved Pi conversation is unavailable", false);
+  return SessionManager.open(join41(sessionDir, file2), sessionDir, provider.cwd);
 }
 function resolveModel(provider, selected) {
   const models = provider.piProviderIds.flatMap((id) => [...provider.runtime.getModels(id)]);
@@ -276810,7 +276884,7 @@ function boundedDiagnostic(value2) {
 function isObject4(value2) {
   return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
 }
-var PROVIDER_GROUPS, BUILTIN_PROVIDER_IDS, MUTATING_TOOLS, BASIC_TOOLS, SAFE_AGENT_NAME, MAX_AGENT_FILE_BYTES, BrokerPiError, PiApprovalState, agentToolParameters;
+var PROVIDER_GROUPS, BUILTIN_PROVIDER_IDS, MUTATING_TOOLS, BASIC_TOOLS, SAFE_AGENT_NAME, MAX_AGENT_FILE_BYTES, sessionApprovals, BrokerPiError, PiApprovalState, agentToolParameters;
 var init_pi_harness = __esm({
   "runtime/src/pi-harness.ts"() {
     "use strict";
@@ -276841,6 +276915,7 @@ var init_pi_harness = __esm({
     BASIC_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls", "agent"];
     SAFE_AGENT_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
     MAX_AGENT_FILE_BYTES = 128 * 1024;
+    sessionApprovals = /* @__PURE__ */ new Map();
     registerBundledOAuthFlowLoaders({
       anthropic: () => anthropicOAuth,
       openaiCodex: () => openaiCodexOAuth,
@@ -295091,6 +295166,7 @@ var HistoryStore = class {
       await Promise.all(chat.images.map(async (image) => {
         if (basename18(image.path) === image.path) await rm2(join43(this.#paths.images, image.path), { force: true });
       }));
+      await this.#removeUnreferencedPiSession(chat);
     }
     return chat;
   }
@@ -295098,6 +295174,7 @@ var HistoryStore = class {
     const chats = await this.listAll();
     await rm2(this.#paths.records, { recursive: true, force: true });
     await rm2(this.#paths.images, { recursive: true, force: true });
+    await rm2(this.#paths.piSessions, { recursive: true, force: true });
     return chats;
   }
   async #evictRecords() {
@@ -295118,6 +295195,19 @@ var HistoryStore = class {
       }
     }));
     return records.filter((record2) => record2 !== void 0).sort((a, b2) => b2.createdAt.localeCompare(a.createdAt));
+  }
+  async #removeUnreferencedPiSession(chat) {
+    const sessionId = chat.provider === "builtin" ? chat.session.acpId : void 0;
+    if (sessionId === void 0 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(sessionId)) return;
+    if ((await this.listAll()).some((record2) => record2.provider === "builtin" && record2.session.acpId === sessionId)) return;
+    let names2;
+    try {
+      names2 = await readdir3(this.#paths.piSessions);
+    } catch {
+      return;
+    }
+    const suffix = `_${sessionId}.jsonl`;
+    await Promise.all(names2.filter((name) => name.endsWith(suffix)).map((name) => rm2(join43(this.#paths.piSessions, name), { force: true })));
   }
 };
 function presentImage(image, paths = quickchatPaths()) {
@@ -296575,6 +296665,7 @@ function isObject7(value2) {
 }
 
 // runtime/src/herdr.ts
+init_paths();
 init_process();
 import { spawn as spawn14 } from "node:child_process";
 var HerdrHandoffError = class extends Error {
@@ -296614,9 +296705,10 @@ function nestedArray(value2, key) {
   const entry = objectValue(value2, key);
   return Array.isArray(entry) ? entry : void 0;
 }
-function nativeResumeArgs(provider, sessionId, cwd = process.cwd()) {
+function nativeResumeArgs(provider, sessionId, cwd = process.cwd(), env2 = process.env) {
   if (provider === "codex") return ["resume", sessionId, "-C", cwd, "-s", "read-only", "-a", "on-request"];
   if (provider === "claude") return ["--resume", sessionId];
+  if (provider === "builtin") return ["--session", sessionId, "--session-dir", quickchatPaths(env2).piSessions, "--approve"];
   return ["--pure", "--session", sessionId];
 }
 function transcriptPrompt(chat) {
@@ -296649,7 +296741,7 @@ async function continueInHerdr(chat, env2 = process.env, dependencies = {}) {
     timeoutMs: 35e3,
     maxOutput: 256e3
   }));
-  const launch = dependencies.launch ?? launchDetached;
+  const launch = dependencies.launch ?? launchDetached2;
   const wait = dependencies.delay ?? delay;
   const existingWindowAddress = await findHerdrWindow(commands.hyprctl, run);
   if (existingWindowAddress === void 0)
@@ -296677,9 +296769,10 @@ async function continueInHerdr(chat, env2 = process.env, dependencies = {}) {
   try {
     let target = await createHandoffTarget(parseResult(listed.stdout), commands.herdr, cwd, chat.title, run, createdTabs);
     const workspaceId = target.workspaceId;
-    const resume = !chat.session.resumable || chat.session.acpId === void 0 ? void 0 : nativeResumeArgs(chat.provider, chat.session.acpId, cwd);
+    const resume = !chat.session.resumable || chat.session.acpId === void 0 ? void 0 : nativeResumeArgs(chat.provider, chat.session.acpId, cwd, env2);
     let mode = resume === void 0 ? "transcript" : "native";
     const initialAgentName = resume === void 0 ? transcriptAgentName : agentName;
+    await prepareAgentPane(commands.herdr, chat.provider, target.paneId, env2, run, wait);
     let started = await startAgent(commands.herdr, chat.provider, initialAgentName, target.paneId, resume, run, wait);
     if (started.code !== 0) {
       const racedAgents = await run(commands.herdr, ["agent", "list"]);
@@ -296695,6 +296788,7 @@ async function continueInHerdr(chat, env2 = process.env, dependencies = {}) {
       mode = "transcript";
       const nativeTabId = target.tabId;
       target = await createTabTarget(commands.herdr, workspaceId, cwd, chat.title, run, createdTabs);
+      await prepareAgentPane(commands.herdr, chat.provider, target.paneId, env2, run, wait);
       started = await startAgent(commands.herdr, chat.provider, transcriptAgentName, target.paneId, void 0, run, wait);
       if (started.code !== 0)
         throw new HerdrHandoffError("session", herdrCliErrorCode(started) ?? "agent_start_failed");
@@ -296730,7 +296824,7 @@ async function continueInHerdr(chat, env2 = process.env, dependencies = {}) {
     throw error48;
   }
 }
-async function launchDetached(executable2, args, env2) {
+async function launchDetached2(executable2, args, env2) {
   await new Promise((resolveLaunch, rejectLaunch) => {
     const child = spawn14(executable2, args, { env: env2, stdio: "ignore", detached: true });
     child.once("error", rejectLaunch);
@@ -296835,7 +296929,8 @@ async function createTabTarget(herdr, workspaceId, cwd, title, run, createdTabs)
   return { workspaceId, tabId, paneId };
 }
 async function startAgent(herdr, provider, agentName, paneId, resume, run, wait) {
-  const args = ["agent", "start", agentName, "--kind", provider, "--pane", paneId, "--timeout", "30000"];
+  const kind = provider === "builtin" ? "pi" : provider;
+  const args = ["agent", "start", agentName, "--kind", kind, "--pane", paneId, "--timeout", "30000"];
   if (resume !== void 0) args.push("--", ...resume);
   let result = await run(herdr, args);
   for (let attempt2 = 0; herdrCliErrorCode(result) === "agent_pane_busy" && attempt2 < 19; attempt2 += 1) {
@@ -296843,6 +296938,19 @@ async function startAgent(herdr, provider, agentName, paneId, resume, run, wait)
     result = await run(herdr, args);
   }
   return result;
+}
+async function prepareAgentPane(herdr, provider, paneId, env2, run, wait) {
+  if (provider !== "builtin") return;
+  const paths = quickchatPaths(env2);
+  const configured = await run(herdr, [
+    "pane",
+    "run",
+    paneId,
+    `export PI_CODING_AGENT_DIR=${shellWord(paths.config)} PI_CODING_AGENT_SESSION_DIR=${shellWord(paths.piSessions)}`
+  ]);
+  if (configured.code !== 0)
+    throw new HerdrHandoffError("session", herdrCliErrorCode(configured) ?? "pi_environment_failed");
+  await wait(100);
 }
 async function focusSessionAndWindow(commands, target, agentName, windowAddress, run, wait) {
   await runFocusCommands(commands.herdr, target.workspaceId, target.tabId, agentName, run);
@@ -297424,6 +297532,7 @@ var QuickchatBroker = class {
   #runs = /* @__PURE__ */ new Map();
   #handoffs = /* @__PURE__ */ new Map();
   #permissions = /* @__PURE__ */ new Map();
+  #authFlow;
   #submissions = /* @__PURE__ */ new Set();
   #dictationGeneration = 0;
   #browserCompanionSetupBusy = false;
@@ -297484,6 +297593,15 @@ var QuickchatBroker = class {
       case "browser_companion_open_settings":
         await this.#openBrowserCompanionSettings(command.family);
         break;
+      case "auth_begin":
+        this.#beginAuth(command.methodId);
+        break;
+      case "auth_response":
+        this.#respondAuth(command);
+        break;
+      case "auth_cancel":
+        this.#cancelAuth(command.flowId);
+        break;
       case "cancel":
         await this.#cancel(command.id);
         break;
@@ -297527,6 +297645,7 @@ var QuickchatBroker = class {
         await this.#copy(command.text);
         break;
       case "shutdown": {
+        this.#cancelAuth(this.#authFlow?.id);
         await Promise.all([...this.#runs.values()].map((run) => run.cancel()));
         await this.#browserCompanion.close();
         return false;
@@ -297539,7 +297658,10 @@ var QuickchatBroker = class {
       this.#error("unsupported_protocol", "Quickchat supports broker protocol version 2", false);
       return;
     }
-    const discovered = await discoverProviders(this.#env, command.harness);
+    const [discovered, authMethods] = await Promise.all([
+      discoverProviders(this.#env, command.harness),
+      command.harness === "builtin" ? Promise.resolve().then(() => (init_pi_harness(), pi_harness_exports)).then(({ discoverPiAuthMethods: discoverPiAuthMethods2 }) => discoverPiAuthMethods2(this.#env)).catch(() => []) : Promise.resolve([])
+    ]);
     await this.#browserCompanion.start().catch(() => void 0);
     await this.#emitBrowserCompanionStatus();
     await Promise.all(discovered.map(async (provider) => {
@@ -297552,6 +297674,135 @@ var QuickchatBroker = class {
     this.#providers = new Map(discovered.map((provider) => [provider.id, provider]));
     const history = (await this.#history.list()).map((chat) => presentChat(chat));
     this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context", "context-attachments"], providers: discovered.map(publicProvider), history });
+    if (command.harness === "builtin") this.#emit({ type: "auth_methods", methods: authMethods });
+  }
+  #beginAuth(methodId) {
+    if (this.#authFlow !== void 0) this.#cancelAuth(this.#authFlow.id);
+    const flow = { id: randomUUID9(), methodId, controller: new AbortController() };
+    this.#authFlow = flow;
+    this.#emit({ type: "auth", phase: "starting", flowId: flow.id, methodId, message: "Starting secure authentication\u2026" });
+    void this.#runAuth(flow);
+  }
+  async #runAuth(flow) {
+    try {
+      const { discoverPiAuthMethods: discoverPiAuthMethods2, loginPiProvider: loginPiProvider2 } = await Promise.resolve().then(() => (init_pi_harness(), pi_harness_exports));
+      await loginPiProvider2(this.#env, flow.methodId, {
+        signal: flow.controller.signal,
+        prompt: (prompt) => this.#promptAuth(flow, prompt),
+        notify: (event) => this.#notifyAuth(flow, event)
+      });
+      if (flow.controller.signal.aborted || this.#authFlow?.id !== flow.id) return;
+      const discovered = await discoverProviders(this.#env, "builtin");
+      this.#providers = new Map(discovered.map((provider) => [provider.id, provider]));
+      this.#emit({ type: "providers", providers: discovered.map(publicProvider) });
+      this.#emit({ type: "auth_methods", methods: await discoverPiAuthMethods2(this.#env) });
+      this.#emit({ type: "auth", phase: "complete", flowId: flow.id, methodId: flow.methodId, message: "Authentication complete. OmaPilot is ready." });
+    } catch (error48) {
+      if (flow.controller.signal.aborted) {
+        this.#emit({ type: "auth", phase: "cancelled", flowId: flow.id, methodId: flow.methodId, message: "Authentication cancelled." });
+      } else {
+        this.#emit({
+          type: "auth",
+          phase: "error",
+          flowId: flow.id,
+          methodId: flow.methodId,
+          message: error48 instanceof Error && error48.message === "Authentication prompt was cancelled" ? error48.message : "Authentication could not be completed. Check the details and try again."
+        });
+      }
+    } finally {
+      flow.prompt?.cleanup();
+      if (this.#authFlow?.id === flow.id) this.#authFlow = void 0;
+    }
+  }
+  #promptAuth(flow, prompt) {
+    if (flow.controller.signal.aborted || this.#authFlow?.id !== flow.id)
+      return Promise.reject(new Error("Authentication prompt was cancelled"));
+    flow.prompt?.reject(new Error("Authentication prompt was cancelled"));
+    return new Promise((resolve17, reject) => {
+      const promptId = randomUUID9();
+      const signals = [flow.controller.signal, prompt.signal].filter((signal2) => signal2 !== void 0);
+      const signal = signals.length === 1 ? signals[0] ?? flow.controller.signal : AbortSignal.any(signals);
+      const onAbort = () => reject(new Error("Authentication prompt was cancelled"));
+      const cleanup = () => signal.removeEventListener("abort", onAbort);
+      flow.prompt = {
+        id: promptId,
+        resolve: (value2) => {
+          cleanup();
+          resolve17(value2);
+        },
+        reject: (error48) => {
+          cleanup();
+          reject(error48);
+        },
+        cleanup
+      };
+      signal.addEventListener("abort", onAbort, { once: true });
+      if (prompt.type === "manual_code") return;
+      this.#emit({
+        type: "auth",
+        phase: "prompt",
+        flowId: flow.id,
+        methodId: flow.methodId,
+        prompt: {
+          id: promptId,
+          kind: prompt.type,
+          message: prompt.message,
+          ..."placeholder" in prompt && prompt.placeholder !== void 0 ? { placeholder: prompt.placeholder } : {},
+          ...prompt.type === "select" ? { options: prompt.options.map((option) => ({ ...option })) } : {}
+        }
+      });
+    });
+  }
+  #notifyAuth(flow, event) {
+    if (this.#authFlow?.id !== flow.id || flow.controller.signal.aborted) return;
+    if (event.type === "auth_url") {
+      if (!isAllowedExternalLink(event.url)) return;
+      this.#emit({
+        type: "auth",
+        phase: "browser",
+        flowId: flow.id,
+        methodId: flow.methodId,
+        url: event.url,
+        ...event.instructions === void 0 ? {} : { instructions: event.instructions }
+      });
+      return;
+    }
+    if (event.type === "device_code") {
+      if (!isAllowedExternalLink(event.verificationUri)) return;
+      this.#emit({
+        type: "auth",
+        phase: "device_code",
+        flowId: flow.id,
+        methodId: flow.methodId,
+        userCode: event.userCode,
+        verificationUri: event.verificationUri,
+        ...event.expiresInSeconds === void 0 ? {} : { expiresInSeconds: event.expiresInSeconds }
+      });
+      return;
+    }
+    const links = event.type === "info" ? event.links?.filter((link) => isAllowedExternalLink(link.url)).map((link) => ({ ...link })) : void 0;
+    this.#emit({
+      type: "auth",
+      phase: "info",
+      flowId: flow.id,
+      methodId: flow.methodId,
+      message: event.message,
+      ...links === void 0 ? {} : { links }
+    });
+  }
+  #respondAuth(command) {
+    const flow = this.#authFlow;
+    if (flow?.id !== command.flowId || flow.prompt?.id !== command.promptId) return;
+    const prompt = flow.prompt;
+    delete flow.prompt;
+    prompt.resolve(command.value);
+  }
+  #cancelAuth(flowId) {
+    const flow = this.#authFlow;
+    if (flow === void 0 || flowId === void 0 || flow.id !== flowId) return;
+    this.#authFlow = void 0;
+    flow.controller.abort();
+    flow.prompt?.reject(new Error("Authentication prompt was cancelled"));
   }
   async #submit(command) {
     if (this.#submissions.has(command.id)) {
@@ -297571,6 +297822,16 @@ var QuickchatBroker = class {
       await this.#contextAttachments.discardMany((command.contextAttachments ?? []).map((value2) => value2.id));
       this.#error("provider_unavailable", "The selected harness is not installed and authenticated", false, command.id);
       return;
+    }
+    let resumeSessionId;
+    if (isPiProvider(provider) && command.resumeChatId !== void 0) {
+      const previous = await this.#history.get(command.resumeChatId);
+      if (previous?.provider !== provider.id || !previous.session.resumable || previous.session.acpId === void 0) {
+        await this.#contextAttachments.discardMany((command.contextAttachments ?? []).map((value2) => value2.id));
+        this.#error("session_unavailable", "The saved Pi conversation is unavailable", false, command.id);
+        return;
+      }
+      resumeSessionId = previous.session.acpId;
     }
     const dangerousAutoApprove = command.dangerousAutoApprove === true && provider.policy.tools === "device-approval";
     this.#emit({ type: "state", id: command.id, state: "preparing", message: `Preparing ${provider.name}\u2026` });
@@ -297603,7 +297864,8 @@ var QuickchatBroker = class {
       this.#emit,
       18e4,
       permission,
-      () => this.#cancelPermissions(command.id)
+      () => this.#cancelPermissions(command.id),
+      resumeSessionId
     ) : runAcpQuestion(
       provider,
       command.id,
@@ -297881,8 +298143,7 @@ var QuickchatBroker = class {
       this.#emit({ type: "link", url: url2, opened: false });
       return;
     }
-    const result = await runCommand(opener, [url2], { env: this.#env, timeoutMs: 5e3, maxOutput: 8192 });
-    this.#emit({ type: "link", url: url2, opened: result.code === 0 });
+    this.#emit({ type: "link", url: url2, opened: await launchDetached(opener, [url2], { env: this.#env }) });
   }
   async #copy(text2) {
     const copy = await resolveExecutable("wl-copy", this.#env);
@@ -297982,6 +298243,7 @@ var submitCommand = external_exports.object({
   id: external_exports.string().min(1).max(120),
   question: external_exports.string().trim().min(1).max(1e5),
   provider: providerIdSchema,
+  resumeChatId: external_exports.string().uuid().optional(),
   model: external_exports.preprocess((value2) => typeof value2 === "string" && value2.trim() === "" ? void 0 : value2, external_exports.string().min(1).max(500).optional()),
   desktopContext: desktopContextSchema.optional(),
   contextAttachments: external_exports.array(contextAttachmentSelectionSchema).max(4).optional(),
@@ -298011,6 +298273,17 @@ var browserCompanionOpenSettingsCommand = external_exports.object({
   type: external_exports.literal("browser_companion_open_settings"),
   family: external_exports.enum(["chromium", "firefox"])
 }).strict();
+var authBeginCommand = external_exports.object({
+  type: external_exports.literal("auth_begin"),
+  methodId: external_exports.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}::(?:api_key|oauth)$/u)
+}).strict();
+var authResponseCommand = external_exports.object({
+  type: external_exports.literal("auth_response"),
+  flowId: external_exports.string().uuid(),
+  promptId: external_exports.string().uuid(),
+  value: external_exports.string().max(32768)
+}).strict();
+var authCancelCommand = external_exports.object({ type: external_exports.literal("auth_cancel"), flowId: external_exports.string().uuid() }).strict();
 var cancelCommand = external_exports.object({ type: external_exports.literal("cancel"), id: external_exports.string().min(1).max(120) });
 var permissionResponseCommand = external_exports.object({
   type: external_exports.literal("permission_response"),
@@ -298031,6 +298304,9 @@ var commandSchema = external_exports.discriminatedUnion("type", [
   contextCancelCommand,
   browserCompanionCommand,
   browserCompanionOpenSettingsCommand,
+  authBeginCommand,
+  authResponseCommand,
+  authCancelCommand,
   contextDiscardCommand,
   cancelCommand,
   permissionResponseCommand,

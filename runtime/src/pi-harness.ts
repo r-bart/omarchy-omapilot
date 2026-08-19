@@ -9,6 +9,7 @@ import { SessionManager } from "../../node_modules/@earendil-works/pi-coding-age
 import { SettingsManager } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js";
 import { parseFrontmatter } from "../../node_modules/@earendil-works/pi-coding-agent/dist/utils/frontmatter.js";
 import type { InlineExtension, ToolDefinition } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/types.js";
+import type { AuthInteraction, AuthType } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/types.js";
 import { registerBundledOAuthFlowLoaders } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/load.js";
 import { anthropicOAuth } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/anthropic.js";
 import { openaiCodexOAuth } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js";
@@ -22,7 +23,7 @@ import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import type { AcpPrompt } from "./context.js";
 import type { AcpResult, AcpRun, PermissionHandler } from "./acp.js";
 import { automaticInstructions, type PiDiscoveredProvider } from "./providers.js";
-import type { BrokerEvent, ModelOption, ProviderPolicyInfo } from "./types.js";
+import type { BrokerEvent, BuiltinAuthMethod, ModelOption, ProviderPolicyInfo } from "./types.js";
 import { quickchatPaths } from "./paths.js";
 
 const PROVIDER_GROUPS = [
@@ -35,6 +36,7 @@ const MUTATING_TOOLS = new Set(["bash", "edit", "write"]);
 const BASIC_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls", "agent"];
 const SAFE_AGENT_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const MAX_AGENT_FILE_BYTES = 128 * 1024;
+const sessionApprovals = new Map<string, PiApprovalState>();
 
 registerBundledOAuthFlowLoaders({
   anthropic: () => anthropicOAuth,
@@ -94,6 +96,46 @@ async function createRuntime(env: NodeJS.ProcessEnv, directory: string): Promise
     if (key?.trim()) await runtime.setRuntimeApiKey(provider, key.trim());
   }
   return runtime;
+}
+
+export async function discoverPiAuthMethods(env: NodeJS.ProcessEnv = process.env): Promise<BuiltinAuthMethod[]> {
+  const directory = configDirectory(env);
+  const runtime = await createRuntime(env, directory);
+  const configured = new Set(configuredProviderIds(directory));
+  const allowed = new Set([...BUILTIN_PROVIDER_IDS, ...configured]);
+  const methods: BuiltinAuthMethod[] = [];
+  for (const provider of runtime.getProviders()) {
+    if (!allowed.has(provider.id)) continue;
+    if (provider.auth.oauth !== undefined) methods.push({
+      id: `${provider.id}::oauth`,
+      providerId: provider.id,
+      authType: "oauth",
+      label: provider.auth.oauth.name,
+      description: provider.auth.oauth.isSubscription === true
+        ? `Use your ${provider.name} subscription in OmaPilot.`
+        : `Sign in to ${provider.name} in your browser.`
+    });
+    if (provider.auth.apiKey?.login !== undefined) methods.push({
+      id: `${provider.id}::api_key`,
+      providerId: provider.id,
+      authType: "api_key",
+      label: provider.auth.apiKey.name,
+      description: `Store this credential only in OmaPilot's private configuration.`
+    });
+  }
+  return methods;
+}
+
+export async function loginPiProvider(
+  env: NodeJS.ProcessEnv,
+  methodId: string,
+  interaction: AuthInteraction
+): Promise<void> {
+  const methods = await discoverPiAuthMethods(env);
+  const method = methods.find((candidate) => candidate.id === methodId);
+  if (method === undefined) throw new BrokerPiError("auth_method_unavailable", "That authentication method is unavailable", false);
+  const runtime = await createRuntime(env, configDirectory(env));
+  await runtime.login(method.providerId, method.authType as AuthType, interaction);
 }
 
 function optionId(providerId: string, modelId: string, grouped: boolean): string {
@@ -179,7 +221,8 @@ export function runPiQuestion(
   emit: (event: BrokerEvent) => void,
   timeoutMs = 180_000,
   requestPermission?: PermissionHandler,
-  cancelPermissions?: () => void
+  cancelPermissions?: () => void,
+  resumeSessionId?: string
 ): AcpRun {
   const controller = new AbortController();
   let activeSession: { abort: () => Promise<void>; dispose: () => void } | undefined;
@@ -193,8 +236,14 @@ export function runPiQuestion(
   const result = (async (): Promise<AcpResult> => {
     const model = resolveModel(provider, selectedModel);
     if (model === undefined) throw new BrokerPiError("model_unavailable", "The selected model is not available", false);
+    const sessionManager = piSessionManager(provider, resumeSessionId);
     const profiles = discoverAgentProfiles(provider.sharedAgentsDir, provider.cwd);
-    const approvals = new PiApprovalState(join(provider.agentDir, "approvals.json"), provider.cwd);
+    const approvalStateKey = `${provider.agentDir}\0${provider.cwd}\0${sessionManager.getSessionId()}`;
+    let approvals = sessionApprovals.get(approvalStateKey);
+    if (approvals === undefined) {
+      approvals = new PiApprovalState(join(provider.agentDir, "approvals.json"), provider.cwd);
+      sessionApprovals.set(approvalStateKey, approvals);
+    }
     const permissionExtension = createPermissionExtension(requestId, requestPermission, approvals);
     const loader = new DefaultResourceLoader({
       cwd: provider.cwd,
@@ -217,7 +266,7 @@ export function runPiQuestion(
       model,
       modelRuntime: provider.runtime,
       resourceLoader: loader,
-      sessionManager: SessionManager.inMemory(provider.cwd),
+      sessionManager,
       settingsManager: settings,
       tools: BASIC_TOOLS,
       customTools: [agentTool]
@@ -249,7 +298,7 @@ export function runPiQuestion(
         sessionId: session.sessionId,
         models: provider.models,
         defaultModel: optionId(model.provider, model.id, provider.id === "builtin"),
-        resumable: false
+        resumable: true
       };
     } catch (error) {
       if (error instanceof BrokerPiError) throw error;
@@ -265,6 +314,19 @@ export function runPiQuestion(
     }
   })();
   return { result, cancel };
+}
+
+function piSessionManager(provider: PiDiscoveredProvider, resumeSessionId: string | undefined): SessionManager {
+  const sessionDir = quickchatPaths(provider.agent.env).piSessions;
+  mkdirSync(sessionDir, { recursive: true, mode: 0o700 });
+  if (resumeSessionId === undefined) return SessionManager.create(provider.cwd, sessionDir);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(resumeSessionId))
+    throw new BrokerPiError("session_unavailable", "The saved Pi conversation is unavailable", false);
+  const suffix = `_${resumeSessionId}.jsonl`;
+  const file = readdirSync(sessionDir).find((name) => name.endsWith(suffix));
+  if (file === undefined)
+    throw new BrokerPiError("session_unavailable", "The saved Pi conversation is unavailable", false);
+  return SessionManager.open(join(sessionDir, file), sessionDir, provider.cwd);
 }
 
 type PiModel = ReturnType<PiDiscoveredProvider["runtime"]["getModels"]>[number];
