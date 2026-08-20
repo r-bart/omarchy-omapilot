@@ -17,6 +17,16 @@ function providerReadyState(currentState, providerCount) {
   return current
 }
 
+function historyContinuationBlocked(requiredProvider, configuredProvider, providers) {
+  var required = normalizedProvider(requiredProvider)
+  if (required === "") return false
+  if (normalizedProvider(configuredProvider) !== required) return true
+  var rows = Array.isArray(providers) ? providers : []
+  for (var i = 0; i < rows.length; i++)
+    if (String(rows[i] && rows[i].value || "") === required) return false
+  return true
+}
+
 function command(type, values) {
   var result = { type: String(type || "") }
   var source = values || {}
@@ -281,9 +291,11 @@ function normalizedDesktopMedia(raw) {
   var player = safeContextText(source.player, 160)
   var title = safeContextText(source.title, 240)
   var artist = safeContextText(source.artist, 200)
+  var status = String(source.status || "").toLowerCase()
   if (player !== "") result.player = player
   if (title !== "") result.title = title
   if (artist !== "") result.artist = artist
+  if (["playing", "paused", "stopped"].indexOf(status) >= 0) result.status = status
   return Object.keys(result).length > 0 ? result : null
 }
 
@@ -321,6 +333,11 @@ function normalizedDesktopContext(raw) {
     if (Number.isFinite(workspaceId) && Math.floor(workspaceId) === workspaceId
         && workspaceId >= -100000 && workspaceId <= 100000) workspaceMap[String(workspaceId)] = workspaceId
   }
+  var activeWorkspace = Number(source.activeWorkspace)
+  if (!Number.isFinite(activeWorkspace) || Math.floor(activeWorkspace) !== activeWorkspace
+      || activeWorkspace < -100000 || activeWorkspace > 100000) activeWorkspace = undefined
+  else workspaceMap[String(activeWorkspace)] = activeWorkspace
+  var focusedMonitor = safeContextText(source.focusedMonitor, 120)
   var apps = []
   var appKeys = Object.keys(appMap).sort()
   for (var k = 0; k < appKeys.length && apps.length < 12; k++) apps.push(normalizedDesktopApp(appMap[appKeys[k]]))
@@ -335,9 +352,12 @@ function normalizedDesktopContext(raw) {
     var player = normalizedDesktopMedia(sourceMedia[j])
     if (player !== null) media.push(player)
   }
-  if (activeWindow === null && apps.length === 0 && workspaces.length === 0 && media.length === 0) return null
+  if (activeWindow === null && activeWorkspace === undefined && focusedMonitor === ""
+      && apps.length === 0 && workspaces.length === 0 && media.length === 0) return null
   var result = { version: 1, apps: apps, workspaces: workspaces, media: media }
   if (activeWindow !== null) result.activeWindow = activeWindow
+  if (activeWorkspace !== undefined) result.activeWorkspace = activeWorkspace
+  if (focusedMonitor !== "") result.focusedMonitor = focusedMonitor
   return result
 }
 
@@ -395,13 +415,110 @@ function errorDiagnosticText(raw) {
     + "\nRetryable: " + (error.retryable ? "yes" : "no")
 }
 
+// User-registered OpenAI-compatible endpoints. QML never constructs the
+// models.json entry itself; it only renders what the broker reports and sends
+// back opaque, already-validated field values.
+function normalizedVoxtypeOsd(event) {
+  var source = event && typeof event === "object" ? event : {}
+  return {
+    available: source.available === true,
+    enabled: source.enabled !== false,
+    message: String(source.message || "")
+  }
+}
+
+function normalizedCustomProviders(input) {
+  var source = Array.isArray(input) ? input : []
+  var result = []
+  for (var i = 0; i < source.length && i < 32; i++) {
+    var entry = source[i]
+    if (!entry || typeof entry !== "object") continue
+    var id = String(entry.id || "")
+    if (id === "") continue
+    var models = Array.isArray(entry.models) ? entry.models : []
+    var normalizedModels = []
+    for (var m = 0; m < models.length && m < 200; m++) {
+      var rawModel = models[m]
+      var modelId = String(rawModel && typeof rawModel === "object" ? rawModel.id : rawModel || "").trim()
+      if (modelId === "") continue
+      var modelName = String(rawModel && typeof rawModel === "object" ? rawModel.name || modelId : modelId).trim()
+      var contextWindow = Number(rawModel && typeof rawModel === "object" ? rawModel.contextWindow : 0)
+      normalizedModels.push({
+        id: modelId,
+        name: modelName || modelId,
+        contextWindow: isFinite(contextWindow) && contextWindow > 0 ? Math.floor(contextWindow) : 128000
+      })
+    }
+    result.push({
+      id: id,
+      name: String(entry.name || id),
+      baseUrl: String(entry.baseUrl || ""),
+      api: String(entry.api || ""),
+      apiLabel: String(entry.api || "") === "openai-responses" ? "/responses" : "/chat/completions",
+      models: normalizedModels,
+      requiresAuth: entry.requiresAuth === true
+    })
+  }
+  return result
+}
+
+// Model option ids are provider-prefixed ("<provider>::<model>"), so their
+// presence is a truthful live-availability signal for keyed and no-auth servers.
+function customProviderModelCount(modelOptions, providerId) {
+  var options = Array.isArray(modelOptions) ? modelOptions : []
+  var prefix = String(providerId || "") + "::"
+  var count = 0
+  for (var i = 0; i < options.length; i++) {
+    var value = String(options[i] && options[i].value || options[i] || "")
+    if (value.indexOf(prefix) === 0) count++
+  }
+  return count
+}
+
+function customProviderCommand(id, name, baseUrl, api, modelIds, apiKey) {
+  var models = []
+  var source = Array.isArray(modelIds) ? modelIds : []
+  for (var i = 0; i < source.length && i < 200; i++) {
+    var entry = source[i]
+    var value = String(entry && typeof entry === "object" ? entry.id : entry || "").trim()
+    if (value === "") continue
+    var model = { id: value }
+    if (entry && typeof entry === "object") {
+      var modelName = String(entry.name || "").trim()
+      var contextWindow = Number(entry.contextWindow || 0)
+      if (modelName !== "") model.name = modelName
+      if (isFinite(contextWindow) && contextWindow > 0) model.contextWindow = Math.floor(contextWindow)
+    }
+    models.push(model)
+  }
+  var payload = {
+    id: String(id || "").trim().toLowerCase(),
+    name: String(name || "").trim(),
+    baseUrl: String(baseUrl || "").trim(),
+    api: api === "openai-completions" ? "openai-completions" : "openai-responses",
+    models: models
+  }
+  // Omitted entirely when blank, so editing a server without retyping its key
+  // leaves the stored credential untouched.
+  var key = String(apiKey || "").trim()
+  if (key !== "") payload.apiKey = key
+  return command("custom_provider_add", payload)
+}
+
+function customProviderTestCommand(baseUrl, apiKey) {
+  var payload = { baseUrl: String(baseUrl || "").trim() }
+  var key = String(apiKey || "").trim()
+  if (key !== "") payload.apiKey = key
+  return command("custom_provider_test", payload)
+}
+
 function normalizedProvider(value) {
   var provider = String(value || "").toLowerCase()
-  return ["builtin", "codex", "claude", "opencode"].indexOf(provider) >= 0 ? provider : ""
+  return ["builtin", "codex", "opencode"].indexOf(provider) >= 0 ? provider : ""
 }
 
 function harnessOptions() {
-  return ["builtin", "codex", "claude", "opencode"].map(function(value) {
+  return ["builtin", "codex", "opencode"].map(function(value) {
     return { value: value, label: providerLabel(value) }
   })
 }
@@ -410,7 +527,6 @@ function providerLabel(value) {
   var provider = normalizedProvider(value)
   if (provider === "builtin") return "Built-in (OmaPilot)"
   if (provider === "codex") return "Codex"
-  if (provider === "claude") return "Claude"
   if (provider === "opencode") return "OpenCode"
   return String(value || "")
 }

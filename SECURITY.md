@@ -29,18 +29,6 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
   **Dangerous auto-approve**, each request may select the normalized request's
   exact provider-native allow-once option without prompting. It never selects a
   session or durable grant.
-- Claude loads installed skills through a per-turn plugin copy with MCP discovery
-  disabled. Internal symlinks, oversized trees, and non-regular entries are
-  skipped. It runs inside a disposable workspace that denies
-  every existing top-level host path except system executable/library roots,
-  hides credential-bearing environment variables, and confines writes to
-  per-turn scratch. WebSearch is available, while WebFetch and direct process
-  network access remains blocked. Commands inside that fixed boundary may run
-  automatically. A command that cannot run inside that boundary may proceed
-  only through a broker-bound choice supplied by the Claude adapter. Approving
-  it explicitly lets it run outside the disposable sandbox with the
-  current user's full process environment and device authority, including host
-  reads, writes, credential-bearing environment variables, and network access.
 - OpenCode may load its positively identified skill tool and use websearch
   automatically. Its external-directory check is allowed only as a prerequisite
   to a separately reviewed shell request; `bash` remains `ask`, and execution

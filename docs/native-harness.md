@@ -1,8 +1,8 @@
 # Native Pi harness
 
 OmaPilot embeds a Pi coding-agent runtime. It does not require an external CLI for
-OpenAI API, Codex subscription, Anthropic, or OpenAI-compatible requests. The
-Codex, Claude, and OpenCode are separate ACP harness choices. They are never
+OpenAI API, Codex subscription, Grok, or OpenAI-compatible requests. Codex and
+OpenCode are separate ACP harness choices. They are never
 used as fallbacks for the built-in harness.
 
 ## Configuration directory
@@ -26,12 +26,12 @@ and named agents are discovered from `~/.agents/` (or `OMAPILOT_AGENTS_DIR`).
 
 Credentials are resolved by Pi's model runtime and are never copied to OmaPilot
 history. OAuth credentials refresh through the provider flow. API keys can come
-from `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `auth.json`:
+from `OPENAI_API_KEY`, `XAI_API_KEY`, or `auth.json`:
 
 ```json
 {
   "openai": { "type": "api_key", "key": "$OPENAI_API_KEY" },
-  "anthropic": { "type": "api_key", "key": "$ANTHROPIC_API_KEY" }
+  "xai": { "type": "api_key", "key": "$XAI_API_KEY" }
 }
 ```
 
@@ -46,8 +46,7 @@ Before launch, OmaPilot scopes that pane to its private configuration and
 session directories, so the interactive Pi process uses the same credential
 and conversation without copying tokens into command arguments.
 
-Codex subscription and Claude subscription OAuth entries use the
-`openai-codex` and `anthropic` keys respectively. Normally, configure these from
+Codex subscription OAuth entries use the `openai-codex` key. Normally, configure these from
 the authentication card under OmaPilot Settings. The broker invokes Pi's native
 typed login APIs in the background: secrets are entered in a password field,
 OAuth continues in the system browser, and provider prompts, device codes,

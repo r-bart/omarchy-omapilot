@@ -30,6 +30,8 @@ QtObject {
 
   function snapshot() {
     var active = isShellToplevel(Hyprland.activeToplevel) ? null : Hyprland.activeToplevel
+    var focusedWorkspace = Hyprland.focusedWorkspace
+    var focusedMonitor = Hyprland.focusedMonitor
     var windows = []
     var toplevels = Hyprland.toplevels ? Hyprland.toplevels.values : []
     for (var i = 0; i < toplevels.length; i++)
@@ -40,16 +42,22 @@ QtObject {
     for (var j = 0; j < players.length; j++) {
       if (media.length >= 4) break
       var player = players[j]
-      if (!player || !player.isPlaying) continue
+      if (!player || (!player.isPlaying && !player.trackTitle && !player.trackArtist)) continue
+      var status = String(MprisPlaybackState.toString(player.playbackState) || "").toLowerCase()
+      if (["playing", "paused", "stopped"].indexOf(status) < 0)
+        status = player.isPlaying ? "playing" : "stopped"
       media.push({
         player: player.identity || player.desktopEntry || "",
         title: player.trackTitle || "",
-        artist: player.trackArtist || ""
+        artist: player.trackArtist || "",
+        status: status
       })
     }
 
     return Protocol.normalizedDesktopContext({
       activeWindow: windowRecord(active, true),
+      activeWorkspace: focusedWorkspace ? focusedWorkspace.id : undefined,
+      focusedMonitor: focusedMonitor ? focusedMonitor.name : "",
       windows: windows,
       media: media
     })

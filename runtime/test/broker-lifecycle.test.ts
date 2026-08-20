@@ -1,9 +1,10 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { deleteAcpSession } from "../src/acp.js";
 import { QuickchatBroker } from "../src/broker.js";
+import * as piHarness from "../src/pi-harness.js";
 import { HerdrHandoffError } from "../src/herdr.js";
 import { HistoryStore } from "../src/history.js";
 import { ImageStore } from "../src/images.js";
@@ -14,6 +15,7 @@ import type { BrokerEvent, ChatRecord, ProviderId } from "../src/types.js";
 const roots: string[] = [];
 afterEach(async () => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
@@ -96,6 +98,179 @@ describe("dictation generation guard", () => {
   });
 });
 
+describe("custom provider registration", () => {
+  it("acknowledges the durable write after credential cleanup", async () => {
+    const root = await mkdtemp(join(tmpdir(), "quickchat-provider-save-")); roots.push(root);
+    const config = join(root, ".config/omapilot");
+    const events: BrokerEvent[] = [];
+    const broker = new QuickchatBroker(events.push.bind(events), {
+      env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config }
+    });
+
+    await broker.handle({
+      type: "custom_provider_add",
+      id: "local-qwen",
+      name: "Local Qwen",
+      baseUrl: "http://127.0.0.1:8080/v1",
+      api: "openai-responses",
+      models: [{ id: "qwen3.8-27b" }]
+    });
+
+    expect(events.slice(0, 2)).toEqual([
+      {
+        type: "custom_provider_saved",
+        provider: {
+          id: "local-qwen",
+          name: "Local Qwen",
+          baseUrl: "http://127.0.0.1:8080/v1",
+          api: "openai-responses",
+          models: [{ id: "qwen3.8-27b", name: "qwen3.8-27b", contextWindow: 128_000 }],
+          requiresAuth: false
+        }
+      },
+      { type: "custom_providers", providers: [expect.objectContaining({ id: "local-qwen" })] }
+    ]);
+    expect(await readFile(join(config, "models.json"), "utf8")).toContain('"local-qwen"');
+  });
+
+  it("tests /models before saving and returns the discovered catalog", async () => {
+    const events: BrokerEvent[] = [];
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>(() => Promise.resolve(new Response(JSON.stringify({
+      data: [{ id: "qwen3.8-27b", max_model_len: 262_144 }]
+    }), { status: 200 }))));
+    const broker = new QuickchatBroker(events.push.bind(events));
+
+    await broker.handle({
+      type: "custom_provider_test",
+      baseUrl: "http://127.0.0.1:8080/v1"
+    });
+
+    expect(events).toEqual([{
+      type: "custom_provider_tested",
+      result: {
+        baseUrl: "http://127.0.0.1:8080/v1",
+        models: [{ id: "qwen3.8-27b", name: "qwen3.8-27b", contextWindow: 262_144 }]
+      }
+    }]);
+  });
+
+  it("preserves an existing server credential when a same-endpoint edit omits the unreadable key", async () => {
+    const root = await mkdtemp(join(tmpdir(), "quickchat-provider-edit-auth-")); roots.push(root);
+    const config = join(root, ".config/omapilot");
+    await mkdir(config, { recursive: true });
+    await writeFile(join(config, "models.json"), JSON.stringify({ providers: { finn: {
+      omapilotManaged: true, omapilotAuthRequired: true, name: "Finn",
+      baseUrl: "http://finn.ts.net:8888/v1", api: "openai-completions",
+      models: [{ id: "qwen", name: "Qwen", api: "openai-completions", contextWindow: 128_000 }]
+    } } }));
+    await writeFile(join(config, "auth.json"), JSON.stringify({ finn: { type: "api_key", key: "stored-secret" } }));
+    const events: BrokerEvent[] = [];
+    const broker = new QuickchatBroker(events.push.bind(events), {
+      env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config }
+    });
+
+    await broker.handle({
+      type: "custom_provider_add", id: "finn", name: "Finn updated",
+      baseUrl: "http://finn.ts.net:8888/v1", api: "openai-completions",
+      models: [{ id: "qwen" }]
+    });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: "custom_provider_saved",
+      provider: expect.objectContaining({ id: "finn", requiresAuth: true })
+    }));
+    expect(JSON.parse(await readFile(join(config, "auth.json"), "utf8"))).toMatchObject({
+      finn: { type: "api_key", key: "stored-secret" }
+    });
+  });
+
+  it("clears an existing server credential when an endpoint edit omits a replacement key", async () => {
+    const root = await mkdtemp(join(tmpdir(), "quickchat-provider-edit-endpoint-")); roots.push(root);
+    const config = join(root, ".config/omapilot");
+    await mkdir(config, { recursive: true });
+    await writeFile(join(config, "models.json"), JSON.stringify({ providers: { finn: {
+      omapilotManaged: true, omapilotAuthRequired: true, name: "Finn",
+      baseUrl: "http://finn.ts.net:8888/v1", api: "openai-completions",
+      models: [{ id: "qwen", name: "Qwen", api: "openai-completions", contextWindow: 128_000 }]
+    } } }));
+    await writeFile(join(config, "auth.json"), JSON.stringify({ finn: { type: "api_key", key: "stored-secret" } }));
+    const events: BrokerEvent[] = [];
+    const broker = new QuickchatBroker(events.push.bind(events), {
+      env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config }
+    });
+
+    await broker.handle({
+      type: "custom_provider_add", id: "finn", name: "Replacement",
+      baseUrl: "http://replacement.ts.net:8888/v1", api: "openai-completions",
+      models: [{ id: "qwen" }]
+    });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: "custom_provider_saved",
+      provider: expect.objectContaining({
+        id: "finn", baseUrl: "http://replacement.ts.net:8888/v1", requiresAuth: false
+      })
+    }));
+    const auth = JSON.parse(await readFile(join(config, "auth.json"), "utf8")) as Record<string, unknown>;
+    expect(auth).not.toHaveProperty("finn");
+  });
+
+  it("restores both the provider definition and credential when endpoint auth cleanup fails", async () => {
+    const root = await mkdtemp(join(tmpdir(), "quickchat-provider-edit-rollback-")); roots.push(root);
+    const config = join(root, ".config/omapilot");
+    await mkdir(config, { recursive: true });
+    const originalProvider = {
+      omapilotManaged: true, omapilotAuthRequired: true, name: "Finn",
+      baseUrl: "http://finn.ts.net:8888/v1", api: "openai-completions",
+      models: [{ id: "qwen", name: "Qwen", api: "openai-completions", contextWindow: 128_000 }]
+    };
+    await writeFile(join(config, "models.json"), JSON.stringify({ providers: { finn: originalProvider } }));
+    await writeFile(join(config, "auth.json"), JSON.stringify({ finn: { type: "api_key", key: "stored-secret" } }));
+    vi.spyOn(piHarness, "logoutPiProvider").mockRejectedValueOnce(new Error("auth store unavailable"));
+    const events: BrokerEvent[] = [];
+    const broker = new QuickchatBroker(events.push.bind(events), {
+      env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config }
+    });
+
+    await broker.handle({
+      type: "custom_provider_add", id: "finn", name: "Replacement",
+      baseUrl: "http://replacement.ts.net:8888/v1", api: "openai-completions",
+      models: [{ id: "qwen" }]
+    });
+
+    expect(events).toEqual([expect.objectContaining({ type: "error", code: "custom_provider_auth_failed" })]);
+    expect(JSON.parse(await readFile(join(config, "models.json"), "utf8")))
+      .toMatchObject({ providers: { finn: originalProvider } });
+    expect(JSON.parse(await readFile(join(config, "auth.json"), "utf8")))
+      .toMatchObject({ finn: { type: "api_key", key: "stored-secret" } });
+  });
+
+  it("emits a rejection without a saved acknowledgement or config write", async () => {
+    const root = await mkdtemp(join(tmpdir(), "quickchat-provider-reject-")); roots.push(root);
+    const config = join(root, ".config/omapilot");
+    const events: BrokerEvent[] = [];
+    const broker = new QuickchatBroker(events.push.bind(events), {
+      env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config }
+    });
+
+    await broker.handle({
+      type: "custom_provider_add",
+      id: "Bad Server Id",
+      name: "Bad Server",
+      baseUrl: "https://example.com/v1",
+      api: "openai-responses",
+      models: [{ id: "qwen" }]
+    });
+
+    expect(events).toEqual([expect.objectContaining({
+      type: "error",
+      code: "invalid_custom_provider"
+    })]);
+    expect(events.some((event) => event.type === "custom_provider_saved")).toBe(false);
+    await expect(readFile(join(config, "models.json"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+});
+
 describe("embedded built-in authentication", () => {
   it("round-trips a secret prompt without launching a terminal", async () => {
     const root = await mkdtemp(join(tmpdir(), "quickchat-broker-auth-")); roots.push(root);
@@ -173,8 +348,8 @@ describe("tool permission lifecycle", () => {
       env: { ...fixture.env, FAKE_ACP_PERMISSION_ATTEMPT: "1" },
       permissionTimeoutMs: 20
     });
-    await broker.handle({ type: "initialize", protocolVersion: 2, harness: "claude" });
-    await broker.handle({ type: "submit", id: "expires", question: "Run uname", provider: "claude" });
+    await broker.handle({ type: "initialize", protocolVersion: 2, harness: "codex" });
+    await broker.handle({ type: "submit", id: "expires", question: "Run uname", provider: "codex" });
     const permission = fixture.events.find((event) => event.type === "permission");
     expect(permission?.type).toBe("permission");
     if (permission?.type !== "permission") throw new Error("permission event missing");
@@ -259,8 +434,7 @@ async function setup(): Promise<{
       ...process.env,
       XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run"),
       QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
-      QUICKCHAT_CLAUDE_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
-      PATH: `${resolve("runtime/test/fixtures/claude-auth")}:${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+      PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
     }
   };
 }

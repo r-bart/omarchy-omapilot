@@ -23,7 +23,6 @@ const paths = {
 describe("Herdr handoff", () => {
   it("constructs native resume arguments for all harnesses", () => {
     expect(nativeResumeArgs("codex", "abc", "/work")).toEqual(["resume", "abc", "-C", "/work", "-s", "read-only", "-a", "on-request"]);
-    expect(nativeResumeArgs("claude", "abc")).toEqual(["--resume", "abc"]);
     expect(nativeResumeArgs("opencode", "abc")).toEqual(["--pure", "--session", "abc"]);
     expect(nativeResumeArgs("builtin", "abc", "/work", env)).toEqual([
       "--session", "abc", "--session-dir", "/home/test/.local/state/quickchat/pi-sessions", "--approve"
@@ -105,7 +104,7 @@ describe("Herdr handoff", () => {
     expect(fixture.launch).not.toHaveBeenCalled();
   });
 
-  it.each<ProviderId>(["codex", "claude", "opencode"])("starts a native %s resume and leaves Herdr focused", async (provider) => {
+  it.each<ProviderId>(["codex", "opencode"])("starts a native %s resume and leaves Herdr focused", async (provider) => {
     const fixture = harness();
     await expect(continueInHerdr(chat({ provider, resumable: true }), env, fixture)).resolves.toEqual({ mode: "native", reused: false });
     const start = callsContaining(fixture.calls, ["agent", "start"])[0]?.args ?? [];
@@ -128,7 +127,7 @@ describe("Herdr handoff", () => {
 
   it("uses a fresh tab/name for transcript fallback, accepts blocked, and cleans the failed native tab", async () => {
     const fixture = harness({ failNative: true });
-    await expect(continueInHerdr(chat({ provider: "claude", resumable: true }), env, fixture))
+    await expect(continueInHerdr(chat({ provider: "codex", resumable: true }), env, fixture))
       .resolves.toEqual({ mode: "transcript", reused: false });
     const starts = callsContaining(fixture.calls, ["agent", "start"]);
     expect(starts).toHaveLength(2);
@@ -162,7 +161,7 @@ describe("Herdr handoff", () => {
 
   it("does not claim success when the failed-native tab cannot be cleaned up", async () => {
     const fixture = harness({ failNative: true, failTabClose: true });
-    await expect(continueInHerdr(chat({ provider: "claude", resumable: true }), env, fixture)).rejects.toMatchObject({
+    await expect(continueInHerdr(chat({ provider: "codex", resumable: true }), env, fixture)).rejects.toMatchObject({
       stage: "workspace", errorCode: "tab_close_failed"
     });
     expect(callsContaining(fixture.calls, ["tab", "close", "w11:t4"])).toHaveLength(4);
@@ -181,7 +180,7 @@ function chat(options: { provider?: ProviderId; resumable?: boolean } = {}): Cha
     id: "11111111-1111-4111-8111-111111111111",
     createdAt: "2026-08-11T00:00:00.000Z",
     title: "Test",
-    provider: options.provider ?? "claude",
+    provider: options.provider ?? "codex",
     question: "Question",
     answer: "Answer",
     images: [],

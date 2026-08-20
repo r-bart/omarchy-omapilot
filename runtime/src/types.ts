@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const providerIdSchema = z.enum(["builtin", "codex", "claude", "opencode"]);
+export const providerIdSchema = z.enum(["builtin", "codex", "opencode"]);
 export type ProviderId = z.infer<typeof providerIdSchema>;
 export const harnessIdSchema = providerIdSchema;
 export type HarnessId = z.infer<typeof harnessIdSchema>;
@@ -23,16 +23,20 @@ const desktopAppSchema = z.object({
 const desktopMediaSchema = z.object({
   player: contextText(160).optional(),
   title: contextText(240).optional(),
-  artist: contextText(200).optional()
+  artist: contextText(200).optional(),
+  status: z.enum(["playing", "paused", "stopped"]).optional()
 }).strict().refine((value) => Object.keys(value).length > 0, "desktop media is empty");
 export const desktopContextSchema = z.object({
   version: z.literal(1),
   activeWindow: desktopWindowSchema.optional(),
+  activeWorkspace: z.number().int().min(-100_000).max(100_000).optional(),
+  focusedMonitor: contextText(120).optional(),
   apps: z.array(desktopAppSchema).max(12),
   workspaces: z.array(z.number().int().min(-100_000).max(100_000)).max(12),
   media: z.array(desktopMediaSchema).max(4)
 }).strict().refine(
-  (value) => value.activeWindow !== undefined || value.apps.length > 0 || value.workspaces.length > 0 || value.media.length > 0,
+  (value) => value.activeWindow !== undefined || value.activeWorkspace !== undefined || value.focusedMonitor !== undefined
+    || value.apps.length > 0 || value.workspaces.length > 0 || value.media.length > 0,
   "desktop context is empty"
 );
 export type DesktopContext = z.infer<typeof desktopContextSchema>;
@@ -120,6 +124,36 @@ const linkCommand = z.object({ type: z.literal("open_link"), url: z.string().max
 const imageCommand = z.object({ type: z.literal("load_image"), id: z.string().min(1).max(200).optional(), url: z.string().max(8_192) });
 const copyCommand = z.object({ type: z.literal("copy"), text: z.string().max(1_000_000) });
 
+// A user-registered OpenAI-compatible endpoint. The broker validates these
+// again in custom-providers.ts; this schema only bounds the wire shape so a
+// malformed UI payload cannot reach the file writer.
+const customProviderAddCommand = z.object({
+  type: z.literal("custom_provider_add"),
+  id: z.string().min(1).max(64),
+  name: z.string().max(64).optional(),
+  baseUrl: z.string().min(1).max(512),
+  api: z.enum(["openai-responses", "openai-completions"]),
+  // Optional, never stored in models.json. The broker hands it straight to the
+  // harness login so it lands in auth.json like any other credential.
+  apiKey: z.string().max(512).optional(),
+  models: z.array(z.object({
+    id: z.string().min(1).max(128),
+    name: z.string().max(64).optional(),
+    contextWindow: z.number().int().positive().optional()
+  })).min(1).max(200)
+});
+const customProviderTestCommand = z.object({
+  type: z.literal("custom_provider_test"),
+  baseUrl: z.string().min(1).max(512),
+  // Optional means exactly that: when omitted, the probe sends no
+  // Authorization header and a successful server is saved as no-auth.
+  apiKey: z.string().max(512).optional()
+}).strict();
+const customProviderRemoveCommand = z.object({
+  type: z.literal("custom_provider_remove"),
+  id: z.string().min(1).max(64)
+});
+
 export const commandSchema = z.discriminatedUnion("type", [
   initializeCommand,
   submitCommand,
@@ -138,9 +172,35 @@ export const commandSchema = z.discriminatedUnion("type", [
   linkCommand,
   imageCommand,
   copyCommand,
-  z.object({ type: z.enum(["dictation_start", "dictation_stop", "dictation_cancel", "history_list", "history_clear", "shutdown"]) })
+  customProviderTestCommand,
+  customProviderAddCommand,
+  z.object({ type: z.literal("voxtype_osd_set"), enabled: z.boolean() }),
+  customProviderRemoveCommand,
+  z.object({ type: z.enum(["dictation_start", "dictation_stop", "dictation_cancel", "history_list", "history_clear", "custom_provider_list", "voxtype_osd_status", "shutdown"]) })
 ]);
 export type BrokerCommand = z.infer<typeof commandSchema>;
+
+export type CustomProviderSpec = {
+  id: string;
+  name: string;
+  baseUrl: string;
+  api: "openai-responses" | "openai-completions";
+  models: Array<{ id: string; name: string; contextWindow: number }>;
+  requiresAuth: boolean;
+};
+export type CustomProviderView = {
+  id: string;
+  name: string;
+  baseUrl: string;
+  api: string;
+  models: Array<{ id: string; name: string; contextWindow: number }>;
+  requiresAuth: boolean;
+};
+
+export type CustomProviderProbeResult = {
+  baseUrl: string;
+  models: Array<{ id: string; name: string; contextWindow: number }>;
+};
 
 export type ModelOption = { id: string; name: string; description?: string };
 export type ProviderPolicyInfo = {
@@ -240,6 +300,11 @@ export type ChatView = Omit<ChatRecord, "images"> & { images: RenderableImage[] 
 export type BrokerEvent =
   | { type: "ready"; protocolVersion: 2; features: Array<"desktop-context" | "context-attachments">; providers: ProviderInfo[]; history: ChatView[] }
   | { type: "providers"; providers: ProviderInfo[] }
+  | { type: "custom_provider_saved"; provider: CustomProviderView }
+  | { type: "custom_provider_tested"; result: CustomProviderProbeResult }
+  | { type: "custom_provider_test_failed"; baseUrl: string; message: string }
+  | { type: "custom_providers"; providers: CustomProviderView[] }
+  | { type: "voxtype_osd"; available: boolean; enabled: boolean; message?: string }
   | { type: "auth_methods"; methods: BuiltinAuthMethod[] }
   | { type: "auth"; phase: "starting"; flowId: string; methodId: string; message: string }
   | { type: "auth"; phase: "prompt"; flowId: string; methodId: string; prompt: BuiltinAuthPrompt }

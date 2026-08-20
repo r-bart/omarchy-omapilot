@@ -16,7 +16,20 @@ The widget follows the current Quattro host contract:
   routes panel actions through Quattro's focused-monitor bar-widget resolver;
   ownership follows the host's reassigned module list across monitor changes.
 
-Quickchat does not edit `shell.json`, Omarchy sources, Hyprland configuration, Voxtype configuration, or Herdr configuration directly.
+Quickchat does not edit `shell.json`, Omarchy sources, Hyprland configuration, or Herdr configuration directly.
+
+One narrowly scoped exception exists for Voxtype. Its floating OSD renders its
+own waveform at the bottom centre of the focused output — the same place the
+voice node occupies — and two indicators for one state is worse than either.
+Voxtype documents a master switch for it, and its own `voxtype config set`
+supports only `engine`, so the value cannot be delegated. Settings therefore
+offers an explicit toggle that writes `[osd] enabled` in
+`~/.config/voxtype/config.toml` and restarts `voxtype.service`. The write
+happens only on that explicit user action, touches exactly one key, preserves
+every other byte of the file including comments and ordering, and copies the
+original to `config.toml.omapilot.bak` the first time it runs. No other Voxtype
+setting is read or written, and a missing configuration disables the toggle
+rather than creating a file.
 
 ## Process boundary
 
@@ -137,17 +150,7 @@ asking; tool output is sent to Codex and may be retained in the saved answer.
 Each broader-access request is bound to a broker nonce. The UI preserves the
 provider's allow/reject option identities and distinguishes session labels from
 durable labels; approval may run commands with current-user device and network
-authority for the scope stated by that option. Claude copies bounded, regular-file
-installed skill trees into a per-turn local plugin with MCP discovery disabled,
-then uses a disposable
-workspace that dynamically denies every existing top-level host path except
-system executable/library roots, hides credential-bearing environment variables,
-blocks direct process network access and WebFetch, confines writes to per-turn
-scratch, and allows WebSearch. Commands inside that boundary may run
-automatically. A Claude command that needs device authority accepts the
-broker-bound choices offered by its adapter. Allowing it runs outside the
-disposable sandbox with the current user's full device,
-network, host-file, and process-environment authority. OpenCode automatically permits
+authority for the scope stated by that option. OpenCode automatically permits
 only its exact skill and websearch identities. Its native bash permission is
 fixed to `ask`; the broker correlates the pending execution, permission request,
 decision, and subsequent updates by tool-call ID before allowing completion.
@@ -162,9 +165,8 @@ The broker does not classify prompt text into action-specific code paths.
 Questions and action requests use the same ACP submission contract; the
 selected harness decides whether a tool is needed under its fixed policy, and
 the broker only mediates structured, request-bound permission events.
-One checked-in instruction is supplied through Codex developer instructions,
-Claude's system prompt plus `skills: all`, and OpenCode's instruction-file
-configuration. It directs providers to use relevant installed skills and never
+One checked-in instruction is supplied through Codex developer instructions and
+OpenCode's instruction-file configuration. It directs providers to use relevant installed skills and never
 claim an action completed without a successful performing tool result.
 
 ## Compatibility rule

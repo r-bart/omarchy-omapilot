@@ -117,8 +117,26 @@ describe("tool permission presentation", () => {
     ]);
   });
 
+  it("does not offer OpenCode session or durable approvals that cannot be enforced", () => {
+    const permission = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "opencode", {
+      sessionId: "session",
+      toolCall: { toolCallId: "tool", kind: "execute", rawInput: { command: "printf safe" } },
+      options: [
+        { optionId: "once", name: "Allow once", kind: "allow_once" },
+        { optionId: "session", name: "Allow for session", kind: "allow_always" },
+        { optionId: "always", name: "Always", kind: "allow_always" },
+        { optionId: "deny", name: "Deny", kind: "reject_once" }
+      ]
+    });
+    expect(permission?.view.options).toEqual([
+      { id: "option-0", decision: "allow_once", label: "Allow once" },
+      { id: "option-3", decision: "reject_once", label: "Deny" }
+    ]);
+    expect(permission?.optionIds).toEqual({ "option-0": "once", "option-3": "deny" });
+  });
+
   it("preserves multiple provider choices in the same ACP category", () => {
-    const permission = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "claude", {
+    const permission = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "codex", {
       sessionId: "session",
       toolCall: { toolCallId: "tool", kind: "execute", rawInput: { command: "apply plan" } },
       options: [
@@ -130,8 +148,8 @@ describe("tool permission presentation", () => {
     expect(permission?.optionIds).toEqual({ "option-0": "auto", "option-1": "acceptEdits" });
   });
 
-  it("marks surfaced Claude command approvals as device authority", () => {
-    const permission = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "claude", {
+  it("marks surfaced command approvals as device authority", () => {
+    const permission = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "codex", {
       sessionId: "session",
       toolCall: { toolCallId: "tool", kind: "execute", rawInput: { command: "uname -s" } },
       options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }]

@@ -3,6 +3,8 @@ import { spawn } from "node:child_process";
 import type { AcpRun, PermissionDecision } from "./acp.js";
 import { BrokerAcpError, deleteAcpSession, probeAcpModels, runAcpQuestion } from "./acp.js";
 import { DictationService } from "./dictation.js";
+import { addCustomProvider, CustomProviderError, listCustomProviders, normalizeBaseUrl, probeCustomProvider, removeCustomProvider } from "./custom-providers.js";
+import { setVoxtypeOsdEnabled, voxtypeOsdStatus } from "./voxtype-osd.js";
 import { promptWithContextAttachments } from "./context.js";
 import { ContextAttachmentError, ContextAttachmentStore } from "./context-attachments.js";
 import { HistoryStore, presentChat, presentImage } from "./history.js";
@@ -11,9 +13,10 @@ import { ImagePolicyError, ImageStore, isAllowedExternalLink } from "./images.js
 import { normalizeToolPermission, type PendingToolPermission } from "./permissions.js";
 import { discoverProviders, fallbackModels, isPiProvider, type DiscoveredProvider } from "./providers.js";
 import { launchDetached, resolveExecutable } from "./process.js";
-import type { BrokerCommand, BrokerEvent, ChatRecord, ProviderId, ProviderInfo } from "./types.js";
+import type { BrokerCommand, BrokerEvent, ChatRecord, CustomProviderView, ProviderId, ProviderInfo } from "./types.js";
 import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import type { AuthEvent, AuthPrompt } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/types.js";
+import type { PiProviderCredentialSnapshot } from "./pi-harness.js";
 import { BrowserCompanionServer, type BrowserCapture } from "./browser-companion.js";
 import {
   browserCompanionSetupStatus,
@@ -122,6 +125,12 @@ export class QuickchatBroker {
         await this.#cleanupSessions(deleted);
         break;
       }
+      case "custom_provider_add": await this.#customProviderAdd(command); break;
+      case "custom_provider_test": await this.#customProviderTest(command); break;
+      case "custom_provider_remove": await this.#customProviderRemove(command.id); break;
+      case "custom_provider_list": this.#emitCustomProviders(); break;
+      case "voxtype_osd_status": this.#emitVoxtypeOsd(voxtypeOsdStatus(this.#env)); break;
+      case "voxtype_osd_set": this.#emitVoxtypeOsd(await setVoxtypeOsdEnabled(command.enabled, this.#env)); break;
       case "dictation_start": await this.#dictationStart(); break;
       case "dictation_stop": await this.#dictationStop(); break;
       case "dictation_cancel": await this.#dictationCancel(); break;
@@ -182,9 +191,7 @@ export class QuickchatBroker {
         notify: (event) => this.#notifyAuth(flow, event)
       });
       if (flow.controller.signal.aborted || this.#authFlow?.id !== flow.id) return;
-      const discovered = await discoverProviders(this.#env, "builtin");
-      this.#providers = new Map(discovered.map((provider) => [provider.id, provider]));
-      this.#emit({ type: "providers", providers: discovered.map(publicProvider) });
+      await this.#rediscoverBuiltin();
       this.#emit({ type: "auth_methods", methods: await discoverPiAuthMethods(this.#env) });
       this.#emit({ type: "auth", phase: "complete", flowId: flow.id, methodId: flow.methodId, message: "Authentication complete. OmaPilot is ready." });
     } catch (error) {
@@ -537,6 +544,173 @@ export class QuickchatBroker {
 
   async #emitHistory(): Promise<void> {
     this.#emit({ type: "history", history: (await this.#history.list()).map((chat) => presentChat(chat)) });
+  }
+
+  async #publishAuthMethods(): Promise<void> {
+    try {
+      const { discoverPiAuthMethods } = await import("./pi-harness.js");
+      this.#emit({ type: "auth_methods", methods: await discoverPiAuthMethods(this.#env) });
+    } catch {
+      // A discovery failure must not abort the surrounding action; the server is
+      // already saved and a reopen of settings will retry.
+    }
+  }
+
+  // Registering or removing a server changes which models exist, so the
+  // built-in harness is rediscovered and the new list published.
+  async #rediscoverBuiltin(): Promise<void> {
+    const discovered = await discoverProviders(this.#env, "builtin");
+    this.#providers = new Map(discovered.map((provider) => [provider.id, provider]));
+    this.#emit({ type: "providers", providers: discovered.map(publicProvider) });
+  }
+
+  #emitVoxtypeOsd(status: { available: boolean; enabled: boolean; message?: string }): void {
+    this.#emit({
+      type: "voxtype_osd",
+      available: status.available,
+      enabled: status.enabled,
+      ...(status.message === undefined ? {} : { message: status.message })
+    });
+  }
+
+  #emitCustomProviders(): void {
+    this.#emit({ type: "custom_providers", providers: listCustomProviders(this.#env) });
+  }
+
+  async #customProviderTest(command: { baseUrl: string; apiKey?: string | undefined }): Promise<void> {
+    try {
+      const result = await probeCustomProvider(command);
+      this.#emit({ type: "custom_provider_tested", result });
+    } catch (error) {
+      const message = error instanceof CustomProviderError
+        ? error.message
+        : "The server test failed unexpectedly";
+      this.#emit({ type: "custom_provider_test_failed", baseUrl: command.baseUrl, message });
+    }
+  }
+
+  // Registering a server changes which models exist, so the harness is asked to
+  // rediscover afterwards. The credential is never accepted here: the user
+  // authenticates the new provider through the existing built-in auth flow,
+  // which already offers configured providers.
+  async #customProviderAdd(command: unknown): Promise<void> {
+    let saved: CustomProviderView;
+    const key = this.#customProviderKey(command);
+    const rawId = typeof command === "object" && command !== null && "id" in command
+      ? (command as { id?: unknown }).id : undefined;
+    const requestedId = typeof rawId === "string" ? rawId.trim().toLowerCase() : "";
+    let existing: CustomProviderView | undefined;
+    let endpointChanged = false;
+    try {
+      existing = listCustomProviders(this.#env).find((provider) => provider.id === requestedId);
+      const rawBaseUrl = typeof command === "object" && command !== null && "baseUrl" in command
+        ? (command as { baseUrl?: unknown }).baseUrl : undefined;
+      const requestedBaseUrl = normalizeBaseUrl(typeof rawBaseUrl === "string" ? rawBaseUrl : "");
+      endpointChanged = existing !== undefined && existing.baseUrl !== requestedBaseUrl;
+      saved = addCustomProvider({
+        ...(typeof command === "object" && command !== null ? command : {}),
+        // A blank key means no auth for a new server. When editing, the UI cannot
+        // read the stored secret, so omission preserves it only while the
+        // normalized endpoint is unchanged. A credential must never cross an
+        // endpoint boundary merely because the provider id stayed the same.
+        requiresAuth: key !== undefined || (existing?.requiresAuth === true && !endpointChanged)
+      }, this.#env);
+    } catch (error) {
+      if (error instanceof CustomProviderError) {
+        this.#emit({ type: "error", code: error.code, message: error.message, retryable: false });
+        return;
+      }
+      throw error;
+    }
+    let priorCredential: PiProviderCredentialSnapshot = undefined;
+    let credentialCaptured = false;
+    let piHarness: typeof import("./pi-harness.js") | undefined;
+    // Registering a server and authenticating it were two separate steps, so a
+    // freshly added endpoint contributed no models and looked broken. If a key
+    // came with the request, sign in immediately through the harness's own login
+    // so it lands in auth.json — never in models.json.
+    try {
+      piHarness = await import("./pi-harness.js");
+      priorCredential = piHarness.snapshotPiProviderCredential(this.#env, saved.id);
+      credentialCaptured = true;
+      if (key !== undefined) {
+        await piHarness.loginPiProvider(this.#env, `${saved.id}::api_key`, {
+          signal: new AbortController().signal,
+          prompt: () => Promise.resolve(key),
+          notify: () => undefined
+        });
+      } else if (endpointChanged || existing === undefined || !existing.requiresAuth) {
+        // Blank means this endpoint intentionally needs no key. Clear both
+        // credentials from a prior endpoint and orphaned credentials left by a
+        // removed provider id before the new definition becomes usable.
+        await piHarness.logoutPiProvider(this.#env, saved.id);
+      }
+    } catch (error) {
+      // Authentication is part of changing the endpoint's trust boundary. Put
+      // the old definition back (or remove a new one) before reporting failure,
+      // so models.json can never point a retained secret at the replacement host.
+      try {
+        if (existing === undefined) removeCustomProvider(saved.id, this.#env);
+        else addCustomProvider({ ...existing, requiresAuth: existing.requiresAuth }, this.#env);
+        if (credentialCaptured && piHarness !== undefined)
+          await piHarness.restorePiProviderCredential(this.#env, saved.id, priorCredential);
+      } catch (rollbackError) {
+        this.#emit({
+          type: "error",
+          code: "custom_provider_rollback_failed",
+          message: `Could not safely update ${saved.id}: ${rollbackError instanceof Error ? rollbackError.message : "rollback failed"}`,
+          retryable: false
+        });
+        return;
+      }
+      this.#emit({
+        type: "error",
+        code: "custom_provider_auth_failed",
+        message: `Could not safely update ${saved.id}: ${error instanceof Error ? error.message : "authentication failed"}`,
+        retryable: false
+      });
+      return;
+    }
+
+    // This is the durable-write acknowledgement. Authentication/credential
+    // cleanup above is part of that durable transaction; model rediscovery is
+    // not, and remains after the acknowledgement so the form closes promptly.
+    this.#emit({ type: "custom_provider_saved", provider: saved });
+    this.#emitCustomProviders();
+
+    await this.#publishAuthMethods();
+    await this.#rediscoverBuiltin();
+  }
+
+  #customProviderKey(command: unknown): string | undefined {
+    if (typeof command !== "object" || command === null) return undefined;
+    const value = (command as { apiKey?: unknown }).apiKey;
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+  }
+
+  async #customProviderRemove(id: string): Promise<void> {
+    try {
+      removeCustomProvider(id, this.#env);
+      // Drop the credential too. Deleting only the definition left a live secret
+      // in auth.json for an endpoint the user had explicitly removed.
+      try {
+        const { logoutPiProvider } = await import("./pi-harness.js");
+        await logoutPiProvider(this.#env, String(id));
+      } catch {
+        // A provider that was never signed in has nothing to log out of.
+      }
+    } catch (error) {
+      if (error instanceof CustomProviderError) {
+        this.#emit({ type: "error", code: error.code, message: error.message, retryable: false });
+        return;
+      }
+      throw error;
+    }
+    this.#emitCustomProviders();
+    await this.#publishAuthMethods();
+    await this.#rediscoverBuiltin();
   }
 
   async #dictationStart(): Promise<void> {

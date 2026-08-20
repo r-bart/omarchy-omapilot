@@ -31,6 +31,16 @@ Scope {
   property var images: []
   property var providers: []
   property var builtinAuthMethods: []
+  property var customProviders: []
+  property var customProviderSaved: null
+  property bool customProviderSavePending: false
+  property var customProviderTest: null
+  property bool customProviderTestPending: false
+  property string customProviderTestError: ""
+  property var voxtypeOsd: ({ available: false, enabled: true, message: "" })
+  // Last server-registration failure, surfaced in settings rather than the chat
+  // lane — a rejection shown where the user is not looking is a silent failure.
+  property string customProviderError: ""
   property var builtinAuth: ({ phase: "idle", flowId: "", methodId: "", message: "", url: "",
     verificationUri: "", userCode: "", prompt: null })
   property var history: []
@@ -47,7 +57,6 @@ Scope {
   property string configuredProvider: "builtin"
   property string configuredBuiltinModel: ""
   property string configuredCodexModel: ""
-  property string configuredClaudeModel: ""
   property string configuredOpencodeModel: ""
   property bool configuredDangerousAutoApprove: false
   property bool desktopContextEnabled: true
@@ -58,6 +67,8 @@ Scope {
   property bool brokerContextAttachmentsSupported: false
   property bool harnessRestartPending: false
   property string pendingContextRequestId: ""
+  property bool continuationBlocked: false
+  property string continuationProvider: ""
   property var browserCompanionStatus: ({
     phase: "ready", relayInstalled: false, setupAvailable: false,
     chromiumConnected: false, firefoxConnected: false,
@@ -65,7 +76,8 @@ Scope {
   })
 
   readonly property bool busy: state === "preparing" || state === "dictating" || state === "streaming" || state === "stopping"
-  readonly property bool canSubmit: initialized && providers.length > 0 && !busy
+  readonly property bool providerReady: initialized && providerAvailable(provider)
+  readonly property bool canSubmit: providerReady && !continuationBlocked && !busy
   readonly property bool canRetry: state === "unavailable" && (!processStarted || providers.length === 0)
   readonly property var modelOptions: Protocol.modelOptions(providers, provider)
   readonly property var providerPolicy: Protocol.providerPolicy(providers, provider)
@@ -86,6 +98,7 @@ Scope {
   signal ipcCloseRequested()
   signal ipcToggleRequested()
   signal ipcHistoryRequested()
+  signal ipcSettingsRequested()
   signal contextOverlayRequested(string payload)
   signal contextBrowserPickerRequested()
   signal contextAttachmentAdded()
@@ -95,6 +108,7 @@ Scope {
     else if (method === "close" || method === "hide") ipcCloseRequested()
     else if (method === "toggle") ipcToggleRequested()
     else if (method === "history") ipcHistoryRequested()
+    else if (method === "settings") ipcSettingsRequested()
     else if (method === "newChat") { newChat(); ipcOpenRequested() }
   }
 
@@ -103,7 +117,6 @@ Scope {
     var desiredProvider = Protocol.normalizedProvider(source.provider) || "builtin"
     var desiredBuiltinModel = String(source.builtinModel || "")
     var desiredCodexModel = String(source.codexModel || "")
-    var desiredClaudeModel = String(source.claudeModel || "")
     var desiredOpencodeModel = String(source.opencodeModel || "")
     var desiredDangerousAutoApprove = source.dangerousAutoApprove === true
     var desiredDesktopContext = String(source.desktopContext || "On") !== "Off"
@@ -111,7 +124,6 @@ Scope {
     var changed = harnessChanged
       || desiredBuiltinModel !== configuredBuiltinModel
       || desiredCodexModel !== configuredCodexModel
-      || desiredClaudeModel !== configuredClaudeModel
       || desiredOpencodeModel !== configuredOpencodeModel
       || desiredDangerousAutoApprove !== configuredDangerousAutoApprove
       || desiredDesktopContext !== desktopContextEnabled
@@ -119,14 +131,12 @@ Scope {
     configuredProvider = desiredProvider
     configuredBuiltinModel = desiredBuiltinModel
     configuredCodexModel = desiredCodexModel
-    configuredClaudeModel = desiredClaudeModel
     configuredOpencodeModel = desiredOpencodeModel
     configuredDangerousAutoApprove = desiredDangerousAutoApprove
     desktopContextEnabled = desiredDesktopContext
     if (!desktopContextEnabled) latchedActiveWindow = null
     provider = desiredProvider
-    var desiredModel = desiredProvider === "claude" ? desiredClaudeModel
-      : desiredProvider === "opencode" ? desiredOpencodeModel : desiredCodexModel
+    var desiredModel = desiredProvider === "opencode" ? desiredOpencodeModel : desiredCodexModel
     if (desiredProvider === "builtin") desiredModel = desiredBuiltinModel
     model = desiredModel
     if (providers.length > 0) selectProvider(provider)
@@ -379,6 +389,8 @@ Scope {
     pendingPermission = null
     permissionQueue = []
     transcript = ""
+    continuationBlocked = false
+    continuationProvider = ""
     state = initialized ? "composing" : "preparing"
     statusMessage = initialized ? "" : "Starting OmaPilot…"
     focusComposerRequested()
@@ -386,13 +398,37 @@ Scope {
   }
 
   function startDictation() {
-    if (!initialized || busy) return
+    if (!providerReady || continuationBlocked || busy) return false
     transcript = ""
     sendCommand(Protocol.command("dictation_start"))
+    return true
   }
 
   function stopDictation() {
     if (state === "dictating") sendCommand(Protocol.command("dictation_stop"))
+  }
+
+  function requestVoxtypeOsd() { sendCommand(Protocol.command("voxtype_osd_status")) }
+  function setVoxtypeOsd(enabled) {
+    sendCommand(Protocol.command("voxtype_osd_set", { enabled: enabled === true }))
+  }
+
+  function requestCustomProviders() { sendCommand(Protocol.command("custom_provider_list")) }
+  function testCustomProvider(baseUrl, apiKey) {
+    customProviderTest = null
+    customProviderTestError = ""
+    customProviderTestPending = true
+    sendCommand(Protocol.customProviderTestCommand(baseUrl, apiKey))
+  }
+  function addCustomProvider(id, name, baseUrl, api, modelIds, apiKey) {
+    customProviderError = ""
+    customProviderSaved = null
+    customProviderSavePending = true
+    sendCommand(Protocol.customProviderCommand(id, name, baseUrl, api, modelIds, apiKey))
+  }
+  function removeCustomProvider(id) {
+    customProviderError = ""
+    sendCommand(Protocol.command("custom_provider_remove", { id: String(id || "") }))
   }
 
   function requestHistory() { sendCommand(Protocol.command("history_list")) }
@@ -471,11 +507,19 @@ Scope {
     answerMarkdown = String(chat.answer || chat.markdown || "")
     errorDetails = null
     images = Array.isArray(chat.images) ? chat.images : []
-    provider = Protocol.normalizedProvider(chat.provider) || provider
+    var historicalProvider = Protocol.normalizedProvider(chat.provider) || provider
+    provider = historicalProvider
     model = String(chat.model || "")
+    // Retain the chat's harness even when it is available now. A later settings
+    // switch must not turn this saved session into a cross-harness continuation.
+    continuationProvider = currentChatId !== "" ? historicalProvider : ""
+    continuationBlocked = Protocol.historyContinuationBlocked(
+      continuationProvider, configuredProvider, providers)
     pendingPermission = null
     state = "complete"
-    statusMessage = ""
+    statusMessage = continuationBlocked
+      ? "This chat used " + Protocol.providerLabel(continuationProvider) + ". Choose that harness in Settings to continue."
+      : ""
     answerChanged()
   }
 
@@ -500,10 +544,14 @@ Scope {
     }
     provider = configuredProvider
     selectProvider(configuredProvider)
+    continuationBlocked = Protocol.historyContinuationBlocked(
+      continuationProvider, configuredProvider, providers)
+    statusMessage = continuationBlocked
+      ? "This chat used " + Protocol.providerLabel(continuationProvider) + ". Choose that harness in Settings to continue."
+      : ""
     var readyState = Protocol.providerReadyState(state, providers.length)
     if (readyState !== state) {
       state = readyState
-      statusMessage = ""
       errorDetails = null
     }
   }
@@ -542,6 +590,34 @@ Scope {
     }
     if (type === "providers") {
       applyProviders(event.providers || [])
+      return
+    }
+    if (type === "voxtype_osd") {
+      voxtypeOsd = Protocol.normalizedVoxtypeOsd(event)
+      return
+    }
+    if (type === "custom_providers") {
+      customProviders = Protocol.normalizedCustomProviders(event.providers || [])
+      return
+    }
+    if (type === "custom_provider_saved") {
+      var savedProviders = Protocol.normalizedCustomProviders([event.provider])
+      if (savedProviders.length === 0) return
+      customProviderSavePending = false
+      customProviderError = ""
+      customProviderSaved = savedProviders[0]
+      return
+    }
+    if (type === "custom_provider_tested") {
+      customProviderTestPending = false
+      customProviderTestError = ""
+      customProviderTest = event.result || null
+      return
+    }
+    if (type === "custom_provider_test_failed") {
+      customProviderTestPending = false
+      customProviderTest = null
+      customProviderTestError = String(event.message || "The server test failed")
       return
     }
     if (type === "auth_methods") {
@@ -683,6 +759,18 @@ Scope {
       return
     }
     if (type === "error") {
+      // A registration failure belongs to the open settings form, not the chat
+      // error lane. The pending flag also catches wire-schema rejections whose
+      // generic `invalid_command` code cannot name the originating command.
+      if (!event.id && (customProviderSavePending || customProviderTestPending
+          || String(event.code || "").indexOf("custom_provider") >= 0)) {
+        customProviderTestPending = false
+        customProviderSavePending = false
+        if (String(event.code || "").indexOf("test") >= 0)
+          customProviderTestError = String(event.message || "The server test failed")
+        else customProviderError = String(event.message || "That server could not be saved")
+        return
+      }
       if (pendingContextRequestId !== "" && String(event.id || "") === pendingContextRequestId) {
         pendingContextRequestId = ""
         statusMessage = ""
@@ -695,6 +783,8 @@ Scope {
         return
       }
       if (String(event.code || "").toLowerCase() === "cancelled") {
+        answerMarkdown = ""
+        images = []
         state = "canceled"
         pendingPermission = null
         permissionQueue = []
@@ -702,6 +792,13 @@ Scope {
         errorDetails = null
         answerChanged()
         return
+      }
+      // Streaming commentary is useful while a tool turn is running, but it is
+      // not a completed answer. Remove it when the terminal provider turn fails.
+      if (event.id) {
+        answerMarkdown = ""
+        images = []
+        answerChanged()
       }
       state = event.unavailable === true ? "unavailable" : "error"
       pendingPermission = null
@@ -774,6 +871,7 @@ Scope {
     function toggle() { root.routeIpc("toggle") }
     function newChat() { root.routeIpc("newChat") }
     function history() { root.routeIpc("history") }
+    function settings() { root.routeIpc("settings") }
   }
 
   Process {

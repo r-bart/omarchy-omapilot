@@ -20,7 +20,7 @@ jq -e '
   and .license == "MIT"
   and .kinds == ["bar-widget", "overlay"]
   and .keepLoaded == true
-  and .entryPoints == {"barWidget":"BarWidget.qml", "overlay":"ContextCaptureOverlay.qml"}
+  and .entryPoints == {"barWidget":"BarWidget.qml", "overlay":"Ambient.qml"}
   and .barWidget.category == "AI"
   and .barWidget.displayName == "OmaPilot"
   and (.barWidget.aliases | index("omapilot") != null)
@@ -31,13 +31,12 @@ jq -e '
     "provider":"builtin",
     "builtinModel":"",
     "codexModel":"",
-    "claudeModel":"",
     "opencodeModel":"",
     "quickActionsJson":"",
     "desktopContext":"On",
     "dangerousAutoApprove":false
   }
-  and ([.barWidget.schema[].key] | sort) == (["builtinModel", "claudeModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "provider"] | sort)
+  and ([.barWidget.schema[].key] | sort) == (["builtinModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "provider"] | sort)
   and (.barWidget.schema[] | select(.key == "dangerousAutoApprove")) == {
     "key":"dangerousAutoApprove",
     "type":"boolean",

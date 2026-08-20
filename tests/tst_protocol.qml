@@ -141,26 +141,20 @@ TestCase {
       policy: { tools: "device-approval", web: "approved-command", hostReads: true },
       models: [{ id: "gpt-5", name: "GPT-5" }]
     }, {
-      id: "claude",
-      ready: true,
-      policy: { tools: "device-approval", web: "search", hostReads: false }
-    }, {
       id: "opencode",
       ready: true,
       policy: { tools: "device-approval", web: "search", hostReads: false }
     }])
-    compare(providers.length, 3)
+    compare(providers.length, 2)
     compare(providers[0].value, "codex")
     compare(providers[0].models[0].label, "GPT-5")
     compare(providers[0].policy.tools, "device-approval")
     compare(providers[0].policy.web, "approved-command")
     verify(providers[0].policy.hostReads)
+    compare(providers[1].value, "opencode")
     compare(providers[1].policy.tools, "device-approval")
     compare(providers[1].policy.web, "search")
     verify(!providers[1].policy.hostReads)
-    compare(providers[2].policy.tools, "device-approval")
-    compare(providers[2].policy.web, "search")
-    verify(!providers[2].policy.hostReads)
     verify(providers[0].capabilities === undefined)
   }
 
@@ -175,25 +169,38 @@ TestCase {
     verify(!missing.hostReads)
     compare(Protocol.providerPolicyDescription("opencode", missing), "OpenCode tool policy is unavailable.")
     verify(Protocol.providerPolicyDescription("opencode", { tools: "device-approval", web: "search", hostReads: false }).indexOf("relevant installed skills") >= 0)
-    verify(Protocol.providerPolicyDescription("claude", { tools: "device-approval", web: "blocked", hostReads: false }).indexOf("web search") < 0)
+    verify(Protocol.providerPolicyDescription("opencode", { tools: "device-approval", web: "blocked", hostReads: false }).indexOf("web search") < 0)
   }
 
   function test_harnessOptionsAreExplicitAndBuiltInFirst() {
     var options = Protocol.harnessOptions()
-    compare(options.length, 4)
+    compare(options.length, 3)
     compare(options[0].value, "builtin")
     compare(options[0].label, "Built-in (OmaPilot)")
     compare(options[1].value, "codex")
-    compare(options[2].value, "claude")
-    compare(options[3].value, "opencode")
+    compare(options[2].value, "opencode")
+    // Claude is no longer a selectable harness.
+    verify(Protocol.normalizedProvider("claude") === "")
   }
 
   function test_providerDiscoveryRequiresExactlyTheConfiguredHarness() {
     compare(Protocol.exactHarnessProviders([{ id: "codex" }], "codex").length, 1)
-    compare(Protocol.exactHarnessProviders([{ id: "claude" }], "codex").length, 0)
-    compare(Protocol.exactHarnessProviders([{ id: "codex" }, { id: "claude" }], "codex").length, 0)
+    compare(Protocol.exactHarnessProviders([{ id: "opencode" }], "codex").length, 0)
+    compare(Protocol.exactHarnessProviders([{ id: "codex" }, { id: "opencode" }], "codex").length, 0)
     compare(Protocol.exactHarnessProviders([], "codex").length, 0)
     compare(Protocol.exactHarnessProviders([{ id: "unknown" }], "codex").length, 0)
+  }
+
+  function test_historyContinuationRequiresTheExactHistoricalHarness() {
+    var codex = [{ value: "codex", label: "Codex", models: [] }]
+    var opencode = [{ value: "opencode", label: "OpenCode", models: [] }]
+    // The same retained requirement is initially satisfied, then blocks after
+    // the user switches to a different available harness.
+    var retained = "codex"
+    verify(!Protocol.historyContinuationBlocked(retained, "codex", codex))
+    verify(Protocol.historyContinuationBlocked(retained, "opencode", opencode))
+    verify(Protocol.historyContinuationBlocked(retained, "codex", []))
+    verify(!Protocol.historyContinuationBlocked("", "opencode", opencode))
   }
 
   function test_toolPermissionIsBoundToCurrentTurn() {
@@ -218,8 +225,8 @@ TestCase {
     verify(payload.model === undefined)
     verify(payload.dangerousAutoApprove === undefined)
     verify(payload.capability === undefined)
-    payload = Protocol.submitCommand("2", "Hello", "claude", " opus ", null, false)
-    compare(payload.model, "opus")
+    payload = Protocol.submitCommand("2", "Hello", "opencode", " grok-4 ", null, false)
+    compare(payload.model, "grok-4")
     verify(payload.dangerousAutoApprove === undefined)
     verify(payload.capability === undefined)
     payload = Protocol.submitCommand("3", "Act", "codex", "", null, true)
@@ -243,8 +250,10 @@ TestCase {
     var payload = Protocol.submitCommand("context", "What is open?", "codex", "", {
       version: 99,
       activeWindow: windows[0],
+      activeWorkspace: 7,
+      focusedMonitor: "DP-2",
       windows: windows,
-      media: [{ player: "Spotify", title: "Track", artist: "Artist" }]
+      media: [{ player: "Spotify", title: "Track", artist: "Artist", status: "paused" }]
     })
     compare(payload.desktopContext.version, 1)
     compare(payload.desktopContext.apps.length, 12)
@@ -252,7 +261,10 @@ TestCase {
     verify(payload.desktopContext.activeWindow.address === undefined)
     compare(payload.desktopContext.apps[0].windowCount, 1)
     compare(payload.desktopContext.workspaces.length, 12)
+    compare(payload.desktopContext.activeWorkspace, 7)
+    compare(payload.desktopContext.focusedMonitor, "DP-2")
     compare(payload.desktopContext.media[0].player, "Spotify")
+    compare(payload.desktopContext.media[0].status, "paused")
   }
 
   function test_submitOmitsEmptyDesktopContext() {
@@ -351,6 +363,31 @@ TestCase {
     verify(Protocol.isSafeExternalUrl("mailto:hello@example.com"))
     verify(!Protocol.isSafeExternalUrl("javascript:alert(1)"))
     verify(!Protocol.isSafeExternalUrl("file:///etc/passwd"))
+  }
+
+  function test_customProviderProbeAndSaveKeepDiscoveredModelMetadata() {
+    var blank = Protocol.customProviderTestCommand(" http://finn.example.ts.net:8888/v1 ", "")
+    compare(blank.type, "custom_provider_test")
+    compare(blank.baseUrl, "http://finn.example.ts.net:8888/v1")
+    verify(blank.apiKey === undefined)
+
+    var keyed = Protocol.customProviderTestCommand("https://models.example/v1", " secret ")
+    compare(keyed.apiKey, "secret")
+    var save = Protocol.customProviderCommand(" Finn ", "Qwen", keyed.baseUrl,
+      "openai-responses", [{ id: "Qwen3.8-27B", name: "Qwen", contextWindow: 262144 }], "")
+    compare(save.id, "finn")
+    compare(save.models.length, 1)
+    compare(save.models[0].id, "Qwen3.8-27B")
+    compare(save.models[0].contextWindow, 262144)
+    verify(save.apiKey === undefined)
+
+    var listed = Protocol.normalizedCustomProviders([{
+      id: "finn", name: "Finn", baseUrl: keyed.baseUrl, api: "openai-completions",
+      models: [{ id: "Qwen3.8-27B", name: "Qwen", contextWindow: 262144 }], requiresAuth: true
+    }])
+    compare(listed.length, 1)
+    compare(listed[0].models[0].name, "Qwen")
+    compare(listed[0].models[0].contextWindow, 262144)
   }
 
   function test_codeFencesBecomeCopyableBlocks() {

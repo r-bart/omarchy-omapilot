@@ -1,6 +1,0 @@
-#!/bin/sh
-case "${1:-}" in
-  auth) printf '{"loggedIn":false,"email":"secret@example.com"}\n'; exit 0 ;;
-  --version) echo "claude 1.0.0" ;;
-  *) exit 1 ;;
-esac

@@ -6,13 +6,38 @@ import { createServer } from "node:http";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 import { afterEach, describe, expect, it } from "vitest";
-import { agentDirectory, configDirectory, discoverAgentProfiles, discoverPiAuthMethods, discoverPiProviders, existingSkillPaths, loginPiProvider, PiApprovalState, runNestedAgentPrompt, runPiQuestion } from "../src/pi-harness.js";
+import { agentDirectory, configDirectory, createDesktopTools, discoverAgentProfiles, discoverPiAuthMethods, discoverPiProviders, existingSkillPaths, loginPiProvider, normalizeOpenUrl, omarchyMediaMethod, PiApprovalState, runNestedAgentPrompt, runPiQuestion } from "../src/pi-harness.js";
 import type { BrokerEvent } from "../src/types.js";
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
 describe("native Pi harness", () => {
+  it("maps bounded Omarchy desktop actions without shell interpolation", () => {
+    expect(normalizeOpenUrl(" https://example.com/search?q=omarchy ")).toBe("https://example.com/search?q=omarchy");
+    expect(() => normalizeOpenUrl("file:///etc/passwd")).toThrow(/http and https/u);
+    expect(() => normalizeOpenUrl("https://user:secret@example.com/")).toThrow(/credential-free/u);
+    expect(omarchyMediaMethod("play_pause")).toBe("playPause");
+    expect(omarchyMediaMethod("source_previous")).toBe("sourcePrevious");
+    expect(() => omarchyMediaMethod("delete")).toThrow(/unavailable/u);
+  });
+
+  it("executes desktop actions as exact argv and fails closed on unexpected media output", async () => {
+    const calls: Array<{ file: string; args: string[] }> = [];
+    const [openUrl, media] = createDesktopTools((file, args) => {
+      calls.push({ file, args });
+      return Promise.resolve({ stdout: file === "omarchy-shell" ? "unexpected\n" : "", stderr: "" });
+    });
+    const opened = await openUrl.execute("open", { url: "https://example.com/" }, undefined, undefined, {} as never);
+    const mediaResult = await media.execute("media", { action: "next" }, undefined, undefined, {} as never);
+    expect(calls).toEqual([
+      { file: "omarchy", args: ["launch", "browser", "https://example.com/"] },
+      { file: "omarchy-shell", args: ["media", "next"] }
+    ]);
+    expect((opened as { isError?: boolean }).isError).not.toBe(true);
+    expect((mediaResult as { isError?: boolean }).isError).toBe(true);
+  });
+
   it("separates OmaPilot config from the standard shared agents root", () => {
     const env = { HOME: "/home/test", XDG_CONFIG_HOME: "/config" };
     expect(configDirectory(env)).toBe("/config/omapilot");
@@ -29,9 +54,13 @@ describe("native Pi harness", () => {
     expect(methods).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "openai-codex::oauth", authType: "oauth" }),
       expect.objectContaining({ id: "openai::api_key", authType: "api_key" }),
-      expect.objectContaining({ id: "anthropic::oauth", authType: "oauth" }),
-      expect.objectContaining({ id: "anthropic::api_key", authType: "api_key" })
+      expect.objectContaining({ id: "xai::oauth", authType: "oauth" }),
+      expect.objectContaining({ id: "xai::api_key", authType: "api_key" })
     ]));
+    // Claude was removed as a provider. The anthropic OAuth flow stays
+    // registered because Pi's loader type requires it, so assert the product
+    // decision directly: no anthropic method may be offered.
+    expect(methods.some((method) => method.providerId === "anthropic")).toBe(false);
   });
 
   it("persists an API key through Pi's typed background login interaction", async () => {
@@ -82,7 +111,8 @@ describe("native Pi harness", () => {
         local: {
           baseUrl: "http://127.0.0.1:11434/v1",
           api: "openai-completions",
-          apiKey: "local-only-placeholder",
+          omapilotManaged: true,
+          omapilotAuthRequired: false,
           models: [{ id: "coder", name: "Local Coder", contextWindow: 32_000 }]
         }
       }
@@ -162,16 +192,37 @@ describe("native Pi harness", () => {
     expect(disposals).toBe(1);
   });
 
+  it("rejects a truncated nested-agent answer instead of presenting partial text as complete", async () => {
+    let disposals = 0;
+    const session = {
+      state: { messages: [] as unknown[] },
+      prompt: () => {
+        session.state.messages.push({
+          role: "assistant", content: [{ type: "text", text: "Partial answer" }], stopReason: "length"
+        });
+        return Promise.resolve();
+      },
+      abort: () => Promise.resolve(),
+      dispose: () => { disposals += 1; }
+    };
+    await expect(runNestedAgentPrompt(session, "Answer", [])).rejects.toMatchObject({
+      code: "incomplete_response", retryable: true
+    });
+    expect(disposals).toBe(1);
+  });
+
   it("runs and streams a complete turn through an OpenAI-compatible endpoint", async () => {
     const root = await mkdtemp(join(tmpdir(), "omapilot-pi-run-"));
     roots.push(root);
     const requests: unknown[] = [];
+    const authorizationHeaders: Array<string | undefined> = [];
     const server = createServer((request, response) => {
       let body = "";
       request.setEncoding("utf8");
       request.on("data", (chunk: string) => { body += chunk; });
       request.on("end", () => {
         requests.push(JSON.parse(body));
+        authorizationHeaders.push(request.headers.authorization);
         response.writeHead(200, { "content-type": "text/event-stream" });
       response.write(`data: ${JSON.stringify({
         id: "chatcmpl-test", object: "chat.completion.chunk", created: 1, model: "coder",
@@ -196,7 +247,8 @@ describe("native Pi harness", () => {
       const agentDir = join(root, ".config/omapilot");
       await mkdir(agentDir, { recursive: true });
       await writeFile(join(agentDir, "models.json"), JSON.stringify({ providers: { local: {
-        baseUrl: `http://127.0.0.1:${String(address.port)}/v1`, api: "openai-completions", apiKey: "test",
+        baseUrl: `http://127.0.0.1:${String(address.port)}/v1`, api: "openai-completions",
+        omapilotManaged: true, omapilotAuthRequired: false,
         compat: { supportsUsageInStreaming: true }, models: [{ id: "coder", name: "Coder" }]
       } } }));
       const [provider] = await discoverPiProviders({ HOME: root, OMAPILOT_CONFIG_DIR: agentDir });
@@ -219,10 +271,116 @@ describe("native Pi harness", () => {
       expect(JSON.stringify(requests[1])).toContain("Say hello");
       expect(JSON.stringify(requests[1])).toContain("Hello from Pi.");
       expect(JSON.stringify(requests[1])).toContain("What did I ask?");
+      expect(JSON.stringify(requests[0])).toContain('"open_url"');
+      expect(JSON.stringify(requests[0])).toContain('"media_control"');
+      expect(authorizationHeaders).toEqual([undefined, undefined]);
       const sessionDir = join(root, ".local/state/quickchat/pi-sessions");
       const sessionFiles = await readdir(sessionDir);
       expect(sessionFiles).toHaveLength(1);
       expect(await readFile(join(sessionDir, sessionFiles[0] ?? "missing"), "utf8")).toContain("What did I ask?");
+    } finally {
+      await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+    }
+  });
+
+  it("rejects and rolls back a failed resumed tool turn instead of replaying prior or partial text", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-pi-failed-turn-"));
+    roots.push(root);
+    let requests = 0;
+    const server = createServer((request, response) => {
+      request.resume();
+      requests += 1;
+      if (requests === 3) {
+        response.writeHead(400, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: {
+          message: "Provider returned error: 12 validation errors for ChatCompletionRequest: input_value='output_text'"
+        } }));
+        return;
+      }
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      const chunk = requests === 1
+        ? {
+            id: "chatcmpl-prior", object: "chat.completion.chunk", created: 1, model: "coder",
+            choices: [{ index: 0, delta: { role: "assistant", content: "Previous success." }, finish_reason: "stop" }]
+          }
+        : {
+            id: "chatcmpl-partial-tool", object: "chat.completion.chunk", created: 1, model: "coder",
+            choices: [{ index: 0, delta: {
+              role: "assistant", content: "Checking now. ",
+              tool_calls: [{ index: 0, id: "call-read", type: "function", function: {
+                name: "read", arguments: JSON.stringify({ path: resolve("package.json") })
+              } }]
+            }, finish_reason: "tool_calls" }]
+          };
+      response.end(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`);
+    });
+    await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+    try {
+      const address = server.address();
+      if (address === null || typeof address === "string") throw new Error("test server did not bind");
+      const agentDir = join(root, ".config/omapilot");
+      await mkdir(agentDir, { recursive: true });
+      await writeFile(join(agentDir, "models.json"), JSON.stringify({ providers: { local: {
+        baseUrl: `http://127.0.0.1:${String(address.port)}/v1`, api: "openai-completions",
+        omapilotManaged: true, omapilotAuthRequired: false,
+        models: [{ id: "coder", name: "Coder" }]
+      } } }));
+      const [provider] = await discoverPiProviders({ HOME: root, OMAPILOT_CONFIG_DIR: agentDir });
+      if (provider === undefined) throw new Error("compatible provider was not discovered");
+      const first = await runPiQuestion(provider, "prior", "First", "local::coder", () => undefined, 5_000).result;
+      const sessionDir = join(root, ".local/state/quickchat/pi-sessions");
+      const [sessionName] = await readdir(sessionDir);
+      if (sessionName === undefined) throw new Error("Pi session was not persisted");
+      const sessionPath = join(sessionDir, sessionName);
+      const beforeFailure = await readFile(sessionPath, "utf8");
+      const events: BrokerEvent[] = [];
+      const failed = runPiQuestion(
+        provider, "failed", "Use a tool", "local::coder", (event) => events.push(event), 5_000,
+        undefined, undefined, first.sessionId
+      );
+      await expect(failed.result).rejects.toMatchObject({ code: "provider_incompatible", retryable: false });
+      expect(events).toContainEqual({ type: "content", id: "failed", delta: "Checking now. " });
+      expect(await readFile(sessionPath, "utf8")).toBe(beforeFailure);
+      expect(requests).toBe(3);
+    } finally {
+      await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+    }
+  });
+
+  it("retries one transient provider failure without retrying the completed turn", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-pi-provider-retry-"));
+    roots.push(root);
+    let requests = 0;
+    const server = createServer((request, response) => {
+      request.resume();
+      requests += 1;
+      if (requests === 1) {
+        response.writeHead(503, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: { message: "temporarily unavailable" } }));
+        return;
+      }
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.end(`data: ${JSON.stringify({
+        id: "chatcmpl-recovered", object: "chat.completion.chunk", created: 1, model: "coder",
+        choices: [{ index: 0, delta: { role: "assistant", content: "Recovered." }, finish_reason: "stop" }]
+      })}\n\ndata: [DONE]\n\n`);
+    });
+    await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+    try {
+      const address = server.address();
+      if (address === null || typeof address === "string") throw new Error("test server did not bind");
+      const agentDir = join(root, ".config/omapilot");
+      await mkdir(agentDir, { recursive: true });
+      await writeFile(join(agentDir, "models.json"), JSON.stringify({ providers: { local: {
+        baseUrl: `http://127.0.0.1:${String(address.port)}/v1`, api: "openai-completions",
+        omapilotManaged: true, omapilotAuthRequired: false,
+        models: [{ id: "coder", name: "Coder" }]
+      } } }));
+      const [provider] = await discoverPiProviders({ HOME: root, OMAPILOT_CONFIG_DIR: agentDir });
+      if (provider === undefined) throw new Error("compatible provider was not discovered");
+      await expect(runPiQuestion(provider, "retry", "Recover", "local::coder", () => undefined, 5_000).result)
+        .resolves.toMatchObject({ answer: "Recovered." });
+      expect(requests).toBe(2);
     } finally {
       await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
     }
@@ -241,7 +399,7 @@ describe("native Pi harness", () => {
         ? {
             id: "chatcmpl-tool", object: "chat.completion.chunk", created: 1, model: "coder",
             choices: [{ index: 0, delta: {
-              role: "assistant",
+              role: "assistant", content: "I will try that. ",
               tool_calls: [{ index: 0, id: "call-write", type: "function", function: {
                 name: "write", arguments: JSON.stringify({ path: target, content: "blocked" })
               } }]
@@ -267,12 +425,14 @@ describe("native Pi harness", () => {
       const [provider] = await discoverPiProviders({ HOME: root, OMAPILOT_CONFIG_DIR: agentDir });
       if (provider === undefined) throw new Error("compatible provider was not discovered");
       const permissions: Array<{ command?: unknown; path?: unknown; content?: unknown }> = [];
-      const run = runPiQuestion(provider, "pi-tool-turn", "Write a file", "local::coder", () => undefined, 5_000,
+      const events: BrokerEvent[] = [];
+      const run = runPiQuestion(provider, "pi-tool-turn", "Write a file", "local::coder", (event) => events.push(event), 5_000,
         (request) => {
           permissions.push(request.toolCall.rawInput ?? {});
           return Promise.resolve(request.options.find((option) => option.kind === "reject_once")?.optionId);
         });
       await expect(run.result).resolves.toMatchObject({ answer: "Denied safely." });
+      expect(events).toContainEqual({ type: "content", id: "pi-tool-turn", delta: "I will try that. " });
       expect(permissions).toEqual([{ command: `write ${target}`, path: target, content: "blocked" }]);
       expect(existsSync(target)).toBe(false);
       expect(requests).toBe(2);

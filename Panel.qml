@@ -10,6 +10,7 @@ import "components/internal" as QuickchatInternal
 import "components/Presentation.js" as Presentation
 import "components/Protocol.js" as Protocol
 import "components/QuickActions.js" as ActionCatalog
+import "components/StateColor.js" as StateColor
 
 Panel {
   id: root
@@ -38,9 +39,12 @@ Panel {
     && typeof settings.quickActionsJson === "string" ? settings.quickActionsJson : ""
   readonly property var quickActionItems: ActionCatalog.actionsFromSettings(
     quickActionsJson,
-    !settings || settings.showSummarizeAction !== false,
-    !settings || settings.showWorkInAppAction !== false)
-  readonly property real minimumContentHeight: Style.space(280)
+    settings ? settings.showSummarizeAction === true : false,
+    settings ? settings.showWorkInAppAction === true : false)
+  // Floored just under the resting composer so an empty panel hugs its content.
+  // The card grows from here: the answer area carries its own minimum once a
+  // response exists, and quick actions add their row only when there are any.
+  readonly property real minimumContentHeight: Style.space(120)
   readonly property real comfortableCardHeight: popup.availableCardHeight > 0
     ? Math.min(Style.space(720), Math.max(Style.space(320), popup.availableCardHeight * 0.82))
     : Style.space(720)
@@ -51,6 +55,16 @@ Panel {
   readonly property var responsePhase: Presentation.responsePhase(
     Quickchat.QuickchatStore.state,
     Quickchat.QuickchatStore.answerMarkdown !== "" || Quickchat.QuickchatStore.images.length > 0)
+  // True whenever the response area is presenting a failure, which is the one
+  // state that used to be announced three times over.
+  readonly property bool failureVisible: Quickchat.QuickchatStore.state === "error"
+    || Quickchat.QuickchatStore.state === "unavailable"
+  // The panel speaks the same state language as the ambient surfaces: working
+  // is one hue, a delivered answer another, failure the theme's urgent role.
+  readonly property string statePhase: failureVisible ? "error"
+    : (responseActivityActive ? "thinking"
+      : (Quickchat.QuickchatStore.answerMarkdown !== "" ? "answering" : "listening"))
+  readonly property color stateColor: StateColor.forPhase(root.accent, Color.urgent, root.statePhase)
   readonly property bool responseActivityActive:
     Quickchat.QuickchatStore.state === "preparing"
     || Quickchat.QuickchatStore.state === "streaming"
@@ -126,6 +140,8 @@ Panel {
 
   function openSettings() {
     viewMode = "settings"
+    Quickchat.QuickchatStore.requestCustomProviders()
+    Quickchat.QuickchatStore.requestVoxtypeOsd()
     Quickchat.QuickchatStore.requestBrowserCompanionStatus()
     Qt.callLater(function() { settingsView.forceInitialFocus() })
   }
@@ -231,7 +247,11 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: panelFocus
-    contentWidth: popup.fittedContentWidth(Style.space(640))
+    // 640 was sized for the old layout, whose header carried identity on its
+    // own line. The redesign puts harness, model, approval posture, and the lane
+    // hints in one row, and at 640 the model name was the first thing elided —
+    // exactly the part worth reading.
+    contentWidth: popup.fittedContentWidth(Style.space(760))
     contentHeight: Presentation.boundedPanelHeight(root.activeNaturalHeight,
       root.minimumContentHeight, root.comfortableCardHeight,
       popup.availableCardHeight, popup.verticalContentInset)
@@ -266,58 +286,84 @@ Panel {
         onWorkInAppRequested: root.prepareWorkInAppDraft()
       }
 
+      // Removing the header's gear took away the only route to settings, so the
+      // lanes that lost their buttons get real keys. These are advertised in the
+      // panel's hint row; an affordance nobody can find is not a design.
+      Shortcut {
+        sequences: ["Ctrl+H"]
+        context: Qt.WindowShortcut
+        enabled: root.opened && root.panelWindowActive && !root.modalInteractionActive
+        onActivated: root.viewMode === "history" ? root.showChat() : root.openHistory()
+      }
+
+      Shortcut {
+        sequences: ["Ctrl+,"]
+        context: Qt.WindowShortcut
+        enabled: root.opened && root.panelWindowActive && !root.modalInteractionActive
+        onActivated: root.viewMode === "settings" ? root.showChat() : root.openSettings()
+      }
+
       ColumnLayout {
         id: chatView
         anchors.fill: parent
         visible: root.viewMode === "chat"
         spacing: Style.spacing.lg
 
-        Quickchat.OmaPilotHeader {
-          id: chatHeader
+        // The request is the hero and sits at the top. The old panel opened with
+        // a logo, a tagline, and a gear, then buried the input under the answer;
+        // that is app chrome. What the user came to do goes first.
+        Quickchat.Composer {
+          id: composer
           Layout.fillWidth: true
           backend: Quickchat.QuickchatStore
-          dangerousAutoApprove: root.dangerousAutoApprove
-          motionEnabled: root.motionEnabled
+          activityActive: root.responseActivityActive && root.opened
+          activityColor: root.stateColor
           foreground: root.foreground
           background: root.surface
           accent: root.accent
           fontFamily: root.fontFamily
-          onSettingsRequested: root.openSettings()
+          onSubmitted: answerScroll.resetForNewTurn()
+          onSettingsRequested: root.viewMode === "settings" ? root.showChat() : root.openSettings()
+          onHistoryRequested: root.viewMode === "history" ? root.showChat() : root.openHistory()
+          onEscapeRequested: root.close()
         }
-
-        BorderSurface {
+        // The answer, unboxed. It used to live in a filled, bordered card with a
+        // runner travelling its perimeter — a window inside a window. Now it sits
+        // directly on the panel under one edge-lit seam, the same seam the answer
+        // curtain uses, so the typed and the spoken paths present identically.
+        // The activity signal moved to the composer's filament.
+        Item {
           id: answerCard
           Layout.fillWidth: true
           Layout.fillHeight: true
           Layout.minimumHeight: visible ? Style.space(120) : 0
           Layout.preferredHeight: implicitHeight
-          implicitHeight: answerLayout.implicitHeight + contentTopInset + contentBottomInset
-            + Style.spacing.xl + Style.spacing.lg
-          color: Style.normalFillFor(root.foreground, root.accent)
-          borderSpec: Border.controlSpec("normal", root.foreground, root.accent)
-          radius: Style.cornerRadius
+          implicitHeight: answerLayout.implicitHeight + Style.spacing.xl
           visible: Quickchat.QuickchatStore.question !== ""
             || Quickchat.QuickchatStore.answerMarkdown !== ""
             || Quickchat.QuickchatStore.state === "error"
             || Quickchat.QuickchatStore.state === "unavailable"
 
-          Quickchat.ResponseActivityBorder {
-            id: responseActivityBorder
-            anchors.fill: parent
-            z: 10
-            active: root.responseActivityActive && root.opened
-            motionEnabled: root.motionEnabled
-            accent: root.accent
-            radius: answerCard.radius
+          // Brightest at the centre, gone by the edges. A full-width rule would
+          // read as a divider; this reads as light arriving with the answer.
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: 1
+            gradient: Gradient {
+              orientation: Gradient.Horizontal
+              GradientStop { position: 0.0; color: "transparent" }
+              GradientStop { position: 0.5; color: Qt.rgba(root.stateColor.r, root.stateColor.g, root.stateColor.b,
+                root.failureVisible ? 0.0 : 0.7) }
+              GradientStop { position: 1.0; color: "transparent" }
+            }
           }
 
           ColumnLayout {
             id: answerLayout
             anchors.fill: parent
-            anchors.leftMargin: parent.contentLeftInset + Style.spacing.xxl
-            anchors.rightMargin: parent.contentRightInset + Style.spacing.xxl
-            anchors.topMargin: parent.contentTopInset + Style.spacing.xl
-            anchors.bottomMargin: parent.contentBottomInset + Style.spacing.lg
+            anchors.topMargin: Style.spacing.xl
             spacing: Style.spacing.lg
 
             RowLayout {
@@ -371,7 +417,11 @@ Panel {
 
                 Text {
                   id: responseState
-                  readonly property bool phaseVisible: text !== "" && !root.responseActivityActive
+                  // The error notice below already names the failure in full, so
+                  // a shouty UNAVAILABLE chip beside the question is the same
+                  // information a third time.
+                  readonly property bool phaseVisible: text !== ""
+                    && !root.responseActivityActive && !root.failureVisible
                   anchors.right: parent.right
                   anchors.verticalCenter: parent.verticalCenter
                   text: root.responsePhase.label
@@ -583,6 +633,21 @@ Panel {
                     onDetailsRequested: root.openErrorDetails()
                   }
 
+                  // Recovery sits with the explanation instead of orphaned under
+                  // the composer.
+                  Button {
+                    visible: Quickchat.QuickchatStore.canRetry
+                    text: "Retry"
+                    tooltipText: "Restart the OmaPilot broker"
+                    foreground: root.foreground
+                    background: root.surface
+                    accent: root.accent
+                    bordered: true
+                    focusable: true
+                    Accessible.name: tooltipText
+                    onClicked: Quickchat.QuickchatStore.retryBroker()
+                  }
+
                   Text {
                     visible: Quickchat.QuickchatStore.statusMessage !== ""
                       && !root.responseActivityActive
@@ -652,6 +717,9 @@ Panel {
               }
             }
 
+            // Borderless and quiet. These are follow-ups to an answer, not
+            // primary controls, and three outlined buttons under every response
+            // was the loudest thing in the old panel.
             RowLayout {
               Layout.fillWidth: true
               visible: Quickchat.QuickchatStore.answerMarkdown !== ""
@@ -661,7 +729,7 @@ Panel {
               PanelActionButton {
                 iconText: "󰆏"
                 tooltipText: "Copy answer"
-                foreground: root.foreground
+                foreground: Qt.darker(root.foreground, 1.4)
                 focusable: true
                 enabled: Quickchat.QuickchatStore.answerMarkdown !== ""
                 Accessible.name: tooltipText
@@ -672,40 +740,26 @@ Panel {
 
               Button {
                 text: "New chat"
-                foreground: root.foreground
+                foreground: Qt.darker(root.foreground, 1.4)
                 background: root.surface
-                bordered: true
+                bordered: false
                 focusable: true
                 onClicked: Quickchat.QuickchatStore.newChat()
               }
 
               Button {
-                iconText: "󰆍"
                 text: "Continue in Herdr"
                 tooltipText: "Continue in Herdr with the native harness permissions"
                 visible: Quickchat.QuickchatStore.currentChatId !== ""
-                foreground: root.foreground
+                foreground: Qt.darker(root.foreground, 1.4)
                 background: root.surface
                 accent: root.accent
-                active: true
-                bordered: true
+                bordered: false
                 focusable: true
                 onClicked: Quickchat.QuickchatStore.continueInHerdr()
               }
             }
           }
-        }
-
-        Quickchat.Composer {
-          id: composer
-          Layout.fillWidth: true
-          backend: Quickchat.QuickchatStore
-          foreground: root.foreground
-          background: root.surface
-          accent: root.accent
-          fontFamily: root.fontFamily
-          onSubmitted: answerScroll.resetForNewTurn()
-          onEscapeRequested: root.close()
         }
 
         Quickchat.QuickActions {
@@ -722,6 +776,124 @@ Panel {
           fontFamily: root.fontFamily
           workInAppShortcutText: "Ctrl+Shift+A"
           onActionRequested: function(actionId, prompt) { composer.setDraft(prompt) }
+        }
+
+        // One hint row carries everything the removed chrome used to: which
+        // harness answered, the permission posture, and how to reach the lanes
+        // that no longer have buttons. Affordances are discoverable in one
+        // place instead of scattered across a header, a toolbar, and a gear.
+        RowLayout {
+          Layout.fillWidth: true
+          Layout.topMargin: Style.spacing.xs
+          spacing: Style.spacing.md
+
+          // Provenance keeps its natural width so the harness name is never the
+          // thing that gets elided; the key hints absorb the slack instead.
+          Text {
+            Layout.fillWidth: true
+            Layout.minimumWidth: 0
+            elide: Text.ElideRight
+            text: {
+              var who = Protocol.providerLabel(Quickchat.QuickchatStore.provider)
+              if (Quickchat.QuickchatStore.model !== "")
+                who += " \u00b7 " + Quickchat.QuickchatStore.model
+              return who
+            }
+            color: Qt.darker(root.foreground, 1.35)
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
+          }
+
+          // Only the dangerous posture is worth stating. Announcing the safe
+          // default on every frame is noise, and it was crowding the row badly
+          // enough to elide the harness name.
+          Text {
+            visible: root.dangerousAutoApprove
+            Layout.maximumWidth: implicitWidth
+            elide: Text.ElideRight
+            text: Presentation.permissionNotice(root.dangerousAutoApprove)
+            color: Color.urgent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
+          }
+
+          // This row is now the only place settings and history are discoverable,
+          // so it has to be readable. Caption size at darker(1.6) was too faint
+          // to notice at all. "enter send" is dropped: Enter in a text field is
+          // not the thing anyone needs told.
+          // Clickable, not just advertised. Removing the gear left settings
+          // reachable only by keystroke, and a keystroke is a single point of
+          // failure: anything upstream that swallows the key makes a whole lane
+          // unreachable with no fallback. These are the same hints, but they are
+          // also the control.
+          // Without this the auto-approve warning butts straight against the
+          // first key hint and the two read as one sentence.
+          Text {
+            visible: root.dangerousAutoApprove
+            text: "\u00b7"
+            color: Qt.darker(root.foreground, 1.9)
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+          }
+
+          Row {
+            spacing: Style.spacing.md
+
+            Repeater {
+              model: [
+                { label: "Ctrl+, settings", lane: "settings" },
+                { label: "Ctrl+H history", lane: "history" }
+              ]
+
+              delegate: Row {
+                required property var modelData
+                required property int index
+                spacing: Style.spacing.md
+
+                Text {
+                  visible: index > 0
+                  text: "\u00b7"
+                  color: Qt.darker(root.foreground, 1.9)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                }
+
+                Text {
+                  id: hintLabel
+                  readonly property var laneData: parent.modelData
+                  text: laneData.label
+                  color: hint.hovered ? root.accent : Qt.darker(root.foreground, 1.2)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                font.underline: hint.hovered
+                Accessible.role: Accessible.Button
+                  Accessible.name: "Open " + hintLabel.laneData.lane
+
+                Behavior on color {
+                  enabled: root.motionEnabled
+                  ColorAnimation { duration: 120 }
+                }
+
+                HoverHandler {
+                  id: hint
+                  cursorShape: Qt.PointingHandCursor
+                }
+
+                TapHandler {
+                  onTapped: {
+                    if (root.viewMode === hintLabel.laneData.lane) root.showChat()
+                    else if (hintLabel.laneData.lane === "settings") root.openSettings()
+                    else root.openHistory()
+                  }
+                }
+                }
+              }
+            }
+          }
         }
       }
 
@@ -749,6 +921,18 @@ Panel {
         onBrowserCompanionRefreshRequested: Quickchat.QuickchatStore.requestBrowserCompanionStatus()
         onBrowserCompanionOpenSettingsRequested: function(family) { Quickchat.QuickchatStore.openBrowserCompanionSettings(family) }
         onBrowserCompanionCopyPathRequested: function(family) { Quickchat.QuickchatStore.copyBrowserCompanionPath(family) }
+        onCustomProviderAddRequested: function(id, name, baseUrl, api, models, apiKey) {
+          Quickchat.QuickchatStore.addCustomProvider(id, name, baseUrl, api, models, apiKey)
+        }
+        onCustomProviderTestRequested: function(baseUrl, apiKey) {
+          Quickchat.QuickchatStore.testCustomProvider(baseUrl, apiKey)
+        }
+        onVoxtypeOsdRequested: function(enabled) {
+          Quickchat.QuickchatStore.setVoxtypeOsd(enabled)
+        }
+        onCustomProviderRemoveRequested: function(id) {
+          Quickchat.QuickchatStore.removeCustomProvider(id)
+        }
         onRecentChatsRequested: root.openHistory()
         onDismissed: root.showChat()
       }

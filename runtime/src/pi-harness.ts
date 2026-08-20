@@ -1,15 +1,17 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, truncateSync, unlinkSync, writeFileSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { createAgentSession } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/sdk.js";
 import { DefaultResourceLoader } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js";
+import { AuthStorage, readStoredCredential } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/auth-storage.js";
 import { ModelRuntime } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.js";
 import { SessionManager } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.js";
 import { SettingsManager } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js";
 import { parseFrontmatter } from "../../node_modules/@earendil-works/pi-coding-agent/dist/utils/frontmatter.js";
 import type { InlineExtension, ToolDefinition } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/types.js";
-import type { AuthInteraction, AuthType } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/types.js";
+import type { AuthInteraction, AuthType, Credential } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/types.js";
 import { registerBundledOAuthFlowLoaders } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/load.js";
 import { anthropicOAuth } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/anthropic.js";
 import { openaiCodexOAuth } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js";
@@ -18,6 +20,7 @@ import { openRouterOAuth } from "../../node_modules/@earendil-works/pi-coding-ag
 import { kimiCodingOAuth } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/kimi-coding.js";
 import { xaiOAuth } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/xai.js";
 import { createRadiusOAuth } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/radius.js";
+import { getApiProvider } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/compat.js";
 import { Type } from "typebox";
 import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import type { AcpPrompt } from "./context.js";
@@ -29,16 +32,33 @@ import { quickchatPaths } from "./paths.js";
 const PROVIDER_GROUPS = [
   { id: "codex", name: "Codex", piProviderIds: ["openai-codex"] },
   { id: "openai", name: "OpenAI", piProviderIds: ["openai"] },
-  { id: "claude", name: "Claude", piProviderIds: ["anthropic"] }
+  { id: "grok", name: "Grok", piProviderIds: ["xai"] }
 ] as const;
-const BUILTIN_PROVIDER_IDS = new Set(["openai-codex", "openai", "anthropic"]);
-const MUTATING_TOOLS = new Set(["bash", "edit", "write"]);
-const BASIC_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls", "agent"];
+const BUILTIN_PROVIDER_IDS = new Set(["openai-codex", "openai", "xai"]);
+const MUTATING_TOOLS = new Set(["bash", "edit", "write", "open_url", "media_control"]);
+const AGENT_PROFILE_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
+const PI_TOOLS = [...AGENT_PROFILE_TOOLS, "agent", "open_url", "media_control"];
 const SAFE_AGENT_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const MAX_AGENT_FILE_BYTES = 128 * 1024;
 const sessionApprovals = new Map<string, PiApprovalState>();
+const NO_AUTH_RUNTIME_KEY = "omapilot-no-auth";
+const MAX_DESKTOP_COMMAND_OUTPUT = 128 * 1024;
+
+const openUrlParameters = Type.Object({
+  url: Type.String({ description: "Absolute http or https URL to open in the default browser", minLength: 1, maxLength: 2048 })
+});
+const mediaControlParameters = Type.Object({
+  action: Type.Union([
+    Type.Literal("play_pause"), Type.Literal("play"), Type.Literal("pause"),
+    Type.Literal("next"), Type.Literal("previous"),
+    Type.Literal("source_next"), Type.Literal("source_previous")
+  ], { description: "Playback action for the active Omarchy media player" })
+});
 
 registerBundledOAuthFlowLoaders({
+  // Required by OAuthFlowLoaders. Registering the flow is not the same as
+  // offering the provider: anthropic is absent from BUILTIN_PROVIDER_IDS, so
+  // no Claude auth method or model is ever surfaced.
   anthropic: () => anthropicOAuth,
   openaiCodex: () => openaiCodexOAuth,
   githubCopilot: () => githubCopilotOAuth,
@@ -89,9 +109,28 @@ async function createRuntime(env: NodeJS.ProcessEnv, directory: string): Promise
     refreshOnCreate: false,
     allowModelNetwork: false
   });
+  // Pi intentionally requires every provider to have an auth resolver, while
+  // local OpenAI-compatible servers commonly require no credential at all.
+  // Register a memory-only resolver for those managed entries and remove the
+  // synthetic SDK Authorization header at the final fetch boundary.
+  for (const provider of configuredNoAuthProviders(directory)) {
+    runtime.registerProvider(provider.id, {
+      api: provider.api,
+      apiKey: NO_AUTH_RUNTIME_KEY,
+      authHeader: false,
+      streamSimple: (model, context, options) => {
+        const implementation = getApiProvider(model.api);
+        if (implementation === undefined) throw new Error(`No API provider registered for api: ${model.api}`);
+        return implementation.streamSimple(model, context, {
+          ...options,
+          fetch: fetchWithoutAuthentication
+        });
+      }
+    });
+  }
   for (const [provider, key] of [
     ["openai", env.OPENAI_API_KEY],
-    ["anthropic", env.ANTHROPIC_API_KEY]
+    ["xai", env.XAI_API_KEY]
   ] as const) {
     if (key?.trim()) await runtime.setRuntimeApiKey(provider, key.trim());
   }
@@ -102,6 +141,7 @@ export async function discoverPiAuthMethods(env: NodeJS.ProcessEnv = process.env
   const directory = configDirectory(env);
   const runtime = await createRuntime(env, directory);
   const configured = new Set(configuredProviderIds(directory));
+  const noAuth = new Set(configuredNoAuthProviders(directory).map((provider) => provider.id));
   const allowed = new Set([...BUILTIN_PROVIDER_IDS, ...configured]);
   const methods: BuiltinAuthMethod[] = [];
   for (const provider of runtime.getProviders()) {
@@ -115,7 +155,7 @@ export async function discoverPiAuthMethods(env: NodeJS.ProcessEnv = process.env
         ? `Use your ${provider.name} subscription in OmaPilot.`
         : `Sign in to ${provider.name} in your browser.`
     });
-    if (provider.auth.apiKey?.login !== undefined) methods.push({
+    if (!noAuth.has(provider.id) && provider.auth.apiKey?.login !== undefined) methods.push({
       id: `${provider.id}::api_key`,
       providerId: provider.id,
       authType: "api_key",
@@ -124,6 +164,33 @@ export async function discoverPiAuthMethods(env: NodeJS.ProcessEnv = process.env
     });
   }
   return methods;
+}
+
+function fetchWithoutAuthentication(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const request = new Request(input, init);
+  const headers = new Headers(request.headers);
+  headers.delete("authorization");
+  headers.delete("api-key");
+  return fetch(new Request(request, { headers }));
+}
+
+function configuredNoAuthProviders(directory: string): Array<{ id: string; api: string }> {
+  const path = join(directory, "models.json");
+  try {
+    if (statSync(path).size > 1024 * 1024) return [];
+    const value: unknown = JSON.parse(readFileSync(path, "utf8"));
+    if (!isObject(value) || !isObject(value.providers)) return [];
+    const providers: Array<{ id: string; api: string }> = [];
+    for (const [id, entry] of Object.entries(value.providers)) {
+      if (!isObject(entry) || entry.omapilotManaged !== true || entry.omapilotAuthRequired === true) continue;
+      const api = typeof entry.api === "string" ? entry.api : "";
+      if (api !== "openai-responses" && api !== "openai-completions") continue;
+      providers.push({ id, api });
+    }
+    return providers;
+  } catch {
+    return [];
+  }
 }
 
 export async function loginPiProvider(
@@ -136,6 +203,38 @@ export async function loginPiProvider(
   if (method === undefined) throw new BrokerPiError("auth_method_unavailable", "That authentication method is unavailable", false);
   const runtime = await createRuntime(env, configDirectory(env));
   await runtime.login(method.providerId, method.authType as AuthType, interaction);
+}
+
+// Removing a server must also drop its credential, or a deleted endpoint leaves
+// a live secret in auth.json forever.
+export async function logoutPiProvider(env: NodeJS.ProcessEnv, providerId: string): Promise<void> {
+  const runtime = await createRuntime(env, configDirectory(env));
+  await runtime.logout(providerId);
+}
+
+export type PiProviderCredentialSnapshot = Credential | undefined;
+
+/** Preserve the unresolved auth.json value so a failed endpoint edit can restore it exactly. */
+export function snapshotPiProviderCredential(
+  env: NodeJS.ProcessEnv,
+  providerId: string
+): PiProviderCredentialSnapshot {
+  const credential = readStoredCredential(providerId, join(configDirectory(env), "auth.json"));
+  return credential === undefined ? undefined : structuredClone(credential);
+}
+
+/** Restore one provider credential without disturbing unrelated auth.json entries. */
+export async function restorePiProviderCredential(
+  env: NodeJS.ProcessEnv,
+  providerId: string,
+  credential: PiProviderCredentialSnapshot
+): Promise<void> {
+  const storage = AuthStorage.create(join(configDirectory(env), "auth.json"));
+  if (credential === undefined) {
+    await storage.delete(providerId);
+    return;
+  }
+  await storage.modify(providerId, () => Promise.resolve(structuredClone(credential)));
 }
 
 function optionId(providerId: string, modelId: string, grouped: boolean): string {
@@ -258,7 +357,11 @@ export function runPiQuestion(
     const agentTool = createAgentTool(provider, model, profiles, requestId, requestPermission, approvals, controller.signal);
     const settings = SettingsManager.inMemory({
       compaction: { enabled: true },
-      retry: { enabled: true, maxRetries: 2 }
+      // Retry once at the HTTP provider boundary, whose status-aware policy
+      // accepts transport errors, 408/409/429, and 5xx while rejecting other
+      // 4xx. Disable Pi's text-classified outer retry so wrapped 400 errors and
+      // partial streams can never be replayed or concatenated.
+      retry: { enabled: false, provider: { maxRetries: 1, maxRetryDelayMs: 5_000 } }
     });
     const { session } = await createAgentSession({
       cwd: provider.cwd,
@@ -268,29 +371,40 @@ export function runPiQuestion(
       resourceLoader: loader,
       sessionManager,
       settingsManager: settings,
-      tools: BASIC_TOOLS,
-      customTools: [agentTool]
+      tools: PI_TOOLS,
+      customTools: [agentTool, ...createDesktopTools()]
     });
     activeSession = session;
-    let answer = "";
+    let streamedText = "";
     const unsubscribe = session.subscribe((event) => {
       if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
-        answer += event.assistantMessageEvent.delta;
+        streamedText += event.assistantMessageEvent.delta;
         emit({ type: "content", id: requestId, delta: event.assistantMessageEvent.delta });
       }
     });
     const timeout = setTimeout(() => { void cancel(); }, timeoutMs);
     timeout.unref();
+    const turnStartIndex = session.state.messages.length;
+    const sessionFile = sessionManager.getSessionFile();
+    const sessionFileExisted = sessionFile !== undefined && existsSync(sessionFile);
+    const sessionFileBytes = sessionFileExisted && sessionFile !== undefined ? statSync(sessionFile).size : 0;
+    let promptStarted = false;
+    let rollbackTurn = false;
     try {
       const normalized = normalizePrompt(prompt);
+      promptStarted = true;
       await session.prompt(normalized.text, normalized.images.length === 0 ? undefined : { images: normalized.images });
       if (controller.signal.aborted) throw new BrokerPiError("cancelled", "The request was cancelled", false);
-      if (answer.trim() === "") answer = finalAssistantText(session.state.messages);
+      const turnMessages = session.state.messages.slice(turnStartIndex);
+      const terminal = terminalAssistantMessage(turnMessages);
+      const terminalError = terminalAssistantError(terminal);
+      if (terminalError !== undefined) throw terminalError;
+      const answer = assistantText(terminal);
       if (answer.trim() === "") {
         if (provider.agent.env.QUICKCHAT_DEBUG_PI === "1") {
-          process.stderr.write(`OmaPilot Pi empty response: ${assistantDiagnostics(session.state.messages)}\n`);
+          process.stderr.write(`OmaPilot Pi empty response: streamed=${String(streamedText.length)} ${assistantDiagnostics(turnMessages)}\n`);
         }
-        throw new BrokerPiError("empty_response", "The model returned no answer", true);
+        throw new BrokerPiError("empty_response", "The model returned no final answer", true);
       }
       return {
         answer,
@@ -301,6 +415,7 @@ export function runPiQuestion(
         resumable: true
       };
     } catch (error) {
+      rollbackTurn = promptStarted;
       if (error instanceof BrokerPiError) throw error;
       const message = error instanceof Error ? error.message : "";
       if (/api key|credential|auth|login/iu.test(message))
@@ -310,6 +425,18 @@ export function runPiQuestion(
       clearTimeout(timeout);
       unsubscribe();
       session.dispose();
+      if (rollbackTurn && sessionFile !== undefined) {
+        try {
+          if (sessionFileExisted) truncateSync(sessionFile, sessionFileBytes);
+          else if (existsSync(sessionFile)) unlinkSync(sessionFile);
+        }
+        catch (error) {
+          if (provider.agent.env.QUICKCHAT_DEBUG_PI === "1") {
+            const message = error instanceof Error ? error.message : String(error);
+            process.stderr.write(`OmaPilot Pi could not roll back failed turn: ${boundedDiagnostic(message)}\n`);
+          }
+        }
+      }
       activeSession = undefined;
     }
   })();
@@ -346,6 +473,99 @@ function normalizePrompt(prompt: AcpPrompt): { text: string; images: Array<{ typ
     text: prompt.filter((block) => block.type === "text").map((block) => block.text).join("\n\n"),
     images: prompt.filter((block): block is Extract<(typeof prompt)[number], { type: "image" }> => block.type === "image")
   };
+}
+
+export function normalizeOpenUrl(raw: string): string {
+  const value = raw.trim();
+  let url: URL;
+  try { url = new URL(value); }
+  catch { throw new BrokerPiError("invalid_url", "Open a complete http or https URL", false); }
+  if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username !== "" || url.password !== "") {
+    throw new BrokerPiError("invalid_url", "Only credential-free http and https URLs can be opened", false);
+  }
+  if (url.href.length > 2048) throw new BrokerPiError("invalid_url", "The URL is too long to open", false);
+  return url.href;
+}
+
+export function omarchyMediaMethod(action: string): string {
+  const methods: Record<string, string> = {
+    play_pause: "playPause",
+    play: "play",
+    pause: "pause",
+    next: "next",
+    previous: "previous",
+    source_next: "sourceNext",
+    source_previous: "sourcePrevious"
+  };
+  const method = methods[action];
+  if (method === undefined) throw new BrokerPiError("invalid_media_action", "That media action is unavailable", false);
+  return method;
+}
+
+type DesktopCommandResult = { stdout: string; stderr: string };
+type DesktopCommandRunner = (file: string, args: string[], signal?: AbortSignal) => Promise<DesktopCommandResult>;
+
+const runDesktopCommand: DesktopCommandRunner = (file, args, signal) => new Promise((resolve, reject) => {
+  execFile(file, args, {
+    encoding: "utf8",
+    maxBuffer: MAX_DESKTOP_COMMAND_OUTPUT,
+    timeout: 10_000,
+    signal
+  }, (error, stdout, stderr) => {
+    if (error !== null) reject(error);
+    else resolve({ stdout, stderr });
+  });
+});
+
+function commandToolError(action: string, error: unknown): { content: Array<{ type: "text"; text: string }>; details: undefined; isError: true } {
+  const message = error instanceof BrokerPiError ? error.message : `${action} failed`;
+  return { content: [{ type: "text", text: message }], details: undefined, isError: true };
+}
+
+export function createDesktopTools(run: DesktopCommandRunner = runDesktopCommand): [
+  ToolDefinition<typeof openUrlParameters>, ToolDefinition<typeof mediaControlParameters>
+] {
+  const openUrl: ToolDefinition<typeof openUrlParameters> = {
+    name: "open_url",
+    label: "Open URL",
+    description: "Open an http or https URL in Omarchy's default browser. Use this instead of computer-use tooling when the user only wants a website opened.",
+    promptSnippet: "Open a URL in the default Omarchy browser",
+    parameters: openUrlParameters,
+    async execute(_toolCallId, input, signal) {
+      try {
+        const url = normalizeOpenUrl(input.url);
+        await run("omarchy", ["launch", "browser", url], signal);
+        return { content: [{ type: "text", text: `Launched ${url} in the default browser.` }], details: { url } };
+      } catch (error) { return commandToolError("Opening the URL", error); }
+    }
+  };
+  const mediaControl: ToolDefinition<typeof mediaControlParameters> = {
+    name: "media_control",
+    label: "Control media",
+    description: "Control the active Omarchy MPRIS media player using the shell's media service.",
+    promptSnippet: "Play, pause, skip, or switch the active media source",
+    parameters: mediaControlParameters,
+    async execute(_toolCallId, input, signal) {
+      try {
+        const method = omarchyMediaMethod(input.action);
+        const result = await run("omarchy-shell", ["media", method], signal);
+        const output = `${result.stdout}\n${result.stderr}`.trim();
+        if (output === "unhandled") return {
+          content: [{ type: "text", text: "No active media player could handle that action." }],
+          details: { action: input.action }, isError: true
+        };
+        if (output !== "ok") return {
+          content: [{ type: "text", text: "The Omarchy media service returned an unexpected result." }],
+          details: { action: input.action }, isError: true
+        };
+        return {
+          content: [{ type: "text", text: `Media action ${input.action} completed.` }],
+          details: { action: input.action }
+        };
+      } catch (error) { return commandToolError("The media action", error); }
+    }
+  };
+  return [openUrl, mediaControl];
 }
 
 type PersistedApprovals = { version: 1; allow: string[]; deny: string[] };
@@ -443,12 +663,24 @@ function createPermissionExtension(requestId: string, handler: PermissionHandler
 
 function reviewableToolInput(name: string, input: Record<string, unknown>): Record<string, unknown> {
   if (name === "bash") return { ...input, command: typeof input.command === "string" ? input.command : "" };
+  if (name === "open_url") {
+    const url = typeof input.url === "string" ? input.url : "";
+    return { command: `omarchy launch browser ${url}`, url };
+  }
+  if (name === "media_control") {
+    const action = typeof input.action === "string" ? input.action : "";
+    let method = action;
+    try { method = omarchyMediaMethod(action); } catch { /* Keep malformed input reviewable. */ }
+    return { command: `omarchy-shell media ${method}`, action };
+  }
   const path = typeof input.path === "string" ? input.path : "unknown";
   return { command: `${name} ${path}`, ...input };
 }
 
 function toolTitle(name: string, input: Record<string, unknown>): string {
   if (name === "bash") return "Run a command";
+  if (name === "open_url") return "Open URL in default browser";
+  if (name === "media_control") return `Control media: ${typeof input.action === "string" ? input.action : "action"}`;
   const path = typeof input.path === "string" ? basename(input.path) : "file";
   return `${name === "write" ? "Write" : "Edit"} ${path}`;
 }
@@ -496,7 +728,7 @@ export function discoverAgentProfiles(directory: string, cwd: string): AgentProf
 function parseTools(value: unknown): string[] | undefined {
   const values = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
   const tools = values.filter((item): item is string => typeof item === "string")
-    .map((item) => item.trim()).filter((item) => BASIC_TOOLS.includes(item) && item !== "agent");
+    .map((item) => item.trim()).filter((item) => AGENT_PROFILE_TOOLS.includes(item));
   return tools.length === 0 ? undefined : [...new Set(tools)];
 }
 
@@ -577,6 +809,7 @@ export async function runNestedAgentPrompt(
   };
   for (const signal of activeSignals) signal.addEventListener("abort", abort, { once: true });
   if (activeSignals.some((signal) => signal.aborted)) abort();
+  const turnStartIndex = session.state.messages.length;
   try {
     if (abortPromise !== undefined) {
       await abortPromise;
@@ -585,7 +818,10 @@ export async function runNestedAgentPrompt(
     await session.prompt(task);
     if (activeSignals.some((signal) => signal.aborted))
       throw new BrokerPiError("cancelled", "The request was cancelled", false);
-    return finalAssistantText(session.state.messages);
+    const terminal = terminalAssistantMessage(session.state.messages.slice(turnStartIndex));
+    const terminalError = terminalAssistantError(terminal);
+    if (terminalError !== undefined) throw terminalError;
+    return assistantText(terminal);
   } finally {
     for (const signal of activeSignals) signal.removeEventListener("abort", abort);
     if (abortPromise !== undefined) await abortPromise;
@@ -604,15 +840,51 @@ function resolveProfileModel(provider: PiDiscoveredProvider, value: string): PiM
   return all.find((model) => model.id === value);
 }
 
-function finalAssistantText(messages: readonly unknown[]): string {
+function terminalAssistantMessage(messages: readonly unknown[]): Record<string, unknown> | undefined {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
-    if (!isObject(message) || message.role !== "assistant" || !Array.isArray(message.content)) continue;
-    const text = message.content.filter((part) => isObject(part) && part.type === "text" && typeof part.text === "string")
-      .map((part) => String((part as Record<string, unknown>).text)).join("");
-    if (text !== "") return text;
+    if (isObject(message) && message.role === "assistant") return message;
   }
-  return "";
+  return undefined;
+}
+
+function assistantText(message: Record<string, unknown> | undefined): string {
+  if (message === undefined || !Array.isArray(message.content)) return "";
+  return message.content.filter((part) => isObject(part) && part.type === "text" && typeof part.text === "string")
+    .map((part) => String((part as Record<string, unknown>).text)).join("");
+}
+
+function terminalAssistantError(message: Record<string, unknown> | undefined): BrokerPiError | undefined {
+  if (message === undefined) return undefined;
+  const stopReason = typeof message.stopReason === "string" ? message.stopReason : "";
+  const diagnostic = typeof message.errorMessage === "string" ? message.errorMessage : "";
+  if (stopReason === "aborted") return new BrokerPiError("cancelled", "The request was cancelled", false);
+  if (stopReason !== "error" && diagnostic === "") {
+    if (stopReason === "stop") return undefined;
+    if (stopReason === "length") {
+      return new BrokerPiError("incomplete_response", "The model stopped before producing a complete answer", true);
+    }
+    return new BrokerPiError("incomplete_response", "The model did not finish the current turn", true);
+  }
+  if (/api key|credential|unauthorized|authentication|\bauth\b|login/iu.test(diagnostic)) {
+    return new BrokerPiError("authentication_required", "Authentication for this provider is missing or expired", false);
+  }
+  if (/ChatCompletionRequest|output_text|function_call_output|tool.*validation/iu.test(diagnostic)) {
+    return new BrokerPiError(
+      "provider_incompatible",
+      "The provider rejected the tool conversation format. Use its chat/completions API or choose another model.",
+      false
+    );
+  }
+  if (/\b(?:400|404|405|422)\b|bad request|invalid request/iu.test(diagnostic)) {
+    return new BrokerPiError("provider_request_rejected", "The provider rejected this request", false);
+  }
+  const retryable = /overloaded|rate.?limit|too many requests|\b(?:408|409|429)\b|\b5\d\d\b|service.?unavailable|network|connection|fetch failed|timed? out|timeout|socket|stream ended/iu.test(diagnostic);
+  return new BrokerPiError(
+    retryable ? "provider_temporarily_unavailable" : "agent_failed",
+    retryable ? "The provider is temporarily unavailable after a retry" : "The Pi harness could not complete the request",
+    retryable
+  );
 }
 
 function assistantDiagnostics(messages: readonly unknown[]): string {
