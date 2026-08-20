@@ -194,9 +194,12 @@ TestCase {
   function test_historyContinuationRequiresTheExactHistoricalHarness() {
     var codex = [{ value: "codex", label: "Codex", models: [] }]
     var opencode = [{ value: "opencode", label: "OpenCode", models: [] }]
-    verify(Protocol.historyContinuationBlocked("codex", "opencode", opencode))
-    verify(Protocol.historyContinuationBlocked("codex", "codex", []))
-    verify(!Protocol.historyContinuationBlocked("codex", "codex", codex))
+    // The same retained requirement is initially satisfied, then blocks after
+    // the user switches to a different available harness.
+    var retained = "codex"
+    verify(!Protocol.historyContinuationBlocked(retained, "codex", codex))
+    verify(Protocol.historyContinuationBlocked(retained, "opencode", opencode))
+    verify(Protocol.historyContinuationBlocked(retained, "codex", []))
     verify(!Protocol.historyContinuationBlocked("", "opencode", opencode))
   }
 

@@ -510,8 +510,11 @@ Scope {
     var historicalProvider = Protocol.normalizedProvider(chat.provider) || provider
     provider = historicalProvider
     model = String(chat.model || "")
-    continuationBlocked = !providerAvailable(historicalProvider)
-    continuationProvider = continuationBlocked ? historicalProvider : ""
+    // Retain the chat's harness even when it is available now. A later settings
+    // switch must not turn this saved session into a cross-harness continuation.
+    continuationProvider = currentChatId !== "" ? historicalProvider : ""
+    continuationBlocked = Protocol.historyContinuationBlocked(
+      continuationProvider, configuredProvider, providers)
     pendingPermission = null
     state = "complete"
     statusMessage = continuationBlocked
@@ -543,7 +546,6 @@ Scope {
     selectProvider(configuredProvider)
     continuationBlocked = Protocol.historyContinuationBlocked(
       continuationProvider, configuredProvider, providers)
-    if (!continuationBlocked) continuationProvider = ""
     statusMessage = continuationBlocked
       ? "This chat used " + Protocol.providerLabel(continuationProvider) + ". Choose that harness in Settings to continue."
       : ""
