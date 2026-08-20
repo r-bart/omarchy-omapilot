@@ -156,6 +156,13 @@ Item {
       return "not ready"
     }
 
+    if (!OmaPilot.QuickchatStore.providerReady || OmaPilot.QuickchatStore.continuationBlocked) {
+      voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
+        ? OmaPilot.QuickchatStore.statusMessage
+        : "Choose an available harness in OmaPilot Settings"
+      return "not ready"
+    }
+
     OmaPilot.QuickchatStore.latchDesktopContext()
 
     if (OmaPilot.QuickchatStore.busy) {
@@ -167,7 +174,11 @@ Item {
       return "preempting"
     }
 
-    OmaPilot.QuickchatStore.startDictation()
+    if (!OmaPilot.QuickchatStore.startDictation()) {
+      voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
+        ? OmaPilot.QuickchatStore.statusMessage : "Voice input is not available right now"
+      return "not ready"
+    }
     return "listening"
   }
 
@@ -213,14 +224,20 @@ Item {
   onStoreStateChanged: {
     if (voiceStartPending && !OmaPilot.QuickchatStore.busy) {
       voiceStartPending = false
-      if (voiceEngaged) OmaPilot.QuickchatStore.startDictation()
+      if (voiceEngaged && !OmaPilot.QuickchatStore.startDictation()) {
+        voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
+          ? OmaPilot.QuickchatStore.statusMessage : "Voice input is not available right now"
+      }
       return
     }
     if (!voiceEngaged) return
     if (storeState !== "composing") return
     var spoken = String(OmaPilot.QuickchatStore.transcript || "").trim()
     if (spoken === "") { dismiss(); return }
-    OmaPilot.QuickchatStore.submit(spoken)
+    if (!OmaPilot.QuickchatStore.submit(spoken)) {
+      voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
+        ? OmaPilot.QuickchatStore.statusMessage : "The selected harness cannot accept this request"
+    }
   }
 
   // ------------------------------------------------------------- dismissal

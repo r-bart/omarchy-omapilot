@@ -296442,10 +296442,20 @@ function readModelsJson(path16) {
       throw new CustomProviderError("models_file_too_large", "models.json is unexpectedly large; not modifying it");
     }
     const value2 = JSON.parse(readFileSync22(path16, "utf8"));
-    return isObject7(value2) ? value2 : {};
+    if (!isObject7(value2)) {
+      throw new CustomProviderError(
+        "models_file_invalid",
+        "models.json must contain a JSON object; fix it before adding a server"
+      );
+    }
+    return value2;
   } catch (error48) {
     if (error48 instanceof CustomProviderError) throw error48;
-    return {};
+    if (isObject7(error48) && error48.code === "ENOENT") return {};
+    throw new CustomProviderError(
+      "models_file_invalid",
+      "models.json could not be read or parsed; fix it before adding a server"
+    );
   }
 }
 function writeModelsJson(path16, value2) {
@@ -297559,7 +297569,7 @@ function herdrErrorMessage(stage, errorCode) {
 }
 
 // runtime/src/permissions.ts
-function normalizeToolPermission(requestId, permissionId, _provider, request) {
+function normalizeToolPermission(requestId, permissionId, provider, request) {
   const kind = request.toolCall.kind ?? "other";
   if (kind !== "execute") return void 0;
   const title = boundedText(request.toolCall.title ?? request.toolCall.name ?? `${kind} tool`, 120);
@@ -297570,6 +297580,7 @@ function normalizeToolPermission(requestId, permissionId, _provider, request) {
   for (const [index3, option] of request.options.entries()) {
     const decision = permissionDecision(option.kind, option.name, option.optionId);
     if (decision === void 0 || !reviewable && decision.startsWith("allow_")) continue;
+    if (provider === "opencode" && decision !== "allow_once" && decision.startsWith("allow_")) continue;
     const id = `option-${index3}`;
     optionIds[id] = option.optionId;
     options.push({ id, decision, label: boundedText(option.name, 48) || defaultLabel(decision) });
@@ -298634,13 +298645,20 @@ var QuickchatBroker = class {
     const key = this.#customProviderKey(command);
     const rawId = typeof command === "object" && command !== null && "id" in command ? command.id : void 0;
     const requestedId = typeof rawId === "string" ? rawId.trim().toLowerCase() : "";
-    const existing = listCustomProviders(this.#env).find((provider) => provider.id === requestedId);
+    let existing;
+    let endpointChanged = false;
     try {
+      existing = listCustomProviders(this.#env).find((provider) => provider.id === requestedId);
+      const rawBaseUrl = typeof command === "object" && command !== null && "baseUrl" in command ? command.baseUrl : void 0;
+      const requestedBaseUrl = normalizeBaseUrl(typeof rawBaseUrl === "string" ? rawBaseUrl : "");
+      endpointChanged = existing !== void 0 && existing.baseUrl !== requestedBaseUrl;
       saved = addCustomProvider({
         ...typeof command === "object" && command !== null ? command : {},
         // A blank key means no auth for a new server. When editing, the UI cannot
-        // read the stored secret, so omission preserves the existing auth state.
-        requiresAuth: key !== void 0 || existing?.requiresAuth === true
+        // read the stored secret, so omission preserves it only while the
+        // normalized endpoint is unchanged. A credential must never cross an
+        // endpoint boundary merely because the provider id stayed the same.
+        requiresAuth: key !== void 0 || existing?.requiresAuth === true && !endpointChanged
       }, this.#env);
     } catch (error48) {
       if (error48 instanceof CustomProviderError) {
@@ -298649,31 +298667,41 @@ var QuickchatBroker = class {
       }
       throw error48;
     }
-    this.#emit({ type: "custom_provider_saved", provider: saved });
-    this.#emitCustomProviders();
-    if (key !== void 0) {
-      try {
+    try {
+      if (key !== void 0) {
         const { loginPiProvider: loginPiProvider2 } = await Promise.resolve().then(() => (init_pi_harness(), pi_harness_exports));
         await loginPiProvider2(this.#env, `${saved.id}::api_key`, {
           signal: new AbortController().signal,
           prompt: () => Promise.resolve(key),
           notify: () => void 0
         });
-      } catch (error48) {
-        this.#emit({
-          type: "error",
-          code: "custom_provider_auth_failed",
-          message: `Saved ${saved.id}, but the key was rejected: ${error48 instanceof Error ? error48.message : "unknown error"}`,
-          retryable: false
-        });
-      }
-    } else if (existing === void 0 || !existing.requiresAuth) {
-      try {
+      } else if (endpointChanged || existing === void 0 || !existing.requiresAuth) {
         const { logoutPiProvider: logoutPiProvider2 } = await Promise.resolve().then(() => (init_pi_harness(), pi_harness_exports));
         await logoutPiProvider2(this.#env, saved.id);
-      } catch {
       }
+    } catch (error48) {
+      try {
+        if (existing === void 0) removeCustomProvider(saved.id, this.#env);
+        else addCustomProvider({ ...existing, requiresAuth: existing.requiresAuth }, this.#env);
+      } catch (rollbackError) {
+        this.#emit({
+          type: "error",
+          code: "custom_provider_rollback_failed",
+          message: `Could not safely update ${saved.id}: ${rollbackError instanceof Error ? rollbackError.message : "rollback failed"}`,
+          retryable: false
+        });
+        return;
+      }
+      this.#emit({
+        type: "error",
+        code: "custom_provider_auth_failed",
+        message: `Could not safely update ${saved.id}: ${error48 instanceof Error ? error48.message : "authentication failed"}`,
+        retryable: false
+      });
+      return;
     }
+    this.#emit({ type: "custom_provider_saved", provider: saved });
+    this.#emitCustomProviders();
     await this.#publishAuthMethods();
     await this.#rediscoverBuiltin();
   }

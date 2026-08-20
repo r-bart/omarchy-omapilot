@@ -98,7 +98,7 @@ describe("dictation generation guard", () => {
 });
 
 describe("custom provider registration", () => {
-  it("acknowledges the durable write before authentication and rediscovery finish", async () => {
+  it("acknowledges the durable write after credential cleanup", async () => {
     const root = await mkdtemp(join(tmpdir(), "quickchat-provider-save-")); roots.push(root);
     const config = join(root, ".config/omapilot");
     const events: BrokerEvent[] = [];
@@ -106,7 +106,7 @@ describe("custom provider registration", () => {
       env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config }
     });
 
-    const completion = broker.handle({
+    await broker.handle({
       type: "custom_provider_add",
       id: "local-qwen",
       name: "Local Qwen",
@@ -115,8 +115,6 @@ describe("custom provider registration", () => {
       models: [{ id: "qwen3.8-27b" }]
     });
 
-    // handle() is still awaiting the slower auth-method/model refresh tail, but
-    // the synchronous atomic write and its acknowledgement have already landed.
     expect(events.slice(0, 2)).toEqual([
       {
         type: "custom_provider_saved",
@@ -132,7 +130,6 @@ describe("custom provider registration", () => {
       { type: "custom_providers", providers: [expect.objectContaining({ id: "local-qwen" })] }
     ]);
     expect(await readFile(join(config, "models.json"), "utf8")).toContain('"local-qwen"');
-    await completion;
   });
 
   it("tests /models before saving and returns the discovered catalog", async () => {
@@ -156,7 +153,7 @@ describe("custom provider registration", () => {
     }]);
   });
 
-  it("preserves an existing server credential when an edit omits the unreadable key", async () => {
+  it("preserves an existing server credential when a same-endpoint edit omits the unreadable key", async () => {
     const root = await mkdtemp(join(tmpdir(), "quickchat-provider-edit-auth-")); roots.push(root);
     const config = join(root, ".config/omapilot");
     await mkdir(config, { recursive: true });
@@ -184,6 +181,37 @@ describe("custom provider registration", () => {
     expect(JSON.parse(await readFile(join(config, "auth.json"), "utf8"))).toMatchObject({
       finn: { type: "api_key", key: "stored-secret" }
     });
+  });
+
+  it("clears an existing server credential when an endpoint edit omits a replacement key", async () => {
+    const root = await mkdtemp(join(tmpdir(), "quickchat-provider-edit-endpoint-")); roots.push(root);
+    const config = join(root, ".config/omapilot");
+    await mkdir(config, { recursive: true });
+    await writeFile(join(config, "models.json"), JSON.stringify({ providers: { finn: {
+      omapilotManaged: true, omapilotAuthRequired: true, name: "Finn",
+      baseUrl: "http://finn.ts.net:8888/v1", api: "openai-completions",
+      models: [{ id: "qwen", name: "Qwen", api: "openai-completions", contextWindow: 128_000 }]
+    } } }));
+    await writeFile(join(config, "auth.json"), JSON.stringify({ finn: { type: "api_key", key: "stored-secret" } }));
+    const events: BrokerEvent[] = [];
+    const broker = new QuickchatBroker(events.push.bind(events), {
+      env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config }
+    });
+
+    await broker.handle({
+      type: "custom_provider_add", id: "finn", name: "Replacement",
+      baseUrl: "http://replacement.ts.net:8888/v1", api: "openai-completions",
+      models: [{ id: "qwen" }]
+    });
+
+    expect(events).toContainEqual(expect.objectContaining({
+      type: "custom_provider_saved",
+      provider: expect.objectContaining({
+        id: "finn", baseUrl: "http://replacement.ts.net:8888/v1", requiresAuth: false
+      })
+    }));
+    const auth = JSON.parse(await readFile(join(config, "auth.json"), "utf8")) as Record<string, unknown>;
+    expect(auth).not.toHaveProperty("finn");
   });
 
   it("emits a rejection without a saved acknowledgement or config write", async () => {

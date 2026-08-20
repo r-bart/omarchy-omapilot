@@ -233,10 +233,20 @@ function readModelsJson(path: string): Record<string, unknown> {
       throw new CustomProviderError("models_file_too_large", "models.json is unexpectedly large; not modifying it");
     }
     const value: unknown = JSON.parse(readFileSync(path, "utf8"));
-    return isObject(value) ? value : {};
+    if (!isObject(value)) {
+      throw new CustomProviderError(
+        "models_file_invalid",
+        "models.json must contain a JSON object; fix it before adding a server"
+      );
+    }
+    return value;
   } catch (error) {
     if (error instanceof CustomProviderError) throw error;
-    return {};
+    if (isObject(error) && error.code === "ENOENT") return {};
+    throw new CustomProviderError(
+      "models_file_invalid",
+      "models.json could not be read or parsed; fix it before adding a server"
+    );
   }
 }
 

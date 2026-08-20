@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -193,5 +193,17 @@ describe("custom OpenAI-compatible providers", () => {
     };
     expect(after.modelOverrides).toEqual({ "openai/gpt-5": { maxTokens: 1000 } });
     expect(Object.keys(after.providers).sort()).toEqual(["my-server", "second"]);
+  });
+
+  it.each([
+    ["malformed JSON", "{ definitely-not-json"],
+    ["a non-object root", "[]"]
+  ])("refuses to replace models.json containing %s", async (_label, contents) => {
+    const { env, modelsPath } = await root();
+    await mkdir(join(modelsPath, ".."), { recursive: true });
+    await writeFile(modelsPath, contents);
+
+    expect(() => addCustomProvider(valid, env)).toThrow(/models\.json/u);
+    expect(await readFile(modelsPath, "utf8")).toBe(contents);
   });
 });

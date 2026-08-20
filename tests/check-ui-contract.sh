@@ -318,6 +318,11 @@ grep -Fq 'Plain http is only allowed for localhost or Tailscale .ts.net endpoint
 grep -Fq 'type: "custom_provider_saved"' "$repo_dir/runtime/src/broker.ts"
 grep -Fq 'type: "custom_provider_tested"' "$repo_dir/runtime/src/broker.ts"
 grep -Fq 'property bool customProviderSavePending: false' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'readonly property bool providerReady: initialized && providerAvailable(provider)' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'readonly property bool canSubmit: providerReady && !continuationBlocked && !busy' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'continuationBlocked = !providerAvailable(provider)' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'if (!providerReady || continuationBlocked || busy) return false' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'if (!OmaPilot.QuickchatStore.submit(spoken))' "$repo_dir/Ambient.qml"
 # The Voxtype OSD switch is the one place OmaPilot writes another tool's config.
 # It must stay a single-key, comment-preserving, backed-up, user-initiated edit,
 # and the exception must stay documented.

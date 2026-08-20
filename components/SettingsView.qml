@@ -167,7 +167,8 @@ Item {
     serverDraftName = String(server.name || "")
     serverDraftUrl = String(server.baseUrl || "")
     // Left blank on purpose: the stored credential is not readable here. Saving
-    // an existing server without a replacement key preserves its auth state.
+    // without a replacement key preserves it only while the endpoint stays the
+    // same; moving to another endpoint clears it so secrets never cross hosts.
     serverDraftKey = ""
     // The saved model set already came from a successful /models probe. Keep it
     // valid while the endpoint is unchanged so a keyed server can be renamed or
@@ -764,7 +765,9 @@ Item {
               Layout.fillWidth: true
               placeholderText: root.serverEditingId === ""
                 ? "API key (optional; blank means no key is required)"
-                : "API key (optional; blank keeps the current auth setting)"
+                : (root.serverDraftUrl.trim() === root.serverOriginalUrl
+                  ? "API key (optional; blank keeps the current auth setting)"
+                  : "API key (optional; blank clears the old endpoint's key)")
               maximumLength: 512
               password: true
               text: root.serverDraftKey

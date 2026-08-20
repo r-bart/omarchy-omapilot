@@ -40,12 +40,12 @@ compact error notice opens an inspectable details pane.
   representation. Without it, screenshot and browser-element capture still work.
 
 OmaPilot includes a native Pi-based harness for Codex subscription, OpenAI API,
-Claude, and configured OpenAI-compatible endpoints. It resolves credentials from
+Grok, and configured OpenAI-compatible endpoints. It resolves credentials from
 environment variables or `${XDG_CONFIG_HOME:-$HOME/.config}/omapilot/auth.json`,
 discovers shared `~/.agents` skills and named agents, and exposes Pi's standard
 coding tools behind OmaPilot's approval broker. See [Native Pi harness configuration](docs/native-harness.md).
-The Harness setting explicitly selects **Built-in (OmaPilot)**, **Codex**,
-**Claude**, or **OpenCode**. The latter three are ACP harnesses and must already
+The Harness setting explicitly selects **Built-in (OmaPilot)**, **Codex**, or
+**OpenCode**. The latter two are ACP harnesses and must already
 be installed and signed in. OmaPilot never substitutes one harness for another.
 When Built-in has no configured credential, its settings card offers
 subscription and API-key sign-in methods. OmaPilot runs Pi's typed login flow
@@ -83,16 +83,14 @@ Omarchy BarWidget/Panel
         │ one JSON command/event per line
         ▼
 OmaPilot broker
-        ├── Built-in (selected) ─ Pi runtime ─ Codex / OpenAI / Claude / compatible APIs
+        ├── Built-in (selected) ─ Pi runtime ─ Codex / OpenAI / Grok / compatible APIs
         ├── Codex (selected) ─── Codex ACP
-        ├── Claude (selected) ── Claude ACP
         └── OpenCode (selected) ─ OpenCode ACP
 ```
 
 The native runtime owns model discovery, auth resolution and refresh, skills,
 named agents, streaming, and Pi tool execution. The explicitly selected Codex
-and Claude ACP routes use exact, source-pinned adapter packages; OpenCode uses
-`opencode acp`.
+ACP route uses an exact, source-pinned adapter package; OpenCode uses `opencode acp`.
 The broker normalizes both paths so QML does not parse provider-specific output.
 
 Every request uses the selected harness and its reviewed automatic policy.
@@ -101,7 +99,7 @@ option when the dangerous setting is enabled.
 Every harness can load relevant installed skills and decide whether a tool is
 needed:
 
-- **Built-in (OmaPilot)** combines available Codex, OpenAI, Claude, and
+- **Built-in (OmaPilot)** combines available Codex, OpenAI, Grok, and
   OpenAI-compatible models in one catalog and loads
   declarative skills and named agents from the documented `~/.agents` roots.
   Pi's read, grep, find, and list tools may read files available to the current
@@ -113,15 +111,6 @@ needed:
   requesting network or broader device authority pauses behind a card showing
   the adapter-normalized command, working directory, and every provider-native
   once, session, durable, or rejection choice supplied by the adapter.
-- **Claude ACP** may load installed skills from a disposable, MCP-free plugin copy,
-  search the web, and run commands inside a disposable
-  scratch workspace. Host paths and credential-bearing environment variables
-  stay hidden, direct process network access is blocked, and writes remain
-  confined to per-turn scratch. Commands inside that fixed boundary may run
-  automatically. A command that needs host/device authority pauses behind the
-  same broker-bound provider choices. An approval runs it outside the
-  disposable sandbox with the current user's
-  device, network, host-file, and process-environment authority.
 - **OpenCode ACP** may load installed skills and use its positively identified web
   search tool automatically. Its native `bash` permission is fixed to `ask`;
   the broker accepts execution only after the exact command receives a

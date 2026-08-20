@@ -67,6 +67,7 @@ Scope {
   property bool brokerContextAttachmentsSupported: false
   property bool harnessRestartPending: false
   property string pendingContextRequestId: ""
+  property bool continuationBlocked: false
   property var browserCompanionStatus: ({
     phase: "ready", relayInstalled: false, setupAvailable: false,
     chromiumConnected: false, firefoxConnected: false,
@@ -74,7 +75,8 @@ Scope {
   })
 
   readonly property bool busy: state === "preparing" || state === "dictating" || state === "streaming" || state === "stopping"
-  readonly property bool canSubmit: initialized && providers.length > 0 && !busy
+  readonly property bool providerReady: initialized && providerAvailable(provider)
+  readonly property bool canSubmit: providerReady && !continuationBlocked && !busy
   readonly property bool canRetry: state === "unavailable" && (!processStarted || providers.length === 0)
   readonly property var modelOptions: Protocol.modelOptions(providers, provider)
   readonly property var providerPolicy: Protocol.providerPolicy(providers, provider)
@@ -386,6 +388,7 @@ Scope {
     pendingPermission = null
     permissionQueue = []
     transcript = ""
+    continuationBlocked = false
     state = initialized ? "composing" : "preparing"
     statusMessage = initialized ? "" : "Starting OmaPilot…"
     focusComposerRequested()
@@ -393,9 +396,10 @@ Scope {
   }
 
   function startDictation() {
-    if (!initialized || busy) return
+    if (!providerReady || continuationBlocked || busy) return false
     transcript = ""
     sendCommand(Protocol.command("dictation_start"))
+    return true
   }
 
   function stopDictation() {
@@ -503,9 +507,12 @@ Scope {
     images = Array.isArray(chat.images) ? chat.images : []
     provider = Protocol.normalizedProvider(chat.provider) || provider
     model = String(chat.model || "")
+    continuationBlocked = !providerAvailable(provider)
     pendingPermission = null
     state = "complete"
-    statusMessage = ""
+    statusMessage = continuationBlocked
+      ? "This chat used " + Protocol.providerLabel(provider) + ". Choose that harness in Settings to continue."
+      : ""
     answerChanged()
   }
 
@@ -530,6 +537,7 @@ Scope {
     }
     provider = configuredProvider
     selectProvider(configuredProvider)
+    continuationBlocked = false
     var readyState = Protocol.providerReadyState(state, providers.length)
     if (readyState !== state) {
       state = readyState

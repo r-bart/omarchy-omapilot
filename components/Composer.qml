@@ -119,7 +119,7 @@ Item {
       id: inlineInput
       Layout.fillWidth: true
       Layout.fillHeight: true
-      enabled: root.backend && !root.backend.busy
+      enabled: root.backend && !root.backend.busy && !root.backend.continuationBlocked
       text: root.draftText
       placeholderText: root.backend && root.backend.initialized
         ? "What do you want to do?"
@@ -145,7 +145,8 @@ Item {
       tooltipText: root.backend && root.backend.state === "dictating" ? "Stop dictation" : "Dictate"
       foreground: root.foreground
       focusable: true
-      enabled: root.backend && root.backend.initialized && root.backend.state !== "streaming" && root.backend.state !== "preparing"
+      enabled: root.backend && root.backend.providerReady && !root.backend.continuationBlocked
+        && root.backend.state !== "streaming" && root.backend.state !== "preparing"
       Accessible.name: tooltipText
       onClicked: {
         if (root.backend.state === "dictating") root.backend.stopDictation()
@@ -238,7 +239,8 @@ Item {
           left: caret.right; right: promptTools.left; top: parent.top; bottom: parent.bottom
           leftMargin: Style.spacing.md; rightMargin: Style.spacing.md
         }
-        enabled: root.backend && root.backend.state !== "streaming" && root.backend.state !== "preparing"
+        enabled: root.backend && !root.backend.continuationBlocked
+          && root.backend.state !== "streaming" && root.backend.state !== "preparing"
         text: root.draftText
         placeholderText: root.backend && root.backend.initialized
           ? "Ask, or describe what to do"
@@ -302,7 +304,7 @@ Item {
           tooltipText: root.backend && root.backend.busy ? "Stop response" : "Dictate with Voxtype"
           foreground: root.backend && root.backend.state === "dictating" ? root.accent : root.foreground
           focusable: true
-          enabled: root.backend && root.backend.initialized
+          enabled: root.backend && root.backend.providerReady && !root.backend.continuationBlocked
           Accessible.name: tooltipText
           onClicked: {
             if (root.backend.busy && root.backend.state !== "dictating") root.backend.cancel()
@@ -335,7 +337,8 @@ Item {
         Layout.fillWidth: true
         text: root.backend ? root.backend.statusMessage : ""
         visible: text !== "" && root.backend
-          && (root.backend.state === "dictating"
+          && (root.backend.continuationBlocked
+            || root.backend.state === "dictating"
             || (root.backend.question === ""
               && root.backend.state !== "error"
               && root.backend.state !== "unavailable"))

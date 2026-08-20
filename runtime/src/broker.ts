@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import type { AcpRun, PermissionDecision } from "./acp.js";
 import { BrokerAcpError, deleteAcpSession, probeAcpModels, runAcpQuestion } from "./acp.js";
 import { DictationService } from "./dictation.js";
-import { addCustomProvider, CustomProviderError, listCustomProviders, probeCustomProvider, removeCustomProvider } from "./custom-providers.js";
+import { addCustomProvider, CustomProviderError, listCustomProviders, normalizeBaseUrl, probeCustomProvider, removeCustomProvider } from "./custom-providers.js";
 import { setVoxtypeOsdEnabled, voxtypeOsdStatus } from "./voxtype-osd.js";
 import { promptWithContextAttachments } from "./context.js";
 import { ContextAttachmentError, ContextAttachmentStore } from "./context-attachments.js";
@@ -598,13 +598,21 @@ export class QuickchatBroker {
     const rawId = typeof command === "object" && command !== null && "id" in command
       ? (command as { id?: unknown }).id : undefined;
     const requestedId = typeof rawId === "string" ? rawId.trim().toLowerCase() : "";
-    const existing = listCustomProviders(this.#env).find((provider) => provider.id === requestedId);
+    let existing: CustomProviderView | undefined;
+    let endpointChanged = false;
     try {
+      existing = listCustomProviders(this.#env).find((provider) => provider.id === requestedId);
+      const rawBaseUrl = typeof command === "object" && command !== null && "baseUrl" in command
+        ? (command as { baseUrl?: unknown }).baseUrl : undefined;
+      const requestedBaseUrl = normalizeBaseUrl(typeof rawBaseUrl === "string" ? rawBaseUrl : "");
+      endpointChanged = existing !== undefined && existing.baseUrl !== requestedBaseUrl;
       saved = addCustomProvider({
         ...(typeof command === "object" && command !== null ? command : {}),
         // A blank key means no auth for a new server. When editing, the UI cannot
-        // read the stored secret, so omission preserves the existing auth state.
-        requiresAuth: key !== undefined || existing?.requiresAuth === true
+        // read the stored secret, so omission preserves it only while the
+        // normalized endpoint is unchanged. A credential must never cross an
+        // endpoint boundary merely because the provider id stayed the same.
+        requiresAuth: key !== undefined || (existing?.requiresAuth === true && !endpointChanged)
       }, this.#env);
     } catch (error) {
       if (error instanceof CustomProviderError) {
@@ -613,42 +621,55 @@ export class QuickchatBroker {
       }
       throw error;
     }
-    // This is the durable-write acknowledgement. Emit it before authentication
-    // and model rediscovery, which can be noticeably slower than the atomic
-    // models.json write and must not leave the form guessing whether it landed.
-    this.#emit({ type: "custom_provider_saved", provider: saved });
-    this.#emitCustomProviders();
-
     // Registering a server and authenticating it were two separate steps, so a
     // freshly added endpoint contributed no models and looked broken. If a key
     // came with the request, sign in immediately through the harness's own login
     // so it lands in auth.json — never in models.json.
-    if (key !== undefined) {
-      try {
+    try {
+      if (key !== undefined) {
         const { loginPiProvider } = await import("./pi-harness.js");
         await loginPiProvider(this.#env, `${saved.id}::api_key`, {
           signal: new AbortController().signal,
           prompt: () => Promise.resolve(key),
           notify: () => undefined
         });
-      } catch (error) {
-        this.#emit({
-          type: "error",
-          code: "custom_provider_auth_failed",
-          message: `Saved ${saved.id}, but the key was rejected: ${error instanceof Error ? error.message : "unknown error"}`,
-          retryable: false
-        });
-      }
-    } else if (existing === undefined || !existing.requiresAuth) {
-      // Blank means this endpoint intentionally needs no key. Clear a credential
-      // left by an earlier no-auth configuration so Pi cannot send a stale secret.
-      try {
+      } else if (endpointChanged || existing === undefined || !existing.requiresAuth) {
+        // Blank means this endpoint intentionally needs no key. Clear both
+        // credentials from a prior endpoint and orphaned credentials left by a
+        // removed provider id before the new definition becomes usable.
         const { logoutPiProvider } = await import("./pi-harness.js");
         await logoutPiProvider(this.#env, saved.id);
-      } catch {
-        // A new no-auth provider has no stored credential to remove.
       }
+    } catch (error) {
+      // Authentication is part of changing the endpoint's trust boundary. Put
+      // the old definition back (or remove a new one) before reporting failure,
+      // so models.json can never point a retained secret at the replacement host.
+      try {
+        if (existing === undefined) removeCustomProvider(saved.id, this.#env);
+        else addCustomProvider({ ...existing, requiresAuth: existing.requiresAuth }, this.#env);
+      } catch (rollbackError) {
+        this.#emit({
+          type: "error",
+          code: "custom_provider_rollback_failed",
+          message: `Could not safely update ${saved.id}: ${rollbackError instanceof Error ? rollbackError.message : "rollback failed"}`,
+          retryable: false
+        });
+        return;
+      }
+      this.#emit({
+        type: "error",
+        code: "custom_provider_auth_failed",
+        message: `Could not safely update ${saved.id}: ${error instanceof Error ? error.message : "authentication failed"}`,
+        retryable: false
+      });
+      return;
     }
+
+    // This is the durable-write acknowledgement. Authentication/credential
+    // cleanup above is part of that durable transaction; model rediscovery is
+    // not, and remains after the acknowledgement so the form closes promptly.
+    this.#emit({ type: "custom_provider_saved", provider: saved });
+    this.#emitCustomProviders();
 
     await this.#publishAuthMethods();
     await this.#rediscoverBuiltin();

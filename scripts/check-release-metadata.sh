@@ -51,6 +51,12 @@ while IFS=$'\t' read -r provider package version executable; do
   }
 done < <(jq -r '.adapters | to_entries[] | [.key, .value.package, .value.version, .value.executable] | @tsv' "$repo_root/runtime/adapters.release.json")
 
+if grep -Eqi 'claude (acp|agent)|claude-agent-acp|anthropic' \
+  "$repo_root/README.md" "$repo_root/SECURITY.md" "$repo_root/THIRD_PARTY_NOTICES.md" \
+  "$repo_root/docs/architecture.md" "$repo_root/docs/native-harness.md" >/dev/null; then
+  fail "release documentation still advertises the removed Claude harness"
+fi
+
 if git -C "$repo_root" ls-files --stage | awk '$1 == "120000" { found=1 } END { exit !found }'; then
   fail "tracked symlinks are incompatible with the Omarchy plugin validator"
 fi

@@ -9,7 +9,7 @@ export type PendingToolPermission = {
 export function normalizeToolPermission(
   requestId: string,
   permissionId: string,
-  _provider: ProviderId,
+  provider: ProviderId,
   request: RequestPermissionRequest
 ): PendingToolPermission | undefined {
   const kind = request.toolCall.kind ?? "other";
@@ -23,6 +23,10 @@ export function normalizeToolPermission(
   for (const [index, option] of request.options.entries()) {
     const decision = permissionDecision(option.kind, option.name, option.optionId);
     if (decision === undefined || (!reviewable && decision.startsWith("allow_"))) continue;
+    // OpenCode's tool-update correlation currently supports one-shot approvals
+    // only. Do not advertise session/durable choices that the completion guard
+    // would correctly refuse to honor.
+    if (provider === "opencode" && decision !== "allow_once" && decision.startsWith("allow_")) continue;
     const id = `option-${index}`;
     optionIds[id] = option.optionId;
     options.push({ id, decision, label: boundedText(option.name, 48) || defaultLabel(decision) });

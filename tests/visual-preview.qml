@@ -21,6 +21,8 @@ ShellRoot {
     property bool initialized: true
     property bool busy: false
     property bool canSubmit: true
+    property bool providerReady: true
+    property bool continuationBlocked: false
     property bool canRetry: false
     property bool contextCaptureAvailable: true
     property bool desktopContextActive: false
