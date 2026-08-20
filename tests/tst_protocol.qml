@@ -191,6 +191,15 @@ TestCase {
     compare(Protocol.exactHarnessProviders([{ id: "unknown" }], "codex").length, 0)
   }
 
+  function test_historyContinuationRequiresTheExactHistoricalHarness() {
+    var codex = [{ value: "codex", label: "Codex", models: [] }]
+    var opencode = [{ value: "opencode", label: "OpenCode", models: [] }]
+    verify(Protocol.historyContinuationBlocked("codex", "opencode", opencode))
+    verify(Protocol.historyContinuationBlocked("codex", "codex", []))
+    verify(!Protocol.historyContinuationBlocked("codex", "codex", codex))
+    verify(!Protocol.historyContinuationBlocked("", "opencode", opencode))
+  }
+
   function test_toolPermissionIsBoundToCurrentTurn() {
     var permission = Protocol.normalizedPermission({
       id: "permission-1", requestId: "turn-1", title: "Run uname",

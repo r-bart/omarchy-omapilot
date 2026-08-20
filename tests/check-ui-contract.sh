@@ -321,7 +321,7 @@ grep -Fq 'property bool customProviderSavePending: false' "$repo_dir/components/
 grep -Fq 'readonly property bool providerReady: initialized && providerAvailable(provider)' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'readonly property bool canSubmit: providerReady && !continuationBlocked && !busy' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'continuationBlocked = !providerAvailable(historicalProvider)' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'configuredProvider !== continuationProvider' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'Protocol.historyContinuationBlocked(' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'if (!providerReady || continuationBlocked || busy) return false' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'if (!OmaPilot.QuickchatStore.submit(spoken))' "$repo_dir/Ambient.qml"
 # The Voxtype OSD switch is the one place OmaPilot writes another tool's config.

@@ -541,7 +541,8 @@ Scope {
     }
     provider = configuredProvider
     selectProvider(configuredProvider)
-    continuationBlocked = continuationProvider !== "" && configuredProvider !== continuationProvider
+    continuationBlocked = Protocol.historyContinuationBlocked(
+      continuationProvider, configuredProvider, providers)
     if (!continuationBlocked) continuationProvider = ""
     statusMessage = continuationBlocked
       ? "This chat used " + Protocol.providerLabel(continuationProvider) + ". Choose that harness in Settings to continue."

@@ -17,6 +17,16 @@ function providerReadyState(currentState, providerCount) {
   return current
 }
 
+function historyContinuationBlocked(requiredProvider, configuredProvider, providers) {
+  var required = normalizedProvider(requiredProvider)
+  if (required === "") return false
+  if (normalizedProvider(configuredProvider) !== required) return true
+  var rows = Array.isArray(providers) ? providers : []
+  for (var i = 0; i < rows.length; i++)
+    if (String(rows[i] && rows[i].value || "") === required) return false
+  return true
+}
+
 function command(type, values) {
   var result = { type: String(type || "") }
   var source = values || {}
