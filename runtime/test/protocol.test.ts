@@ -100,7 +100,7 @@ describe("NDJSON protocol", () => {
     const env = {
       ...process.env,
       XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
-      QUICKCHAT_CODEX_ACP: fake, QUICKCHAT_CLAUDE_ACP: fake,
+      QUICKCHAT_CODEX_ACP: fake,
       FAKE_ACP_AUDIT_FILE: audit,
       FAKE_ACP_PROMPT_CAPTURE: promptCapture,
       PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
@@ -124,9 +124,11 @@ describe("NDJSON protocol", () => {
       desktopContext: {
         version: 1,
         activeWindow: { appId: "chromium", title: "Context-only browser title", workspace: 2, monitor: "DP-1" },
+        activeWorkspace: 2,
+        focusedMonitor: "DP-1",
         apps: [{ appId: "kitty", workspaces: [1], windowCount: 1 }],
         workspaces: [1, 2],
-        media: []
+        media: [{ player: "Cliamp", title: "Track", status: "playing" }]
       }
     })}\n`);
     await until(() => events.some((event) => event.type === "complete"));
@@ -143,6 +145,8 @@ describe("NDJSON protocol", () => {
     expect(promptBlocks).toHaveLength(2);
     expect(promptBlocks[0]?.text).toContain("QUICKCHAT DESKTOP CONTEXT");
     expect(promptBlocks[0]?.text).toContain("Context-only browser title");
+    expect(promptBlocks[0]?.text).toContain('"activeWorkspace":2');
+    expect(promptBlocks[0]?.text).toContain('"status":"playing"');
     expect(promptBlocks[1]?.text).toBe("Say hello");
     child.stdin.write(`${JSON.stringify({ type: "history_delete", chatId: complete.chat.id })}\n`);
     await until(async () => (await readFile(audit, "utf8").catch(() => "")).trim() === "delete:fake-1");
@@ -298,7 +302,7 @@ describe("NDJSON protocol", () => {
     expect(events.some((event) => event.type === "content")).toBe(false);
   }, 20_000);
 
-  it.each(["codex", "claude", "opencode"] as const)("round-trips a bounded allow-once tool decision for %s without exposing provider option IDs", async (provider) => {
+  it.each(["codex", "opencode"] as const)("round-trips a bounded allow-once tool decision for %s without exposing provider option IDs", async (provider) => {
     const state = await mkdtemp(join(tmpdir(), "quickchat-tool-permission-")); roots.push(state);
     const child = spawn(brokerExecutable(), [], {
       env: {
@@ -307,8 +311,7 @@ describe("NDJSON protocol", () => {
         FAKE_ACP_EXPECT_ALLOW: "1",
         XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
         QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
-        QUICKCHAT_CLAUDE_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
-        PATH: `${resolve("runtime/test/fixtures/claude-auth")}:${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+        PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
       },
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -334,7 +337,7 @@ describe("NDJSON protocol", () => {
     await new Promise((resolveExit) => child.once("close", resolveExit));
   }, 25_000);
 
-  it.each(["codex", "claude", "opencode"] as const)("auto-selects the exact allow-once option for %s without emitting a prompt", async (provider) => {
+  it.each(["codex", "opencode"] as const)("auto-selects the exact allow-once option for %s without emitting a prompt", async (provider) => {
     const events = await autoApproveAttempt(provider, { FAKE_ACP_EXPECT_ALLOW: "1" });
     expect(events.some((event) => event.type === "permission")).toBe(false);
     expect(events.some((event) => event.type === "permission_closed")).toBe(false);
@@ -364,16 +367,15 @@ describe("NDJSON protocol", () => {
         FAKE_ACP_PERMISSION_ATTEMPT: "1",
         XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
         QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
-        QUICKCHAT_CLAUDE_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
-        PATH: `${resolve("runtime/test/fixtures/claude-auth")}:${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+        PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
       },
       stdio: ["pipe", "pipe", "pipe"]
     });
     const events: Record<string, unknown>[] = [];
     createInterface({ input: child.stdout }).on("line", (line) => events.push(parseObject(line)));
-    child.stdin.write('{"type":"initialize","protocolVersion":2,"harness":"claude"}\n');
+    child.stdin.write('{"type":"initialize","protocolVersion":2,"harness":"codex"}\n');
     await until(() => events.some((event) => event.type === "ready"));
-    child.stdin.write('{"type":"submit","id":"deny-turn","question":"Do not run it","provider":"claude"}\n');
+    child.stdin.write('{"type":"submit","id":"deny-turn","question":"Do not run it","provider":"codex"}\n');
     await until(() => events.some((event) => event.type === "permission"));
     const permission = z.object({ type: z.literal("permission"), permission: z.object({ id: z.string().uuid(), options: z.array(z.object({ id: z.string(), decision: z.string() })) }) })
       .parse(events.find((event) => event.type === "permission"));
@@ -425,7 +427,7 @@ describe("NDJSON protocol", () => {
     const child = spawn(brokerExecutable(), [], {
       env: {
         ...process.env, FAKE_ACP_WAIT: "1", XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
-        QUICKCHAT_CODEX_ACP: fake, QUICKCHAT_CLAUDE_ACP: fake,
+        QUICKCHAT_CODEX_ACP: fake,
         FAKE_ACP_STREAM_CHUNKS: JSON.stringify(["partial <"]), FAKE_ACP_CHUNK_AUDIT: chunkAudit,
         FAKE_ACP_LATE_AFTER_CANCEL: "1",
         PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
@@ -491,7 +493,6 @@ async function forbiddenAttempt(provider: "codex" | "opencode", extraEnv: NodeJS
       ...extraEnv,
       XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
       QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
-      QUICKCHAT_CLAUDE_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
       PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
     },
     stdio: ["pipe", "pipe", "pipe"]
@@ -508,7 +509,7 @@ async function forbiddenAttempt(provider: "codex" | "opencode", extraEnv: NodeJS
 }
 
 async function autoApproveAttempt(
-  provider: "codex" | "claude" | "opencode",
+  provider: "codex" | "opencode",
   extraEnv: NodeJS.ProcessEnv
 ): Promise<Record<string, unknown>[]> {
   const state = await mkdtemp(join(tmpdir(), "quickchat-auto-approve-")); roots.push(state);
@@ -521,8 +522,7 @@ async function autoApproveAttempt(
       XDG_CACHE_HOME: join(state, "cache"),
       XDG_RUNTIME_DIR: join(state, "run"),
       QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
-      QUICKCHAT_CLAUDE_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
-      PATH: `${resolve("runtime/test/fixtures/claude-auth")}:${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+      PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
     },
     stdio: ["pipe", "pipe", "pipe"]
   });

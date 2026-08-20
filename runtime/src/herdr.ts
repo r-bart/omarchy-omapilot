@@ -79,7 +79,6 @@ export function nativeResumeArgs(
   // Keep Codex interactive so any command outside its read-only sandbox still
   // requires the user's approval in Herdr.
   if (provider === "codex") return ["resume", sessionId, "-C", cwd, "-s", "read-only", "-a", "on-request"];
-  if (provider === "claude") return ["--resume", sessionId];
   if (provider === "builtin") return ["--session", sessionId, "--session-dir", quickchatPaths(env).piSessions, "--approve"];
   return ["--pure", "--session", sessionId];
 }

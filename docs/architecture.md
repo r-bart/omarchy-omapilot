@@ -16,7 +16,20 @@ The widget follows the current Quattro host contract:
   routes panel actions through Quattro's focused-monitor bar-widget resolver;
   ownership follows the host's reassigned module list across monitor changes.
 
-Quickchat does not edit `shell.json`, Omarchy sources, Hyprland configuration, Voxtype configuration, or Herdr configuration directly.
+Quickchat does not edit `shell.json`, Omarchy sources, Hyprland configuration, or Herdr configuration directly.
+
+One narrowly scoped exception exists for Voxtype. Its floating OSD renders its
+own waveform at the bottom centre of the focused output — the same place the
+voice node occupies — and two indicators for one state is worse than either.
+Voxtype documents a master switch for it, and its own `voxtype config set`
+supports only `engine`, so the value cannot be delegated. Settings therefore
+offers an explicit toggle that writes `[osd] enabled` in
+`~/.config/voxtype/config.toml` and restarts `voxtype.service`. The write
+happens only on that explicit user action, touches exactly one key, preserves
+every other byte of the file including comments and ordering, and copies the
+original to `config.toml.omapilot.bak` the first time it runs. No other Voxtype
+setting is read or written, and a missing configuration disables the toggle
+rather than creating a file.
 
 ## Process boundary
 

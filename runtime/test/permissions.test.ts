@@ -118,7 +118,7 @@ describe("tool permission presentation", () => {
   });
 
   it("preserves multiple provider choices in the same ACP category", () => {
-    const permission = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "claude", {
+    const permission = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "codex", {
       sessionId: "session",
       toolCall: { toolCallId: "tool", kind: "execute", rawInput: { command: "apply plan" } },
       options: [
@@ -130,8 +130,8 @@ describe("tool permission presentation", () => {
     expect(permission?.optionIds).toEqual({ "option-0": "auto", "option-1": "acceptEdits" });
   });
 
-  it("marks surfaced Claude command approvals as device authority", () => {
-    const permission = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "claude", {
+  it("marks surfaced command approvals as device authority", () => {
+    const permission = normalizeToolPermission("turn-1", "11111111-1111-4111-8111-111111111111", "codex", {
       sessionId: "session",
       toolCall: { toolCallId: "tool", kind: "execute", rawInput: { command: "uname -s" } },
       options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }]

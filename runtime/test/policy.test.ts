@@ -1,10 +1,10 @@
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { parseCodexModelCatalog, prepareClaudeSkills, probeAcpModels, providerPolicyEnvironment, providerSessionRequest, runAcpQuestion } from "../src/acp.js";
+import { parseCodexModelCatalog, probeAcpModels, providerPolicyEnvironment, runAcpQuestion } from "../src/acp.js";
 import {
   automaticInstructionPath,
   automaticInstructions,
@@ -63,83 +63,6 @@ describe("provider security profiles", () => {
     expect(automatic).toMatchObject({ developer_instructions: expect.stringContaining("relevant installed skills") });
     for (const feature of provider("codex").lockdownFeatures ?? []) {
       if (feature !== "shell_tool" && feature !== "unified_exec" && feature !== "skill_search") expect(automaticFeatures[feature]).toBe(false);
-    }
-  });
-
-  it("gives automatic Claude Bash and web tools inside disposable local scratch", () => {
-    const request = providerSessionRequest({
-      id: "claude", name: "Claude", models: [], policy: { tools: "device-approval", web: "search", hostReads: false },
-      harnessPath: "/test/claude",
-      agent: {
-        executable: "/test/claude-acp", args: [],
-        env: { PATH: "/usr/bin", LANG: "C.UTF-8", HOME: "/home/private", API_TOKEN: "secret", USER: "private-user" }
-      }
-    }, "/run/user/1000/quickchat/automatic-turn");
-    const serialized = JSON.parse(JSON.stringify(request)) as {
-      _meta: { systemPrompt: string; claudeCode: { options: {
-        tools: string[];
-        disallowedTools: string[];
-        sandbox: {
-          enabled: boolean; failIfUnavailable: boolean; autoAllowBashIfSandboxed: boolean;
-          allowUnsandboxedCommands: boolean;
-          network: { allowedDomains: string[]; strictAllowlist: boolean; allowLocalBinding: boolean; allowUnixSockets: string[] };
-          filesystem: { denyRead: string[]; allowRead: string[]; denyWrite: string[]; allowWrite: string[] };
-          credentials: { envVars: Array<{ name: string; mode: string }> };
-        }
-      } } }
-    };
-    const options = serialized._meta.claudeCode.options;
-    expect(request.mcpServers).toEqual([]);
-    expect(serialized._meta.systemPrompt).toBe(automaticInstructions());
-    expect(options.tools).toEqual(["Bash", "WebSearch", "Skill"]);
-    expect(serialized._meta.claudeCode.options).toMatchObject({ skills: "all" });
-    expect(serialized._meta.claudeCode.options).toMatchObject({ disallowedTools: expect.arrayContaining(["WebFetch"]) });
-    expect(options.sandbox).toMatchObject({
-      enabled: true,
-      failIfUnavailable: true,
-      autoAllowBashIfSandboxed: true,
-      allowUnsandboxedCommands: true,
-      network: { allowedDomains: [], strictAllowlist: true, allowLocalBinding: false, allowUnixSockets: [] },
-      filesystem: {
-        allowRead: ["/run/user/1000/quickchat/automatic-turn", "/dev/null", "/etc/ld.so.cache"],
-        denyWrite: ["/"],
-        allowWrite: ["/run/user/1000/quickchat/automatic-turn"]
-      }
-    });
-    expect(options.sandbox.filesystem.denyRead).toEqual(expect.arrayContaining([
-      "/home", "/root", "/tmp", "/var", "/etc", "/run", "/proc", "/sys", "/dev", "/boot", "/usr/local"
-    ]));
-    expect(options.sandbox.filesystem.denyRead).not.toContain("/usr");
-    expect(options.sandbox.credentials.envVars).toEqual([
-      { name: "API_TOKEN", mode: "deny" },
-      { name: "HOME", mode: "deny" },
-      { name: "USER", mode: "deny" }
-    ]);
-  });
-
-  it("copies installed Claude skills into disposable plugin scope and skips unsafe internal symlinks", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-claude-skills-"));
-    try {
-      const home = join(root, "home");
-      const cwd = join(root, "turn");
-      const source = join(root, "source-skill");
-      await mkdir(join(home, ".agents", "skills"), { recursive: true });
-      await mkdir(source, { recursive: true });
-      await writeFile(join(source, "SKILL.md"), "# Safe skill\n");
-      await symlink(source, join(home, ".agents", "skills", "safe"));
-      const unsafe = join(home, ".agents", "skills", "unsafe");
-      await mkdir(unsafe, { recursive: true });
-      await writeFile(join(unsafe, "SKILL.md"), "# Unsafe skill\n");
-      await symlink("/etc/hostname", join(unsafe, "host-secret"));
-      await mkdir(cwd, { recursive: true });
-      const plugin = await prepareClaudeSkills(cwd, { HOME: home });
-      expect(plugin).toBeDefined();
-      if (plugin === undefined) return;
-      await expect(readFile(join(plugin, "skills", "safe", "SKILL.md"), "utf8")).resolves.toBe("# Safe skill\n");
-      await expect(readFile(join(plugin, "skills", "unsafe", "SKILL.md"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
-      await expect(readFile(join(plugin, ".claude-plugin", "plugin.json"), "utf8")).resolves.toContain("omarchy-quickchat-installed-skills");
-    } finally {
-      await rm(root, { recursive: true, force: true });
     }
   });
 
@@ -339,20 +262,17 @@ describe("provider security profiles", () => {
   it("discovers only the selected ACP harness without public capability metadata", async () => {
     const env = {
       ...process.env,
-      PATH: `${resolve("runtime/test/fixtures/claude-auth")}:${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`,
-      QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
-      QUICKCHAT_CLAUDE_ACP: resolve("runtime/test/fake-acp-agent.mjs")
+      PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`,
+      QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs")
     };
     const providers = (await Promise.all([
       discoverProviders(env, "codex"),
-      discoverProviders(env, "claude"),
       discoverProviders(env, "opencode")
     ])).flat();
-    expect(providers.map((provider) => provider.id)).toEqual(["codex", "claude", "opencode"]);
+    expect(providers.map((provider) => provider.id)).toEqual(["codex", "opencode"]);
     expect(providers.every((provider) => !("capabilities" in provider))).toBe(true);
     expect(providers.map(({ id, policy }) => ({ id, policy }))).toEqual([
       { id: "codex", policy: { tools: "device-approval", web: "approved-command", hostReads: true } },
-      { id: "claude", policy: { tools: "device-approval", web: "search", hostReads: false } },
       { id: "opencode", policy: { tools: "device-approval", web: "search", hostReads: false } }
     ]);
     const opencode = providers.find((provider) => provider.id === "opencode");

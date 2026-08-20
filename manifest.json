@@ -11,20 +11,19 @@
   "activation": "on-demand",
   "entryPoints": {
     "barWidget": "BarWidget.qml",
-    "overlay": "ContextCaptureOverlay.qml"
+    "overlay": "Ambient.qml"
   },
   "barWidget": {
     "displayName": "OmaPilot",
     "description": "Work through an authenticated AI harness without leaving the Omarchy bar.",
     "category": "AI",
-    "aliases": ["ai", "chat", "pilot", "omapilot", "quickchat", "codex", "openai", "claude", "opencode", "pi"],
+    "aliases": ["ai", "chat", "pilot", "omapilot", "quickchat", "codex", "openai", "grok", "xai", "opencode", "pi"],
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
       "provider": "builtin",
       "builtinModel": "",
       "codexModel": "",
-      "claudeModel": "",
       "opencodeModel": "",
       "quickActionsJson": "",
       "desktopContext": "On",
@@ -35,7 +34,7 @@
         "key": "provider",
         "type": "enum",
         "label": "Harness",
-        "options": ["builtin", "codex", "claude", "opencode"],
+        "options": ["builtin", "codex", "opencode"],
         "defaultValue": "builtin",
         "description": "Choose one harness explicitly. Built-in uses OmaPilot's native Pi runtime; the others use their logged-in ACP harness without fallback."
       },
@@ -44,7 +43,7 @@
         "type": "string",
         "label": "Last built-in model",
         "defaultValue": "",
-        "description": "Empty uses the built-in default; discovered OpenAI, Claude, and compatible models are selected in OmaPilot."
+        "description": "Empty uses the built-in default; discovered Codex, OpenAI, Grok, and OpenAI-compatible models are selected in OmaPilot."
       },
       {
         "key": "codexModel",
@@ -52,13 +51,6 @@
         "label": "Last Codex model",
         "defaultValue": "",
         "description": "Empty uses the Codex default; discovered models are selected in OmaPilot."
-      },
-      {
-        "key": "claudeModel",
-        "type": "string",
-        "label": "Last Claude model",
-        "defaultValue": "",
-        "description": "Empty uses the Claude default; discovered models are selected in OmaPilot."
       },
       {
         "key": "opencodeModel",

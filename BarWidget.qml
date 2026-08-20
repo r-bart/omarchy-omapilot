@@ -63,6 +63,18 @@ BarWidget {
     if (panelLoader.item && panelLoader.item.openHistory) panelLoader.item.openHistory()
   }
 
+  // A global route into settings. The in-panel key depends on the panel already
+  // being open and focused, and the panel dismisses on focus loss, so a hotkey
+  // that opens straight into settings is the reliable path.
+  function openSettings() {
+    if (!panelLoader.item) return
+    // Use the same show path as the working open/history routes. openFromHotkey
+    // additionally suppresses the bar's centre hover reveal, and that variant
+    // does not survive being summoned while focus sits in another window.
+    root.open()
+    if (panelLoader.item.openSettings) panelLoader.item.openSettings()
+  }
+
   function routedWidget() {
     if (bar && typeof bar.findPanelWidget === "function") {
       var target = bar.findPanelWidget(moduleName)
@@ -75,6 +87,7 @@ BarWidget {
   function routeClose() { routedWidget().close() }
   function routeToggle() { routedWidget().togglePanel() }
   function routeHistory() { routedWidget().openHistory() }
+  function routeSettings() { routedWidget().openSettings() }
 
   function closeForPopoutSwitch() {
     inlineExpanded = false
@@ -119,6 +132,9 @@ BarWidget {
     }
     function onIpcHistoryRequested() {
       if (root.routedWidget() === root) root.openHistory()
+    }
+    function onIpcSettingsRequested() {
+      if (root.routedWidget() === root) root.openSettings()
     }
     function onContextAttachmentAdded() {
       if (root.routedWidget() === root) root.open()

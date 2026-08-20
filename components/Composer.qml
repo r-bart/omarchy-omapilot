@@ -20,9 +20,21 @@ Item {
   signal modelChanged(string provider, string model)
   signal submitted()
   signal escapeRequested()
+  // Routed through key events rather than Qt Shortcut. The panel is a layer
+  // surface whose keyboard focus is OnDemand after a brief Exclusive prime, so
+  // window activation — which Qt.WindowShortcut depends on — is not dependable.
+  // Key events reach the focused editor regardless, which is why Enter and
+  // Escape below have always worked.
+  signal settingsRequested()
+  signal historyRequested()
 
   readonly property bool inputActive: inlineMode ? inlineInput.activeFocus : promptInput.activeFocus
   property bool attachmentPopupOpen: false
+  // Set by the owner. Motion must not run while the panel is closed, so the
+  // filament is gated on visibility rather than on backend state alone.
+  property bool activityActive: false
+  // Supplied by the owner so the filament shows the current state, not just accent.
+  property color activityColor: accent
   readonly property bool popupOpen: inlineProvider.popupOpen || attachmentPopupOpen
 
   implicitWidth: inlineMode ? Style.space(360) : Style.space(520)
@@ -195,141 +207,122 @@ Item {
       Accessible.name: "Desktop context is attached on send"
     }
 
-    BorderSurface {
+    // The hero: one borderless prompt line, not a boxed text area with a
+    // toolbar. The old surface framed OmaPilot as an app embedded in the
+    // desktop; a bare caret and a filament read as the desktop itself asking.
+    // The visible container is gone, so the input needs no border states.
+    Item {
+      id: promptRow
       Layout.fillWidth: true
-      Layout.preferredHeight: Style.space(126)
+      Layout.preferredHeight: Math.max(Style.space(34), promptInput.implicitHeight + Style.spacing.md)
       visible: !root.backend || root.backend.pendingPermission === null
-      color: Style.normalFillFor(root.foreground, root.accent)
-      borderSpec: Border.controlSpec(promptInput.activeFocus ? "focus" : (promptHover.hovered ? "hover-cursor" : "normal"), root.foreground, root.accent)
-      radius: Style.cornerRadius
 
       HoverHandler { id: promptHover }
 
-      ColumnLayout {
-        anchors.fill: parent
-        anchors.topMargin: parent.contentTopInset
-        anchors.rightMargin: parent.contentRightInset
-        anchors.bottomMargin: parent.contentBottomInset
-        anchors.leftMargin: parent.contentLeftInset
-        spacing: 0
+      Text {
+        id: caret
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.topMargin: Style.spacing.xs
+        text: "\u203a"
+        color: root.accent
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.heading
+        opacity: promptInput.activeFocus ? 1 : 0.55
+        Behavior on opacity { NumberAnimation { duration: 140 } }
+      }
 
-        Item {
-          Layout.fillWidth: true
-          Layout.fillHeight: true
-
-          TextArea {
-            id: promptInput
-            anchors.fill: parent
-            anchors.leftMargin: Style.spacing.lg
-            anchors.rightMargin: Style.spacing.lg
-            anchors.topMargin: Style.spacing.md
-            anchors.bottomMargin: Style.spacing.sm
-            enabled: root.backend && root.backend.state !== "streaming" && root.backend.state !== "preparing"
-            text: root.draftText
-            placeholderText: root.backend && root.backend.initialized
-              ? "What do you want to do?"
-              : "Starting OmaPilot…"
-            placeholderTextColor: Qt.darker(root.foreground, 1.55)
-            color: root.foreground
-            selectionColor: Style.selectionFillFor(root.foreground, root.accent)
-            selectedTextColor: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            wrapMode: TextEdit.Wrap
-            background: null
-            Accessible.name: "OmaPilot request"
-            onTextEdited: root.draftText = text
-
-            Keys.onPressed: function(event) {
-              if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                  && !(event.modifiers & Qt.ShiftModifier)) {
-                root.submit()
-                event.accepted = true
-              } else if (event.key === Qt.Key_Escape) {
-                if (root.backend && root.backend.busy) root.backend.cancel()
-                else root.escapeRequested()
-                event.accepted = true
-              }
-            }
-          }
+      TextArea {
+        id: promptInput
+        anchors {
+          left: caret.right; right: promptTools.left; top: parent.top; bottom: parent.bottom
+          leftMargin: Style.spacing.md; rightMargin: Style.spacing.md
         }
+        enabled: root.backend && root.backend.state !== "streaming" && root.backend.state !== "preparing"
+        text: root.draftText
+        placeholderText: root.backend && root.backend.initialized
+          ? "Ask, or describe what to do"
+          : "Starting OmaPilot\u2026"
+        placeholderTextColor: Qt.darker(root.foreground, 1.7)
+        color: root.foreground
+        selectionColor: Style.selectionFillFor(root.foreground, root.accent)
+        selectedTextColor: root.foreground
+        font.family: root.fontFamily
+        // Deliberately larger than body: the request is the most important
+        // text in the panel, and the old body-size input buried it.
+        font.pixelSize: Style.font.heading
+        wrapMode: TextEdit.Wrap
+        background: null
+        leftPadding: 0
+        topPadding: 0
+        bottomPadding: 0
+        Accessible.name: "OmaPilot request"
+        onTextEdited: root.draftText = text
 
-        PanelSeparator {
-          Layout.fillWidth: true
-          foreground: root.foreground
-        }
-
-        RowLayout {
-          Layout.fillWidth: true
-          Layout.leftMargin: Style.spacing.lg
-          Layout.rightMargin: Style.spacing.md
-          Layout.topMargin: Style.spacing.sm
-          Layout.bottomMargin: Style.spacing.sm
-          spacing: Style.spacing.sm
-
-          Button {
-            iconText: "󰹑"
-            tooltipText: "Clip context from the desktop"
-            foreground: root.foreground
-            background: root.background
-            bordered: true
-            focusable: true
-            horizontalPadding: Style.spacing.md
-            verticalPadding: Style.spacing.md
-            enabled: root.backend && root.backend.contextCaptureAvailable
-            Accessible.name: tooltipText
-            onClicked: root.backend.beginContextCapture()
-          }
-
-          Text {
-            Layout.fillWidth: true
-            text: "Using "
-              + (root.backend ? Protocol.providerLabel(root.backend.provider) : "OmaPilot")
-            color: Qt.darker(root.foreground, 1.4)
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            elide: Text.ElideRight
-            Accessible.role: Accessible.StaticText
-            Accessible.name: text
-          }
-
-          Button {
-            iconText: root.backend && root.backend.state === "dictating" ? "󰓛" : "󰍬"
-            tooltipText: root.backend && root.backend.state === "dictating" ? "Finish dictation" : "Dictate with Voxtype"
-            foreground: root.foreground
-            background: root.background
-            bordered: true
-            focusable: true
-            horizontalPadding: Style.spacing.md
-            verticalPadding: Style.spacing.md
-            enabled: root.backend && root.backend.initialized && root.backend.state !== "streaming" && root.backend.state !== "preparing"
-            Accessible.name: tooltipText
-            onClicked: {
-              if (root.backend.state === "dictating") root.backend.stopDictation()
-              else root.backend.startDictation()
-            }
-          }
-
-          Button {
-            iconText: root.backend && root.backend.busy ? "󰓛" : "󰒊"
-            tooltipText: root.backend && root.backend.busy ? "Stop response" : "Send request"
-            foreground: root.foreground
-            background: root.background
-            accent: root.accent
-            active: root.backend && !root.backend.busy && root.draftText.trim() !== ""
-            bordered: true
-            focusable: true
-            horizontalPadding: Style.spacing.md
-            verticalPadding: Style.spacing.md
-            enabled: root.backend && (root.backend.busy || (root.backend.canSubmit && root.draftText.trim() !== ""))
-            Accessible.name: tooltipText
-            onClicked: {
-              if (root.backend.busy) root.backend.cancel()
-              else root.submit()
-            }
+        Keys.onPressed: function(event) {
+          if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+              && !(event.modifiers & Qt.ShiftModifier)) {
+            root.submit()
+            event.accepted = true
+          } else if (event.key === Qt.Key_Comma && (event.modifiers & Qt.ControlModifier)) {
+            root.settingsRequested()
+            event.accepted = true
+          } else if (event.key === Qt.Key_H && (event.modifiers & Qt.ControlModifier)) {
+            root.historyRequested()
+            event.accepted = true
+          } else if (event.key === Qt.Key_Escape) {
+            if (root.backend && root.backend.busy) root.backend.cancel()
+            else root.escapeRequested()
+            event.accepted = true
           }
         }
       }
+
+      // Only the two affordances that have no keyboard equivalent worth
+      // teaching stay visible, and they lose their boxes. Provider identity
+      // moved to the panel's hint row; send is Enter.
+      Row {
+        id: promptTools
+        anchors.right: parent.right
+        anchors.top: parent.top
+        spacing: Style.spacing.xs
+
+        PanelActionButton {
+          iconText: "\uf0c5"
+          tooltipText: "Clip context from the desktop"
+          foreground: root.foreground
+          focusable: true
+          enabled: root.backend && root.backend.contextCaptureAvailable
+          Accessible.name: tooltipText
+          onClicked: root.backend.beginContextCapture()
+        }
+
+        PanelActionButton {
+          iconText: root.backend && root.backend.busy ? "\udb80\ude9b" : "\udb80\udd6c"
+          tooltipText: root.backend && root.backend.busy ? "Stop response" : "Dictate with Voxtype"
+          foreground: root.backend && root.backend.state === "dictating" ? root.accent : root.foreground
+          focusable: true
+          enabled: root.backend && root.backend.initialized
+          Accessible.name: tooltipText
+          onClicked: {
+            if (root.backend.busy && root.backend.state !== "dictating") root.backend.cancel()
+            else if (root.backend.state === "dictating") root.backend.stopDictation()
+            else root.backend.startDictation()
+          }
+        }
+      }
+    }
+
+    // The filament: the composer's only edge. Dim at rest, accent on focus,
+    // and it carries the activity sweep so motion lives on the same line the
+    // user is typing on rather than around a card.
+    ActivityFilament {
+      Layout.fillWidth: true
+      visible: !root.backend || root.backend.pendingPermission === null
+      accent: root.activityColor
+      foreground: root.foreground
+      focused: promptInput.activeFocus || promptHover.hovered
+      active: root.activityActive
     }
 
     RowLayout {
@@ -356,7 +349,12 @@ Item {
 
       Button {
         id: retryButton
+        // Suppressed while the panel is showing an error notice. The notice
+        // explains the failure and now carries its own retry, so leaving this
+        // one here stranded a lone bordered button under the composer with no
+        // label beside it and no context.
         visible: root.backend && root.backend.canRetry
+          && root.backend.state !== "error" && root.backend.state !== "unavailable"
         text: "Retry"
         tooltipText: "Restart the OmaPilot broker"
         foreground: root.foreground

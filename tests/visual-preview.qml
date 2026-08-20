@@ -56,9 +56,12 @@ ShellRoot {
         description: "Use your OpenAI Codex subscription in OmaPilot." },
       { value: "openai::api_key", label: "OpenAI API key",
         description: "Store this credential only in OmaPilot's private configuration." },
-      { value: "anthropic::oauth", label: "Anthropic (Claude Pro/Max)",
+      { value: "xai::oauth", label: "xAI (Grok/X subscription)",
         description: "Use your Anthropic subscription in OmaPilot." }
     ]
+    property var customProviders: []
+    property var customProviderSaved: null
+    property string customProviderError: ""
     property var builtinAuth: ({ phase: "idle", flowId: "", methodId: "", message: "",
       url: "", verificationUri: "", userCode: "", prompt: null })
     property bool builtinAuthBusy: false

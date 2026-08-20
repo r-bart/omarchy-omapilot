@@ -1,6 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { readdirSync } from "node:fs";
-import { cp, lstat, mkdir, mkdtemp, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -63,13 +62,11 @@ export async function probeAcpModels(provider: DiscoveredProvider, timeoutMs = 1
           clientCapabilities: { session: { configOptions: { boolean: {} } } },
           clientInfo: { name: "omarchy-quickchat", version: QUICKCHAT_CLIENT_VERSION }
         });
-        const ephemeral = provider.id === "claude";
-        if (!ephemeral && !canRemoveSession(initialized.agentCapabilities)) return { models: [] };
-        const claudePlugin = provider.id === "claude" ? await prepareClaudeSkills(cwd, provider.agent.env) : undefined;
-        const session = await ctx.buildSession(providerSessionRequest(provider, cwd, ephemeral, claudePlugin)).start();
+        if (!canRemoveSession(initialized.agentCapabilities)) return { models: [] };
+        const session = await ctx.buildSession(providerSessionRequest(provider, cwd)).start();
         const config = modelConfiguration(session.newSessionResponse.configOptions ?? []);
         session.dispose();
-        if (!ephemeral) await removeSession(ctx, initialized.agentCapabilities, session.sessionId);
+        await removeSession(ctx, initialized.agentCapabilities, session.sessionId);
         return { models: config.models, ...(config.current === undefined ? {} : { defaultModel: config.current }) };
       });
   } catch {
@@ -296,8 +293,7 @@ export function runAcpQuestion(
         });
         if (initialized.protocolVersion !== acp.PROTOCOL_VERSION) throw new Error("ACP protocol version is unsupported");
         resumable = initialized.agentCapabilities?.loadSession === true;
-        const claudePlugin = provider.id === "claude" ? await prepareClaudeSkills(cwd, provider.agent.env) : undefined;
-        const newRequest = providerSessionRequest(provider, cwd, false, claudePlugin);
+        const newRequest = providerSessionRequest(provider, cwd);
         const session = await ctx.buildSession(newRequest).start();
         sessionIdentifier = session.sessionId;
         cancelSession = async () => {
@@ -450,139 +446,16 @@ async function removeSession(
   return false;
 }
 
+// Every remaining harness uses the plain ACP session request. The Claude
+// harness was the only provider that needed a _meta payload (its tool
+// allowlist, skill plugin, and permission settings), so the parameterised
+// request collapsed to its base when Claude was removed.
 export function providerSessionRequest(
   provider: DiscoveredProvider,
-  cwd: string,
-  ephemeral = false,
-  claudePlugin?: string
+  cwd: string
 ): NewSessionRequest {
-  const base: NewSessionRequest = { cwd, mcpServers: [] };
-  if (provider.id !== "claude") return base;
-  const tools = ["Bash", "WebSearch", "Skill"];
-  const systemPrompt = automaticInstructions();
-  return {
-    ...base,
-    _meta: {
-      systemPrompt,
-      claudeCode: {
-        options: {
-          tools,
-          skills: "all",
-          ...(claudePlugin === undefined ? {} : { plugins: [{ type: "local", path: claudePlugin, skipMcpDiscovery: true }] }),
-          ...(ephemeral ? { persistSession: false } : {}),
-          disallowedTools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "NotebookEdit", "Task", "Agent", "WebSearch", "WebFetch"].filter((tool) => !tools.includes(tool)),
-          settingSources: [],
-          settings: {
-            permissions: {
-              ask: ["Bash(*)"],
-              deny: ["Write(*)", "Edit(*)", "NotebookEdit(*)", "Task(*)", "Agent(*)"],
-              disableBypassPermissionsMode: "disable"
-            }
-          },
-          sandbox: {
-            enabled: true,
-            failIfUnavailable: true,
-            autoAllowBashIfSandboxed: true,
-            allowUnsandboxedCommands: true,
-            network: { allowedDomains: [], strictAllowlist: true, allowLocalBinding: false, allowUnixSockets: [] },
-            filesystem: {
-              denyRead: sandboxDeniedReadPaths(),
-              allowRead: [cwd, "/dev/null", "/etc/ld.so.cache"],
-              denyWrite: ["/"],
-              allowWrite: [cwd]
-            },
-            credentials: {
-              envVars: sandboxCredentialEnvironment(provider.agent.env)
-            }
-          }
-        }
-      }
-    }
-  };
-}
-
-export async function prepareClaudeSkills(cwd: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {
-  const home = env.HOME;
-  if (home === undefined || home === "") return undefined;
-  const roots = [join(home, ".agents", "skills"), join(home, ".claude", "skills")];
-  const plugin = join(cwd, ".quickchat-claude-skills");
-  const skills = join(plugin, "skills");
-  const names = new Set<string>();
-  let files = 0;
-  let bytes = 0;
-  for (const root of roots) {
-    const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
-    for (const entry of entries) {
-      if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/u.test(entry.name) || names.has(entry.name)) continue;
-      const source = await realpath(join(root, entry.name)).catch(() => undefined);
-      if (source === undefined || !(await stat(source).catch(() => undefined))?.isDirectory()) continue;
-      if (!(await stat(join(source, "SKILL.md")).catch(() => undefined))?.isFile()) continue;
-      const measured = await measureSafeSkill(source, files, bytes);
-      if (measured === undefined) continue;
-      files = measured.files;
-      bytes = measured.bytes;
-      await mkdir(skills, { recursive: true, mode: 0o700 });
-      await cp(source, join(skills, entry.name), { recursive: true, errorOnExist: true, force: false });
-      names.add(entry.name);
-    }
-  }
-  if (names.size === 0) return undefined;
-  const manifest = join(plugin, ".claude-plugin", "plugin.json");
-  await mkdir(join(plugin, ".claude-plugin"), { recursive: true, mode: 0o700 });
-  await writeFile(manifest, `${JSON.stringify({
-    name: "omarchy-quickchat-installed-skills",
-    version: "0.0.0",
-    description: "Disposable view of locally installed skills for Quickchat"
-  }, null, 2)}\n`, { mode: 0o600 });
-  return plugin;
-}
-
-async function measureSafeSkill(
-  root: string,
-  initialFiles: number,
-  initialBytes: number
-): Promise<{ files: number; bytes: number } | undefined> {
-  const queue = [root];
-  let files = initialFiles;
-  let bytes = initialBytes;
-  while (queue.length > 0) {
-    const directory = queue.pop();
-    if (directory === undefined) break;
-    const entries = await readdir(directory, { withFileTypes: true }).catch(() => undefined);
-    if (entries === undefined) return undefined;
-    for (const entry of entries) {
-      const path = join(directory, entry.name);
-      const info = await lstat(path).catch(() => undefined);
-      if (info === undefined || info.isSymbolicLink()) return undefined;
-      if (info.isDirectory()) queue.push(path);
-      else if (info.isFile()) {
-        files += 1;
-        bytes += info.size;
-        if (files > 1_000 || bytes > 5 * 1024 * 1024) return undefined;
-      } else return undefined;
-    }
-  }
-  return { files, bytes };
-}
-
-const SANDBOX_SYSTEM_ROOTS = new Set(["bin", "sbin", "lib", "lib64", "usr"]);
-
-function sandboxDeniedReadPaths(): string[] {
-  // Discover the actual root at turn creation rather than maintaining an
-  // incomplete list. Only executable/library roots remain generally readable;
-  // /usr/local is host-managed data and is denied separately.
-  return [
-    ...readdirSync("/").filter((name) => !SANDBOX_SYSTEM_ROOTS.has(name)).map((name) => `/${name}`),
-    "/usr/local"
-  ].sort();
-}
-
-function sandboxCredentialEnvironment(env: NodeJS.ProcessEnv): Array<{ name: string; mode: "deny" }> {
-  const safe = /^(?:PATH|LANG|LC_[A-Z0-9_]+|TERM|COLORTERM|SHELL)$/u;
-  return Object.keys(env)
-    .filter((name) => /^[A-Za-z_][A-Za-z0-9_]*$/u.test(name) && !safe.test(name))
-    .sort()
-    .map((name) => ({ name, mode: "deny" as const }));
+  void provider;
+  return { cwd, mcpServers: [] };
 }
 
 export function modelConfiguration(options: SessionConfigOption[]): { configId?: string; current?: string; models: ModelOption[] } {

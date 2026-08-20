@@ -42,8 +42,7 @@ await generateThirdPartyLicenses({
 await chmod(output, 0o755);
 
 for (const adapter of [
-  { name: "codex-acp", entry: "@agentclientprotocol/codex-acp/dist/index.js" },
-  { name: "claude-agent-acp", entry: "@agentclientprotocol/claude-agent-acp/dist/index.js" }
+  { name: "codex-acp", entry: "@agentclientprotocol/codex-acp/dist/index.js" }
 ]) {
   const adapterOutput = resolve(runtimeRoot, `dist/adapters/${adapter.name}.js`);
   await mkdir(dirname(adapterOutput), { recursive: true });

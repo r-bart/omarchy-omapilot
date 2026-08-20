@@ -54,14 +54,12 @@ const OPEN_CODE_PERMISSION = {
 const providerNames: Record<ProviderId, string> = {
   builtin: "Built-in (OmaPilot)",
   codex: "Codex",
-  claude: "Claude",
   opencode: "OpenCode"
 };
 
 const providerPolicies: Record<ProviderId, ProviderPolicyInfo> = {
   builtin: { tools: "device-approval", web: "approved-command", hostReads: true },
   codex: { tools: "device-approval", web: "approved-command", hostReads: true },
-  claude: { tools: "device-approval", web: "search", hostReads: false },
   opencode: { tools: "device-approval", web: "search", hostReads: false }
 };
 
@@ -103,9 +101,9 @@ export function openCodePolicyEnvironment(env: NodeJS.ProcessEnv, disabledMcp: s
   };
 }
 
-async function adapterExecutable(provider: "codex" | "claude", env: NodeJS.ProcessEnv): Promise<string | undefined> {
-  const explicit = env[provider === "codex" ? "QUICKCHAT_CODEX_ACP" : "QUICKCHAT_CLAUDE_ACP"];
-  const binary = provider === "codex" ? "codex-acp" : "claude-agent-acp";
+async function adapterExecutable(provider: "codex", env: NodeJS.ProcessEnv): Promise<string | undefined> {
+  const explicit = env.QUICKCHAT_CODEX_ACP;
+  const binary = "codex-acp";
   const paths = quickchatPaths(env);
   const candidates = [
     explicit,
@@ -123,16 +121,6 @@ async function authenticated(provider: ProviderId, path: string, env: NodeJS.Pro
   if (provider === "codex") {
     return (await runCommand(path, ["login", "status"], { env, timeoutMs: 8_000, maxOutput: 64_000 })).code === 0;
   }
-  if (provider === "claude") {
-    const result = await runCommand(path, ["auth", "status"], { env, timeoutMs: 8_000, maxOutput: 64_000 });
-    if (result.code !== 0) return false;
-    try {
-      const value: unknown = JSON.parse(result.stdout);
-      return typeof value === "object" && value !== null && "loggedIn" in value && value.loggedIn === true;
-    } catch {
-      return false;
-    }
-  }
   const result = await runCommand(path, ["--pure", "auth", "list"], { env, timeoutMs: 8_000, maxOutput: 64_000 });
   const output = stripAnsi(result.stdout + result.stderr);
   return result.code === 0 && /Credentials/u.test(output) && /(?:●|oauth|api)/iu.test(output);
@@ -149,7 +137,6 @@ function agentEnvironment(provider: ProviderId, harnessPath: string, env: NodeJS
   if (provider === "codex") {
     return { ...env, CODEX_PATH: harnessPath, INITIAL_AGENT_MODE: "read-only", NO_BROWSER: "1" };
   }
-  if (provider === "claude") return { ...env, CLAUDE_CODE_EXECUTABLE: harnessPath };
   return openCodePolicyEnvironment(env);
 }
 
@@ -174,7 +161,7 @@ export async function discoverProviders(
 
   const requested = harness;
   const found: DiscoveredProvider[] = [];
-  for (const id of ["codex", "claude", "opencode"] satisfies ProviderId[]) {
+  for (const id of ["codex", "opencode"] satisfies ProviderId[]) {
     if (id !== requested) continue;
     const harnessPath = await resolveExecutable(id, env);
     if (harnessPath === undefined || !await authenticated(id, harnessPath, env)) continue;

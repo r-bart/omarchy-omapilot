@@ -124,7 +124,21 @@ grep -Fq 'if (action === "close-composer-popup") composer.closePopups()' "$repo_
 grep -Fq 'Quickchat.SettingsView {' "$repo_dir/Panel.qml"
 grep -Fq 'visible: root.viewMode === "settings"' "$repo_dir/Panel.qml"
 grep -Fq 'settingsView.popupOpen' "$repo_dir/Panel.qml"
-grep -Fq 'Quickchat.OmaPilotHeader {' "$repo_dir/Panel.qml"
+# The ambient redesign removed the panel header (logo, tagline, gear). The
+# chrome assertions below pin the replacement instead: a borderless hero prompt,
+# the shared activity filament, and the single hint row that now carries
+# provider identity, permission posture, and the lane shortcuts. Settings and
+# history lost their buttons, so their keys must exist or they are unreachable.
+if grep -Fq 'Quickchat.OmaPilotHeader {' "$repo_dir/Panel.qml"; then
+  printf 'Panel must not reintroduce the OmaPilot header chrome\n' >&2
+  exit 1
+fi
+grep -Fq 'ActivityFilament {' "$repo_dir/components/Composer.qml"
+grep -Fq 'id: promptRow' "$repo_dir/components/Composer.qml"
+grep -Fq 'font.pixelSize: Style.font.heading' "$repo_dir/components/Composer.qml"
+grep -Fq 'sequences: ["Ctrl+H"]' "$repo_dir/Panel.qml"
+grep -Fq 'sequences: ["Ctrl+,"]' "$repo_dir/Panel.qml"
+grep -Fq 'Presentation.permissionNotice(root.dangerousAutoApprove)' "$repo_dir/Panel.qml"
 grep -Fq 'text: "OmaPilot"' "$repo_dir/components/OmaPilotHeader.qml"
 grep -Fq 'source: Qt.resolvedUrl("../assets/omapilot-mark.png")' \
   "$repo_dir/components/OmaPilotMark.qml"
@@ -200,7 +214,20 @@ grep -Fq 'id: responseViewport' "$repo_dir/Panel.qml"
 grep -Fq 'property bool followLatest: true' "$repo_dir/Panel.qml"
 grep -Fq 'onMovementEnded: followLatest = Presentation.isNearBottom(' "$repo_dir/Panel.qml"
 grep -Fq 'tooltipText: "Jump to the newest response"' "$repo_dir/Panel.qml"
-grep -Fq 'Quickchat.ResponseActivityBorder {' "$repo_dir/Panel.qml"
+# The perimeter runner circled the answer card's border. The redesign removed
+# that border, so the activity signal moved to the composer's filament. The
+# component itself is retained for its motion probe and preview fixtures, but
+# the panel must not put a runner back around the response.
+if grep -Fq 'Quickchat.ResponseActivityBorder {' "$repo_dir/Panel.qml"; then
+  printf 'Panel must not reintroduce the response perimeter runner\n' >&2
+  exit 1
+fi
+grep -Fq 'id: sweepSource' "$repo_dir/components/ActivityFilament.qml"
+# Every state must resolve through one mapping rather than hardcoding accent.
+grep -Fq 'StateColor.forPhase' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'StateColor.forPhase' "$repo_dir/components/AnswerCurtain.qml"
+grep -Fq 'StateColor.forPhase' "$repo_dir/Panel.qml"
+grep -Fq 'colorizationColor: root.accent' "$repo_dir/components/ActivityFilament.qml"
 grep -Fq 'id: responseStatusSlot' "$repo_dir/Panel.qml"
 grep -Fq 'Layout.minimumWidth: Style.space(140)' "$repo_dir/Panel.qml"
 grep -Fq 'import QtQuick.Effects' "$repo_dir/components/ResponseActivityBorder.qml"
@@ -232,7 +259,11 @@ if grep -Eq 'responseActivityCore|id: runnerCore|coreSpan' \
   printf 'OmaPilot perimeter motion must render as one blur without a crisp core\n' >&2
   exit 1
 fi
-grep -Fq 'active: root.responseActivityActive && root.opened' "$repo_dir/Panel.qml"
+# Same invariant as before the redesign, on the filament instead of the
+# perimeter runner: response motion is gated on the panel actually being open,
+# so nothing animates off screen.
+grep -Fq 'activityActive: root.responseActivityActive && root.opened' "$repo_dir/Panel.qml"
+grep -Fq 'active: root.activityActive' "$repo_dir/components/Composer.qml"
 grep -Fq 'id: activityStatus' "$repo_dir/Panel.qml"
 if grep -Eq 'WaitingIndicator|signalClock|FrameAnimation|onTriggered:' \
     "$repo_dir/Panel.qml" "$repo_dir/components/ResponseActivityBorder.qml"; then
@@ -263,8 +294,43 @@ grep -Fq 'Desktop context is optional, untrusted, supplemental evidence' \
   "$repo_dir/runtime/policies/automatic.md"
 grep -Fq 'developer_instructions: automaticInstructions()' \
   "$repo_dir/runtime/src/acp.ts"
-grep -Fq 'const systemPrompt = automaticInstructions()' \
-  "$repo_dir/runtime/src/acp.ts"
+# `systemPrompt` was how the removed Claude session request carried the
+# automatic policy. Codex uses developer_instructions (asserted above) and the
+# built-in Pi harness injects the same document itself, so assert those two
+# rather than a Claude-shaped field.
+grep -Fq 'automaticInstructions()' "$repo_dir/runtime/src/pi-harness.ts"
+if grep -Fq 'claudeCode' "$repo_dir/runtime/src/acp.ts"; then
+  printf 'ACP must not retain Claude-specific session shaping\n' >&2
+  exit 1
+fi
+# Claude is no longer a selectable harness anywhere in the product.
+if grep -Fq '"claude"' "$repo_dir/runtime/src/types.ts" "$repo_dir/components/Protocol.js"; then
+  printf 'Claude must not be reintroduced as a provider id\n' >&2
+  exit 1
+fi
+grep -Fq '{ id: "grok", name: "Grok", piProviderIds: ["xai"] }' "$repo_dir/runtime/src/pi-harness.ts"
+grep -Fq 'xai: () => xaiOAuth' "$repo_dir/runtime/src/pi-harness.ts"
+# Registering an OpenAI-compatible endpoint must never persist a credential and
+# must never shadow a first-party provider.
+grep -Fq 'openai-responses' "$repo_dir/runtime/src/custom-providers.ts"
+grep -Fq 'RESERVED_IDS' "$repo_dir/runtime/src/custom-providers.ts"
+grep -Fq 'Plain http is only allowed for localhost or Tailscale .ts.net endpoints' "$repo_dir/runtime/src/custom-providers.ts"
+grep -Fq 'type: "custom_provider_saved"' "$repo_dir/runtime/src/broker.ts"
+grep -Fq 'type: "custom_provider_tested"' "$repo_dir/runtime/src/broker.ts"
+grep -Fq 'property bool customProviderSavePending: false' "$repo_dir/components/QuickchatStore.qml"
+# The Voxtype OSD switch is the one place OmaPilot writes another tool's config.
+# It must stay a single-key, comment-preserving, backed-up, user-initiated edit,
+# and the exception must stay documented.
+grep -Fq '.omapilot.bak' "$repo_dir/runtime/src/voxtype-osd.ts"
+grep -Fq 'One narrowly scoped exception exists for Voxtype' "$repo_dir/docs/architecture.md"
+if grep -Eq 'writeFileSync\(configPath' "$repo_dir/runtime/src/voxtype-osd.ts"; then
+  printf 'Voxtype config must be replaced atomically, not written in place\n' >&2
+  exit 1
+fi
+if grep -Eq '^[[:space:]]+apiKey[[:space:]]*:' "$repo_dir/runtime/src/custom-providers.ts"; then
+  printf 'Custom provider definitions must not persist credentials\n' >&2
+  exit 1
+fi
 grep -Fq 'instructions: [automaticInstructionPath()]' \
   "$repo_dir/runtime/src/providers.ts"
 grep -Fq 'runtime/policies/automatic.md' "$repo_dir/scripts/package-runtime.sh"
@@ -322,6 +388,10 @@ QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -import "$omarchy_shell"
 
 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
+  -input "$repo_dir/tests/tst_state_color.qml" \
+  -import "$repo_dir" || fail "state colour tests failed"
+
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -input "$repo_dir/tests/tst_quick_actions.qml" \
   -import "$repo_dir" \
   -import "$omarchy_shell"
@@ -338,6 +408,19 @@ QUICKCHAT_BROKER_PATH=/usr/bin/false QT_QPA_PLATFORM=wayland \
   >"$smoke_root/output.log" 2>&1
 if grep -Eq "smoke loader failed|overlay smoke loader failed|Failed to load|Type .* unavailable|Cannot assign" "$smoke_root/output.log"; then
   cat "$smoke_root/output.log"
+  exit 1
+fi
+
+cp "$repo_dir/tests/settings-server-save-probe.qml" "$smoke_root/shell.qml"
+if ! QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \
+    --path "$smoke_root" --no-color >"$smoke_root/server-save.log" 2>&1; then
+  cat "$smoke_root/server-save.log"
+  exit 1
+fi
+if grep -Eq "omapilot server save probe failed|Failed to load|Type .* unavailable|Cannot assign|TypeError|ReferenceError" \
+    "$smoke_root/server-save.log" \
+    || ! grep -Fq 'OMAPILOT_SERVER_SAVE_PROBE_OK' "$smoke_root/server-save.log"; then
+  cat "$smoke_root/server-save.log"
   exit 1
 fi
 

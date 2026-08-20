@@ -141,7 +141,7 @@ function isChatRecord(value: unknown): value is ChatRecord {
   return "schemaVersion" in value && value.schemaVersion === 1 &&
     "id" in value && typeof value.id === "string" && isUuid(value.id) &&
     "createdAt" in value && typeof value.createdAt === "string" &&
-    "provider" in value && ["builtin", "codex", "openai", "claude", "openai-compatible", "opencode"].includes(String(value.provider)) &&
+    "provider" in value && ["builtin", "codex", "openai", "claude", "grok", "xai", "openai-compatible", "opencode"].includes(String(value.provider)) &&
     "question" in value && typeof value.question === "string" &&
     "answer" in value && typeof value.answer === "string" &&
     "images" in value && Array.isArray(value.images);
