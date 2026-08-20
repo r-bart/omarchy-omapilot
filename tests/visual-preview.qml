@@ -23,6 +23,7 @@ ShellRoot {
     property bool canSubmit: true
     property bool providerReady: true
     property bool continuationBlocked: false
+    property string continuationProvider: ""
     property bool canRetry: false
     property bool contextCaptureAvailable: true
     property bool desktopContextActive: false

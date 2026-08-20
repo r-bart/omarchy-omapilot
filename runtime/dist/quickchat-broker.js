@@ -276427,8 +276427,10 @@ __export(pi_harness_exports, {
   logoutPiProvider: () => logoutPiProvider,
   normalizeOpenUrl: () => normalizeOpenUrl,
   omarchyMediaMethod: () => omarchyMediaMethod,
+  restorePiProviderCredential: () => restorePiProviderCredential,
   runNestedAgentPrompt: () => runNestedAgentPrompt,
-  runPiQuestion: () => runPiQuestion
+  runPiQuestion: () => runPiQuestion,
+  snapshotPiProviderCredential: () => snapshotPiProviderCredential
 });
 import { existsSync as existsSync26, mkdirSync as mkdirSync13, readdirSync as readdirSync11, readFileSync as readFileSync20, renameSync as renameSync4, statSync as statSync12, truncateSync, unlinkSync as unlinkSync3, writeFileSync as writeFileSync12 } from "node:fs";
 import { createHash as createHash2, randomUUID as randomUUID7 } from "node:crypto";
@@ -276537,6 +276539,18 @@ async function loginPiProvider(env2, methodId, interaction) {
 async function logoutPiProvider(env2, providerId) {
   const runtime = await createRuntime(env2, configDirectory(env2));
   await runtime.logout(providerId);
+}
+function snapshotPiProviderCredential(env2, providerId) {
+  const credential = readStoredCredential(providerId, join41(configDirectory(env2), "auth.json"));
+  return credential === void 0 ? void 0 : structuredClone(credential);
+}
+async function restorePiProviderCredential(env2, providerId, credential) {
+  const storage = AuthStorage.create(join41(configDirectory(env2), "auth.json"));
+  if (credential === void 0) {
+    await storage.delete(providerId);
+    return;
+  }
+  await storage.modify(providerId, () => Promise.resolve(structuredClone(credential)));
 }
 function optionId(providerId, modelId, grouped) {
   return grouped ? `${providerId}::${modelId}` : modelId;
@@ -277103,6 +277117,7 @@ var init_pi_harness = __esm({
     "use strict";
     init_sdk2();
     init_resource_loader();
+    init_auth_storage();
     init_model_runtime();
     init_session_manager();
     init_settings_manager();
@@ -298667,22 +298682,28 @@ var QuickchatBroker = class {
       }
       throw error48;
     }
+    let priorCredential = void 0;
+    let credentialCaptured = false;
+    let piHarness;
     try {
+      piHarness = await Promise.resolve().then(() => (init_pi_harness(), pi_harness_exports));
+      priorCredential = piHarness.snapshotPiProviderCredential(this.#env, saved.id);
+      credentialCaptured = true;
       if (key !== void 0) {
-        const { loginPiProvider: loginPiProvider2 } = await Promise.resolve().then(() => (init_pi_harness(), pi_harness_exports));
-        await loginPiProvider2(this.#env, `${saved.id}::api_key`, {
+        await piHarness.loginPiProvider(this.#env, `${saved.id}::api_key`, {
           signal: new AbortController().signal,
           prompt: () => Promise.resolve(key),
           notify: () => void 0
         });
       } else if (endpointChanged || existing === void 0 || !existing.requiresAuth) {
-        const { logoutPiProvider: logoutPiProvider2 } = await Promise.resolve().then(() => (init_pi_harness(), pi_harness_exports));
-        await logoutPiProvider2(this.#env, saved.id);
+        await piHarness.logoutPiProvider(this.#env, saved.id);
       }
     } catch (error48) {
       try {
         if (existing === void 0) removeCustomProvider(saved.id, this.#env);
         else addCustomProvider({ ...existing, requiresAuth: existing.requiresAuth }, this.#env);
+        if (credentialCaptured && piHarness !== void 0)
+          await piHarness.restorePiProviderCredential(this.#env, saved.id, priorCredential);
       } catch (rollbackError) {
         this.#emit({
           type: "error",

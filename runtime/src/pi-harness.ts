@@ -5,12 +5,13 @@ import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { createAgentSession } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/sdk.js";
 import { DefaultResourceLoader } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js";
+import { AuthStorage, readStoredCredential } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/auth-storage.js";
 import { ModelRuntime } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.js";
 import { SessionManager } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.js";
 import { SettingsManager } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js";
 import { parseFrontmatter } from "../../node_modules/@earendil-works/pi-coding-agent/dist/utils/frontmatter.js";
 import type { InlineExtension, ToolDefinition } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/types.js";
-import type { AuthInteraction, AuthType } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/types.js";
+import type { AuthInteraction, AuthType, Credential } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/types.js";
 import { registerBundledOAuthFlowLoaders } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/load.js";
 import { anthropicOAuth } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/anthropic.js";
 import { openaiCodexOAuth } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js";
@@ -209,6 +210,31 @@ export async function loginPiProvider(
 export async function logoutPiProvider(env: NodeJS.ProcessEnv, providerId: string): Promise<void> {
   const runtime = await createRuntime(env, configDirectory(env));
   await runtime.logout(providerId);
+}
+
+export type PiProviderCredentialSnapshot = Credential | undefined;
+
+/** Preserve the unresolved auth.json value so a failed endpoint edit can restore it exactly. */
+export function snapshotPiProviderCredential(
+  env: NodeJS.ProcessEnv,
+  providerId: string
+): PiProviderCredentialSnapshot {
+  const credential = readStoredCredential(providerId, join(configDirectory(env), "auth.json"));
+  return credential === undefined ? undefined : structuredClone(credential);
+}
+
+/** Restore one provider credential without disturbing unrelated auth.json entries. */
+export async function restorePiProviderCredential(
+  env: NodeJS.ProcessEnv,
+  providerId: string,
+  credential: PiProviderCredentialSnapshot
+): Promise<void> {
+  const storage = AuthStorage.create(join(configDirectory(env), "auth.json"));
+  if (credential === undefined) {
+    await storage.delete(providerId);
+    return;
+  }
+  await storage.modify(providerId, () => Promise.resolve(structuredClone(credential)));
 }
 
 function optionId(providerId: string, modelId: string, grouped: boolean): string {

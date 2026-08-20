@@ -68,6 +68,7 @@ Scope {
   property bool harnessRestartPending: false
   property string pendingContextRequestId: ""
   property bool continuationBlocked: false
+  property string continuationProvider: ""
   property var browserCompanionStatus: ({
     phase: "ready", relayInstalled: false, setupAvailable: false,
     chromiumConnected: false, firefoxConnected: false,
@@ -389,6 +390,7 @@ Scope {
     permissionQueue = []
     transcript = ""
     continuationBlocked = false
+    continuationProvider = ""
     state = initialized ? "composing" : "preparing"
     statusMessage = initialized ? "" : "Starting OmaPilot…"
     focusComposerRequested()
@@ -505,13 +507,15 @@ Scope {
     answerMarkdown = String(chat.answer || chat.markdown || "")
     errorDetails = null
     images = Array.isArray(chat.images) ? chat.images : []
-    provider = Protocol.normalizedProvider(chat.provider) || provider
+    var historicalProvider = Protocol.normalizedProvider(chat.provider) || provider
+    provider = historicalProvider
     model = String(chat.model || "")
-    continuationBlocked = !providerAvailable(provider)
+    continuationBlocked = !providerAvailable(historicalProvider)
+    continuationProvider = continuationBlocked ? historicalProvider : ""
     pendingPermission = null
     state = "complete"
     statusMessage = continuationBlocked
-      ? "This chat used " + Protocol.providerLabel(provider) + ". Choose that harness in Settings to continue."
+      ? "This chat used " + Protocol.providerLabel(continuationProvider) + ". Choose that harness in Settings to continue."
       : ""
     answerChanged()
   }
@@ -537,11 +541,14 @@ Scope {
     }
     provider = configuredProvider
     selectProvider(configuredProvider)
-    continuationBlocked = false
+    continuationBlocked = continuationProvider !== "" && configuredProvider !== continuationProvider
+    if (!continuationBlocked) continuationProvider = ""
+    statusMessage = continuationBlocked
+      ? "This chat used " + Protocol.providerLabel(continuationProvider) + ". Choose that harness in Settings to continue."
+      : ""
     var readyState = Protocol.providerReadyState(state, providers.length)
     if (readyState !== state) {
       state = readyState
-      statusMessage = ""
       errorDetails = null
     }
   }

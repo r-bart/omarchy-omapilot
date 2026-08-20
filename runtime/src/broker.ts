@@ -16,6 +16,7 @@ import { launchDetached, resolveExecutable } from "./process.js";
 import type { BrokerCommand, BrokerEvent, ChatRecord, CustomProviderView, ProviderId, ProviderInfo } from "./types.js";
 import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import type { AuthEvent, AuthPrompt } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/types.js";
+import type { PiProviderCredentialSnapshot } from "./pi-harness.js";
 import { BrowserCompanionServer, type BrowserCapture } from "./browser-companion.js";
 import {
   browserCompanionSetupStatus,
@@ -621,14 +622,19 @@ export class QuickchatBroker {
       }
       throw error;
     }
+    let priorCredential: PiProviderCredentialSnapshot = undefined;
+    let credentialCaptured = false;
+    let piHarness: typeof import("./pi-harness.js") | undefined;
     // Registering a server and authenticating it were two separate steps, so a
     // freshly added endpoint contributed no models and looked broken. If a key
     // came with the request, sign in immediately through the harness's own login
     // so it lands in auth.json — never in models.json.
     try {
+      piHarness = await import("./pi-harness.js");
+      priorCredential = piHarness.snapshotPiProviderCredential(this.#env, saved.id);
+      credentialCaptured = true;
       if (key !== undefined) {
-        const { loginPiProvider } = await import("./pi-harness.js");
-        await loginPiProvider(this.#env, `${saved.id}::api_key`, {
+        await piHarness.loginPiProvider(this.#env, `${saved.id}::api_key`, {
           signal: new AbortController().signal,
           prompt: () => Promise.resolve(key),
           notify: () => undefined
@@ -637,8 +643,7 @@ export class QuickchatBroker {
         // Blank means this endpoint intentionally needs no key. Clear both
         // credentials from a prior endpoint and orphaned credentials left by a
         // removed provider id before the new definition becomes usable.
-        const { logoutPiProvider } = await import("./pi-harness.js");
-        await logoutPiProvider(this.#env, saved.id);
+        await piHarness.logoutPiProvider(this.#env, saved.id);
       }
     } catch (error) {
       // Authentication is part of changing the endpoint's trust boundary. Put
@@ -647,6 +652,8 @@ export class QuickchatBroker {
       try {
         if (existing === undefined) removeCustomProvider(saved.id, this.#env);
         else addCustomProvider({ ...existing, requiresAuth: existing.requiresAuth }, this.#env);
+        if (credentialCaptured && piHarness !== undefined)
+          await piHarness.restorePiProviderCredential(this.#env, saved.id, priorCredential);
       } catch (rollbackError) {
         this.#emit({
           type: "error",

@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { deleteAcpSession } from "../src/acp.js";
 import { QuickchatBroker } from "../src/broker.js";
+import * as piHarness from "../src/pi-harness.js";
 import { HerdrHandoffError } from "../src/herdr.js";
 import { HistoryStore } from "../src/history.js";
 import { ImageStore } from "../src/images.js";
@@ -212,6 +213,36 @@ describe("custom provider registration", () => {
     }));
     const auth = JSON.parse(await readFile(join(config, "auth.json"), "utf8")) as Record<string, unknown>;
     expect(auth).not.toHaveProperty("finn");
+  });
+
+  it("restores both the provider definition and credential when endpoint auth cleanup fails", async () => {
+    const root = await mkdtemp(join(tmpdir(), "quickchat-provider-edit-rollback-")); roots.push(root);
+    const config = join(root, ".config/omapilot");
+    await mkdir(config, { recursive: true });
+    const originalProvider = {
+      omapilotManaged: true, omapilotAuthRequired: true, name: "Finn",
+      baseUrl: "http://finn.ts.net:8888/v1", api: "openai-completions",
+      models: [{ id: "qwen", name: "Qwen", api: "openai-completions", contextWindow: 128_000 }]
+    };
+    await writeFile(join(config, "models.json"), JSON.stringify({ providers: { finn: originalProvider } }));
+    await writeFile(join(config, "auth.json"), JSON.stringify({ finn: { type: "api_key", key: "stored-secret" } }));
+    vi.spyOn(piHarness, "logoutPiProvider").mockRejectedValueOnce(new Error("auth store unavailable"));
+    const events: BrokerEvent[] = [];
+    const broker = new QuickchatBroker(events.push.bind(events), {
+      env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config }
+    });
+
+    await broker.handle({
+      type: "custom_provider_add", id: "finn", name: "Replacement",
+      baseUrl: "http://replacement.ts.net:8888/v1", api: "openai-completions",
+      models: [{ id: "qwen" }]
+    });
+
+    expect(events).toEqual([expect.objectContaining({ type: "error", code: "custom_provider_auth_failed" })]);
+    expect(JSON.parse(await readFile(join(config, "models.json"), "utf8")))
+      .toMatchObject({ providers: { finn: originalProvider } });
+    expect(JSON.parse(await readFile(join(config, "auth.json"), "utf8")))
+      .toMatchObject({ finn: { type: "api_key", key: "stored-secret" } });
   });
 
   it("emits a rejection without a saved acknowledgement or config write", async () => {
