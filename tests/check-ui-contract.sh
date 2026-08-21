@@ -27,6 +27,9 @@ qml_files=(
   "$repo_dir/components/QuickActions.qml"
   "$repo_dir/components/QuickActionEditor.qml"
   "$repo_dir/components/SettingsView.qml"
+  "$repo_dir/components/SettingsTabs.qml"
+  "$repo_dir/components/StateLightBar.qml"
+  "$repo_dir/components/ActivityFilament.qml"
   "$repo_dir/components/ResponseActivityBorder.qml"
   "$repo_dir/components/internal/PermissionFocusGuard.qml"
   "$repo_dir/components/internal/PanelKeyboardNavigation.qml"
@@ -126,18 +129,47 @@ grep -Fq 'visible: root.viewMode === "settings"' "$repo_dir/Panel.qml"
 grep -Fq 'settingsView.popupOpen' "$repo_dir/Panel.qml"
 # The ambient redesign removed the panel header (logo, tagline, gear). The
 # chrome assertions below pin the replacement instead: a borderless hero prompt,
-# the shared activity filament, and the single hint row that now carries
-# provider identity, permission posture, and the lane shortcuts. Settings and
-# history lost their buttons, so their keys must exist or they are unreachable.
+# one answer seam, and a hint row carrying provider identity, permission posture,
+# the desktop-global settings binding, and focused-panel history navigation.
 if grep -Fq 'Quickchat.OmaPilotHeader {' "$repo_dir/Panel.qml"; then
   printf 'Panel must not reintroduce the OmaPilot header chrome\n' >&2
   exit 1
 fi
-grep -Fq 'ActivityFilament {' "$repo_dir/components/Composer.qml"
+if grep -Fq 'ActivityFilament {' "$repo_dir/components/Composer.qml"; then
+  printf 'The composer must not draw a second rule above the answer seam\n' >&2
+  exit 1
+fi
+grep -Fq 'Quickchat.StateLightBar {' "$repo_dir/Panel.qml"
+grep -Fq 'Layout.minimumHeight: contentVisible ? Style.space(120) : stateLightBar.implicitHeight' \
+  "$repo_dir/Panel.qml"
+grep -Fq 'visible: answerCard.contentVisible' "$repo_dir/Panel.qml"
+grep -Fq 'readonly property bool atmosphereActive: motionEnabled' \
+  "$repo_dir/components/StateLightBar.qml"
+grep -Fq '&& (phase === "listening" || phase === "thinking")' \
+  "$repo_dir/components/StateLightBar.qml"
+grep -Fq 'running: root.atmosphereActive' "$repo_dir/components/StateLightBar.qml"
+grep -Fq 'StateColor.forPhase' "$repo_dir/components/StateLightBar.qml"
+grep -Fq 'colorizationColor: root.displayedColor' "$repo_dir/components/StateLightBar.qml"
 grep -Fq 'id: promptRow' "$repo_dir/components/Composer.qml"
+grep -Fq 'iconText: "󰹑"' "$repo_dir/components/Composer.qml"
+grep -Fq '󰍬' "$repo_dir/components/Composer.qml"
+if grep -Fq 'Active window, open apps, workspaces, and playing media' \
+    "$repo_dir/components/Composer.qml"; then
+  printf 'Desktop context disclosure must be the hostname, not a capability list\n' >&2
+  exit 1
+fi
+grep -Fq 'Protocol.providerShortLabel(Quickchat.QuickchatStore.provider)' "$repo_dir/Panel.qml"
 grep -Fq 'font.pixelSize: Style.font.heading' "$repo_dir/components/Composer.qml"
 grep -Fq 'sequences: ["Ctrl+H"]' "$repo_dir/Panel.qml"
-grep -Fq 'sequences: ["Ctrl+,"]' "$repo_dir/Panel.qml"
+grep -Fq '{ label: "Super+Alt+P settings", lane: "settings" }' "$repo_dir/Panel.qml"
+if grep -Fq 'Ctrl+,' "$repo_dir/Panel.qml" "$repo_dir/components/Composer.qml"; then
+  printf 'Settings must use only the desktop-global Super+Alt+P binding\n' >&2
+  exit 1
+fi
+if grep -Fq 'id: caret' "$repo_dir/components/Composer.qml"; then
+  printf 'Prompt text must share the content left edge without a decorative caret\n' >&2
+  exit 1
+fi
 grep -Fq 'Presentation.permissionNotice(root.dangerousAutoApprove)' "$repo_dir/Panel.qml"
 grep -Fq 'text: "OmaPilot"' "$repo_dir/components/OmaPilotHeader.qml"
 grep -Fq 'source: Qt.resolvedUrl("../assets/omapilot-mark.png")' \
@@ -172,7 +204,10 @@ grep -Fq 'modalInteractionActive: root.modalInteractionActive' \
 grep -Fq 'Accessible.name: tooltipText' "$repo_dir/components/QuickActions.qml"
 grep -Fq 'quickActionsJson' "$repo_dir/Panel.qml"
 grep -Fq 'onQuickActionsEdited:' "$repo_dir/Panel.qml"
-grep -Fq 'text: "OmaPilot settings"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'Accessible.name: "OmaPilot settings"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'SettingsTabs {' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'property string selectedTab: "agent"' "$repo_dir/components/SettingsView.qml"
+grep -Fq '{ id: "agent", label: "Agent" }' "$repo_dir/components/Presentation.js"
 grep -Fq 'QuickActionEditor {' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'maximumActions = 5' "$repo_dir/components/QuickActions.js"
 grep -Fq 'function moveAction(actions, index, delta)' "$repo_dir/components/QuickActions.js"
@@ -180,7 +215,11 @@ grep -Fq 'function removeAction(actions, index)' "$repo_dir/components/QuickActi
 grep -Fq 'ActionCatalog.addAction(' "$repo_dir/components/QuickActionEditor.qml"
 grep -Fq 'ActionCatalog.updateAction(' "$repo_dir/components/QuickActionEditor.qml"
 grep -Fq 'label: "Dangerous auto-approve"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'label: "Desktop context"' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'text: "Browser context"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'onDesktopContextRequested:' "$repo_dir/Panel.qml"
+grep -Fq 'text: "History"' "$repo_dir/components/HistoryView.qml"
+grep -Fq 'ActivityFilament {' "$repo_dir/components/HistoryView.qml"
 grep -Fq 'text: root.browserCompanion.relayInstalled === true ? "Repair browser setup" : "Enable browser context"' \
   "$repo_dir/components/SettingsView.qml"
 grep -Fq 'onBrowserCompanionInstallRequested:' "$repo_dir/Panel.qml"
@@ -215,9 +254,9 @@ grep -Fq 'property bool followLatest: true' "$repo_dir/Panel.qml"
 grep -Fq 'onMovementEnded: followLatest = Presentation.isNearBottom(' "$repo_dir/Panel.qml"
 grep -Fq 'tooltipText: "Jump to the newest response"' "$repo_dir/Panel.qml"
 # The perimeter runner circled the answer card's border. The redesign removed
-# that border, so the activity signal moved to the composer's filament. The
-# component itself is retained for its motion probe and preview fixtures, but
-# the panel must not put a runner back around the response.
+# that border, so state now lives in the persistent answer seam. The old
+# component remains for its motion probe and preview fixtures, but the panel
+# must not put a runner back around the response.
 if grep -Fq 'Quickchat.ResponseActivityBorder {' "$repo_dir/Panel.qml"; then
   printf 'Panel must not reintroduce the response perimeter runner\n' >&2
   exit 1
@@ -225,8 +264,14 @@ fi
 grep -Fq 'id: sweepSource' "$repo_dir/components/ActivityFilament.qml"
 # Every state must resolve through one mapping rather than hardcoding accent.
 grep -Fq 'StateColor.forPhase' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'anchors { left: parent.left; right: parent.right }' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'property real tide: 0.35' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'property real drift: 0' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'readonly property bool atmosphereActive: motionEnabled' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'running: root.atmosphereActive' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'running: root.motionEnabled && root.lit && root.phase !== "listening"' "$repo_dir/components/VoiceNode.qml"
+grep -Fq '0.50 + root.drift * 0.055' "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'StateColor.forPhase' "$repo_dir/components/AnswerCurtain.qml"
-grep -Fq 'StateColor.forPhase' "$repo_dir/Panel.qml"
 grep -Fq 'colorizationColor: root.accent' "$repo_dir/components/ActivityFilament.qml"
 grep -Fq 'id: responseStatusSlot' "$repo_dir/Panel.qml"
 grep -Fq 'Layout.minimumWidth: Style.space(140)' "$repo_dir/Panel.qml"
@@ -259,11 +304,9 @@ if grep -Eq 'responseActivityCore|id: runnerCore|coreSpan' \
   printf 'OmaPilot perimeter motion must render as one blur without a crisp core\n' >&2
   exit 1
 fi
-# Same invariant as before the redesign, on the filament instead of the
-# perimeter runner: response motion is gated on the panel actually being open,
-# so nothing animates off screen.
-grep -Fq 'activityActive: root.responseActivityActive && root.opened' "$repo_dir/Panel.qml"
-grep -Fq 'active: root.activityActive' "$repo_dir/components/Composer.qml"
+# The persistent state light is panel-gated, so its atmosphere stops as soon as
+# the panel closes instead of animating off screen.
+grep -Fq 'motionEnabled: root.motionEnabled && root.opened' "$repo_dir/Panel.qml"
 grep -Fq 'id: activityStatus' "$repo_dir/Panel.qml"
 if grep -Eq 'WaitingIndicator|signalClock|FrameAnimation|onTriggered:' \
     "$repo_dir/Panel.qml" "$repo_dir/components/ResponseActivityBorder.qml"; then
@@ -442,6 +485,33 @@ if grep -Eq "omapilot motion probe failed|Failed to load|Type .* unavailable|Can
   exit 1
 fi
 
+cp "$repo_dir/tests/voice-node-lifecycle-probe.qml" "$smoke_root/shell.qml"
+if ! QT_QPA_PLATFORM=wayland timeout 5s quickshell --no-duplicate \
+    --path "$smoke_root" --no-color >"$smoke_root/voice-node-lifecycle.log" 2>&1; then
+  cat "$smoke_root/voice-node-lifecycle.log"
+  exit 1
+fi
+if grep -Eq "omapilot voice node lifecycle probe failed|Failed to load|Type .* unavailable|Cannot assign|TypeError" \
+    "$smoke_root/voice-node-lifecycle.log" \
+    || ! grep -Fq 'OMAPILOT_VOICE_NODE_LIFECYCLE_PROBE_OK' "$smoke_root/voice-node-lifecycle.log"; then
+  cat "$smoke_root/voice-node-lifecycle.log"
+  exit 1
+fi
+
+cp "$repo_dir/tests/state-light-bar-lifecycle-probe.qml" "$smoke_root/shell.qml"
+if ! QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \
+    --path "$smoke_root" --no-color >"$smoke_root/state-light-bar-lifecycle.log" 2>&1; then
+  cat "$smoke_root/state-light-bar-lifecycle.log"
+  exit 1
+fi
+if grep -Eq "omapilot state light bar lifecycle probe failed|Failed to load|Type .* unavailable|Cannot assign|TypeError" \
+    "$smoke_root/state-light-bar-lifecycle.log" \
+    || ! grep -Fq 'OMAPILOT_STATE_LIGHT_BAR_LIFECYCLE_PROBE_OK' \
+      "$smoke_root/state-light-bar-lifecycle.log"; then
+  cat "$smoke_root/state-light-bar-lifecycle.log"
+  exit 1
+fi
+
 motion_frame_root="$smoke_root/motion-frames"
 mkdir -p "$motion_frame_root"
 cp "$repo_dir/tests/motion-preview.qml" "$smoke_root/shell.qml"
@@ -486,7 +556,7 @@ if grep -Eq "visual preview failed|Failed to load|Type .* unavailable|Cannot ass
   exit 1
 fi
 
-for preview_state in actions-settings waiting streaming error error-details context; do
+for preview_state in settings actions-settings history waiting streaming error error-details context; do
   preview_output="$repo_dir/screenshots/implementation-omapilot-$preview_state.png"
   OMAPILOT_PREVIEW_STATE="$preview_state" OMAPILOT_PREVIEW_PATH="$preview_output" \
     QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \

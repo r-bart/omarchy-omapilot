@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Protocol.js" as Protocol
@@ -25,17 +26,19 @@ Item {
   // window activation — which Qt.WindowShortcut depends on — is not dependable.
   // Key events reach the focused editor regardless, which is why Enter and
   // Escape below have always worked.
-  signal settingsRequested()
   signal historyRequested()
 
   readonly property bool inputActive: inlineMode ? inlineInput.activeFocus : promptInput.activeFocus
   property bool attachmentPopupOpen: false
-  // Set by the owner. Motion must not run while the panel is closed, so the
-  // filament is gated on visibility rather than on backend state alone.
-  property bool activityActive: false
-  // Supplied by the owner so the filament shows the current state, not just accent.
-  property color activityColor: accent
+  property string hostName: ""
   readonly property bool popupOpen: inlineProvider.popupOpen || attachmentPopupOpen
+
+  FileView {
+    path: "/etc/hostname"
+    watchChanges: false
+    printErrors: false
+    onLoaded: root.hostName = String(text() || "").trim().split(/\s+/)[0]
+  }
 
   implicitWidth: inlineMode ? Style.space(360) : Style.space(520)
   implicitHeight: inlineMode ? Style.bar.sizeHorizontal : panelComposer.implicitHeight
@@ -198,46 +201,30 @@ Item {
 
     Text {
       Layout.fillWidth: true
-      visible: root.backend && root.backend.desktopContextActive
-      text: "󰍹  Active window, open apps, workspaces, and playing media are attached on send."
+      visible: root.backend && root.backend.desktopContextActive && root.hostName !== ""
+      text: "󰍹  " + root.hostName
       color: Qt.darker(root.foreground, 1.45)
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
-      wrapMode: Text.Wrap
+      elide: Text.ElideRight
       Accessible.role: Accessible.StaticText
-      Accessible.name: "Desktop context is attached on send"
+      Accessible.name: "Desktop context attached from " + root.hostName
     }
 
     // The hero: one borderless prompt line, not a boxed text area with a
-    // toolbar. The old surface framed OmaPilot as an app embedded in the
-    // desktop; a bare caret and a filament read as the desktop itself asking.
-    // The visible container is gone, so the input needs no border states.
+    // toolbar. Keep its text on the same left edge as context and responses;
+    // a decorative prompt glyph only indented the user's words.
     Item {
       id: promptRow
       Layout.fillWidth: true
       Layout.preferredHeight: Math.max(Style.space(34), promptInput.implicitHeight + Style.spacing.md)
       visible: !root.backend || root.backend.pendingPermission === null
 
-      HoverHandler { id: promptHover }
-
-      Text {
-        id: caret
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.topMargin: Style.spacing.xs
-        text: "\u203a"
-        color: root.accent
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.heading
-        opacity: promptInput.activeFocus ? 1 : 0.55
-        Behavior on opacity { NumberAnimation { duration: 140 } }
-      }
-
       TextArea {
         id: promptInput
         anchors {
-          left: caret.right; right: promptTools.left; top: parent.top; bottom: parent.bottom
-          leftMargin: Style.spacing.md; rightMargin: Style.spacing.md
+          left: parent.left; right: promptTools.left; top: parent.top; bottom: parent.bottom
+          rightMargin: Style.spacing.md
         }
         enabled: root.backend && !root.backend.continuationBlocked
           && root.backend.state !== "streaming" && root.backend.state !== "preparing"
@@ -266,9 +253,6 @@ Item {
               && !(event.modifiers & Qt.ShiftModifier)) {
             root.submit()
             event.accepted = true
-          } else if (event.key === Qt.Key_Comma && (event.modifiers & Qt.ControlModifier)) {
-            root.settingsRequested()
-            event.accepted = true
           } else if (event.key === Qt.Key_H && (event.modifiers & Qt.ControlModifier)) {
             root.historyRequested()
             event.accepted = true
@@ -290,7 +274,7 @@ Item {
         spacing: Style.spacing.xs
 
         PanelActionButton {
-          iconText: "\uf0c5"
+          iconText: "󰹑"
           tooltipText: "Clip context from the desktop"
           foreground: root.foreground
           focusable: true
@@ -300,7 +284,8 @@ Item {
         }
 
         PanelActionButton {
-          iconText: root.backend && root.backend.busy ? "\udb80\ude9b" : "\udb80\udd6c"
+          iconText: root.backend && (root.backend.busy || root.backend.state === "dictating")
+            ? "󰓛" : "󰍬"
           tooltipText: root.backend && root.backend.busy ? "Stop response" : "Dictate with Voxtype"
           foreground: root.backend && root.backend.state === "dictating" ? root.accent : root.foreground
           focusable: true
@@ -313,18 +298,6 @@ Item {
           }
         }
       }
-    }
-
-    // The filament: the composer's only edge. Dim at rest, accent on focus,
-    // and it carries the activity sweep so motion lives on the same line the
-    // user is typing on rather than around a card.
-    ActivityFilament {
-      Layout.fillWidth: true
-      visible: !root.backend || root.backend.pendingPermission === null
-      accent: root.activityColor
-      foreground: root.foreground
-      focused: promptInput.activeFocus || promptHover.hovered
-      active: root.activityActive
     }
 
     RowLayout {
