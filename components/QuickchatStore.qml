@@ -79,6 +79,11 @@ Scope {
   property string pendingContextRequestId: ""
   property bool continuationBlocked: false
   property string continuationProvider: ""
+  property string pendingHerdrChatId: ""
+  // A global new-chat hotkey can arrive while a provider turn or dictation is
+  // still active. Keep the old request identity until cancellation settles so
+  // its final events cannot leak into the fresh composer.
+  property bool newChatPending: false
   property var browserCompanionStatus: ({
     phase: "ready", relayInstalled: false, setupAvailable: false,
     chromiumConnected: false, firefoxConnected: false,
@@ -401,7 +406,8 @@ Scope {
       pendingPermission = queued.length > 0 ? queued[0] : null
   }
 
-  function newChat() {
+  function resetChat() {
+    newChatPending = false
     clearContextAttachments()
     currentId = ""
     currentChatId = ""
@@ -414,10 +420,29 @@ Scope {
     transcript = ""
     continuationBlocked = false
     continuationProvider = ""
+    pendingHerdrChatId = ""
     state = initialized ? "composing" : "preparing"
     statusMessage = initialized ? "" : "Starting OmaPilot…"
     focusComposerRequested()
     answerChanged()
+  }
+
+  function newChat() {
+    stopSpeaking()
+    var turnInFlight = dictationPhase !== ""
+      || (pendingHerdrChatId === "" && currentId !== "" && busy)
+    if (turnInFlight) {
+      newChatPending = true
+      cancel()
+      return
+    }
+    resetChat()
+  }
+
+  onBusyChanged: {
+    if (newChatPending && !busy) Qt.callLater(function() {
+      if (root.newChatPending && !root.busy) root.resetChat()
+    })
   }
 
   function startDictation() {
@@ -559,6 +584,7 @@ Scope {
 
   function continueInHerdr() {
     if (!currentChatId) return
+    pendingHerdrChatId = currentChatId
     state = "preparing"
     statusMessage = "Opening in Herdr…"
     sendCommand(Protocol.command("continue_in_herdr", { chatId: currentChatId }))
@@ -947,8 +973,10 @@ Scope {
       return
     }
     if (type === "herdr") {
+      if (pendingHerdrChatId === "" || String(event.chatId || "") !== pendingHerdrChatId) return
       var outcome = Protocol.herdrOutcome(event)
       if (!outcome) { console.warn("quickchat: unknown Herdr state " + String(event.state || "")); return }
+      if (String(event.state || "") !== "opening") pendingHerdrChatId = ""
       state = outcome.state
       statusMessage = outcome.message
       if (outcome.state === "error") errorDetails = Protocol.normalizedError({
@@ -977,6 +1005,7 @@ Scope {
     function hide() { root.routeIpc("hide") }
     function toggle() { root.routeIpc("toggle") }
     function newChat() { root.routeIpc("newChat") }
+    function continueInHerdr() { root.continueInHerdr() }
     function history() { root.routeIpc("history") }
     function settings() { root.routeIpc("settings") }
   }

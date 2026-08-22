@@ -229,6 +229,23 @@ grep -Fq 'Protocol.command("voice_status")' "$repo_dir/components/QuickchatStore
 grep -Fq 'Protocol.ttsKeySetCommand(provider, apiKey)' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'onVoiceEnabledRequested:' "$repo_dir/Panel.qml"
 grep -Fq 'if (!OmaPilot.QuickchatStore.voiceEnabled)' "$repo_dir/Ambient.qml"
+grep -Fq 'function newVoiceChat(): string {' "$repo_dir/Ambient.qml"
+grep -Fq 'freshVoiceStartPending = freshChat' "$repo_dir/Ambient.qml"
+grep -Fq 'if (freshChat && !freshChatReset) OmaPilot.QuickchatStore.newChat()' \
+  "$repo_dir/Ambient.qml"
+grep -Fq 'function continueInHerdr() { root.continueInHerdr() }' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq '|| (pendingHerdrChatId === "" && currentId !== "" && busy)' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'if (root.newChatPending && !root.busy) root.resetChat()' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'pendingHerdrChatId = currentChatId' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'String(event.chatId || "") !== pendingHerdrChatId' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'SUPER + SHIFT + A' "$repo_dir/README.md"
+grep -Fq 'io.github.spencerbull.omapilot newVoiceChat' "$repo_dir/README.md"
+grep -Fq 'SUPER + ALT + N' "$repo_dir/README.md"
+grep -Fq 'io.github.spencerbull.quickchat continueInHerdr' "$repo_dir/README.md"
 if grep -Fq 'text: "Voice indicator"' "$repo_dir/components/SettingsView.qml"; then
   printf 'Voice settings must own listening and speaking, not only the Voxtype OSD\n' >&2
   exit 1
