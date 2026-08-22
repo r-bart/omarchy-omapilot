@@ -339,7 +339,7 @@ export class QuickchatBroker {
     const run = isPiProvider(provider)
       ? (await import("./pi-harness.js")).runPiQuestion(
         provider, command.id, prompt, command.model, this.#emit, 180_000, permission,
-        () => this.#cancelPermissions(command.id), resumeSessionId)
+        () => this.#cancelPermissions(command.id), resumeSessionId, command.webHandoffProvider ?? "duckduckgo")
       : runAcpQuestion(provider, command.id, prompt, command.model,
         this.#emit, 180_000, this.#images, permission,
         () => this.#cancelPermissions(command.id));

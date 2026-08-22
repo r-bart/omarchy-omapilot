@@ -27,6 +27,7 @@
       "opencodeModel": "",
       "quickActionsJson": "",
       "desktopContext": "On",
+      "webHandoffProvider": "duckduckgo",
       "dangerousAutoApprove": false,
       "voiceEnabled": false,
       "ttsProvider": "kokoro",
@@ -70,6 +71,14 @@
         "options": ["On", "Off"],
         "defaultValue": "On",
         "description": "Attach a bounded active-window, open-app, workspace, and playing-media snapshot to each new request."
+      },
+      {
+        "key": "webHandoffProvider",
+        "type": "enum",
+        "label": "Search provider",
+        "options": ["duckduckgo", "google", "chatgpt", "claude", "grok"],
+        "defaultValue": "duckduckgo",
+        "description": "Choose where OmaPilot opens current-information questions. AI sites also receive a paste-ready copy; answers stay in the browser."
       },
       {
         "key": "dangerousAutoApprove",

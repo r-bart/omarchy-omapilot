@@ -11,6 +11,7 @@ Item {
   required property var backend
   property bool dangerousAutoApprove: false
   property bool desktopContextEnabled: true
+  property string webHandoffProvider: "duckduckgo"
   property var quickActions: []
   property string selectedTab: "agent"
   property bool motionEnabled: true
@@ -84,7 +85,8 @@ Item {
   property string authPromptSelection: ""
   readonly property bool popupOpen: providerPicker.popupOpen || modelPicker.popupOpen
     || authMethodPicker.popupOpen || authPromptPicker.popupOpen
-    || ttsProviderPicker.popupOpen || ttsModelPicker.popupOpen || ttsVoicePicker.popupOpen
+    || webHandoffProviderPicker.popupOpen || ttsProviderPicker.popupOpen
+    || ttsModelPicker.popupOpen || ttsVoicePicker.popupOpen
   readonly property bool modalInteractionActive: popupOpen
     || browserCompanionBusy
     || (selectedTab === "desktop" && browserRemoveConfirmation)
@@ -96,6 +98,7 @@ Item {
 
   signal dangerousAutoApproveRequested(bool enabled)
   signal desktopContextRequested(bool enabled)
+  signal webHandoffProviderRequested(string provider)
   signal providerChanged(string provider)
   signal modelChanged(string provider, string model)
   signal quickActionsEdited(var actions)
@@ -283,6 +286,7 @@ Item {
     modelPicker.close()
     authMethodPicker.close()
     authPromptPicker.close()
+    webHandoffProviderPicker.close()
     ttsProviderPicker.close()
     ttsModelPicker.close()
     ttsVoicePicker.close()
@@ -1237,6 +1241,39 @@ Item {
             fontFamily: root.fontFamily
             Accessible.name: label
             onClicked: root.desktopContextRequested(!root.desktopContextEnabled)
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Search provider"
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+          }
+
+          Dropdown {
+            id: webHandoffProviderPicker
+            Layout.fillWidth: true
+            showLabel: false
+            options: Protocol.webHandoffProviderOptions()
+            value: Protocol.normalizedWebHandoffProvider(root.webHandoffProvider) || "duckduckgo"
+            enabled: root.backend && !root.backend.busy
+            foreground: root.foreground
+            background: root.background
+            Accessible.name: "Search provider"
+            onChanged: function(value) { root.webHandoffProviderRequested(value) }
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "For current-information requests, OmaPilot can open the question in this site. AI sites also get a paste-ready copy in case they cannot prefill it. The answer stays in the browser and is not read back into this conversation."
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.Wrap
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
           }
 
           Text {

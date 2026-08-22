@@ -70,6 +70,7 @@ Scope {
   property string configuredOpencodeModel: ""
   property bool configuredDangerousAutoApprove: false
   property bool desktopContextEnabled: true
+  property string webHandoffProvider: "duckduckgo"
   property bool brokerDesktopContextSupported: false
   property var latchedActiveWindow: null
   property var latchedCaptureTarget: null
@@ -135,6 +136,7 @@ Scope {
     var desiredOpencodeModel = String(source.opencodeModel || "")
     var desiredDangerousAutoApprove = source.dangerousAutoApprove === true
     var desiredDesktopContext = String(source.desktopContext || "On") !== "Off"
+    var desiredWebHandoffProvider = Protocol.normalizedWebHandoffProvider(source.webHandoffProvider) || "duckduckgo"
     var desiredVoiceEnabled = source.voiceEnabled === true
     var desiredTtsProvider = Protocol.normalizedTtsProvider(source.ttsProvider) || "kokoro"
     var desiredTtsModel = String(source.ttsModel || "")
@@ -146,6 +148,7 @@ Scope {
       || desiredOpencodeModel !== configuredOpencodeModel
       || desiredDangerousAutoApprove !== configuredDangerousAutoApprove
       || desiredDesktopContext !== desktopContextEnabled
+      || desiredWebHandoffProvider !== webHandoffProvider
       || desiredVoiceEnabled !== voiceEnabled
       || desiredTtsProvider !== ttsProvider
       || desiredTtsModel !== ttsModel
@@ -157,6 +160,7 @@ Scope {
     configuredOpencodeModel = desiredOpencodeModel
     configuredDangerousAutoApprove = desiredDangerousAutoApprove
     desktopContextEnabled = desiredDesktopContext
+    webHandoffProvider = desiredWebHandoffProvider
     voiceEnabled = desiredVoiceEnabled
     ttsProvider = desiredTtsProvider
     ttsModel = desiredTtsModel
@@ -266,7 +270,8 @@ Scope {
     }
     var autoApprove = configuredDangerousAutoApprove
     sendCommand(Protocol.submitCommand(
-      currentId, prompt, provider, model, context, autoApprove, attachmentSelections, resumeChatId))
+      currentId, prompt, provider, model, context, autoApprove, attachmentSelections, resumeChatId,
+      webHandoffProvider))
     contextAttachments = []
     answerChanged()
     return true

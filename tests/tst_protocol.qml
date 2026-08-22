@@ -237,6 +237,19 @@ TestCase {
     verify(payload.dangerousAutoApprove)
   }
 
+  function test_webHandoffProviderIsNormalizedAndSubmitted() {
+    compare(Protocol.normalizedWebHandoffProvider("CLAUDE"), "claude")
+    compare(Protocol.normalizedWebHandoffProvider("bing"), "")
+    compare(Protocol.webHandoffProviderLabel("chatgpt"), "ChatGPT Search")
+    compare(Protocol.webHandoffProviderOptions().length, 5)
+    var payload = Protocol.submitCommand(
+      "research", "Find current information", "builtin", "", null, false, [], "", "grok")
+    compare(payload.webHandoffProvider, "grok")
+    verify(Protocol.submitCommand(
+      "research", "Find current information", "builtin", "", null, false, [], "", "bing")
+      .webHandoffProvider === undefined)
+  }
+
   function test_followUpSubmitCarriesOnlyAValidSavedChatId() {
     var saved = "11111111-1111-4111-8111-111111111111"
     compare(Protocol.submitCommand("turn", "Follow up", "builtin", "", null, false, [], saved).resumeChatId, saved)

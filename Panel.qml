@@ -34,6 +34,9 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property bool dangerousAutoApprove: settings
     && settings.dangerousAutoApprove === true
+  readonly property string webHandoffProvider: settings
+    && Protocol.normalizedWebHandoffProvider(settings.webHandoffProvider)
+    ? Protocol.normalizedWebHandoffProvider(settings.webHandoffProvider) : "duckduckgo"
   readonly property bool voiceEnabled: settings && settings.voiceEnabled === true
   readonly property string ttsProvider: settings && Protocol.normalizedTtsProvider(settings.ttsProvider)
     ? Protocol.normalizedTtsProvider(settings.ttsProvider) : "kokoro"
@@ -883,6 +886,7 @@ Panel {
         visible: root.viewMode === "settings"
         backend: Quickchat.QuickchatStore
         dangerousAutoApprove: root.dangerousAutoApprove
+        webHandoffProvider: root.webHandoffProvider
         desktopContextEnabled: settings
           && String(settings.desktopContext || "On") !== "Off"
         voiceEnabled: root.voiceEnabled
@@ -900,6 +904,9 @@ Panel {
         }
         onDesktopContextRequested: function(enabled) {
           root.persistSettings({ desktopContext: enabled === true ? "On" : "Off" })
+        }
+        onWebHandoffProviderRequested: function(provider) {
+          root.persistSettings({ webHandoffProvider: Protocol.normalizedWebHandoffProvider(provider) || "duckduckgo" })
         }
         onProviderChanged: function(provider) { root.selectProvider(provider) }
         onModelChanged: function(provider, model) {

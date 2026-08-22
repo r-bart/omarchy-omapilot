@@ -90,7 +90,7 @@ function normalizedAuthEvent(raw) {
   return result
 }
 
-function submitCommand(id, question, provider, model, desktopContext, dangerousAutoApprove, contextAttachments, resumeChatId) {
+function submitCommand(id, question, provider, model, desktopContext, dangerousAutoApprove, contextAttachments, resumeChatId, webHandoffProvider) {
   var payload = command("submit", {
     id: String(id || ""),
     question: String(question || ""),
@@ -105,6 +105,8 @@ function submitCommand(id, question, provider, model, desktopContext, dangerousA
   if (context !== null) payload.desktopContext = context
   var attachments = normalizedContextSelections(contextAttachments)
   if (attachments.length > 0) payload.contextAttachments = attachments
+  var handoffProvider = normalizedWebHandoffProvider(webHandoffProvider)
+  if (handoffProvider !== "") payload.webHandoffProvider = handoffProvider
   if (dangerousAutoApprove === true) payload.dangerousAutoApprove = true
   return payload
 }
@@ -710,6 +712,27 @@ function ttsStopCommand() {
 function normalizedProvider(value) {
   var provider = String(value || "").toLowerCase()
   return ["builtin", "codex", "opencode"].indexOf(provider) >= 0 ? provider : ""
+}
+
+function normalizedWebHandoffProvider(value) {
+  var provider = String(value || "").toLowerCase()
+  return ["duckduckgo", "google", "chatgpt", "claude", "grok"].indexOf(provider) >= 0 ? provider : ""
+}
+
+function webHandoffProviderOptions() {
+  return ["duckduckgo", "google", "chatgpt", "claude", "grok"].map(function(value) {
+    return { value: value, label: webHandoffProviderLabel(value) }
+  })
+}
+
+function webHandoffProviderLabel(value) {
+  var provider = normalizedWebHandoffProvider(value)
+  if (provider === "duckduckgo") return "DuckDuckGo"
+  if (provider === "google") return "Google"
+  if (provider === "chatgpt") return "ChatGPT Search"
+  if (provider === "claude") return "Claude"
+  if (provider === "grok") return "Grok"
+  return String(value || "")
 }
 
 function harnessOptions() {

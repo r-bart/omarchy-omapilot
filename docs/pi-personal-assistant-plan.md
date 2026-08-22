@@ -11,7 +11,11 @@ skill discovery, a bundled desktop skill, installed app discovery with
 focus-or-launch, bounded desktop state, exact window focus/move/resize/float/
 close actions, workspace focus/monitor movement, and broker-side post-state
 receipts. The system, productivity, browser-interaction, and connector slices
-remain follow-on milestones.
+remain follow-on milestones. A bounded `web_handoff` bridge now covers the
+lighter browser-research case: the user selects DuckDuckGo, Google, ChatGPT
+Search, Claude, or Grok; Pi opens the reviewed question in that site and never
+claims to have consumed the browser's answer. This does not replace the later
+browser snapshot/interaction milestone.
 
 ## Audit verdict (pre-implementation baseline)
 

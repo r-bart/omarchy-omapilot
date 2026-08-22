@@ -5,6 +5,8 @@ export const providerIdSchema = z.enum(["builtin", "codex", "opencode"]);
 export type ProviderId = z.infer<typeof providerIdSchema>;
 export const harnessIdSchema = providerIdSchema;
 export type HarnessId = z.infer<typeof harnessIdSchema>;
+export const webHandoffProviderSchema = z.enum(["duckduckgo", "google", "chatgpt", "claude", "grok"]);
+export type WebHandoffProvider = z.infer<typeof webHandoffProviderSchema>;
 
 const contextText = (max: number) => z.string().min(1).max(max).refine(
   (value) => !/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(value),
@@ -75,6 +77,7 @@ const submitCommand = z.object({
   model: z.preprocess((value) => typeof value === "string" && value.trim() === "" ? undefined : value, z.string().min(1).max(500).optional()),
   desktopContext: desktopContextSchema.optional(),
   contextAttachments: z.array(contextAttachmentSelectionSchema).max(4).optional(),
+  webHandoffProvider: webHandoffProviderSchema.optional(),
   dangerousAutoApprove: z.boolean().optional()
 });
 const contextBeginCommand = z.object({

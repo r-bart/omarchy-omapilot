@@ -19,6 +19,12 @@ Use the structured desktop tools when they cover the request. They validate exac
 
 Use `open_url` for a URL. Use `bash` and its normal approval flow when a CLI request needs arguments or shell composition; `app_open` launches only an exact catalog entry.
 
+## Web research handoff
+
+Use `web_handoff` when the user needs current external information and no native search tool can return it inside OmaPilot. It opens the exact question in the search provider selected under **Settings → Desktop → Search provider**. Google and DuckDuckGo receive a search query; ChatGPT Search, Claude, and Grok also receive a paste-ready prompt on the clipboard in case their web composer does not prefill it.
+
+This is an interactive browser handoff, not a search result. Report only that the provider was opened. Never claim to have read, synthesized, or verified the browser's answer. Use `open_url` instead when the user supplied a specific URL.
+
 ## Windows and workspaces
 
 1. Read `desktop_state` immediately before choosing a target. Window titles are private by default; request them only when class and workspace are insufficient to identify the user's intended window.

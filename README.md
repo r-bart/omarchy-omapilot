@@ -185,6 +185,21 @@ web search for current or otherwise unknown information. These instructions
 shape how a harness chooses among capabilities but cannot enable a capability
 or bypass the provider policy and approval boundary above.
 
+## Browser search handoff
+
+Built-in OmaPilot can hand a current-information question to a browser without
+adding a paid search API. Choose **Settings → Desktop → Search provider** and
+select DuckDuckGo, Google, ChatGPT Search, Claude, or Grok. The `web_handoff`
+tool shows an approval card with the provider, exact question, and destination
+URL, then opens it through `omarchy launch browser`.
+
+DuckDuckGo and Google receive a normal search query. AI sites receive a
+search-oriented prompt in their URL and a paste-ready clipboard copy as a
+fallback because their web composers may not reliably prefill. This is an
+interactive handoff: OmaPilot reports that the browser opened, but it does not
+read, synthesize, or verify the answer shown there. OpenCode's native search,
+when available under its own policy, remains separate from this setting.
+
 ## Desktop context on submit
 
 Desktop context is **On** by default and can be disabled in the widget's

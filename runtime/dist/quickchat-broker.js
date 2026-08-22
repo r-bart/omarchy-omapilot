@@ -103001,7 +103001,7 @@ var require_cross_spawn = __commonJS({
     var cp = __require("child_process");
     var parse6 = require_parse2();
     var enoent = require_enoent();
-    function spawn18(command, args, options) {
+    function spawn19(command, args, options) {
       const parsed = parse6(command, args, options);
       const spawned = cp.spawn(parsed.command, parsed.args, parsed.options);
       enoent.hookChildProcess(spawned, parsed);
@@ -103013,8 +103013,8 @@ var require_cross_spawn = __commonJS({
       result.error = result.error || enoent.verifyENOENTSync(result.status, parsed);
       return result;
     }
-    module.exports = spawn18;
-    module.exports.spawn = spawn18;
+    module.exports = spawn19;
+    module.exports.spawn = spawn19;
     module.exports.sync = spawnSync8;
     module.exports._parse = parse6;
     module.exports._enoent = enoent;
@@ -277223,6 +277223,157 @@ var init_desktop = __esm({
   }
 });
 
+// runtime/src/tools/web-handoff.ts
+import { spawn as spawn13 } from "node:child_process";
+function normalizeWebHandoffQuery(raw) {
+  const value2 = raw.replaceAll(/\s+/gu, " ").trim();
+  if (value2 === "") throw new Error("Add a question before opening a web handoff");
+  if (value2.length > MAX_HANDOFF_QUERY) throw new Error("The web handoff question is too long");
+  if (/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(value2))
+    throw new Error("The web handoff question contains unsafe control or display characters");
+  return value2;
+}
+function webHandoffTarget(provider, rawQuery) {
+  const definition = PROVIDERS[provider];
+  const query = normalizeWebHandoffQuery(rawQuery);
+  const prompt = definition.ai ? `${AI_HANDOFF_PROMPT}
+
+${query}` : query;
+  const url2 = new URL(definition.url);
+  url2.searchParams.set("q", prompt);
+  if (url2.href.length > MAX_HANDOFF_URL) throw new Error("The web handoff URL is too long");
+  return {
+    provider,
+    label: definition.label,
+    query,
+    prompt,
+    url: url2.href,
+    clipboardFallback: definition.ai
+  };
+}
+function webHandoffApproval(provider, rawQuery) {
+  try {
+    const target = webHandoffTarget(provider, typeof rawQuery === "string" ? rawQuery : "");
+    return {
+      command: `omarchy launch browser ${target.url}`,
+      provider: target.provider,
+      providerLabel: target.label,
+      query: target.query,
+      clipboardFallback: target.clipboardFallback,
+      url: target.url
+    };
+  } catch {
+    return {
+      command: "web_handoff (invalid question; no browser will be opened)",
+      provider,
+      providerLabel: PROVIDERS[provider].label,
+      query: "Invalid question"
+    };
+  }
+}
+function webHandoffTitle(provider) {
+  return `Open web handoff in ${PROVIDERS[provider].label}`;
+}
+function createWebHandoffTool(provider = "duckduckgo", run = runDesktopCommand, copy = writeClipboard) {
+  return {
+    name: "web_handoff",
+    label: "Open web handoff",
+    description: "Open an exact question in the browser research provider chosen in OmaPilot settings. This hands work to the browser and does not return or verify the provider's answer.",
+    promptSnippet: "Hand off a current-information question to the user's configured browser research provider",
+    parameters: webHandoffParameters,
+    async execute(_toolCallId, input2, signal) {
+      try {
+        const target = webHandoffTarget(provider, input2.query);
+        await run("omarchy", ["launch", "browser", target.url], signal);
+        const clipboardCopied = target.clipboardFallback ? await copy(target.prompt, signal) : false;
+        const fallback = target.clipboardFallback ? clipboardCopied ? " A paste-ready copy is also on the clipboard if the site did not prefill its composer." : " If the site did not prefill its composer, enter the reviewed question there." : "";
+        return {
+          content: [{
+            type: "text",
+            text: `Opened ${target.label} in the default browser with the question.${fallback} Continue in the browser; OmaPilot has not read an answer.`
+          }],
+          details: {
+            provider: target.provider,
+            providerLabel: target.label,
+            query: target.query,
+            url: target.url,
+            clipboardCopied,
+            answerAvailable: false
+          }
+        };
+      } catch {
+        return {
+          content: [{ type: "text", text: "The web handoff could not be opened." }],
+          details: void 0,
+          isError: true
+        };
+      }
+    }
+  };
+}
+var MAX_HANDOFF_QUERY, MAX_HANDOFF_URL, AI_HANDOFF_PROMPT, webHandoffParameters, PROVIDERS, writeClipboard;
+var init_web_handoff = __esm({
+  "runtime/src/tools/web-handoff.ts"() {
+    "use strict";
+    init_build3();
+    init_desktop();
+    MAX_HANDOFF_QUERY = 1e3;
+    MAX_HANDOFF_URL = 8192;
+    AI_HANDOFF_PROMPT = "Search the web for current information and answer with cited sources.";
+    webHandoffParameters = typebox_exports2.Object({
+      query: typebox_exports2.String({
+        description: "Exact question to hand off to the browser research provider configured by the user",
+        minLength: 1,
+        maxLength: MAX_HANDOFF_QUERY
+      })
+    });
+    PROVIDERS = {
+      duckduckgo: { label: "DuckDuckGo", url: "https://duckduckgo.com/", ai: false },
+      google: { label: "Google", url: "https://www.google.com/search", ai: false },
+      chatgpt: { label: "ChatGPT Search", url: "https://chatgpt.com/", ai: true },
+      claude: { label: "Claude", url: "https://claude.ai/new", ai: true },
+      grok: { label: "Grok", url: "https://grok.com/", ai: true }
+    };
+    writeClipboard = (text4, signal) => new Promise((resolve18) => {
+      if (signal?.aborted === true) {
+        resolve18(false);
+        return;
+      }
+      let child;
+      try {
+        child = spawn13("wl-copy", [], { stdio: ["pipe", "ignore", "ignore"] });
+      } catch {
+        resolve18(false);
+        return;
+      }
+      let settled = false;
+      const finish = (copied) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        signal?.removeEventListener("abort", abort);
+        resolve18(copied);
+      };
+      const abort = () => {
+        child?.kill("SIGTERM");
+        finish(false);
+      };
+      const timeout = setTimeout(abort, 5e3);
+      timeout.unref();
+      signal?.addEventListener("abort", abort, { once: true });
+      child.once("error", () => finish(false));
+      child.once("close", (code) => finish(code === 0));
+      const stdin = child.stdin;
+      if (stdin === null) {
+        finish(false);
+        return;
+      }
+      stdin.once("error", () => finish(false));
+      stdin.end(text4);
+    });
+  }
+});
+
 // runtime/src/pi-harness.ts
 var pi_harness_exports = {};
 __export(pi_harness_exports, {
@@ -277434,7 +277585,7 @@ function configuredProviderIds(directory) {
     return [];
   }
 }
-function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeoutMs = 18e4, requestPermission, cancelPermissions, resumeSessionId) {
+function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeoutMs = 18e4, requestPermission, cancelPermissions, resumeSessionId, webHandoffProvider = "duckduckgo") {
   const controller = new AbortController();
   let activeSession;
   const cancel = async () => {
@@ -277454,7 +277605,7 @@ function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeou
       approvals = new PiApprovalState(join42(provider.agentDir, "approvals.json"), provider.cwd);
       sessionApprovals.set(approvalStateKey, approvals);
     }
-    const permissionExtension = createPermissionExtension(requestId, requestPermission, approvals);
+    const permissionExtension = createPermissionExtension(requestId, requestPermission, approvals, webHandoffProvider);
     const loader = new DefaultResourceLoader({
       cwd: provider.cwd,
       agentDir: provider.agentDir,
@@ -277483,7 +277634,7 @@ function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeou
       sessionManager,
       settingsManager: settings3,
       tools: PI_TOOLS,
-      customTools: [agentTool, ...createDesktopTools(), ...createPersonalAssistantTools()]
+      customTools: [agentTool, ...createDesktopTools(), createWebHandoffTool(webHandoffProvider), ...createPersonalAssistantTools()]
     });
     activeSession = session;
     let streamedText = "";
@@ -277681,7 +277832,7 @@ function stableValue(value2) {
   if (!isObject5(value2)) return value2;
   return Object.fromEntries(Object.keys(value2).sort().map((key) => [key, stableValue(value2[key])]));
 }
-function createPermissionExtension(requestId, handler, approvals) {
+function createPermissionExtension(requestId, handler, approvals, webHandoffProvider = "duckduckgo") {
   return {
     name: "omapilot-permissions",
     hidden: true,
@@ -277689,7 +277840,7 @@ function createPermissionExtension(requestId, handler, approvals) {
       pi2.on("tool_call", async (event) => {
         if (!requiresPiPermission(event.toolName)) return void 0;
         if (handler === void 0) return { block: true, reason: "OmaPilot did not provide a permission handler" };
-        const rawInput = reviewableToolInput(event.toolName, event.input);
+        const rawInput = reviewableToolInput(event.toolName, event.input, webHandoffProvider);
         const approvalKey = approvals.key(event.toolName, rawInput);
         if (approvals.denied(approvalKey)) return { block: true, reason: "This exact tool request is always denied" };
         if (approvals.allowed(approvalKey)) return void 0;
@@ -277698,7 +277849,7 @@ function createPermissionExtension(requestId, handler, approvals) {
           toolCall: {
             toolCallId: event.toolCallId,
             kind: "execute",
-            title: toolTitle(event.toolName, event.input),
+            title: toolTitle(event.toolName, event.input, webHandoffProvider),
             rawInput
           },
           options: [
@@ -277722,8 +277873,9 @@ function createPermissionExtension(requestId, handler, approvals) {
 function requiresPiPermission(toolName) {
   return MUTATING_TOOLS.has(toolName);
 }
-function reviewableToolInput(name, input2) {
+function reviewableToolInput(name, input2, webHandoffProvider) {
   if (name === "bash") return { ...input2, command: typeof input2.command === "string" ? input2.command : "" };
+  if (name === "web_handoff") return webHandoffApproval(webHandoffProvider, input2.query);
   if (name === "open_url") {
     const url2 = typeof input2.url === "string" ? input2.url : "";
     return { command: `omarchy launch browser ${url2}`, url: url2 };
@@ -277742,8 +277894,9 @@ function reviewableToolInput(name, input2) {
   const path16 = typeof input2.path === "string" ? input2.path : "unknown";
   return { command: `${name} ${path16}`, ...input2 };
 }
-function toolTitle(name, input2) {
+function toolTitle(name, input2, webHandoffProvider) {
   if (name === "bash") return "Run a command";
+  if (name === "web_handoff") return webHandoffTitle(webHandoffProvider);
   if (name === "open_url") return "Open URL in default browser";
   if (name === "media_control") return `Control media: ${typeof input2.action === "string" ? input2.action : "action"}`;
   const desktopTitle = desktopToolTitle(name, input2);
@@ -277974,6 +278127,7 @@ var init_pi_harness = __esm({
     init_providers();
     init_paths();
     init_desktop();
+    init_web_handoff();
     init_desktop();
     PROVIDER_GROUPS = [
       { id: "codex", name: "Codex", piProviderIds: ["openai-codex"] },
@@ -277986,6 +278140,7 @@ var init_pi_harness = __esm({
       "edit",
       "write",
       "open_url",
+      "web_handoff",
       "media_control",
       "app_open",
       "window_action",
@@ -277996,6 +278151,7 @@ var init_pi_harness = __esm({
       ...AGENT_PROFILE_TOOLS,
       "agent",
       "open_url",
+      "web_handoff",
       "media_control",
       "app_catalog",
       "app_open",
@@ -278367,10 +278523,10 @@ import { createInterface as createInterface6 } from "node:readline";
 
 // runtime/src/broker.ts
 import { randomUUID as randomUUID9 } from "node:crypto";
-import { spawn as spawn17 } from "node:child_process";
+import { spawn as spawn18 } from "node:child_process";
 
 // runtime/src/acp.ts
-import { spawn as spawn13 } from "node:child_process";
+import { spawn as spawn14 } from "node:child_process";
 import { mkdir as mkdir3, mkdtemp as mkdtemp2, rm as rm3 } from "node:fs/promises";
 import { join as join45 } from "node:path";
 import { createInterface as createInterface5 } from "node:readline";
@@ -296347,7 +296503,7 @@ init_process();
 var QUICKCHAT_CLIENT_VERSION = "0.2.0";
 async function probeAcpModels(provider, timeoutMs = 15e3) {
   if (provider.id === "codex") return probeCodexModels(provider, timeoutMs);
-  const child = spawn13(provider.agent.executable, provider.agent.args, {
+  const child = spawn14(provider.agent.executable, provider.agent.args, {
     cwd: "/",
     env: secureEnvironment(provider),
     stdio: ["pipe", "pipe", "ignore"],
@@ -296388,7 +296544,7 @@ async function probeAcpModels(provider, timeoutMs = 15e3) {
 async function probeCodexModels(provider, timeoutMs) {
   const maximumResponseLineBytes = 4 * 1024 * 1024;
   const featureArgs = (provider.lockdownFeatures ?? []).flatMap((feature) => ["-c", `features.${feature}=false`]);
-  const child = spawn13(provider.harnessPath, [
+  const child = spawn14(provider.harnessPath, [
     "app-server",
     "--strict-config",
     "-c",
@@ -296484,7 +296640,7 @@ function isObject7(value2) {
   return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
 }
 async function deleteAcpSession(provider, sessionId, timeoutMs = 15e3) {
-  const child = spawn13(provider.agent.executable, provider.agent.args, {
+  const child = spawn14(provider.agent.executable, provider.agent.args, {
     cwd: "/",
     env: secureEnvironment(provider),
     stdio: ["pipe", "pipe", "ignore"],
@@ -296520,7 +296676,7 @@ async function deleteAcpSession(provider, sessionId, timeoutMs = 15e3) {
   }
 }
 function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs = 18e4, imageStore = new ImageStore(), requestPermission, cancelPermissions, observeTool, openCodePermissionWaitMs = 61e3) {
-  const child = spawn13(provider.agent.executable, provider.agent.args, {
+  const child = spawn14(provider.agent.executable, provider.agent.args, {
     cwd: "/",
     env: secureEnvironment(provider),
     stdio: ["pipe", "pipe", "pipe"],
@@ -297128,7 +297284,7 @@ function dictationStartArgs(transcript) {
 }
 
 // runtime/src/tts.ts
-import { spawn as spawn14 } from "node:child_process";
+import { spawn as spawn15 } from "node:child_process";
 import { mkdirSync as mkdirSync14, readFileSync as readFileSync23, renameSync as renameSync5, statSync as statSync14, unlinkSync as unlinkSync4, writeFileSync as writeFileSync13 } from "node:fs";
 import { mkdtemp as mkdtemp3, rm as rm5, writeFile as writeFile4 } from "node:fs/promises";
 import { tmpdir as tmpdir7 } from "node:os";
@@ -297796,7 +297952,7 @@ async function playAudioFile(path16, env2, signal) {
 function runPlayer(executable2, args, env2, signal) {
   return new Promise((resolve18, reject) => {
     let settled = false;
-    const child = spawn14(executable2, args, {
+    const child = spawn15(executable2, args, {
       env: env2,
       stdio: "ignore",
       detached: process.platform !== "win32"
@@ -298761,7 +298917,7 @@ function isObject10(value2) {
 // runtime/src/herdr.ts
 init_paths();
 init_process();
-import { spawn as spawn15 } from "node:child_process";
+import { spawn as spawn16 } from "node:child_process";
 var HerdrHandoffError = class extends Error {
   stage;
   errorCode;
@@ -298919,7 +299075,7 @@ async function continueInHerdr(chat, env2 = process.env, dependencies = {}) {
 }
 async function launchDetached2(executable2, args, env2) {
   await new Promise((resolveLaunch, rejectLaunch) => {
-    const child = spawn15(executable2, args, { env: env2, stdio: "ignore", detached: true });
+    const child = spawn16(executable2, args, { env: env2, stdio: "ignore", detached: true });
     child.once("error", rejectLaunch);
     child.once("spawn", () => {
       child.unref();
@@ -299538,7 +299694,7 @@ function titleScore(candidate, target) {
 init_process();
 import { access as access6 } from "node:fs/promises";
 import { constants as constants10 } from "node:fs";
-import { spawn as spawn16 } from "node:child_process";
+import { spawn as spawn17 } from "node:child_process";
 import { dirname as dirname28, join as join52, resolve as resolve17 } from "node:path";
 import { fileURLToPath as fileURLToPath9 } from "node:url";
 function repositoryRoot() {
@@ -299601,7 +299757,7 @@ async function openBrowserCompanionSettings(family, env2) {
   if (executablePath === void 0) return false;
   const url2 = family === "firefox" ? "about:debugging#/runtime/this-firefox" : "chrome://extensions";
   return new Promise((resolveLaunch) => {
-    const child = spawn16(executablePath, [url2], { env: env2, stdio: "ignore", detached: true });
+    const child = spawn17(executablePath, [url2], { env: env2, stdio: "ignore", detached: true });
     child.once("error", () => resolveLaunch(false));
     child.once("spawn", () => {
       child.unref();
@@ -299997,7 +300153,8 @@ var QuickchatBroker = class {
       18e4,
       permission,
       () => this.#cancelPermissions(command.id),
-      resumeSessionId
+      resumeSessionId,
+      command.webHandoffProvider ?? "duckduckgo"
     ) : runAcpQuestion(
       provider,
       command.id,
@@ -300509,7 +300666,7 @@ var QuickchatBroker = class {
       return;
     }
     const copied = await new Promise((resolveCopy) => {
-      const child = spawn17(copy, [], { env: this.#env, stdio: ["pipe", "ignore", "ignore"] });
+      const child = spawn18(copy, [], { env: this.#env, stdio: ["pipe", "ignore", "ignore"] });
       child.stdin.end(text4);
       child.once("error", () => resolveCopy(false));
       child.once("close", (code) => resolveCopy(code === 0));
@@ -300544,6 +300701,7 @@ function isBrokerRunError(error48) {
 // runtime/src/types.ts
 var providerIdSchema = external_exports.enum(["builtin", "codex", "opencode"]);
 var harnessIdSchema = providerIdSchema;
+var webHandoffProviderSchema = external_exports.enum(["duckduckgo", "google", "chatgpt", "claude", "grok"]);
 var contextText = (max) => external_exports.string().min(1).max(max).refine(
   (value2) => !/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(value2),
   "desktop context contains control characters"
@@ -300607,6 +300765,7 @@ var submitCommand = external_exports.object({
   model: external_exports.preprocess((value2) => typeof value2 === "string" && value2.trim() === "" ? void 0 : value2, external_exports.string().min(1).max(500).optional()),
   desktopContext: desktopContextSchema.optional(),
   contextAttachments: external_exports.array(contextAttachmentSelectionSchema).max(4).optional(),
+  webHandoffProvider: webHandoffProviderSchema.optional(),
   dangerousAutoApprove: external_exports.boolean().optional()
 });
 var contextBeginCommand = external_exports.object({

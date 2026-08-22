@@ -27,13 +27,14 @@ import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import type { AcpPrompt } from "./context.js";
 import type { AcpResult, AcpRun, PermissionHandler } from "./acp.js";
 import { automaticInstructions, type PiDiscoveredProvider } from "./providers.js";
-import type { BrokerEvent, BuiltinAuthMethod, ModelOption, ProviderPolicyInfo } from "./types.js";
+import type { BrokerEvent, BuiltinAuthMethod, ModelOption, ProviderPolicyInfo, WebHandoffProvider } from "./types.js";
 import { quickchatPaths } from "./paths.js";
 import {
   createPersonalAssistantTools,
   desktopToolTitle,
   reviewDesktopToolInput
 } from "./tools/desktop.js";
+import { createWebHandoffTool, webHandoffApproval, webHandoffTitle } from "./tools/web-handoff.js";
 
 export {
   createPersonalAssistantTools,
@@ -51,11 +52,11 @@ const PROVIDER_GROUPS = [
 ] as const;
 const BUILTIN_PROVIDER_IDS = new Set(["openai-codex", "openai", "xai"]);
 const MUTATING_TOOLS = new Set([
-  "bash", "edit", "write", "open_url", "media_control", "app_open", "window_action", "workspace_action"
+  "bash", "edit", "write", "open_url", "web_handoff", "media_control", "app_open", "window_action", "workspace_action"
 ]);
 const AGENT_PROFILE_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
 const PI_TOOLS = [
-  ...AGENT_PROFILE_TOOLS, "agent", "open_url", "media_control", "app_catalog", "app_open", "desktop_state",
+  ...AGENT_PROFILE_TOOLS, "agent", "open_url", "web_handoff", "media_control", "app_catalog", "app_open", "desktop_state",
   "window_action", "workspace_action"
 ];
 const SAFE_AGENT_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
@@ -341,7 +342,8 @@ export function runPiQuestion(
   timeoutMs = 180_000,
   requestPermission?: PermissionHandler,
   cancelPermissions?: () => void,
-  resumeSessionId?: string
+  resumeSessionId?: string,
+  webHandoffProvider: WebHandoffProvider = "duckduckgo"
 ): AcpRun {
   const controller = new AbortController();
   let activeSession: { abort: () => Promise<void>; dispose: () => void } | undefined;
@@ -363,7 +365,7 @@ export function runPiQuestion(
       approvals = new PiApprovalState(join(provider.agentDir, "approvals.json"), provider.cwd);
       sessionApprovals.set(approvalStateKey, approvals);
     }
-    const permissionExtension = createPermissionExtension(requestId, requestPermission, approvals);
+    const permissionExtension = createPermissionExtension(requestId, requestPermission, approvals, webHandoffProvider);
     const loader = new DefaultResourceLoader({
       cwd: provider.cwd,
       agentDir: provider.agentDir,
@@ -392,7 +394,7 @@ export function runPiQuestion(
       sessionManager,
       settingsManager: settings,
       tools: PI_TOOLS,
-      customTools: [agentTool, ...createDesktopTools(), ...createPersonalAssistantTools()]
+      customTools: [agentTool, ...createDesktopTools(), createWebHandoffTool(webHandoffProvider), ...createPersonalAssistantTools()]
     });
     activeSession = session;
     let streamedText = "";
@@ -641,7 +643,12 @@ function stableValue(value: unknown): unknown {
   return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableValue(value[key])]));
 }
 
-function createPermissionExtension(requestId: string, handler: PermissionHandler | undefined, approvals: PiApprovalState): InlineExtension {
+function createPermissionExtension(
+  requestId: string,
+  handler: PermissionHandler | undefined,
+  approvals: PiApprovalState,
+  webHandoffProvider: WebHandoffProvider = "duckduckgo"
+): InlineExtension {
   return {
     name: "omapilot-permissions",
     hidden: true,
@@ -649,7 +656,7 @@ function createPermissionExtension(requestId: string, handler: PermissionHandler
       pi.on("tool_call", async (event) => {
         if (!requiresPiPermission(event.toolName)) return undefined;
         if (handler === undefined) return { block: true, reason: "OmaPilot did not provide a permission handler" };
-        const rawInput = reviewableToolInput(event.toolName, event.input);
+        const rawInput = reviewableToolInput(event.toolName, event.input, webHandoffProvider);
         const approvalKey = approvals.key(event.toolName, rawInput);
         if (approvals.denied(approvalKey)) return { block: true, reason: "This exact tool request is always denied" };
         if (approvals.allowed(approvalKey)) return undefined;
@@ -658,7 +665,7 @@ function createPermissionExtension(requestId: string, handler: PermissionHandler
           toolCall: {
             toolCallId: event.toolCallId,
             kind: "execute",
-            title: toolTitle(event.toolName, event.input),
+            title: toolTitle(event.toolName, event.input, webHandoffProvider),
             rawInput
           },
           options: [
@@ -685,8 +692,13 @@ export function requiresPiPermission(toolName: string): boolean {
   return MUTATING_TOOLS.has(toolName);
 }
 
-function reviewableToolInput(name: string, input: Record<string, unknown>): Record<string, unknown> {
+function reviewableToolInput(
+  name: string,
+  input: Record<string, unknown>,
+  webHandoffProvider: WebHandoffProvider
+): Record<string, unknown> {
   if (name === "bash") return { ...input, command: typeof input.command === "string" ? input.command : "" };
+  if (name === "web_handoff") return webHandoffApproval(webHandoffProvider, input.query);
   if (name === "open_url") {
     const url = typeof input.url === "string" ? input.url : "";
     return { command: `omarchy launch browser ${url}`, url };
@@ -703,8 +715,9 @@ function reviewableToolInput(name: string, input: Record<string, unknown>): Reco
   return { command: `${name} ${path}`, ...input };
 }
 
-function toolTitle(name: string, input: Record<string, unknown>): string {
+function toolTitle(name: string, input: Record<string, unknown>, webHandoffProvider: WebHandoffProvider): string {
   if (name === "bash") return "Run a command";
+  if (name === "web_handoff") return webHandoffTitle(webHandoffProvider);
   if (name === "open_url") return "Open URL in default browser";
   if (name === "media_control") return `Control media: ${typeof input.action === "string" ? input.action : "action"}`;
   const desktopTitle = desktopToolTitle(name, input);

@@ -8,6 +8,7 @@ import { createInterface } from "node:readline";
 import { afterEach, describe, expect, it } from "vitest";
 import { agentDirectory, bundledSkillPaths, configDirectory, createDesktopTools, discoverAgentProfiles, discoverPiAuthMethods, discoverPiProviders, existingSkillPaths, loginPiProvider, normalizeOpenUrl, omarchyMediaMethod, PiApprovalState, requiresPiPermission, runNestedAgentPrompt, runPiQuestion } from "../src/pi-harness.js";
 import type { BrokerEvent } from "../src/types.js";
+import { createWebHandoffTool, normalizeWebHandoffQuery, webHandoffApproval, webHandoffTarget } from "../src/tools/web-handoff.js";
 import { DefaultResourceLoader } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js";
 
 const roots: string[] = [];
@@ -37,6 +38,47 @@ describe("native Pi harness", () => {
     ]);
     expect((opened as { isError?: boolean }).isError).not.toBe(true);
     expect((mediaResult as { isError?: boolean }).isError).toBe(true);
+  });
+
+  it("builds bounded provider-specific browser handoffs without claiming an answer", () => {
+    expect(normalizeWebHandoffQuery("  current\n  Omarchy release  ")).toBe("current Omarchy release");
+    expect(() => normalizeWebHandoffQuery("\u202eevil")).toThrow(/unsafe/u);
+    expect(() => normalizeWebHandoffQuery("bad\u0000query")).toThrow(/unsafe/u);
+    const search = webHandoffTarget("duckduckgo", "current Omarchy release");
+    expect(new URL(search.url).searchParams.get("q")).toBe("current Omarchy release");
+    expect(search.clipboardFallback).toBe(false);
+
+    const ai = webHandoffTarget("chatgpt", "current Omarchy release");
+    expect(new URL(ai.url).origin).toBe("https://chatgpt.com");
+    expect(new URL(ai.url).searchParams.get("q")).toBe(ai.prompt);
+    expect(ai.prompt).toContain("answer with cited sources");
+    expect(ai.clipboardFallback).toBe(true);
+    expect(webHandoffApproval("grok", "\u202einvalid")).toMatchObject({
+      command: "web_handoff (invalid question; no browser will be opened)",
+      provider: "grok",
+      query: "Invalid question"
+    });
+  });
+
+  it("opens the configured AI site as exact argv and copies a resilient fallback prompt", async () => {
+    const calls: Array<{ file: string; args: string[] }> = [];
+    const copied: string[] = [];
+    const tool = createWebHandoffTool("claude", (file, args) => {
+      calls.push({ file, args });
+      return Promise.resolve({ stdout: "", stderr: "" });
+    }, (text) => { copied.push(text); return Promise.resolve(true); });
+    const result = await tool.execute(
+      "handoff", { query: "What changed in Omarchy today?" }, undefined, undefined, {} as never
+    ) as { content: Array<{ text: string }>; details?: Record<string, unknown>; isError?: boolean };
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.file).toBe("omarchy");
+    expect(calls[0]?.args.slice(0, 2)).toEqual(["launch", "browser"]);
+    expect(new URL(calls[0]?.args[2] ?? "").origin).toBe("https://claude.ai");
+    expect(copied).toHaveLength(1);
+    expect(copied[0]).toContain("What changed in Omarchy today?");
+    expect(result.content[0]?.text).toContain("OmaPilot has not read an answer");
+    expect(result.details).toMatchObject({ provider: "claude", clipboardCopied: true, answerAvailable: false });
+    expect(result.isError).not.toBe(true);
   });
 
   it("separates OmaPilot config from the standard shared agents root", () => {
@@ -171,6 +213,7 @@ describe("native Pi harness", () => {
     expect(existingSkillPaths(agentDir, project, root)).toEqual([userSkills, globalPiSkills, projectSkills, piProjectSkills]);
     expect(bundledSkillPaths()).toEqual([resolve("skills")]);
     expect(requiresPiPermission("desktop_state")).toBe(false);
+    expect(requiresPiPermission("web_handoff")).toBe(true);
     expect(requiresPiPermission("app_open")).toBe(true);
     expect(requiresPiPermission("window_action")).toBe(true);
     expect(requiresPiPermission("workspace_action")).toBe(true);
@@ -293,6 +336,7 @@ describe("native Pi harness", () => {
       expect(JSON.stringify(requests[1])).toContain("Hello from Pi.");
       expect(JSON.stringify(requests[1])).toContain("What did I ask?");
       expect(JSON.stringify(requests[0])).toContain('"open_url"');
+      expect(JSON.stringify(requests[0])).toContain('"web_handoff"');
       expect(JSON.stringify(requests[0])).toContain('"media_control"');
       expect(JSON.stringify(requests[0])).toContain('"app_catalog"');
       expect(JSON.stringify(requests[0])).toContain('"app_open"');
@@ -461,6 +505,64 @@ describe("native Pi harness", () => {
       expect(events).toContainEqual({ type: "content", id: "pi-tool-turn", delta: "I will try that. " });
       expect(permissions).toEqual([{ command: `write ${target}`, path: target, content: "blocked" }]);
       expect(existsSync(target)).toBe(false);
+      expect(requests).toBe(2);
+    } finally {
+      await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+    }
+  });
+
+  it("binds the selected web handoff provider into the exact Pi approval request", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-pi-web-handoff-"));
+    roots.push(root);
+    let requests = 0;
+    const server = createServer((request, response) => {
+      request.resume();
+      requests += 1;
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      const chunk = requests === 1
+        ? {
+            id: "chatcmpl-web-handoff", object: "chat.completion.chunk", created: 1, model: "coder",
+            choices: [{ index: 0, delta: {
+              role: "assistant",
+              tool_calls: [{ index: 0, id: "call-web-handoff", type: "function", function: {
+                name: "web_handoff", arguments: JSON.stringify({ query: "What changed in Omarchy today?" })
+              } }]
+            }, finish_reason: "tool_calls" }]
+          }
+        : {
+            id: "chatcmpl-web-handoff", object: "chat.completion.chunk", created: 1, model: "coder",
+            choices: [{ index: 0, delta: { role: "assistant", content: "The browser handoff was denied." }, finish_reason: "stop" }]
+          };
+      response.end(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`);
+    });
+    await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+    try {
+      const address = server.address();
+      if (address === null || typeof address === "string") throw new Error("test server did not bind");
+      const agentDir = join(root, ".config/omapilot");
+      await mkdir(agentDir, { recursive: true });
+      await writeFile(join(agentDir, "models.json"), JSON.stringify({ providers: { local: {
+        baseUrl: `http://127.0.0.1:${String(address.port)}/v1`, api: "openai-completions", apiKey: "test",
+        models: [{ id: "coder", name: "Coder" }]
+      } } }));
+      const [provider] = await discoverPiProviders({ HOME: root, OMAPILOT_CONFIG_DIR: agentDir });
+      if (provider === undefined) throw new Error("compatible provider was not discovered");
+      const permissions: Array<Record<string, unknown>> = [];
+      const run = runPiQuestion(
+        provider, "pi-web-handoff", "Find current information", "local::coder", () => undefined, 5_000,
+        (request) => {
+          permissions.push((request.toolCall.rawInput ?? {}) as Record<string, unknown>);
+          return Promise.resolve(request.options.find((option) => option.kind === "reject_once")?.optionId);
+        }, undefined, undefined, "grok"
+      );
+      await expect(run.result).resolves.toMatchObject({ answer: "The browser handoff was denied." });
+      expect(permissions).toHaveLength(1);
+      expect(permissions[0]).toMatchObject({
+        provider: "grok", providerLabel: "Grok", query: "What changed in Omarchy today?", clipboardFallback: true
+      });
+      const reviewedUrl = permissions[0]?.url;
+      if (typeof reviewedUrl !== "string") throw new Error("reviewed web handoff URL missing");
+      expect(new URL(reviewedUrl).origin).toBe("https://grok.com");
       expect(requests).toBe(2);
     } finally {
       await new Promise<void>((resolveClose) => server.close(() => resolveClose()));

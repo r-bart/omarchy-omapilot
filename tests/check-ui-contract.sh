@@ -66,6 +66,9 @@ if grep -Fq 'backendSelection' "$repo_dir/components/QuickchatStore.qml"; then
 fi
 grep -Fq 'property bool desktopContextEnabled: true' \
   "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'property string webHandoffProvider: "duckduckgo"' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'webHandoffProvider))' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'DesktopContext.snapshot()' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'Protocol.hasFeature(event.features, "desktop-context")' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'import Quickshell.Hyprland' "$repo_dir/components/DesktopContext.qml"
@@ -216,6 +219,10 @@ grep -Fq 'ActionCatalog.addAction(' "$repo_dir/components/QuickActionEditor.qml"
 grep -Fq 'ActionCatalog.updateAction(' "$repo_dir/components/QuickActionEditor.qml"
 grep -Fq 'label: "Dangerous auto-approve"' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'label: "Desktop context"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'text: "Search provider"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'Accessible.name: "Search provider"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'onWebHandoffProviderRequested:' "$repo_dir/Panel.qml"
+grep -Fq '"webHandoffProvider": "duckduckgo"' "$repo_dir/manifest.json"
 grep -Fq '{ id: "voice", label: "Voice" }' "$repo_dir/components/Presentation.js"
 grep -Fq 'visible: root.selectedTab === "voice"' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'label: "Enable voice"' "$repo_dir/components/SettingsView.qml"
@@ -253,7 +260,10 @@ fi
 grep -Fq 'voice-auth.json' "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'id: "kokoro"' "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'elevenlabs: "ElevenLabs"' "$repo_dir/runtime/src/tts.ts"
-grep -Fq 'https://api.elevenlabs.io/v2/voices?page_size=100' "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'const ELEVENLABS_VOICES_URL = "https://api.elevenlabs.io/v2/voices"' \
+  "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'url.searchParams.set("page_size", String(ELEVENLABS_VOICE_PAGE_SIZE))' \
+  "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'wyWA56cQNU2KqUW4eCsI' "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'wyWA56cQNU2KqUW4eCsI' "$repo_dir/components/Protocol.js"
 grep -Fq 'function ttsSpeakCommand' "$repo_dir/components/Protocol.js"
@@ -395,8 +405,14 @@ if grep -Fq 'claudeCode' "$repo_dir/runtime/src/acp.ts"; then
   printf 'ACP must not retain Claude-specific session shaping\n' >&2
   exit 1
 fi
-# Claude is no longer a selectable harness anywhere in the product.
-if grep -Fq '"claude"' "$repo_dir/runtime/src/types.ts" "$repo_dir/components/Protocol.js"; then
+# Claude is no longer a selectable harness. It may still be an external browser
+# handoff target, so keep this guard scoped to the actual harness contracts.
+grep -Fq 'providerIdSchema = z.enum(["builtin", "codex", "opencode"])' \
+  "$repo_dir/runtime/src/types.ts"
+grep -Fq 'verify(Protocol.normalizedProvider("claude") === "")' \
+  "$repo_dir/tests/tst_protocol.qml"
+if jq -e '.barWidget.schema[] | select(.key == "provider") | .options | index("claude")' \
+    "$repo_dir/manifest.json" >/dev/null; then
   printf 'Claude must not be reintroduced as a provider id\n' >&2
   exit 1
 fi
