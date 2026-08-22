@@ -128,6 +128,40 @@ describe("voice TTS providers", () => {
     expect(probed.voices[0]).toEqual({ id: ELEVENLABS_DEFAULT_VOICE_ID, name: "Clyde" });
   });
 
+  it("paginates a large ElevenLabs voice catalog without exceeding the per-response limit", async () => {
+    const requestedPages: string[] = [];
+    const fetcher: typeof fetch = (input) => {
+      const url = new URL(requestUrl(input));
+      if (url.pathname === "/v1/models") return Promise.resolve(jsonResponse([]));
+      expect(url.pathname).toBe("/v2/voices");
+      expect(url.searchParams.get("page_size")).toBe("20");
+      expect(url.searchParams.get("include_total_count")).toBe("false");
+
+      const token = url.searchParams.get("next_page_token") ?? "page-0";
+      requestedPages.push(token);
+      const offset = Number(token.replace("page-", "")) * 20;
+      const voices = Array.from({ length: 20 }, (_, index) => ({
+        voice_id: `voice-${offset + index}`,
+        name: `Voice ${offset + index}`,
+        description: "x".repeat(8_000)
+      }));
+      const nextOffset = offset + voices.length;
+      return Promise.resolve(jsonResponse({
+        voices,
+        has_more: nextOffset < 100,
+        next_page_token: nextOffset < 100 ? `page-${nextOffset / 20}` : null
+      }));
+    };
+
+    const { voice } = await service({ fetch: fetcher });
+    const probed = await voice.testKey("elevenlabs", "eleven-test-key");
+    expect(requestedPages).toEqual(["page-0", "page-1", "page-2", "page-3", "page-4"]);
+    expect(probed.available).toBe(true);
+    expect(probed.voices).toHaveLength(100);
+    expect(probed.voices[0]).toEqual({ id: ELEVENLABS_DEFAULT_VOICE_ID, name: "Clyde" });
+    expect(probed.voices.at(-1)?.id).toBe("voice-98");
+  });
+
   it("validates an OpenAI key against /v1/models and keeps the static TTS catalog", async () => {
     let authorization = "";
     const fetcher: typeof fetch = (_input, init) => {
