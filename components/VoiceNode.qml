@@ -42,6 +42,13 @@ Item {
   // The brightest part of the full-width gradient wanders by only a few percent.
   // That slight asymmetry is what keeps the edge from feeling mechanically looped.
   property real drift: 0
+  property real livingPhase: 0
+  readonly property real organicLift: atmosphereActive
+    ? 0.52 + 0.25 * Math.sin(livingPhase)
+      + 0.15 * Math.sin(livingPhase * 1.618 + 1.1)
+      + 0.08 * Math.sin(livingPhase * 2.414 + 2.7) : 0.5
+  readonly property real organicDrift: drift * 0.76
+    + (atmosphereActive ? 0.24 * Math.sin(livingPhase * 0.447 + 0.4) : 0)
   readonly property bool atmosphereActive: motionEnabled
     && (phase === "listening" || phase === "thinking")
 
@@ -63,6 +70,15 @@ Item {
     loops: Animation.Infinite
     NumberAnimation { target: root; property: "level"; to: 1; duration: 820; easing.type: Easing.InOutSine }
     NumberAnimation { target: root; property: "level"; to: 0.34; duration: 980; easing.type: Easing.InOutSine }
+  }
+  Timer {
+    interval: 40
+    repeat: true
+    running: root.atmosphereActive
+    onTriggered: {
+      var pace = root.phase === "thinking" ? 0.076 : 0.047
+      root.livingPhase = (root.livingPhase + pace) % (Math.PI * 200)
+    }
   }
   SequentialAnimation {
     id: tideAnimation
@@ -147,15 +163,15 @@ Item {
       visible: false
       anchors { left: parent.left; right: parent.right }
       height: Style.space(64)
-      y: parent.height - Style.space(14) - root.tide * Style.space(2)
+      y: parent.height - Style.space(15) - (root.tide * 2 + root.organicLift * 2.4)
       Rectangle {
         anchors.fill: parent
         gradient: Gradient {
           orientation: Gradient.Horizontal
           GradientStop { position: 0.0; color: Qt.rgba(root.lightColor.r, root.lightColor.g, root.lightColor.b, 0.10) }
-          GradientStop { position: 0.18 + root.drift * 0.025; color: Qt.rgba(root.lightColor.r, root.lightColor.g, root.lightColor.b, 0.48) }
-          GradientStop { position: 0.50 + root.drift * 0.055; color: root.lightColor }
-          GradientStop { position: 0.82 + root.drift * 0.025; color: Qt.rgba(root.lightColor.r, root.lightColor.g, root.lightColor.b, 0.48) }
+          GradientStop { position: 0.18 + root.organicDrift * 0.035; color: Qt.rgba(root.lightColor.r, root.lightColor.g, root.lightColor.b, 0.52) }
+          GradientStop { position: 0.50 + root.organicDrift * 0.075; color: root.lightColor }
+          GradientStop { position: 0.82 + root.organicDrift * 0.035; color: Qt.rgba(root.lightColor.r, root.lightColor.g, root.lightColor.b, 0.52) }
           GradientStop { position: 1.0; color: Qt.rgba(root.lightColor.r, root.lightColor.g, root.lightColor.b, 0.10) }
         }
       }
@@ -174,8 +190,8 @@ Item {
       brightness: 0.26
       colorization: 1
       colorizationColor: root.lightColor
-      opacity: root.presence * (0.24 + root.level * 0.22 + root.tide * 0.06)
-      scale: 1 + root.level * 0.035 + root.tide * 0.018
+      opacity: root.presence * (0.27 + root.level * 0.24 + root.tide * 0.07 + root.organicLift * 0.06)
+      scale: 1 + root.level * 0.04 + root.tide * 0.02 + root.organicLift * 0.012
       transformOrigin: Item.Bottom
     }
 
@@ -190,7 +206,7 @@ Item {
       brightness: 0.42
       colorization: 1
       colorizationColor: root.lightColor
-      opacity: root.presence * (0.14 + root.level * 0.16 + root.tide * 0.04)
+      opacity: root.presence * (0.17 + root.level * 0.18 + root.tide * 0.05)
       scale: 1 + root.level * 0.022 + root.tide * 0.012
       transformOrigin: Item.Bottom
     }
@@ -294,6 +310,7 @@ Item {
       motionEnabled: root.motionEnabled
       visible: root.phase === "listening" || root.phase === "thinking"
       intensity: root.presence * (root.phase === "thinking" ? 0.6 : 1)
+      motionStyle: root.phase
     }
 
     // ---- caption. Voice mode's only text.

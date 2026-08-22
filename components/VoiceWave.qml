@@ -29,6 +29,8 @@ Item {
   property real level: 0.5          // 0..1, swells the ribbon
   property real intensity: 1        // overall opacity multiplier
   property bool motionEnabled: true
+  // listening | thinking. This changes character, not just speed.
+  property string motionStyle: "listening"
 
   readonly property var layers: [
     { frequency: 1.3, drift:  1.00, weight: 1.00, thickness: 3.0, amplitude: 1.00 },
@@ -38,6 +40,7 @@ Item {
   readonly property int samples: 44
 
   property real phase: 0
+  property real livingPhase: 0
 
   // 30fps rather than a 60fps binding. The ribbon drifts slowly, so half the
   // updates are indistinguishable and cost half the CPU.
@@ -45,7 +48,13 @@ Item {
     interval: 33
     repeat: true
     running: root.motionEnabled && root.visible
-    onTriggered: root.phase = (root.phase + 0.028) % (Math.PI * 2)
+    onTriggered: {
+      var base = root.motionStyle === "thinking" ? 0.041 : 0.032
+      var variation = 1 + 0.18 * Math.sin(root.livingPhase * 0.73)
+        + 0.08 * Math.sin(root.livingPhase * 1.91 + 0.7)
+      root.phase = (root.phase + base * variation) % (Math.PI * 200)
+      root.livingPhase = (root.livingPhase + 0.017) % (Math.PI * 200)
+    }
   }
 
   function wavePoints(layer) {
@@ -64,6 +73,14 @@ Item {
       // Two summed harmonics per layer so no single sine is recognisable.
       var wave = Math.sin(t * Math.PI * 2 * layer.frequency + root.phase * layer.drift)
         + 0.35 * Math.sin(t * Math.PI * 2 * layer.frequency * 2.3 - root.phase * layer.drift * 1.7)
+        + 0.16 * Math.sin(t * Math.PI * 2 * layer.frequency * 0.618
+          + root.phase * layer.drift * 0.43 + root.livingPhase)
+      if (root.motionStyle === "thinking") {
+        // A travelling knot gives thinking direction while the surrounding
+        // harmonics keep it from becoming a mechanical progress sweep.
+        var knot = Math.exp(-Math.pow((t - (0.5 + 0.34 * Math.sin(root.phase * 0.31))) / 0.16, 2))
+        wave += knot * 0.42 * Math.sin(root.phase * 1.7 + t * 8)
+      }
       points.push(Qt.point(t * w, mid + wave * peak * envelope * 0.74))
     }
     return points

@@ -22,6 +22,16 @@ Item {
   property color displayedColor: lightColor
   property real tide: 0.32
   property real drift: 0
+  // Incommensurate harmonics make the light feel organic without pretending
+  // to be random input or measurable progress. The cycle is deterministic,
+  // but the three frequencies take a long time to visibly line up again.
+  property real livingPhase: 0
+  readonly property real flicker: atmosphereActive
+    ? (0.50 + 0.24 * Math.sin(livingPhase)
+      + 0.16 * Math.sin(livingPhase * 1.618 + 1.2)
+      + 0.10 * Math.sin(livingPhase * 2.414 + 3.4)) : 0.5
+  readonly property real livingDrift: drift * 0.72
+    + (atmosphereActive ? 0.28 * Math.sin(livingPhase * 0.437 + 0.8) : 0)
   readonly property bool atmosphereActive: motionEnabled
     && (phase === "listening" || phase === "thinking")
   readonly property bool motionRunning: tideAnimation.running || driftAnimation.running
@@ -63,6 +73,16 @@ Item {
       target: root; property: "tide"; to: 0.18
       duration: root.phase === "thinking" ? 1350 : 3100
       easing.type: Easing.InOutSine
+    }
+  }
+
+  Timer {
+    interval: 40
+    repeat: true
+    running: root.atmosphereActive
+    onTriggered: {
+      var pace = root.phase === "thinking" ? 0.092 : 0.046
+      root.livingPhase = (root.livingPhase + pace) % (Math.PI * 200)
     }
   }
 
@@ -114,9 +134,9 @@ Item {
       gradient: Gradient {
         orientation: Gradient.Horizontal
         GradientStop { position: 0.0; color: "transparent" }
-        GradientStop { position: 0.42 + root.drift * 0.055; color: root.withAlpha(0.08) }
-        GradientStop { position: 0.50 + root.drift * 0.055; color: root.withAlpha(0.92) }
-        GradientStop { position: 0.58 + root.drift * 0.055; color: root.withAlpha(0.08) }
+        GradientStop { position: 0.39 + root.livingDrift * 0.075; color: root.withAlpha(0.05) }
+        GradientStop { position: 0.50 + root.livingDrift * 0.075; color: root.withAlpha(0.88 + root.flicker * 0.12) }
+        GradientStop { position: 0.61 + root.livingDrift * 0.075; color: root.withAlpha(0.05) }
         GradientStop { position: 1.0; color: "transparent" }
       }
     }
@@ -130,10 +150,50 @@ Item {
     blur: 0.75
     blurMax: 18
     blurMultiplier: 0.85
-    brightness: 0.28 + root.tide * 0.34
+    brightness: 0.32 + root.tide * 0.38 + root.flicker * 0.12
     colorization: 1
     colorizationColor: root.displayedColor
-    opacity: 0.42 + root.tide * 0.38
+    opacity: 0.48 + root.tide * 0.38
+  }
+
+
+  // A smaller satellite bloom slips around the main source. Its irrational
+  // cadence is the bit of controlled irregularity that stops the bar reading
+  // as a loading indicator.
+  Item {
+    id: satelliteSource
+    width: parent.width * (0.08 + root.flicker * 0.035)
+    height: 4
+    x: parent.width * (0.5 + root.livingDrift * 0.22) - width / 2
+    anchors.verticalCenter: parent.verticalCenter
+    visible: false
+
+    Rectangle {
+      anchors.fill: parent
+      gradient: Gradient {
+        orientation: Gradient.Horizontal
+        GradientStop { position: 0.0; color: "transparent" }
+        GradientStop { position: 0.30; color: root.withAlpha(0.16) }
+        GradientStop { position: 0.50; color: root.withAlpha(0.34 + root.flicker * 0.18) }
+        GradientStop { position: 0.70; color: root.withAlpha(0.16) }
+        GradientStop { position: 1.0; color: "transparent" }
+      }
+    }
+  }
+
+  MultiEffect {
+    anchors.fill: satelliteSource
+    source: satelliteSource
+    autoPaddingEnabled: true
+    blurEnabled: true
+    blur: 1
+    blurMax: 24
+    blurMultiplier: 1.6
+    brightness: 0.2 + root.flicker * 0.18
+    colorization: 1
+    colorizationColor: root.displayedColor
+    opacity: root.atmosphereActive ? 0.72 : 0
+    Behavior on opacity { NumberAnimation { duration: 220 } }
   }
 
   onPhaseChanged: settleAtmosphere()
