@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync,
 import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { homedir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createAgentSession } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/sdk.js";
 import { DefaultResourceLoader } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js";
 import { AuthStorage, readStoredCredential } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/auth-storage.js";
@@ -28,6 +29,20 @@ import type { AcpResult, AcpRun, PermissionHandler } from "./acp.js";
 import { automaticInstructions, type PiDiscoveredProvider } from "./providers.js";
 import type { BrokerEvent, BuiltinAuthMethod, ModelOption, ProviderPolicyInfo } from "./types.js";
 import { quickchatPaths } from "./paths.js";
+import {
+  createPersonalAssistantTools,
+  desktopToolTitle,
+  reviewDesktopToolInput
+} from "./tools/desktop.js";
+
+export {
+  createPersonalAssistantTools,
+  discoverInstalledApps,
+  normalizeWindowAddress,
+  readDesktopState,
+  windowActionCommand,
+  workspaceActionCommand
+} from "./tools/desktop.js";
 
 const PROVIDER_GROUPS = [
   { id: "codex", name: "Codex", piProviderIds: ["openai-codex"] },
@@ -35,9 +50,14 @@ const PROVIDER_GROUPS = [
   { id: "grok", name: "Grok", piProviderIds: ["xai"] }
 ] as const;
 const BUILTIN_PROVIDER_IDS = new Set(["openai-codex", "openai", "xai"]);
-const MUTATING_TOOLS = new Set(["bash", "edit", "write", "open_url", "media_control"]);
+const MUTATING_TOOLS = new Set([
+  "bash", "edit", "write", "open_url", "media_control", "app_open", "window_action", "workspace_action"
+]);
 const AGENT_PROFILE_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
-const PI_TOOLS = [...AGENT_PROFILE_TOOLS, "agent", "open_url", "media_control"];
+const PI_TOOLS = [
+  ...AGENT_PROFILE_TOOLS, "agent", "open_url", "media_control", "app_catalog", "app_open", "desktop_state",
+  "window_action", "workspace_action"
+];
 const SAFE_AGENT_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const MAX_AGENT_FILE_BYTES = 128 * 1024;
 const sessionApprovals = new Map<string, PiApprovalState>();
@@ -349,7 +369,7 @@ export function runPiQuestion(
       agentDir: provider.agentDir,
       noExtensions: true,
       noSkills: true,
-      additionalSkillPaths: existingSkillPaths(provider.sharedAgentsDir, provider.cwd),
+      additionalSkillPaths: allSkillPaths(provider),
       extensionFactories: [permissionExtension],
       appendSystemPrompt: [automaticInstructions(), formatAgentProfiles(profiles)]
     });
@@ -372,7 +392,7 @@ export function runPiQuestion(
       sessionManager,
       settingsManager: settings,
       tools: PI_TOOLS,
-      customTools: [agentTool, ...createDesktopTools()]
+      customTools: [agentTool, ...createDesktopTools(), ...createPersonalAssistantTools()]
     });
     activeSession = session;
     let streamedText = "";
@@ -627,7 +647,7 @@ function createPermissionExtension(requestId: string, handler: PermissionHandler
     hidden: true,
     factory: (pi) => {
       pi.on("tool_call", async (event) => {
-        if (!MUTATING_TOOLS.has(event.toolName)) return undefined;
+        if (!requiresPiPermission(event.toolName)) return undefined;
         if (handler === undefined) return { block: true, reason: "OmaPilot did not provide a permission handler" };
         const rawInput = reviewableToolInput(event.toolName, event.input);
         const approvalKey = approvals.key(event.toolName, rawInput);
@@ -661,6 +681,10 @@ function createPermissionExtension(requestId: string, handler: PermissionHandler
   };
 }
 
+export function requiresPiPermission(toolName: string): boolean {
+  return MUTATING_TOOLS.has(toolName);
+}
+
 function reviewableToolInput(name: string, input: Record<string, unknown>): Record<string, unknown> {
   if (name === "bash") return { ...input, command: typeof input.command === "string" ? input.command : "" };
   if (name === "open_url") {
@@ -673,6 +697,8 @@ function reviewableToolInput(name: string, input: Record<string, unknown>): Reco
     try { method = omarchyMediaMethod(action); } catch { /* Keep malformed input reviewable. */ }
     return { command: `omarchy-shell media ${method}`, action };
   }
+  const desktopInput = reviewDesktopToolInput(name, input);
+  if (desktopInput !== undefined) return desktopInput;
   const path = typeof input.path === "string" ? input.path : "unknown";
   return { command: `${name} ${path}`, ...input };
 }
@@ -681,17 +707,32 @@ function toolTitle(name: string, input: Record<string, unknown>): string {
   if (name === "bash") return "Run a command";
   if (name === "open_url") return "Open URL in default browser";
   if (name === "media_control") return `Control media: ${typeof input.action === "string" ? input.action : "action"}`;
+  const desktopTitle = desktopToolTitle(name, input);
+  if (desktopTitle !== undefined) return desktopTitle;
   const path = typeof input.path === "string" ? basename(input.path) : "file";
   return `${name === "write" ? "Write" : "Edit"} ${path}`;
 }
 
-export function existingSkillPaths(directory: string, cwd: string): string[] {
+export function existingSkillPaths(directory: string, cwd: string, home = homedir()): string[] {
   const candidates = [
     join(directory, "skills"),
+    join(home, ".pi/agent/skills"),
     join(cwd, ".agents/skills"),
     join(cwd, ".pi/skills")
   ];
   return [...new Set(candidates.filter((path) => existsSync(path)))];
+}
+
+export function bundledSkillPaths(): string[] {
+  const path = resolve(dirname(fileURLToPath(import.meta.url)), "../../skills");
+  return existsSync(path) ? [path] : [];
+}
+
+function allSkillPaths(provider: PiDiscoveredProvider): string[] {
+  return [
+    ...existingSkillPaths(provider.sharedAgentsDir, provider.cwd, provider.agent.env.HOME ?? homedir()),
+    ...bundledSkillPaths()
+  ];
 }
 
 export function discoverAgentProfiles(directory: string, cwd: string): AgentProfile[] {
@@ -769,7 +810,7 @@ function createAgentTool(
         agentDir: provider.agentDir,
         noExtensions: true,
         noSkills: true,
-        additionalSkillPaths: existingSkillPaths(provider.sharedAgentsDir, provider.cwd),
+        additionalSkillPaths: allSkillPaths(provider),
         extensionFactories: [createPermissionExtension(requestId, requestPermission, approvals)],
         systemPrompt: [automaticInstructions(), profile.systemPrompt].join("\n\n")
       });

@@ -47,8 +47,10 @@ compact error notice opens an inspectable details pane.
 OmaPilot includes a native Pi-based harness for Codex subscription, OpenAI API,
 Grok, and configured OpenAI-compatible endpoints. It resolves credentials from
 environment variables or `${XDG_CONFIG_HOME:-$HOME/.config}/omapilot/auth.json`,
-discovers shared `~/.agents` skills and named agents, and exposes Pi's standard
-coding tools behind OmaPilot's approval broker. See [Native Pi harness configuration](docs/native-harness.md).
+discovers shared `~/.agents` skills, Omarchy's official `~/.pi/agent/skills`
+root, bundled OmaPilot skills, and named agents. It exposes Pi's standard coding
+tools plus verified app, window, workspace, and monitor controls behind
+OmaPilot's approval broker. See [Native Pi harness configuration](docs/native-harness.md).
 The Harness setting explicitly selects **Built-in (OmaPilot)**, **Codex**, or
 **OpenCode**. The latter two are ACP harnesses and must already
 be installed and signed in. OmaPilot never substitutes one harness for another.
@@ -134,7 +136,12 @@ needed:
 
 - **Built-in (OmaPilot)** combines available Codex, OpenAI, Grok, and
   OpenAI-compatible models in one catalog and loads
-  declarative skills and named agents from the documented `~/.agents` roots.
+  declarative skills from `~/.agents/skills`, `~/.pi/agent/skills`, project
+  skill roots, and this plugin's bundled `skills/` directory, plus named agents
+  from the documented `~/.agents` roots. Its structured desktop tools discover
+  exact installed apps and current Hyprland targets, then verify app focus or
+  launch, window focus/move/resize/float/close, and workspace focus or monitor
+  movement before reporting success.
   Pi's read, grep, find, and list tools may read files available to the current
   user. Bash, edit, and write require review unless an exact session or durable
   grant already exists. Executable Pi extensions are not loaded.

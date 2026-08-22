@@ -98,7 +98,7 @@ function launchDetached(executable2, args, options = {}) {
 }
 async function runCommand(executable2, args, options = {}) {
   const maxOutput = options.maxOutput ?? 1e6;
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     const child = spawn(executable2, args, {
       cwd: options.cwd,
       env: options.env,
@@ -121,13 +121,13 @@ async function runCommand(executable2, args, options = {}) {
     timer.unref();
     child.once("close", (code) => {
       clearTimeout(timer);
-      resolve17({ code: code ?? 1, stdout, stderr });
+      resolve18({ code: code ?? 1, stdout, stderr });
     });
   });
 }
 async function runBinaryCommand(executable2, args, options = {}) {
   const maxOutput = options.maxOutput ?? 8 * 1024 * 1024;
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     const child = spawn(executable2, args, {
       cwd: options.cwd,
       env: options.env,
@@ -156,7 +156,7 @@ async function runBinaryCommand(executable2, args, options = {}) {
     timer.unref();
     child.once("close", (code) => {
       clearTimeout(timer);
-      resolve17({ code: exceeded ? 1 : code ?? 1, stdout: Buffer.concat(chunks), stderr });
+      resolve18({ code: exceeded ? 1 : code ?? 1, stdout: Buffer.concat(chunks), stderr });
     });
   });
 }
@@ -257,9 +257,9 @@ function CodePointLength(value2) {
 }
 function ConsumeModifiers(value2, index3) {
   while (index3 < value2.length) {
-    const point = value2.codePointAt(index3);
-    if (IsCombiningMark(point) || IsVariationSelector(point)) {
-      index3 += CodePointLength(point);
+    const point2 = value2.codePointAt(index3);
+    if (IsCombiningMark(point2) || IsVariationSelector(point2)) {
+      index3 += CodePointLength(point2);
     } else {
       break;
     }
@@ -8461,8 +8461,8 @@ var init_event_stream = __esm({
       constructor(isComplete, extractResult) {
         this.isComplete = isComplete;
         this.extractResult = extractResult;
-        this.finalResultPromise = new Promise((resolve17) => {
-          this.resolveFinalResult = resolve17;
+        this.finalResultPromise = new Promise((resolve18) => {
+          this.resolveFinalResult = resolve18;
         });
       }
       push(event) {
@@ -8496,7 +8496,7 @@ var init_event_stream = __esm({
           } else if (this.done) {
             return;
           } else {
-            const result = await new Promise((resolve17) => this.waiting.push(resolve17));
+            const result = await new Promise((resolve18) => this.waiting.push(resolve18));
             if (result.done)
               return;
             yield result.value;
@@ -8649,7 +8649,7 @@ function raceWithAbortSignal(operation, signal) {
     });
     return Promise.reject(abortReason(signal));
   }
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     let settled = false;
     const cleanup = () => signal.removeEventListener("abort", onAbort);
     const onAbort = () => {
@@ -8665,7 +8665,7 @@ function raceWithAbortSignal(operation, signal) {
         return;
       settled = true;
       cleanup();
-      resolve17(value2);
+      resolve18(value2);
     }, (error48) => {
       if (settled)
         return;
@@ -9127,7 +9127,7 @@ function createProvider(input2) {
   const single = typeof input2.api.stream === "function" ? input2.api : void 0;
   const byApi = single ? void 0 : input2.api;
   const apiFor = (model) => single ?? byApi?.[model.api];
-  const dispatch = (model, run) => {
+  const dispatch2 = (model, run) => {
     const streams2 = apiFor(model);
     if (!streams2) {
       return lazyStream(model, async () => {
@@ -9167,8 +9167,8 @@ function createProvider(input2) {
       });
     } : void 0,
     filterModels: input2.filterModels,
-    stream: (model, context, options) => dispatch(model, (streams2) => streams2.stream(model, context, options)),
-    streamSimple: (model, context, options) => dispatch(model, (streams2) => streams2.streamSimple(model, context, options))
+    stream: (model, context, options) => dispatch2(model, (streams2) => streams2.stream(model, context, options)),
+    streamSimple: (model, context, options) => dispatch2(model, (streams2) => streams2.streamSimple(model, context, options))
   };
   const streams = single ? [single] : Object.values(byApi ?? {}).filter((entry) => entry !== void 0);
   if (streams.some((entry) => entry.fetchDeferred !== void 0)) {
@@ -9530,8 +9530,8 @@ var init_models = __esm({
         const credential = await raceWithAbortSignal(loginOperation, signal);
         let mutationStarted = false;
         let markMutationStarted;
-        const started = new Promise((resolve17) => {
-          markMutationStarted = resolve17;
+        const started = new Promise((resolve18) => {
+          markMutationStarted = resolve18;
         });
         const mutation = this.credentials.modify(providerId, async () => {
           mutationStarted = true;
@@ -9541,7 +9541,7 @@ var init_models = __esm({
         void mutation.catch(() => {
         });
         try {
-          await new Promise((resolve17, reject) => {
+          await new Promise((resolve18, reject) => {
             const onAbort = () => {
               if (!mutationStarted)
                 reject(signal.reason);
@@ -9549,7 +9549,7 @@ var init_models = __esm({
             signal.addEventListener("abort", onAbort, { once: true });
             void Promise.race([started, mutation]).then(() => {
               signal.removeEventListener("abort", onAbort);
-              resolve17();
+              resolve18();
             }, (error48) => {
               signal.removeEventListener("abort", onAbort);
               reject(error48);
@@ -9832,10 +9832,10 @@ function createAbortedMessage(partial2) {
 }
 function scheduleChunk(chunk, tokensPerSecond) {
   if (!tokensPerSecond || tokensPerSecond <= 0) {
-    return new Promise((resolve17) => queueMicrotask(resolve17));
+    return new Promise((resolve18) => queueMicrotask(resolve18));
   }
   const delayMs = estimateTokens(chunk) / tokensPerSecond * 1e3;
-  return new Promise((resolve17) => setTimeout(resolve17, delayMs));
+  return new Promise((resolve18) => setTimeout(resolve18, delayMs));
 }
 async function streamWithDeltas(stream11, message, minTokenSize, maxTokenSize, tokensPerSecond, signal) {
   const partial2 = { ...message, content: [], stopReason: "pending" };
@@ -10587,12 +10587,12 @@ function buildProviderErrorPattern(patterns) {
   return new RegExp(patterns.join("|"), "i");
 }
 function sleep(ms2, signal) {
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     if (signal?.aborted) {
       reject(new RetrySleepAbortError());
       return;
     }
-    const timeout = setTimeout(resolve17, ms2);
+    const timeout = setTimeout(resolve18, ms2);
     signal?.addEventListener("abort", () => {
       clearTimeout(timeout);
       reject(new RetrySleepAbortError());
@@ -18940,8 +18940,8 @@ var init_agent = __esm({
         const abortController = new AbortController();
         let resolvePromise = () => {
         };
-        const promise2 = new Promise((resolve17) => {
-          resolvePromise = resolve17;
+        const promise2 = new Promise((resolve18) => {
+          resolvePromise = resolve18;
         });
         this.activeRun = { promise: promise2, resolve: resolvePromise, abortController };
         this._state.isStreaming = true;
@@ -25774,10 +25774,10 @@ var require_resolve_block_map = __commonJS({
       let offset = bm.offset;
       let commentEnd = null;
       for (const collItem of bm.items) {
-        const { start, key, sep: sep11, value: value2 } = collItem;
+        const { start, key, sep: sep12, value: value2 } = collItem;
         const keyProps = resolveProps.resolveProps(start, {
           indicator: "explicit-key-ind",
-          next: key ?? sep11?.[0],
+          next: key ?? sep12?.[0],
           offset,
           onError: onError2,
           parentIndent: bm.indent,
@@ -25791,7 +25791,7 @@ var require_resolve_block_map = __commonJS({
             else if ("indent" in key && key.indent !== bm.indent)
               onError2(offset, "BAD_INDENT", startColMsg);
           }
-          if (!keyProps.anchor && !keyProps.tag && !sep11) {
+          if (!keyProps.anchor && !keyProps.tag && !sep12) {
             commentEnd = keyProps.end;
             if (keyProps.comment) {
               if (map2.comment)
@@ -25815,7 +25815,7 @@ var require_resolve_block_map = __commonJS({
         ctx.atKey = false;
         if (utilMapIncludes.mapIncludes(ctx, map2.items, keyNode))
           onError2(keyStart, "DUPLICATE_KEY", "Map keys must be unique");
-        const valueProps = resolveProps.resolveProps(sep11 ?? [], {
+        const valueProps = resolveProps.resolveProps(sep12 ?? [], {
           indicator: "map-value-ind",
           next: value2,
           offset: keyNode.range[2],
@@ -25831,7 +25831,7 @@ var require_resolve_block_map = __commonJS({
             if (ctx.options.strict && keyProps.start < valueProps.found.offset - 1024)
               onError2(keyNode.range, "KEY_OVER_1024_CHARS", "The : indicator must be at most 1024 chars after the start of an implicit block mapping key");
           }
-          const valueNode = value2 ? composeNode(ctx, value2, valueProps, onError2) : composeEmptyNode(ctx, offset, sep11, null, valueProps, onError2);
+          const valueNode = value2 ? composeNode(ctx, value2, valueProps, onError2) : composeEmptyNode(ctx, offset, sep12, null, valueProps, onError2);
           if (ctx.schema.compat)
             utilFlowIndentCheck.flowIndentCheck(bm.indent, value2, onError2);
           offset = valueNode.range[2];
@@ -25922,7 +25922,7 @@ var require_resolve_end = __commonJS({
       let comment = "";
       if (end) {
         let hasSpace = false;
-        let sep11 = "";
+        let sep12 = "";
         for (const token of end) {
           const { source, type } = token;
           switch (type) {
@@ -25936,13 +25936,13 @@ var require_resolve_end = __commonJS({
               if (!comment)
                 comment = cb;
               else
-                comment += sep11 + cb;
-              sep11 = "";
+                comment += sep12 + cb;
+              sep12 = "";
               break;
             }
             case "newline":
               if (comment)
-                sep11 += source;
+                sep12 += source;
               hasSpace = true;
               break;
             default:
@@ -25985,18 +25985,18 @@ var require_resolve_flow_collection = __commonJS({
       let offset = fc.offset + fc.start.source.length;
       for (let i2 = 0; i2 < fc.items.length; ++i2) {
         const collItem = fc.items[i2];
-        const { start, key, sep: sep11, value: value2 } = collItem;
+        const { start, key, sep: sep12, value: value2 } = collItem;
         const props = resolveProps.resolveProps(start, {
           flow: fcName,
           indicator: "explicit-key-ind",
-          next: key ?? sep11?.[0],
+          next: key ?? sep12?.[0],
           offset,
           onError: onError2,
           parentIndent: fc.indent,
           startOnNewline: false
         });
         if (!props.found) {
-          if (!props.anchor && !props.tag && !sep11 && !value2) {
+          if (!props.anchor && !props.tag && !sep12 && !value2) {
             if (i2 === 0 && props.comma)
               onError2(props.comma, "UNEXPECTED_TOKEN", `Unexpected , in ${fcName}`);
             else if (i2 < fc.items.length - 1)
@@ -26050,8 +26050,8 @@ var require_resolve_flow_collection = __commonJS({
             }
           }
         }
-        if (!isMap && !sep11 && !props.found) {
-          const valueNode = value2 ? composeNode(ctx, value2, props, onError2) : composeEmptyNode(ctx, props.end, sep11, null, props, onError2);
+        if (!isMap && !sep12 && !props.found) {
+          const valueNode = value2 ? composeNode(ctx, value2, props, onError2) : composeEmptyNode(ctx, props.end, sep12, null, props, onError2);
           coll.items.push(valueNode);
           offset = valueNode.range[2];
           if (isBlock(value2))
@@ -26063,7 +26063,7 @@ var require_resolve_flow_collection = __commonJS({
           if (isBlock(key))
             onError2(keyNode.range, "BLOCK_IN_FLOW", blockMsg);
           ctx.atKey = false;
-          const valueProps = resolveProps.resolveProps(sep11 ?? [], {
+          const valueProps = resolveProps.resolveProps(sep12 ?? [], {
             flow: fcName,
             indicator: "map-value-ind",
             next: value2,
@@ -26074,8 +26074,8 @@ var require_resolve_flow_collection = __commonJS({
           });
           if (valueProps.found) {
             if (!isMap && !props.found && ctx.options.strict) {
-              if (sep11)
-                for (const st3 of sep11) {
+              if (sep12)
+                for (const st3 of sep12) {
                   if (st3 === valueProps.found)
                     break;
                   if (st3.type === "newline") {
@@ -26092,7 +26092,7 @@ var require_resolve_flow_collection = __commonJS({
             else
               onError2(valueProps.start, "MISSING_CHAR", `Missing , or : between ${fcName} items`);
           }
-          const valueNode = value2 ? composeNode(ctx, value2, valueProps, onError2) : valueProps.found ? composeEmptyNode(ctx, valueProps.end, sep11, null, valueProps, onError2) : null;
+          const valueNode = value2 ? composeNode(ctx, value2, valueProps, onError2) : valueProps.found ? composeEmptyNode(ctx, valueProps.end, sep12, null, valueProps, onError2) : null;
           if (valueNode) {
             if (isBlock(value2))
               onError2(valueNode.range, "BLOCK_IN_FLOW", blockMsg);
@@ -26272,7 +26272,7 @@ var require_resolve_block_scalar = __commonJS({
           chompStart = i2 + 1;
       }
       let value2 = "";
-      let sep11 = "";
+      let sep12 = "";
       let prevMoreIndented = false;
       for (let i2 = 0; i2 < contentStart; ++i2)
         value2 += lines[i2][0].slice(trimIndent) + "\n";
@@ -26289,24 +26289,24 @@ var require_resolve_block_scalar = __commonJS({
           indent = "";
         }
         if (type === Scalar.Scalar.BLOCK_LITERAL) {
-          value2 += sep11 + indent.slice(trimIndent) + content;
-          sep11 = "\n";
+          value2 += sep12 + indent.slice(trimIndent) + content;
+          sep12 = "\n";
         } else if (indent.length > trimIndent || content[0] === "	") {
-          if (sep11 === " ")
-            sep11 = "\n";
-          else if (!prevMoreIndented && sep11 === "\n")
-            sep11 = "\n\n";
-          value2 += sep11 + indent.slice(trimIndent) + content;
-          sep11 = "\n";
+          if (sep12 === " ")
+            sep12 = "\n";
+          else if (!prevMoreIndented && sep12 === "\n")
+            sep12 = "\n\n";
+          value2 += sep12 + indent.slice(trimIndent) + content;
+          sep12 = "\n";
           prevMoreIndented = true;
         } else if (content === "") {
-          if (sep11 === "\n")
+          if (sep12 === "\n")
             value2 += "\n";
           else
-            sep11 = "\n";
+            sep12 = "\n";
         } else {
-          value2 += sep11 + content;
-          sep11 = " ";
+          value2 += sep12 + content;
+          sep12 = " ";
           prevMoreIndented = false;
         }
       }
@@ -26488,25 +26488,25 @@ var require_resolve_flow_scalar = __commonJS({
       if (!match2)
         return source;
       let res = match2[1];
-      let sep11 = " ";
+      let sep12 = " ";
       let pos = first.lastIndex;
       line.lastIndex = pos;
       while (match2 = line.exec(source)) {
         if (match2[1] === "") {
-          if (sep11 === "\n")
-            res += sep11;
+          if (sep12 === "\n")
+            res += sep12;
           else
-            sep11 = "\n";
+            sep12 = "\n";
         } else {
-          res += sep11 + match2[1];
-          sep11 = " ";
+          res += sep12 + match2[1];
+          sep12 = " ";
         }
         pos = line.lastIndex;
       }
       const last = /[ \t]*(.*)/sy;
       last.lastIndex = pos;
       match2 = last.exec(source);
-      return res + sep11 + (match2?.[1] ?? "");
+      return res + sep12 + (match2?.[1] ?? "");
     }
     function doubleQuotedValue(source, onError2) {
       let res = "";
@@ -27316,14 +27316,14 @@ var require_cst_stringify = __commonJS({
         }
       }
     }
-    function stringifyItem({ start, key, sep: sep11, value: value2 }) {
+    function stringifyItem({ start, key, sep: sep12, value: value2 }) {
       let res = "";
       for (const st3 of start)
         res += st3.source;
       if (key)
         res += stringifyToken(key);
-      if (sep11)
-        for (const st3 of sep11)
+      if (sep12)
+        for (const st3 of sep12)
           res += st3.source;
       if (value2)
         res += stringifyToken(value2);
@@ -28490,18 +28490,18 @@ var require_parser = __commonJS({
         if (this.type === "map-value-ind") {
           const prev = getPrevProps(this.peek(2));
           const start = getFirstKeyStartProps(prev);
-          let sep11;
+          let sep12;
           if (scalar.end) {
-            sep11 = scalar.end;
-            sep11.push(this.sourceToken);
+            sep12 = scalar.end;
+            sep12.push(this.sourceToken);
             delete scalar.end;
           } else
-            sep11 = [this.sourceToken];
+            sep12 = [this.sourceToken];
           const map2 = {
             type: "block-map",
             offset: scalar.offset,
             indent: scalar.indent,
-            items: [{ start, key: scalar, sep: sep11 }]
+            items: [{ start, key: scalar, sep: sep12 }]
           };
           this.onKeyLine = true;
           this.stack[this.stack.length - 1] = map2;
@@ -28654,15 +28654,15 @@ var require_parser = __commonJS({
                 } else if (isFlowToken(it2.key) && !includesToken(it2.sep, "newline")) {
                   const start2 = getFirstKeyStartProps(it2.start);
                   const key = it2.key;
-                  const sep11 = it2.sep;
-                  sep11.push(this.sourceToken);
+                  const sep12 = it2.sep;
+                  sep12.push(this.sourceToken);
                   delete it2.key;
                   delete it2.sep;
                   this.stack.push({
                     type: "block-map",
                     offset: this.offset,
                     indent: this.indent,
-                    items: [{ start: start2, key, sep: sep11 }]
+                    items: [{ start: start2, key, sep: sep12 }]
                   });
                 } else if (start.length > 0) {
                   it2.sep = it2.sep.concat(start, this.sourceToken);
@@ -28856,13 +28856,13 @@ var require_parser = __commonJS({
             const prev = getPrevProps(parent);
             const start = getFirstKeyStartProps(prev);
             fixFlowSeqItems(fc);
-            const sep11 = fc.end.splice(1, fc.end.length);
-            sep11.push(this.sourceToken);
+            const sep12 = fc.end.splice(1, fc.end.length);
+            sep12.push(this.sourceToken);
             const map2 = {
               type: "block-map",
               offset: fc.offset,
               indent: fc.indent,
-              items: [{ start, key: fc, sep: sep11 }]
+              items: [{ start, key: fc, sep: sep12 }]
             };
             this.onKeyLine = true;
             this.stack[this.stack.length - 1] = map2;
@@ -31136,8 +31136,8 @@ ${command}` : command,
         if (!onUpdate)
           return;
         updateDirty = true;
-        const delay2 = BASH_UPDATE_THROTTLE_MS - (Date.now() - lastUpdateAt);
-        if (delay2 <= 0) {
+        const delay3 = BASH_UPDATE_THROTTLE_MS - (Date.now() - lastUpdateAt);
+        if (delay3 <= 0) {
           clearUpdateTimer();
           emitOutputUpdate();
           return;
@@ -31145,7 +31145,7 @@ ${command}` : command,
         updateTimer ??= setTimeout(() => {
           updateTimer = void 0;
           emitOutputUpdate();
-        }, delay2);
+        }, delay3);
       };
       onUpdate?.({ content: [], details: void 0 });
       try {
@@ -32306,8 +32306,8 @@ async function withFileMutationQueue(env2, path16, fn) {
     const currentQueue2 = state2.queues.get(key2) ?? Promise.resolve();
     let releaseNext2 = () => {
     };
-    const nextQueue = new Promise((resolve17) => {
-      releaseNext2 = resolve17;
+    const nextQueue = new Promise((resolve18) => {
+      releaseNext2 = resolve18;
     });
     const chainedQueue2 = currentQueue2.then(() => nextQueue);
     state2.queues.set(key2, chainedQueue2);
@@ -33469,7 +33469,7 @@ var init_values = __esm({
 var sleep2;
 var init_sleep = __esm({
   "node_modules/@earendil-works/pi-coding-agent/node_modules/@anthropic-ai/sdk/internal/utils/sleep.mjs"() {
-    sleep2 = (ms2) => new Promise((resolve17) => setTimeout(resolve17, ms2));
+    sleep2 = (ms2) => new Promise((resolve18) => setTimeout(resolve18, ms2));
   }
 });
 
@@ -33964,10 +33964,10 @@ async function* iterSSEChunks(iterator) {
     yield data;
   }
 }
-function partition(str3, delimiter3) {
-  const index3 = str3.indexOf(delimiter3);
+function partition(str3, delimiter4) {
+  const index3 = str3.indexOf(delimiter4);
   if (index3 !== -1) {
-    return [str3.substring(0, index3), delimiter3, str3.substring(index3 + delimiter3.length)];
+    return [str3.substring(0, index3), delimiter4, str3.substring(index3 + delimiter4.length)];
   }
   return [str3, "", ""];
 }
@@ -34247,8 +34247,8 @@ var init_api_promise = __esm({
     init_parse4();
     APIPromise = class _APIPromise extends Promise {
       constructor(client2, responsePromise, parseResponse2 = defaultParseResponse) {
-        super((resolve17) => {
-          resolve17(null);
+        super((resolve18) => {
+          resolve18(null);
         });
         this.responsePromise = responsePromise;
         this.parseResponse = parseResponse2;
@@ -36161,12 +36161,12 @@ var init_BetaMessageStream = __esm({
           }
           return this._emit("error", new AnthropicError(String(error48)));
         });
-        __classPrivateFieldSet(this, _BetaMessageStream_connectedPromise, new Promise((resolve17, reject) => {
-          __classPrivateFieldSet(this, _BetaMessageStream_resolveConnectedPromise, resolve17, "f");
+        __classPrivateFieldSet(this, _BetaMessageStream_connectedPromise, new Promise((resolve18, reject) => {
+          __classPrivateFieldSet(this, _BetaMessageStream_resolveConnectedPromise, resolve18, "f");
           __classPrivateFieldSet(this, _BetaMessageStream_rejectConnectedPromise, reject, "f");
         }), "f");
-        __classPrivateFieldSet(this, _BetaMessageStream_endPromise, new Promise((resolve17, reject) => {
-          __classPrivateFieldSet(this, _BetaMessageStream_resolveEndPromise, resolve17, "f");
+        __classPrivateFieldSet(this, _BetaMessageStream_endPromise, new Promise((resolve18, reject) => {
+          __classPrivateFieldSet(this, _BetaMessageStream_resolveEndPromise, resolve18, "f");
           __classPrivateFieldSet(this, _BetaMessageStream_rejectEndPromise, reject, "f");
         }), "f");
         __classPrivateFieldGet2(this, _BetaMessageStream_connectedPromise, "f").catch(() => {
@@ -36336,11 +36336,11 @@ var init_BetaMessageStream = __esm({
        *   const message = await stream.emitted('message') // rejects if the stream errors
        */
       emitted(event) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           __classPrivateFieldSet(this, _BetaMessageStream_catchingPromiseCreated, true, "f");
           if (event !== "error")
             this.once("error", reject);
-          this.once(event, resolve17);
+          this.once(event, resolve18);
         });
       }
       async done() {
@@ -36683,7 +36683,7 @@ var init_BetaMessageStream = __esm({
               if (done) {
                 return { value: void 0, done: true };
               }
-              return new Promise((resolve17, reject) => readQueue.push({ resolve: resolve17, reject })).then((chunk2) => chunk2 ? { value: chunk2, done: false } : { value: void 0, done: true });
+              return new Promise((resolve18, reject) => readQueue.push({ resolve: resolve18, reject })).then((chunk2) => chunk2 ? { value: chunk2, done: false } : { value: void 0, done: true });
             }
             const chunk = pushQueue.shift();
             return { value: chunk, done: false };
@@ -36754,13 +36754,13 @@ Wrap your summary in <summary></summary> tags.`;
 
 // node_modules/@anthropic-ai/sdk/lib/tools/BetaToolRunner.mjs
 function promiseWithResolvers() {
-  let resolve17;
+  let resolve18;
   let reject;
   const promise2 = new Promise((res, rej) => {
-    resolve17 = res;
+    resolve18 = res;
     reject = rej;
   });
-  return { promise: promise2, resolve: resolve17, reject };
+  return { promise: promise2, resolve: resolve18, reject };
 }
 async function generateToolResponse(params, lastMessage = params.messages.at(-1), requestOptions) {
   if (!lastMessage || lastMessage.role !== "assistant" || !lastMessage.content || typeof lastMessage.content === "string") {
@@ -38588,12 +38588,12 @@ var init_MessageStream = __esm({
           }
           return this._emit("error", new AnthropicError(String(error48)));
         });
-        __classPrivateFieldSet(this, _MessageStream_connectedPromise, new Promise((resolve17, reject) => {
-          __classPrivateFieldSet(this, _MessageStream_resolveConnectedPromise, resolve17, "f");
+        __classPrivateFieldSet(this, _MessageStream_connectedPromise, new Promise((resolve18, reject) => {
+          __classPrivateFieldSet(this, _MessageStream_resolveConnectedPromise, resolve18, "f");
           __classPrivateFieldSet(this, _MessageStream_rejectConnectedPromise, reject, "f");
         }), "f");
-        __classPrivateFieldSet(this, _MessageStream_endPromise, new Promise((resolve17, reject) => {
-          __classPrivateFieldSet(this, _MessageStream_resolveEndPromise, resolve17, "f");
+        __classPrivateFieldSet(this, _MessageStream_endPromise, new Promise((resolve18, reject) => {
+          __classPrivateFieldSet(this, _MessageStream_resolveEndPromise, resolve18, "f");
           __classPrivateFieldSet(this, _MessageStream_rejectEndPromise, reject, "f");
         }), "f");
         __classPrivateFieldGet2(this, _MessageStream_connectedPromise, "f").catch(() => {
@@ -38763,11 +38763,11 @@ var init_MessageStream = __esm({
        *   const message = await stream.emitted('message') // rejects if the stream errors
        */
       emitted(event) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           __classPrivateFieldSet(this, _MessageStream_catchingPromiseCreated, true, "f");
           if (event !== "error")
             this.once("error", reject);
-          this.once(event, resolve17);
+          this.once(event, resolve18);
         });
       }
       async done() {
@@ -39085,7 +39085,7 @@ var init_MessageStream = __esm({
               if (done) {
                 return { value: void 0, done: true };
               }
-              return new Promise((resolve17, reject) => readQueue.push({ resolve: resolve17, reject })).then((chunk2) => chunk2 ? { value: chunk2, done: false } : { value: void 0, done: true });
+              return new Promise((resolve18, reject) => readQueue.push({ resolve: resolve18, reject })).then((chunk2) => chunk2 ? { value: chunk2, done: false } : { value: void 0, done: true });
             }
             const chunk = pushQueue.shift();
             return { value: chunk, done: false };
@@ -40055,8 +40055,8 @@ function getBunSandboxEnvValue(name) {
   if (procEnvCache === null) {
     procEnvCache = /* @__PURE__ */ new Map();
     try {
-      const { readFileSync: readFileSync25 } = __require("node:fs");
-      const data = readFileSync25("/proc/self/environ", "utf-8");
+      const { readFileSync: readFileSync26 } = __require("node:fs");
+      const data = readFileSync26("/proc/self/environ", "utf-8");
       for (const entry of data.split("\0")) {
         const idx = entry.indexOf("=");
         if (idx > 0) {
@@ -40123,7 +40123,7 @@ function createAbortError() {
   return error48;
 }
 function abortableSleep(ms2, signal) {
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     if (signal?.aborted) {
       reject(createAbortError());
       return;
@@ -40134,7 +40134,7 @@ function abortableSleep(ms2, signal) {
     };
     const timeout = setTimeout(() => {
       signal?.removeEventListener("abort", onAbort);
-      resolve17();
+      resolve18();
     }, Math.max(0, ms2));
     signal?.addEventListener("abort", onAbort, { once: true });
   });
@@ -41990,7 +41990,7 @@ var init_values2 = __esm({
 var sleep3;
 var init_sleep2 = __esm({
   "node_modules/@earendil-works/pi-coding-agent/node_modules/openai/internal/utils/sleep.mjs"() {
-    sleep3 = (ms2) => new Promise((resolve17) => setTimeout(resolve17, ms2));
+    sleep3 = (ms2) => new Promise((resolve18) => setTimeout(resolve18, ms2));
   }
 });
 
@@ -42862,10 +42862,10 @@ async function* iterSSEChunks2(iterator) {
     yield data;
   }
 }
-function partition2(str3, delimiter3) {
-  const index3 = str3.indexOf(delimiter3);
+function partition2(str3, delimiter4) {
+  const index3 = str3.indexOf(delimiter4);
   if (index3 !== -1) {
-    return [str3.substring(0, index3), delimiter3, str3.substring(index3 + delimiter3.length)];
+    return [str3.substring(0, index3), delimiter4, str3.substring(index3 + delimiter4.length)];
   }
   return [str3, "", ""];
 }
@@ -43151,8 +43151,8 @@ var init_api_promise2 = __esm({
     init_parse5();
     APIPromise2 = class _APIPromise extends Promise {
       constructor(client2, responsePromise, parseResponse2 = defaultParseResponse2) {
-        super((resolve17) => {
-          resolve17(null);
+        super((resolve18) => {
+          resolve18(null);
         });
         this.responsePromise = responsePromise;
         this.parseResponse = parseResponse2;
@@ -43899,12 +43899,12 @@ var init_EventStream = __esm({
         _EventStream_errored.set(this, false);
         _EventStream_aborted.set(this, false);
         _EventStream_catchingPromiseCreated.set(this, false);
-        __classPrivateFieldSet2(this, _EventStream_connectedPromise, new Promise((resolve17, reject) => {
-          __classPrivateFieldSet2(this, _EventStream_resolveConnectedPromise, resolve17, "f");
+        __classPrivateFieldSet2(this, _EventStream_connectedPromise, new Promise((resolve18, reject) => {
+          __classPrivateFieldSet2(this, _EventStream_resolveConnectedPromise, resolve18, "f");
           __classPrivateFieldSet2(this, _EventStream_rejectConnectedPromise, reject, "f");
         }), "f");
-        __classPrivateFieldSet2(this, _EventStream_endPromise, new Promise((resolve17, reject) => {
-          __classPrivateFieldSet2(this, _EventStream_resolveEndPromise, resolve17, "f");
+        __classPrivateFieldSet2(this, _EventStream_endPromise, new Promise((resolve18, reject) => {
+          __classPrivateFieldSet2(this, _EventStream_resolveEndPromise, resolve18, "f");
           __classPrivateFieldSet2(this, _EventStream_rejectEndPromise, reject, "f");
         }), "f");
         __classPrivateFieldGet3(this, _EventStream_connectedPromise, "f").catch(() => {
@@ -43988,11 +43988,11 @@ var init_EventStream = __esm({
        *   const message = await stream.emitted('message') // rejects if the stream errors
        */
       emitted(event) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           __classPrivateFieldSet2(this, _EventStream_catchingPromiseCreated, true, "f");
           if (event !== "error")
             this.once("error", reject);
-          this.once(event, resolve17);
+          this.once(event, resolve18);
         });
       }
       async done() {
@@ -45049,7 +45049,7 @@ var init_ChatCompletionStream = __esm({
               if (done) {
                 return { value: void 0, done: true };
               }
-              return new Promise((resolve17, reject) => readQueue.push({ resolve: resolve17, reject })).then((chunk2) => chunk2 ? { value: chunk2, done: false } : { value: void 0, done: true });
+              return new Promise((resolve18, reject) => readQueue.push({ resolve: resolve18, reject })).then((chunk2) => chunk2 ? { value: chunk2, done: false } : { value: void 0, done: true });
             }
             const chunk = pushQueue.shift();
             return { value: chunk, done: false };
@@ -48525,7 +48525,7 @@ var init_AssistantStream = __esm({
               if (done) {
                 return { value: void 0, done: true };
               }
-              return new Promise((resolve17, reject) => readQueue.push({ resolve: resolve17, reject })).then((chunk2) => chunk2 ? { value: chunk2, done: false } : { value: void 0, done: true });
+              return new Promise((resolve18, reject) => readQueue.push({ resolve: resolve18, reject })).then((chunk2) => chunk2 ? { value: chunk2, done: false } : { value: void 0, done: true });
             }
             const chunk = pushQueue.shift();
             return { value: chunk, done: false };
@@ -50870,7 +50870,7 @@ var init_ResponseStream = __esm({
               if (done) {
                 return { value: void 0, done: true };
               }
-              return new Promise((resolve17, reject) => readQueue.push({ resolve: resolve17, reject })).then((event2) => event2 ? { value: event2, done: false } : { value: void 0, done: true });
+              return new Promise((resolve18, reject) => readQueue.push({ resolve: resolve18, reject })).then((event2) => event2 ? { value: event2, done: false } : { value: void 0, done: true });
             }
             const event = pushQueue.shift();
             return { value: event, done: false };
@@ -53993,7 +53993,7 @@ var require_p_retry = __commonJS({
       return error48;
     };
     var isNetworkError = (errorMessage2) => networkErrorMsgs.includes(errorMessage2);
-    var pRetry2 = (input2, options) => new Promise((resolve17, reject) => {
+    var pRetry2 = (input2, options) => new Promise((resolve18, reject) => {
       options = {
         onFailedAttempt: () => {
         },
@@ -54003,7 +54003,7 @@ var require_p_retry = __commonJS({
       const operation = retry.operation(options);
       operation.attempt(async (attemptNumber) => {
         try {
-          resolve17(await input2(attemptNumber));
+          resolve18(await input2(attemptNumber));
         } catch (error48) {
           if (!(error48 instanceof Error)) {
             reject(new TypeError(`Non-error was thrown: "${error48}". You should only throw errors.`));
@@ -54537,10 +54537,10 @@ var require_retry3 = __commonJS({
       if (!await shouldRetryFn(err2)) {
         return { shouldRetry: false, config: err2.config };
       }
-      const delay2 = getNextRetryDelay(config2);
+      const delay3 = getNextRetryDelay(config2);
       err2.config.retryConfig.currentRetryAttempt += 1;
-      const backoff = config2.retryBackoff ? config2.retryBackoff(err2, delay2) : new Promise((resolve17) => {
-        setTimeout(resolve17, delay2);
+      const backoff = config2.retryBackoff ? config2.retryBackoff(err2, delay3) : new Promise((resolve18) => {
+        setTimeout(resolve18, delay3);
       });
       if (config2.onRetryAttempt) {
         await config2.onRetryAttempt(err2);
@@ -54817,8 +54817,8 @@ var require_common2 = __commonJS({
         }
         return debug;
       }
-      function extend2(namespace, delimiter3) {
-        const newDebug = createDebug(this.namespace + (typeof delimiter3 === "undefined" ? ":" : delimiter3) + namespace);
+      function extend2(namespace, delimiter4) {
+        const newDebug = createDebug(this.namespace + (typeof delimiter4 === "undefined" ? ":" : delimiter4) + namespace);
         newDebug.log = this.log;
         return newDebug;
       }
@@ -55431,8 +55431,8 @@ var require_helpers = __commonJS({
     function req(url2, opts = {}) {
       const href = typeof url2 === "string" ? url2 : url2.href;
       const req2 = (href.startsWith("https:") ? https2 : http3).request(url2, opts);
-      const promise2 = new Promise((resolve17, reject) => {
-        req2.once("response", resolve17).once("error", reject).end();
+      const promise2 = new Promise((resolve18, reject) => {
+        req2.once("response", resolve18).once("error", reject).end();
       });
       req2.then = promise2.then.bind(promise2);
       return req2;
@@ -55609,7 +55609,7 @@ var require_parse_proxy_response = __commonJS({
     var debug_1 = __importDefault(require_src());
     var debug = (0, debug_1.default)("https-proxy-agent:parse-proxy-response");
     function parseProxyResponse(socket) {
-      return new Promise((resolve17, reject) => {
+      return new Promise((resolve18, reject) => {
         let buffersLength = 0;
         const buffers = [];
         function read() {
@@ -55675,7 +55675,7 @@ var require_parse_proxy_response = __commonJS({
           }
           debug("got proxy server response: %o %o", firstLine, headers);
           cleanup();
-          resolve17({
+          resolve18({
             connect: {
               statusCode,
               statusText,
@@ -55917,7 +55917,7 @@ var require_ponyfill_es2018 = __commonJS({
         return new originalPromise(executor);
       }
       function promiseResolvedWith(value2) {
-        return newPromise((resolve17) => resolve17(value2));
+        return newPromise((resolve18) => resolve18(value2));
       }
       function promiseRejectedWith(reason) {
         return originalPromiseReject(reason);
@@ -56087,8 +56087,8 @@ var require_ponyfill_es2018 = __commonJS({
         return new TypeError("Cannot " + name + " a stream using a released reader");
       }
       function defaultReaderClosedPromiseInitialize(reader) {
-        reader._closedPromise = newPromise((resolve17, reject) => {
-          reader._closedPromise_resolve = resolve17;
+        reader._closedPromise = newPromise((resolve18, reject) => {
+          reader._closedPromise_resolve = resolve18;
           reader._closedPromise_reject = reject;
         });
       }
@@ -56139,11 +56139,11 @@ var require_ponyfill_es2018 = __commonJS({
           throw new TypeError(`${context} is not a function.`);
         }
       }
-      function isObject10(x4) {
+      function isObject11(x4) {
         return typeof x4 === "object" && x4 !== null || typeof x4 === "function";
       }
       function assertObject(x4, context) {
-        if (!isObject10(x4)) {
+        if (!isObject11(x4)) {
           throw new TypeError(`${context} is not an object.`);
         }
       }
@@ -56262,8 +56262,8 @@ var require_ponyfill_es2018 = __commonJS({
           }
           let resolvePromise;
           let rejectPromise;
-          const promise2 = newPromise((resolve17, reject) => {
-            resolvePromise = resolve17;
+          const promise2 = newPromise((resolve18, reject) => {
+            resolvePromise = resolve18;
             rejectPromise = reject;
           });
           const readRequest = {
@@ -56368,8 +56368,8 @@ var require_ponyfill_es2018 = __commonJS({
           const reader = this._reader;
           let resolvePromise;
           let rejectPromise;
-          const promise2 = newPromise((resolve17, reject) => {
-            resolvePromise = resolve17;
+          const promise2 = newPromise((resolve18, reject) => {
+            resolvePromise = resolve18;
             rejectPromise = reject;
           });
           const readRequest = {
@@ -57388,8 +57388,8 @@ var require_ponyfill_es2018 = __commonJS({
           }
           let resolvePromise;
           let rejectPromise;
-          const promise2 = newPromise((resolve17, reject) => {
-            resolvePromise = resolve17;
+          const promise2 = newPromise((resolve18, reject) => {
+            resolvePromise = resolve18;
             rejectPromise = reject;
           });
           const readIntoRequest = {
@@ -57701,10 +57701,10 @@ var require_ponyfill_es2018 = __commonJS({
           wasAlreadyErroring = true;
           reason = void 0;
         }
-        const promise2 = newPromise((resolve17, reject) => {
+        const promise2 = newPromise((resolve18, reject) => {
           stream11._pendingAbortRequest = {
             _promise: void 0,
-            _resolve: resolve17,
+            _resolve: resolve18,
             _reject: reject,
             _reason: reason,
             _wasAlreadyErroring: wasAlreadyErroring
@@ -57721,9 +57721,9 @@ var require_ponyfill_es2018 = __commonJS({
         if (state2 === "closed" || state2 === "errored") {
           return promiseRejectedWith(new TypeError(`The stream (in ${state2} state) is not in the writable state and cannot be closed`));
         }
-        const promise2 = newPromise((resolve17, reject) => {
+        const promise2 = newPromise((resolve18, reject) => {
           const closeRequest = {
-            _resolve: resolve17,
+            _resolve: resolve18,
             _reject: reject
           };
           stream11._closeRequest = closeRequest;
@@ -57736,9 +57736,9 @@ var require_ponyfill_es2018 = __commonJS({
         return promise2;
       }
       function WritableStreamAddWriteRequest(stream11) {
-        const promise2 = newPromise((resolve17, reject) => {
+        const promise2 = newPromise((resolve18, reject) => {
           const writeRequest = {
-            _resolve: resolve17,
+            _resolve: resolve18,
             _reject: reject
           };
           stream11._writeRequests.push(writeRequest);
@@ -58354,8 +58354,8 @@ var require_ponyfill_es2018 = __commonJS({
         return new TypeError("Cannot " + name + " a stream using a released writer");
       }
       function defaultWriterClosedPromiseInitialize(writer) {
-        writer._closedPromise = newPromise((resolve17, reject) => {
-          writer._closedPromise_resolve = resolve17;
+        writer._closedPromise = newPromise((resolve18, reject) => {
+          writer._closedPromise_resolve = resolve18;
           writer._closedPromise_reject = reject;
           writer._closedPromiseState = "pending";
         });
@@ -58391,8 +58391,8 @@ var require_ponyfill_es2018 = __commonJS({
         writer._closedPromiseState = "resolved";
       }
       function defaultWriterReadyPromiseInitialize(writer) {
-        writer._readyPromise = newPromise((resolve17, reject) => {
-          writer._readyPromise_resolve = resolve17;
+        writer._readyPromise = newPromise((resolve18, reject) => {
+          writer._readyPromise_resolve = resolve18;
           writer._readyPromise_reject = reject;
         });
         writer._readyPromiseState = "pending";
@@ -58479,7 +58479,7 @@ var require_ponyfill_es2018 = __commonJS({
         source._disturbed = true;
         let shuttingDown = false;
         let currentWrite = promiseResolvedWith(void 0);
-        return newPromise((resolve17, reject) => {
+        return newPromise((resolve18, reject) => {
           let abortAlgorithm;
           if (signal !== void 0) {
             abortAlgorithm = () => {
@@ -58624,7 +58624,7 @@ var require_ponyfill_es2018 = __commonJS({
             if (isError) {
               reject(error48);
             } else {
-              resolve17(void 0);
+              resolve18(void 0);
             }
             return null;
           }
@@ -58905,8 +58905,8 @@ var require_ponyfill_es2018 = __commonJS({
         let branch1;
         let branch2;
         let resolveCancelPromise;
-        const cancelPromise = newPromise((resolve17) => {
-          resolveCancelPromise = resolve17;
+        const cancelPromise = newPromise((resolve18) => {
+          resolveCancelPromise = resolve18;
         });
         function pullAlgorithm() {
           if (reading) {
@@ -58997,8 +58997,8 @@ var require_ponyfill_es2018 = __commonJS({
         let branch1;
         let branch2;
         let resolveCancelPromise;
-        const cancelPromise = newPromise((resolve17) => {
-          resolveCancelPromise = resolve17;
+        const cancelPromise = newPromise((resolve18) => {
+          resolveCancelPromise = resolve18;
         });
         function forwardReaderError(thisReader) {
           uponRejection(thisReader._closedPromise, (r2) => {
@@ -59778,8 +59778,8 @@ var require_ponyfill_es2018 = __commonJS({
           const writableHighWaterMark = ExtractHighWaterMark(writableStrategy, 1);
           const writableSizeAlgorithm = ExtractSizeAlgorithm(writableStrategy);
           let startPromise_resolve;
-          const startPromise = newPromise((resolve17) => {
-            startPromise_resolve = resolve17;
+          const startPromise = newPromise((resolve18) => {
+            startPromise_resolve = resolve18;
           });
           InitializeTransformStream(this, startPromise, writableHighWaterMark, writableSizeAlgorithm, readableHighWaterMark, readableSizeAlgorithm);
           SetUpTransformStreamDefaultControllerFromTransformer(this, transformer);
@@ -59872,8 +59872,8 @@ var require_ponyfill_es2018 = __commonJS({
         if (stream11._backpressureChangePromise !== void 0) {
           stream11._backpressureChangePromise_resolve();
         }
-        stream11._backpressureChangePromise = newPromise((resolve17) => {
-          stream11._backpressureChangePromise_resolve = resolve17;
+        stream11._backpressureChangePromise = newPromise((resolve18) => {
+          stream11._backpressureChangePromise_resolve = resolve18;
         });
         stream11._backpressure = backpressure;
       }
@@ -60041,8 +60041,8 @@ var require_ponyfill_es2018 = __commonJS({
           return controller._finishPromise;
         }
         const readable = stream11._readable;
-        controller._finishPromise = newPromise((resolve17, reject) => {
-          controller._finishPromise_resolve = resolve17;
+        controller._finishPromise = newPromise((resolve18, reject) => {
+          controller._finishPromise_resolve = resolve18;
           controller._finishPromise_reject = reject;
         });
         const cancelPromise = controller._cancelAlgorithm(reason);
@@ -60068,8 +60068,8 @@ var require_ponyfill_es2018 = __commonJS({
           return controller._finishPromise;
         }
         const readable = stream11._readable;
-        controller._finishPromise = newPromise((resolve17, reject) => {
-          controller._finishPromise_resolve = resolve17;
+        controller._finishPromise = newPromise((resolve18, reject) => {
+          controller._finishPromise_resolve = resolve18;
           controller._finishPromise_reject = reject;
         });
         const flushPromise = controller._flushAlgorithm();
@@ -60099,8 +60099,8 @@ var require_ponyfill_es2018 = __commonJS({
           return controller._finishPromise;
         }
         const writable = stream11._writable;
-        controller._finishPromise = newPromise((resolve17, reject) => {
-          controller._finishPromise_resolve = resolve17;
+        controller._finishPromise = newPromise((resolve18, reject) => {
+          controller._finishPromise_resolve = resolve18;
           controller._finishPromise_reject = reject;
         });
         const cancelPromise = controller._cancelAlgorithm(reason);
@@ -62051,7 +62051,7 @@ import zlib from "node:zlib";
 import Stream4, { PassThrough as PassThrough2, pipeline as pump } from "node:stream";
 import { Buffer as Buffer3 } from "node:buffer";
 async function fetch2(url2, options_) {
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     const request = new Request2(url2, options_);
     const { parsedURL, options } = getNodeRequestOptions(request);
     if (!supportedSchemas.has(parsedURL.protocol)) {
@@ -62060,7 +62060,7 @@ async function fetch2(url2, options_) {
     if (parsedURL.protocol === "data:") {
       const data = dist_default(request.url);
       const response2 = new Response2(data, { headers: { "Content-Type": data.typeFull } });
-      resolve17(response2);
+      resolve18(response2);
       return;
     }
     const send = (parsedURL.protocol === "https:" ? https : http2).request;
@@ -62182,7 +62182,7 @@ async function fetch2(url2, options_) {
             if (responseReferrerPolicy) {
               requestOptions.referrerPolicy = responseReferrerPolicy;
             }
-            resolve17(fetch2(new Request2(locationURL, requestOptions)));
+            resolve18(fetch2(new Request2(locationURL, requestOptions)));
             finalize2();
             return;
           }
@@ -62215,7 +62215,7 @@ async function fetch2(url2, options_) {
       const codings = headers.get("Content-Encoding");
       if (!request.compress || request.method === "HEAD" || codings === null || response_.statusCode === 204 || response_.statusCode === 304) {
         response = new Response2(body, responseOptions);
-        resolve17(response);
+        resolve18(response);
         return;
       }
       const zlibOptions = {
@@ -62229,7 +62229,7 @@ async function fetch2(url2, options_) {
           }
         });
         response = new Response2(body, responseOptions);
-        resolve17(response);
+        resolve18(response);
         return;
       }
       if (codings === "deflate" || codings === "x-deflate") {
@@ -62253,12 +62253,12 @@ async function fetch2(url2, options_) {
             });
           }
           response = new Response2(body, responseOptions);
-          resolve17(response);
+          resolve18(response);
         });
         raw.once("end", () => {
           if (!response) {
             response = new Response2(body, responseOptions);
-            resolve17(response);
+            resolve18(response);
           }
         });
         return;
@@ -62270,11 +62270,11 @@ async function fetch2(url2, options_) {
           }
         });
         response = new Response2(body, responseOptions);
-        resolve17(response);
+        resolve18(response);
         return;
       }
       response = new Response2(body, responseOptions);
-      resolve17(response);
+      resolve18(response);
     });
     writeToStream(request_, request).catch(reject);
   });
@@ -67646,11 +67646,11 @@ var require_verify_stream = __commonJS({
     var toString2 = require_tostring();
     var util = __require("util");
     var JWS_REGEX = /^[a-zA-Z0-9\-_]+?\.[a-zA-Z0-9\-_]+?\.([a-zA-Z0-9\-_]+)?$/;
-    function isObject10(thing) {
+    function isObject11(thing) {
       return Object.prototype.toString.call(thing) === "[object Object]";
     }
     function safeJsonParse(thing) {
-      if (isObject10(thing))
+      if (isObject11(thing))
         return thing;
       try {
         return JSON.parse(thing);
@@ -68344,7 +68344,7 @@ var require_jwtaccess = __commonJS({
         }
       }
       fromStreamAsync(inputStream) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           if (!inputStream) {
             reject(new Error("Must pass in a stream containing the service account auth settings."));
           }
@@ -68353,7 +68353,7 @@ var require_jwtaccess = __commonJS({
             try {
               const data = JSON.parse(s2);
               this.fromJSON(data);
-              resolve17();
+              resolve18();
             } catch (err2) {
               reject(err2);
             }
@@ -68592,7 +68592,7 @@ var require_jwtclient = __commonJS({
         }
       }
       fromStreamAsync(inputStream) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           if (!inputStream) {
             throw new Error("Must pass in a stream containing the service account auth settings.");
           }
@@ -68601,7 +68601,7 @@ var require_jwtclient = __commonJS({
             try {
               const data = JSON.parse(s2);
               this.fromJSON(data);
-              resolve17();
+              resolve18();
             } catch (e2) {
               reject(e2);
             }
@@ -68734,7 +68734,7 @@ var require_refreshclient = __commonJS({
         }
       }
       async fromStreamAsync(inputStream) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           if (!inputStream) {
             return reject(new Error("Must pass in a stream containing the user refresh token."));
           }
@@ -68743,7 +68743,7 @@ var require_refreshclient = __commonJS({
             try {
               const data = JSON.parse(s2);
               this.fromJSON(data);
-              return resolve17();
+              return resolve18();
             } catch (err2) {
               return reject(err2);
             }
@@ -70576,7 +70576,7 @@ var require_pluggable_auth_handler = __commonJS({
        * @return A promise that resolves with the executable response.
        */
       retrieveResponseFromExecutable(envMap) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           const child = childProcess.spawn(this.commandComponents[0], this.commandComponents.slice(1), {
             env: { ...process.env, ...Object.fromEntries(envMap) }
           });
@@ -70598,7 +70598,7 @@ var require_pluggable_auth_handler = __commonJS({
               try {
                 const responseJson = JSON.parse(output);
                 const response = new executable_response_1.ExecutableResponse(responseJson);
-                return resolve17(response);
+                return resolve18(response);
               } catch (error48) {
                 if (error48 instanceof executable_response_1.ExecutableResponseError) {
                   return reject(error48);
@@ -71501,7 +71501,7 @@ var require_googleauth = __commonJS({
         }
       }
       fromStreamAsync(inputStream, options) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           if (!inputStream) {
             throw new Error("Must pass in a stream containing the Google auth settings.");
           }
@@ -71511,7 +71511,7 @@ var require_googleauth = __commonJS({
               try {
                 const data = JSON.parse(chunks.join(""));
                 const r2 = this._cacheClientFromJSON(data, options);
-                return resolve17(r2);
+                return resolve18(r2);
               } catch (err2) {
                 if (!this.keyFilename)
                   throw err2;
@@ -71521,7 +71521,7 @@ var require_googleauth = __commonJS({
                 });
                 this.cachedCredential = client2;
                 this.setGapicJWTValues(client2);
-                return resolve17(client2);
+                return resolve18(client2);
               }
             } catch (err2) {
               return reject(err2);
@@ -71557,17 +71557,17 @@ var require_googleauth = __commonJS({
        * Run the Google Cloud SDK command that prints the default project ID
        */
       async getDefaultServiceProjectId() {
-        return new Promise((resolve17) => {
+        return new Promise((resolve18) => {
           (0, child_process_1.exec)("gcloud config config-helper --format json", (err2, stdout) => {
             if (!err2 && stdout) {
               try {
                 const projectId = JSON.parse(stdout).configuration.properties.core.project;
-                resolve17(projectId);
+                resolve18(projectId);
                 return;
               } catch (e2) {
               }
             }
-            resolve17(null);
+            resolve18(null);
           });
         });
       }
@@ -79216,14 +79216,14 @@ function __asyncValues(o) {
   }, i2);
   function verb(n7) {
     i2[n7] = o[n7] && function(v3) {
-      return new Promise(function(resolve17, reject) {
-        v3 = o[n7](v3), settle(resolve17, reject, v3.done, v3.value);
+      return new Promise(function(resolve18, reject) {
+        v3 = o[n7](v3), settle(resolve18, reject, v3.done, v3.value);
       });
     };
   }
-  function settle(resolve17, reject, d2, v3) {
+  function settle(resolve18, reject, d2, v3) {
     Promise.resolve(v3).then(function(v4) {
-      resolve17({ value: v4, done: d2 });
+      resolve18({ value: v4, done: d2 });
     }, reject);
   }
 }
@@ -85564,10 +85564,10 @@ function iterBinaryChunks(iterator) {
     }
   });
 }
-function partition3(str3, delimiter3) {
-  const index3 = str3.indexOf(delimiter3);
+function partition3(str3, delimiter4) {
+  const index3 = str3.indexOf(delimiter4);
   if (index3 !== -1) {
-    return [str3.substring(0, index3), delimiter3, str3.substring(index3 + delimiter3.length)];
+    return [str3.substring(0, index3), delimiter4, str3.substring(index3 + delimiter4.length)];
   }
   return [str3, "", ""];
 }
@@ -89260,11 +89260,11 @@ var init_node = __esm({
               while (true) {
                 delimiterIndex = -1;
                 delimiterLength = 0;
-                for (const delimiter3 of delimiters) {
-                  const index3 = buffer.indexOf(delimiter3);
+                for (const delimiter4 of delimiters) {
+                  const index3 = buffer.indexOf(delimiter4);
                   if (index3 !== -1 && (delimiterIndex === -1 || index3 < delimiterIndex)) {
                     delimiterIndex = index3;
-                    delimiterLength = delimiter3.length;
+                    delimiterLength = delimiter4.length;
                   }
                 }
                 if (delimiterIndex === -1) {
@@ -89591,8 +89591,8 @@ var init_node = __esm({
         const url2 = `${websocketBaseUrl}/ws/google.ai.generativelanguage.${apiVersion}.GenerativeService.BidiGenerateMusic?key=${apiKey}`;
         let onopenResolve = () => {
         };
-        const onopenPromise = new Promise((resolve17) => {
-          onopenResolve = resolve17;
+        const onopenPromise = new Promise((resolve18) => {
+          onopenResolve = resolve18;
         });
         const callbacks = params.callbacks;
         const onopenAwaitedCallback = function() {
@@ -89798,8 +89798,8 @@ var init_node = __esm({
         }
         let onopenResolve = () => {
         };
-        const onopenPromise = new Promise((resolve17) => {
-          onopenResolve = resolve17;
+        const onopenPromise = new Promise((resolve18) => {
+          onopenResolve = resolve18;
         });
         const callbacks = params.callbacks;
         const onopenAwaitedCallback = function() {
@@ -92147,7 +92147,7 @@ var init_node = __esm({
         return void 0;
       }
     };
-    sleep$1 = (ms2) => new Promise((resolve17) => setTimeout(resolve17, ms2));
+    sleep$1 = (ms2) => new Promise((resolve18) => setTimeout(resolve18, ms2));
     FallbackEncoder3 = ({ headers, body }) => {
       return {
         bodyHeaders: {
@@ -92656,8 +92656,8 @@ ${underline}`);
     };
     APIPromise3 = class _APIPromise extends Promise {
       constructor(client2, responsePromise, parseResponse2 = defaultParseResponse3) {
-        super((resolve17) => {
-          resolve17(null);
+        super((resolve18) => {
+          resolve18(null);
         });
         this.responsePromise = responsePromise;
         this.parseResponse = parseResponse2;
@@ -95925,12 +95925,12 @@ function validateRetryDelayMs(delayMs, options) {
   return delayMs;
 }
 function sleep5(ms2, signal) {
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     if (signal?.aborted) {
       reject(new Error("Request was aborted"));
       return;
     }
-    const timeout = setTimeout(resolve17, ms2);
+    const timeout = setTimeout(resolve18, ms2);
     signal?.addEventListener("abort", () => {
       clearTimeout(timeout);
       reject(new Error("Request was aborted"));
@@ -96309,7 +96309,7 @@ async function connectWebSocket(url2, headers, signal, connectTimeoutMs = DEFAUL
   }
   const wsHeaders = headersToRecord(headers);
   delete wsHeaders["OpenAI-Beta"];
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     let settled = false;
     let timeout;
     let socket;
@@ -96344,7 +96344,7 @@ async function connectWebSocket(url2, headers, signal, connectTimeoutMs = DEFAUL
         return;
       settled = true;
       cleanup();
-      resolve17(socket);
+      resolve18(socket);
     };
     const onError2 = (event) => {
       fail(extractWebSocketError(event));
@@ -96520,9 +96520,9 @@ async function* parseWebSocket(socket, signal, idleTimeoutMs) {
   const wake = () => {
     if (!pending)
       return;
-    const resolve17 = pending;
+    const resolve18 = pending;
     pending = null;
-    resolve17();
+    resolve18();
   };
   const onMessage = (event) => {
     void (async () => {
@@ -96589,8 +96589,8 @@ async function* parseWebSocket(socket, signal, idleTimeoutMs) {
       if (done)
         break;
       let timeout;
-      await new Promise((resolve17, reject) => {
-        pending = resolve17;
+      await new Promise((resolve18, reject) => {
+        pending = resolve18;
         if (idleTimeoutMs !== void 0 && idleTimeoutMs > 0) {
           timeout = setTimeout(() => {
             const error48 = new Error(`WebSocket idle timeout after ${idleTimeoutMs}ms`);
@@ -102618,12 +102618,12 @@ var require_isexe = __commonJS({
         if (typeof Promise !== "function") {
           throw new TypeError("callback not provided");
         }
-        return new Promise(function(resolve17, reject) {
+        return new Promise(function(resolve18, reject) {
           isexe(path16, options || {}, function(er, is2) {
             if (er) {
               reject(er);
             } else {
-              resolve17(is2);
+              resolve18(is2);
             }
           });
         });
@@ -102689,27 +102689,27 @@ var require_which = __commonJS({
         opt = {};
       const { pathEnv, pathExt, pathExtExe } = getPathInfo(cmd, opt);
       const found = [];
-      const step = (i2) => new Promise((resolve17, reject) => {
+      const step = (i2) => new Promise((resolve18, reject) => {
         if (i2 === pathEnv.length)
-          return opt.all && found.length ? resolve17(found) : reject(getNotFoundError3(cmd));
+          return opt.all && found.length ? resolve18(found) : reject(getNotFoundError3(cmd));
         const ppRaw = pathEnv[i2];
         const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
         const pCmd = path16.join(pathPart, cmd);
         const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
-        resolve17(subStep(p, i2, 0));
+        resolve18(subStep(p, i2, 0));
       });
-      const subStep = (p, i2, ii2) => new Promise((resolve17, reject) => {
+      const subStep = (p, i2, ii2) => new Promise((resolve18, reject) => {
         if (ii2 === pathExt.length)
-          return resolve17(step(i2 + 1));
+          return resolve18(step(i2 + 1));
         const ext2 = pathExt[ii2];
         isexe(p + ext2, { pathExt: pathExtExe }, (er, is2) => {
           if (!er && is2) {
             if (opt.all)
               found.push(p + ext2);
             else
-              return resolve17(p + ext2);
+              return resolve18(p + ext2);
           }
-          return resolve17(subStep(p, i2, ii2 + 1));
+          return resolve18(subStep(p, i2, ii2 + 1));
         });
       });
       return cb ? step(0).then((res) => cb(null, res), cb) : step(0);
@@ -103030,7 +103030,7 @@ function spawnProcessSync(command, args, options) {
   return process.platform === "win32" ? import_cross_spawn.default.sync(command, args, options) : nodeSpawnSync(command, args, options);
 }
 function waitForChildProcess(child) {
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     let settled = false;
     let exited = false;
     let exitCode = null;
@@ -103057,7 +103057,7 @@ function waitForChildProcess(child) {
       cleanup();
       child.stdout?.destroy();
       child.stderr?.destroy();
-      resolve17(code);
+      resolve18(code);
     };
     const maybeFinalizeAfterExit = () => {
       if (!exited || settled)
@@ -105032,9 +105032,9 @@ async function walkDirectoryWithFd(baseDir, fdPath, query, maxResults, signal) {
   if (query) {
     args.push(buildFdPathQuery(query));
   }
-  return await new Promise((resolve17) => {
+  return await new Promise((resolve18) => {
     if (signal.aborted) {
-      resolve17([]);
+      resolve18([]);
       return;
     }
     const child = spawn2(fdPath, args, {
@@ -105047,7 +105047,7 @@ async function walkDirectoryWithFd(baseDir, fdPath, query, maxResults, signal) {
         return;
       resolved = true;
       signal.removeEventListener("abort", onAbort);
-      resolve17(results);
+      resolve18(results);
     };
     const onAbort = () => {
       if (child.exitCode === null) {
@@ -109115,7 +109115,7 @@ var init_tui = __esm({
           return;
         }
         const elapsed = performance2.now() - this.lastRenderAt;
-        const delay2 = Math.max(0, _TuiBase.MIN_RENDER_INTERVAL_MS - elapsed);
+        const delay3 = Math.max(0, _TuiBase.MIN_RENDER_INTERVAL_MS - elapsed);
         this.renderTimer = setTimeout(() => {
           this.renderTimer = void 0;
           if (this.stopped || !this.renderRequested) {
@@ -109127,7 +109127,7 @@ var init_tui = __esm({
           if (this.renderRequested) {
             this.scheduleRender();
           }
-        }, delay2);
+        }, delay3);
       }
       handleTerminalInput(data) {
         if (this.consumeOsc11BackgroundResponse(data)) {
@@ -109412,10 +109412,10 @@ var init_tui = __esm({
        * @returns Promise containing the parsed RGB color, or undefined if it times out or fails to parse.
        */
       queryTerminalBackgroundColor({ timeoutMs }) {
-        return new Promise((resolve17) => {
+        return new Promise((resolve18) => {
           const query = {
             settled: false,
-            resolve: resolve17,
+            resolve: resolve18,
             timer: void 0
           };
           query.timer = setTimeout(() => {
@@ -109438,7 +109438,7 @@ var init_tui = __esm({
        * `CSI ? 997 ; 1 n` for dark or `CSI ? 997 ; 2 n` for light.
        */
       queryTerminalColorScheme({ timeoutMs }) {
-        return new Promise((resolve17) => {
+        return new Promise((resolve18) => {
           let settled = false;
           let timer;
           let unsubscribe = () => {
@@ -109452,7 +109452,7 @@ var init_tui = __esm({
               timer = void 0;
             }
             unsubscribe();
-            resolve17(scheme);
+            resolve18(scheme);
           };
           unsubscribe = this.onTerminalColorSchemeChange(settle);
           timer = setTimeout(() => settle(void 0), timeoutMs);
@@ -113127,9 +113127,9 @@ var init_latex = __esm({
           return rows.map((row, index3) => {
             const value2 = (row[0] ?? "").replace(/,\s*$/, "");
             const condition = row[1] ?? "";
-            const delimiter3 = index3 === 0 ? "\u23A7" : index3 === rows.length - 1 ? "\u23A9" : "\u23A8";
+            const delimiter4 = index3 === 0 ? "\u23A7" : index3 === rows.length - 1 ? "\u23A9" : "\u23A8";
             const conditionPrefix = /^(?:if|when|for|otherwise)\b/i.test(condition) ? " " : " if ";
-            return `${delimiter3} ${value2}${condition ? `${conditionPrefix}${condition}` : ""}`;
+            return `${delimiter4} ${value2}${condition ? `${conditionPrefix}${condition}` : ""}`;
           }).join("\n");
         }
         if (["array", "matrix", "smallmatrix", "pmatrix", "bmatrix", "Bmatrix", "vmatrix", "Vmatrix"].includes(environment)) {
@@ -113158,14 +113158,14 @@ var init_latex = __esm({
             vmatrix: ["\u2502", "\u2502", "\u2502", "\u2502", "\u2502", "\u2502"],
             Vmatrix: ["\u2551", "\u2551", "\u2551", "\u2551", "\u2551", "\u2551"]
           };
-          const delimiter3 = delimiters[environment];
-          if (!delimiter3) {
+          const delimiter4 = delimiters[environment];
+          if (!delimiter4) {
             this.supported = false;
             return rows.join("\n");
           }
           lines = rows.map((row, index4) => {
-            const left = index4 === 0 ? delimiter3[0] : index4 === rows.length - 1 ? delimiter3[4] : delimiter3[2];
-            const right = index4 === 0 ? delimiter3[1] : index4 === rows.length - 1 ? delimiter3[5] : delimiter3[3];
+            const left = index4 === 0 ? delimiter4[0] : index4 === rows.length - 1 ? delimiter4[4] : delimiter4[2];
+            const right = index4 === 0 ? delimiter4[1] : index4 === rows.length - 1 ? delimiter4[5] : delimiter4[3];
             return `${left} ${row} ${right}`;
           });
         }
@@ -115019,7 +115019,7 @@ var init_terminal = __esm({
               break;
             if (now - lastDataTime >= idleMs)
               break;
-            await new Promise((resolve17) => setTimeout(resolve17, Math.min(idleMs, timeLeft)));
+            await new Promise((resolve18) => setTimeout(resolve18, Math.min(idleMs, timeLeft)));
           }
         } finally {
           process.stdin.removeListener("data", onData);
@@ -116245,50 +116245,50 @@ var init_tui_alt_screen = __esm({
       }
       getSelectionPoint(event, scrollView) {
         if (scrollView) {
-          const point = this.getScrollSelectionPoint(scrollView, event.x, event.y);
-          if (point)
-            return point;
+          const point2 = this.getScrollSelectionPoint(scrollView, event.x, event.y);
+          if (point2)
+            return point2;
         }
         return {
           row: Math.max(0, Math.min(this.terminal.rows - 1, event.y)),
           col: Math.max(0, Math.min(this.terminal.columns - 1, event.x))
         };
       }
-      getSelectionSourceLine(point) {
-        if (point.scrollView && this.currentLayout) {
-          const lines = getScrollViewBox(this.currentLayout, point.scrollView)?.scrollContentLines;
+      getSelectionSourceLine(point2) {
+        if (point2.scrollView && this.currentLayout) {
+          const lines = getScrollViewBox(this.currentLayout, point2.scrollView)?.scrollContentLines;
           if (lines)
-            return lines[point.row] ?? "";
+            return lines[point2.row] ?? "";
         }
-        return this.previousScreen[point.row] ?? "";
+        return this.previousScreen[point2.row] ?? "";
       }
-      getWordSelection(point) {
-        const line = stripTerminalSequences(this.getSelectionSourceLine(point));
+      getWordSelection(point2) {
+        const line = stripTerminalSequences(this.getSelectionSourceLine(point2));
         let start = 0;
         for (const segment2 of wordSegmenter4.segment(line)) {
           const end = start + visibleWidth(segment2.segment);
-          if (point.col >= start && point.col < end) {
+          if (point2.col >= start && point2.col < end) {
             return {
-              start: { ...point, col: start },
-              end: { ...point, col: end, boundary: true }
+              start: { ...point2, col: start },
+              end: { ...point2, col: end, boundary: true }
             };
           }
           start = end;
         }
         return void 0;
       }
-      getLineSelection(point) {
+      getLineSelection(point2) {
         return {
-          start: { ...point, col: 0 },
-          end: { ...point, col: visibleWidth(this.getSelectionSourceLine(point)), boundary: true }
+          start: { ...point2, col: 0 },
+          end: { ...point2, col: visibleWidth(this.getSelectionSourceLine(point2)), boundary: true }
         };
       }
-      updateSelectionFocus(point) {
+      updateSelectionFocus(point2) {
         if (this.selectionGranularity === "character" || !this.selectionInitialRange) {
-          this.selectionFocus = point;
+          this.selectionFocus = point2;
           return;
         }
-        const range2 = this.selectionGranularity === "word" ? this.getWordSelection(point) : this.getLineSelection(point);
+        const range2 = this.selectionGranularity === "word" ? this.getWordSelection(point2) : this.getLineSelection(point2);
         if (!range2)
           return;
         const initial = this.selectionInitialRange;
@@ -116301,15 +116301,15 @@ var init_tui_alt_screen = __esm({
           this.selectionFocus = range2.end;
         }
       }
-      getClickCount(point, word) {
+      getClickCount(point2, word) {
         const now = Date.now();
         const previous = this.lastClick;
-        const count = word && previous && now - previous.timestamp <= DOUBLE_CLICK_INTERVAL_MS && previous.row === point.row && previous.scrollView === point.scrollView && previous.wordStart === word.start.col && previous.wordEnd === word.end.col ? previous.count % 3 + 1 : 1;
+        const count = word && previous && now - previous.timestamp <= DOUBLE_CLICK_INTERVAL_MS && previous.row === point2.row && previous.scrollView === point2.scrollView && previous.wordStart === word.start.col && previous.wordEnd === word.end.col ? previous.count % 3 + 1 : 1;
         this.lastClick = word ? {
           timestamp: now,
           count,
-          row: point.row,
-          scrollView: point.scrollView,
+          row: point2.row,
+          scrollView: point2.scrollView,
           wordStart: word.start.col,
           wordEnd: word.end.col
         } : void 0;
@@ -116352,9 +116352,9 @@ var init_tui_alt_screen = __esm({
           this.stopSelectionAutoScroll();
           return;
         }
-        const point = this.getScrollSelectionPoint(scrollView, pointer.x, pointer.y);
-        if (point)
-          this.updateSelectionFocus(point);
+        const point2 = this.getScrollSelectionPoint(scrollView, pointer.x, pointer.y);
+        if (point2)
+          this.updateSelectionFocus(point2);
         this.requestRender();
       }
       stopSelectionAutoScroll() {
@@ -116370,7 +116370,7 @@ var init_tui_alt_screen = __esm({
         if (button !== 0 && !(event.release && button === 3))
           return;
         const anchorScrollView = this.selectionAnchor?.scrollView;
-        const point = this.getSelectionPoint(event, anchorScrollView);
+        const point2 = this.getSelectionPoint(event, anchorScrollView);
         if (event.release) {
           if (!this.selectionPressActive)
             return;
@@ -116378,8 +116378,8 @@ var init_tui_alt_screen = __esm({
           this.stopSelectionAutoScroll();
           if (!this.selectionAnchor)
             return;
-          this.updateSelectionFocus(point);
-          const clickedUrl = !this.selectionDragged && this.selectionAnchor.scrollView === point.scrollView && this.selectionAnchor.row === point.row && this.selectionAnchor.col === point.col ? this.pressedUrl : void 0;
+          this.updateSelectionFocus(point2);
+          const clickedUrl = !this.selectionDragged && this.selectionAnchor.scrollView === point2.scrollView && this.selectionAnchor.row === point2.row && this.selectionAnchor.col === point2.col ? this.pressedUrl : void 0;
           this.pressedUrl = void 0;
           if (clickedUrl && this.openUrl) {
             this.selectionAnchor = void 0;
@@ -116401,7 +116401,7 @@ var init_tui_alt_screen = __esm({
           this.selectionDragged = true;
           this.lastClick = void 0;
           this.pressedUrl = void 0;
-          this.updateSelectionFocus(point);
+          this.updateSelectionFocus(point2);
           this.updateSelectionAutoScroll(event);
           this.requestRender();
           return;
@@ -118087,7 +118087,7 @@ var require_core = __commonJS({
       return match2 && match2.index === 0;
     }
     var BACKREF_RE = /\[(?:[^\\\]]|\\.)*\]|\(\??|\\([1-9][0-9]*)|\\./;
-    function join52(regexps, separator = "|") {
+    function join53(regexps, separator = "|") {
       let numCaptures = 0;
       return regexps.map((regex2) => {
         numCaptures += 1;
@@ -118391,7 +118391,7 @@ var require_core = __commonJS({
             this.exec = () => null;
           }
           const terminators = this.regexes.map((el) => el[1]);
-          this.matcherRe = langRe(join52(terminators), true);
+          this.matcherRe = langRe(join53(terminators), true);
           this.lastIndex = 0;
         }
         /** @param {string} s */
@@ -153436,7 +153436,7 @@ function getThemeExportColors(themeName) {
     if (!exportSection)
       return {};
     const vars = themeJson.vars ?? {};
-    const resolve17 = (value2) => {
+    const resolve18 = (value2) => {
       if (value2 === void 0)
         return void 0;
       const resolved = resolveVarRefs(value2, vars);
@@ -153447,9 +153447,9 @@ function getThemeExportColors(themeName) {
       return resolved;
     };
     return {
-      pageBg: resolve17(exportSection.pageBg),
-      cardBg: resolve17(exportSection.cardBg),
-      infoBg: resolve17(exportSection.infoBg)
+      pageBg: resolve18(exportSection.pageBg),
+      cardBg: resolve18(exportSection.cardBg),
+      infoBg: resolve18(exportSection.infoBg)
     };
   } catch {
     return {};
@@ -153869,12 +153869,12 @@ var init_frontmatter = __esm({
 
 // node_modules/@earendil-works/pi-coding-agent/dist/utils/sleep.js
 function sleep6(ms2, signal) {
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     if (signal?.aborted) {
       reject(new Error("Aborted"));
       return;
     }
-    const timeout = setTimeout(resolve17, ms2);
+    const timeout = setTimeout(resolve18, ms2);
     signal?.addEventListener("abort", () => {
       clearTimeout(timeout);
       reject(new Error("Aborted"));
@@ -155717,13 +155717,13 @@ async function resizeImageInWorker(workerSpecifier, inputBytes, mimeType, option
   const worker = createResizeWorker(workerSpecifier);
   try {
     const inputBytesForWorker = toTransferableBytes(inputBytes);
-    return await new Promise((resolve17, reject) => {
+    return await new Promise((resolve18, reject) => {
       let settled = false;
       const settle = (result) => {
         if (settled)
           return;
         settled = true;
-        resolve17(result);
+        resolve18(result);
       };
       const fail = (error48) => {
         if (settled)
@@ -162496,11 +162496,11 @@ Default "index" lookups for the main are deprecated for ES modules.`, "Deprecati
             return e5;
           })(l4, t4);
         }
-        function fileURLToPath9(e4) {
+        function fileURLToPath10(e4) {
           return "string" != typeof e4 || e4.startsWith("file://") ? normalizeSlash((0, Qe3.fileURLToPath)(e4)) : normalizeSlash(e4);
         }
         function pathToFileURL5(e4) {
-          return (0, Qe3.pathToFileURL)(fileURLToPath9(e4)).toString();
+          return (0, Qe3.pathToFileURL)(fileURLToPath10(e4)).toString();
         }
         const Ut3 = /* @__PURE__ */ new Set(["node", "import"]), Mt2 = [".mjs", ".cjs", ".js", ".json"], jt2 = /* @__PURE__ */ new Set(["ERR_MODULE_NOT_FOUND", "ERR_UNSUPPORTED_DIR_IMPORT", "MODULE_NOT_FOUND", "ERR_PACKAGE_PATH_NOT_EXPORTED"]);
         function _tryModuleResolve(e4, t4, i3) {
@@ -162513,11 +162513,11 @@ Default "index" lookups for the main are deprecated for ES modules.`, "Deprecati
         function _resolve(e4, t4 = {}) {
           if ("string" != typeof e4) {
             if (!(e4 instanceof URL)) throw new TypeError("input must be a `string` or `URL`");
-            e4 = fileURLToPath9(e4);
+            e4 = fileURLToPath10(e4);
           }
           if (/(?:node|data|http|https):/.test(e4)) return e4;
           if (st3.has(e4)) return "node:" + e4;
-          if (e4.startsWith("file://") && (e4 = fileURLToPath9(e4)), isAbsolute7(e4)) try {
+          if (e4.startsWith("file://") && (e4 = fileURLToPath10(e4)), isAbsolute7(e4)) try {
             if ((0, $e3.statSync)(e4).isFile()) return pathToFileURL5(e4);
           } catch (e5) {
             if ("ENOENT" !== e5?.code) throw e5;
@@ -162547,7 +162547,7 @@ Default "index" lookups for the main are deprecated for ES modules.`, "Deprecati
           return _resolve(e4, t4);
         }
         function resolvePathSync(e4, t4) {
-          return fileURLToPath9(resolveSync(e4, t4));
+          return fileURLToPath10(resolveSync(e4, t4));
         }
         const Ft3 = /(?:[\s;]|^)(?:import[\s\w*,{}]*from|import\s*["'*{]|export\b\s*(?:[*{]|default|class|type|function|const|var|let|async function)|import\.meta\b)/m, Bt2 = /\/\*.+?\*\/|\/\/.*(?=[nr])/g;
         function hasESMSyntax(e4, t4 = {}) {
@@ -162705,7 +162705,7 @@ Default "index" lookups for the main are deprecated for ES modules.`, "Deprecati
         }
         function tryNativeRequireResolve(e4, t4, i3, n8) {
           try {
-            return e4.nativeRequire.resolve(t4, { ...n8, paths: [pathe_M_eThtNZ_dirname(fileURLToPath9(i3)), ...n8?.paths || []] });
+            return e4.nativeRequire.resolve(t4, { ...n8, paths: [pathe_M_eThtNZ_dirname(fileURLToPath10(i3)), ...n8?.paths || []] });
           } catch {
           }
         }
@@ -162895,7 +162895,7 @@ Default "index" lookups for the main are deprecated for ES modules.`, "Deprecati
             const i4 = {};
             return void 0 !== e5.cache && (i4.fsCache = e5.cache), void 0 !== e5.requireCache && (i4.moduleCache = e5.requireCache), { ...t5, ...i4, ...e5 };
           })(t4);
-          "string" == typeof e4 && e4.startsWith("file://") && (e4 = fileURLToPath9(e4));
+          "string" == typeof e4 && e4.startsWith("file://") && (e4 = fileURLToPath10(e4));
           const c2 = a2.alias && Object.keys(a2.alias).length > 0 ? normalizeAliases(a2.alias || {}) : void 0;
           let l4;
           if (a2.tsconfigPaths) {
@@ -163232,7 +163232,7 @@ Did you specify these with the most recent transformation maps first?`);
             for (let e6 = 1; e6 < s2; e6++) a += "/" + n7[e6];
             (!a || o && !a.endsWith("/..")) && (a += "/"), e5.path = a;
           }
-          function resolve17(e5, t4) {
+          function resolve18(e5, t4) {
             if (!e5 && !t4) return "";
             const r4 = parseUrl(e5);
             let n7 = r4.type;
@@ -163269,7 +163269,7 @@ Did you specify these with the most recent transformation maps first?`);
                 return r4.scheme + "//" + r4.user + r4.host + r4.port + r4.path + s2;
             }
           }
-          return resolve17;
+          return resolve18;
         })();
       }, "./node_modules/.pnpm/@jridgewell+sourcemap-codec@1.5.5/node_modules/@jridgewell/sourcemap-codec/dist/sourcemap-codec.umd.js"(e3, t3, r3) {
         var n7;
@@ -191576,11 +191576,11 @@ ${o}`);
         RegExp.prototype[Symbol.replace];
         const { ERR_INVALID_MODULE_SPECIFIER: $e3, ERR_INVALID_PACKAGE_CONFIG: Ke3, ERR_INVALID_PACKAGE_TARGET: We3, ERR_MODULE_NOT_FOUND: qe3, ERR_PACKAGE_IMPORT_NOT_DEFINED: He3, ERR_PACKAGE_PATH_NOT_EXPORTED: ze3, ERR_UNSUPPORTED_DIR_IMPORT: Ge3, ERR_UNSUPPORTED_RESOLVE_REQUEST: Xe3 } = Fe3;
         /* @__PURE__ */ new Set();
-        function fileURLToPath9(e4) {
+        function fileURLToPath10(e4) {
           return "string" != typeof e4 || e4.startsWith("file://") ? normalizeSlash((0, we3.fileURLToPath)(e4)) : normalizeSlash(e4);
         }
         function pathToFileURL5(e4) {
-          return (0, we3.pathToFileURL)(fileURLToPath9(e4)).toString();
+          return (0, we3.pathToFileURL)(fileURLToPath10(e4)).toString();
         }
         function importMetaPathsPlugin(e4, t4) {
           return { name: "import-meta-paths", visitor: { Program(e5) {
@@ -191599,8 +191599,8 @@ ${o}`);
               }
             } });
             for (const e6 of r3) e6.replaceWith(m3.smart.ast`${t4.filename ? JSON.stringify(pathToFileURL5(t4.filename)) : "require('url').pathToFileURL(__filename).toString()"}`);
-            for (const e6 of n8) e6.replaceWith(m3.smart.ast`${t4.filename ? JSON.stringify(pathe_M_eThtNZ_dirname(fileURLToPath9(pathToFileURL5(t4.filename)))) : "__dirname"}`);
-            for (const e6 of s3) e6.replaceWith(m3.smart.ast`${t4.filename ? JSON.stringify(fileURLToPath9(pathToFileURL5(t4.filename))) : "__filename"}`);
+            for (const e6 of n8) e6.replaceWith(m3.smart.ast`${t4.filename ? JSON.stringify(pathe_M_eThtNZ_dirname(fileURLToPath10(pathToFileURL5(t4.filename)))) : "__dirname"}`);
+            for (const e6 of s3) e6.replaceWith(m3.smart.ast`${t4.filename ? JSON.stringify(fileURLToPath10(pathToFileURL5(t4.filename))) : "__filename"}`);
           } } };
         }
         var Je3 = __webpack_require__("./node_modules/.pnpm/@babel+helper-module-imports@7.28.6/node_modules/@babel/helper-module-imports/lib/index.js"), Ye3 = __webpack_require__("./node_modules/.pnpm/@babel+helper-module-transforms@7.28.6_@babel+core@7.29.0/node_modules/@babel/helper-module-transforms/lib/index.js"), Qe3 = __webpack_require__("./node_modules/.pnpm/@babel+helper-simple-access@7.27.1/node_modules/@babel/helper-simple-access/lib/index.js");
@@ -192117,7 +192117,7 @@ var init_args = __esm({
 // node_modules/graceful-fs/polyfills.js
 var require_polyfills = __commonJS({
   "node_modules/@earendil-works/pi-coding-agent/node_modules/graceful-fs/polyfills.js"(exports, module) {
-    var constants10 = __require("constants");
+    var constants11 = __require("constants");
     var origCwd = process.cwd;
     var cwd = null;
     var platform3 = process.env.GRACEFUL_FS_PLATFORM || process.platform;
@@ -192141,7 +192141,7 @@ var require_polyfills = __commonJS({
     var chdir;
     module.exports = patch;
     function patch(fs11) {
-      if (constants10.hasOwnProperty("O_SYMLINK") && process.version.match(/^v0\.6\.[0-2]|^v0\.5\./)) {
+      if (constants11.hasOwnProperty("O_SYMLINK") && process.version.match(/^v0\.6\.[0-2]|^v0\.5\./)) {
         patchLchmod(fs11);
       }
       if (!fs11.lutimes) {
@@ -192243,7 +192243,7 @@ var require_polyfills = __commonJS({
         fs12.lchmod = function(path16, mode, callback) {
           fs12.open(
             path16,
-            constants10.O_WRONLY | constants10.O_SYMLINK,
+            constants11.O_WRONLY | constants11.O_SYMLINK,
             mode,
             function(err2, fd) {
               if (err2) {
@@ -192259,7 +192259,7 @@ var require_polyfills = __commonJS({
           );
         };
         fs12.lchmodSync = function(path16, mode) {
-          var fd = fs12.openSync(path16, constants10.O_WRONLY | constants10.O_SYMLINK, mode);
+          var fd = fs12.openSync(path16, constants11.O_WRONLY | constants11.O_SYMLINK, mode);
           var threw = true;
           var ret;
           try {
@@ -192279,9 +192279,9 @@ var require_polyfills = __commonJS({
         };
       }
       function patchLutimes(fs12) {
-        if (constants10.hasOwnProperty("O_SYMLINK") && fs12.futimes) {
+        if (constants11.hasOwnProperty("O_SYMLINK") && fs12.futimes) {
           fs12.lutimes = function(path16, at2, mt2, cb) {
-            fs12.open(path16, constants10.O_SYMLINK, function(er, fd) {
+            fs12.open(path16, constants11.O_SYMLINK, function(er, fd) {
               if (er) {
                 if (cb) cb(er);
                 return;
@@ -192294,7 +192294,7 @@ var require_polyfills = __commonJS({
             });
           };
           fs12.lutimesSync = function(path16, at2, mt2) {
-            var fd = fs12.openSync(path16, constants10.O_SYMLINK);
+            var fd = fs12.openSync(path16, constants11.O_SYMLINK);
             var ret;
             var threw = true;
             try {
@@ -193613,12 +193613,12 @@ var require_adapter = __commonJS({
       return newFs;
     }
     function toPromise(method) {
-      return (...args) => new Promise((resolve17, reject) => {
+      return (...args) => new Promise((resolve18, reject) => {
         args.push((err2, result) => {
           if (err2) {
             reject(err2);
           } else {
-            resolve17(result);
+            resolve18(result);
           }
         });
         method(...args);
@@ -193710,7 +193710,7 @@ function raceWithAbortSignal2(operation, signal) {
     });
     return Promise.reject(abortReason2(signal));
   }
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     let settled = false;
     const cleanup = () => signal.removeEventListener("abort", onAbort);
     const onAbort = () => {
@@ -193726,7 +193726,7 @@ function raceWithAbortSignal2(operation, signal) {
         return;
       settled = true;
       cleanup();
-      resolve17(value2);
+      resolve18(value2);
     }, (error48) => {
       if (settled)
         return;
@@ -198080,8 +198080,8 @@ var init_model_runtime = __esm({
       enqueueCredentialOperation(providerId, signal, task) {
         const previous = this.credentialOperations.get(providerId) ?? Promise.resolve();
         let markStarted;
-        const started = new Promise((resolve17) => {
-          markStarted = resolve17;
+        const started = new Promise((resolve18) => {
+          markStarted = resolve18;
         });
         const operation = (async () => {
           await previous.catch(() => {
@@ -202137,10 +202137,10 @@ var require_truncate = __commonJS({
   "node_modules/@earendil-works/pi-coding-agent/node_modules/semver/functions/truncate.js"(exports, module) {
     "use strict";
     var parse6 = require_parse3();
-    var constants10 = require_constants2();
+    var constants11 = require_constants2();
     var SemVer = require_semver();
     var truncate = (version3, truncation, options) => {
-      if (!constants10.RELEASE_TYPES.includes(truncation)) {
+      if (!constants11.RELEASE_TYPES.includes(truncation)) {
         return null;
       }
       const clonedVersion = cloneInputVersion(version3, options);
@@ -203181,7 +203181,7 @@ var require_semver2 = __commonJS({
   "node_modules/@earendil-works/pi-coding-agent/node_modules/semver/index.js"(exports, module) {
     "use strict";
     var internalRe = require_re();
-    var constants10 = require_constants2();
+    var constants11 = require_constants2();
     var SemVer = require_semver();
     var identifiers = require_identifiers();
     var parse6 = require_parse3();
@@ -203265,8 +203265,8 @@ var require_semver2 = __commonJS({
       re: internalRe.re,
       src: internalRe.src,
       tokens: internalRe.t,
-      SEMVER_SPEC_VERSION: constants10.SEMVER_SPEC_VERSION,
-      RELEASE_TYPES: constants10.RELEASE_TYPES,
+      SEMVER_SPEC_VERSION: constants11.SEMVER_SPEC_VERSION,
+      RELEASE_TYPES: constants11.RELEASE_TYPES,
       compareIdentifiers: identifiers.compareIdentifiers,
       rcompareIdentifiers: identifiers.rcompareIdentifiers
     };
@@ -204553,13 +204553,13 @@ function getRawStdoutWrite() {
 async function writeRawStdoutChunk(text4) {
   while (true) {
     try {
-      await new Promise((resolve17, reject) => {
+      await new Promise((resolve18, reject) => {
         try {
           getRawStdoutWrite()(text4, (error48) => {
             if (error48)
               reject(error48);
             else
-              resolve17();
+              resolve18();
           });
         } catch (error48) {
           reject(error48 instanceof Error ? error48 : new Error(String(error48)));
@@ -204572,7 +204572,7 @@ async function writeRawStdoutChunk(text4) {
       if (code !== "ENOBUFS" && code !== "EAGAIN" && code !== "EWOULDBLOCK") {
         throw writeError;
       }
-      await new Promise((resolve17) => setTimeout(resolve17, RAW_STDOUT_RETRY_DELAY_MS));
+      await new Promise((resolve18) => setTimeout(resolve18, RAW_STDOUT_RETRY_DELAY_MS));
     }
   }
 }
@@ -207427,9 +207427,9 @@ var require_timers = __commonJS({
        * before the specified function or code is executed.
        * @param {*} arg
        */
-      constructor(callback, delay2, arg) {
+      constructor(callback, delay3, arg) {
         this._onTimeout = callback;
-        this._idleTimeout = delay2;
+        this._idleTimeout = delay3;
         this._timerArg = arg;
         this.refresh();
       }
@@ -207474,8 +207474,8 @@ var require_timers = __commonJS({
        * when the timer expires.
        * @returns {NodeJS.Timeout|FastTimer}
        */
-      setTimeout(callback, delay2, arg) {
-        return delay2 <= RESOLUTION_MS ? setTimeout(callback, delay2, arg) : new FastTimer(callback, delay2, arg);
+      setTimeout(callback, delay3, arg) {
+        return delay3 <= RESOLUTION_MS ? setTimeout(callback, delay3, arg) : new FastTimer(callback, delay3, arg);
       },
       /**
        * The clearTimeout method cancels an instantiated Timer previously created
@@ -207501,8 +207501,8 @@ var require_timers = __commonJS({
        * when the timer expires.
        * @returns {FastTimer}
        */
-      setFastTimeout(callback, delay2, arg) {
-        return new FastTimer(callback, delay2, arg);
+      setFastTimeout(callback, delay3, arg) {
+        return new FastTimer(callback, delay3, arg);
       },
       /**
        * The clearTimeout method cancels an instantiated FastTimer previously
@@ -207528,8 +207528,8 @@ var require_timers = __commonJS({
        * @deprecated
        * @param {number} [delay=0] The delay in milliseconds to add to the now value.
        */
-      tick(delay2 = 0) {
-        fastNow += delay2 - RESOLUTION_MS + 1;
+      tick(delay3 = 0) {
+        fastNow += delay3 - RESOLUTION_MS + 1;
         onTick();
         onTick();
       },
@@ -209811,7 +209811,7 @@ var require_dispatcher = __commonJS({
       }
       compose(...args) {
         const interceptors = Array.isArray(args[0]) ? args[0] : args;
-        let dispatch = this.dispatch.bind(this);
+        let dispatch2 = this.dispatch.bind(this);
         for (const interceptor of interceptors) {
           if (interceptor == null) {
             continue;
@@ -209819,13 +209819,13 @@ var require_dispatcher = __commonJS({
           if (typeof interceptor !== "function") {
             throw new TypeError(`invalid interceptor, expected function received ${typeof interceptor}`);
           }
-          dispatch = interceptor(dispatch);
-          if (dispatch == null || typeof dispatch !== "function" || dispatch.length !== 2) {
+          dispatch2 = interceptor(dispatch2);
+          if (dispatch2 == null || typeof dispatch2 !== "function" || dispatch2.length !== 2) {
             throw new TypeError("invalid interceptor");
           }
         }
         return new Proxy(this, {
-          get: (target, key) => key === "dispatch" ? dispatch : target[key]
+          get: (target, key) => key === "dispatch" ? dispatch2 : target[key]
         });
       }
     };
@@ -209883,9 +209883,9 @@ var require_dispatcher_base = __commonJS({
       }
       close(callback) {
         if (callback === void 0) {
-          return new Promise((resolve17, reject) => {
+          return new Promise((resolve18, reject) => {
             this.close((err2, data) => {
-              return err2 ? reject(err2) : resolve17(data);
+              return err2 ? reject(err2) : resolve18(data);
             });
           });
         }
@@ -209923,9 +209923,9 @@ var require_dispatcher_base = __commonJS({
           err2 = null;
         }
         if (callback === void 0) {
-          return new Promise((resolve17, reject) => {
+          return new Promise((resolve18, reject) => {
             this.destroy(err2, (err3, data) => {
-              return err3 ? reject(err3) : resolve17(data);
+              return err3 ? reject(err3) : resolve18(data);
             });
           });
         }
@@ -213776,7 +213776,7 @@ var require_client_h1 = __commonJS({
       kHTTPContext,
       kClosed
     } = require_symbols();
-    var constants10 = require_constants4();
+    var constants11 = require_constants4();
     var EMPTY_BUF = Buffer.alloc(0);
     var FastBuffer = Buffer[Symbol.species];
     var removeAllListeners = util.removeAllListeners;
@@ -213907,7 +213907,7 @@ var require_client_h1 = __commonJS({
          */
       constructor(client2, socket, { exports: exports2 }) {
         this.llhttp = exports2;
-        this.ptr = this.llhttp.llhttp_alloc(constants10.TYPE.RESPONSE);
+        this.ptr = this.llhttp.llhttp_alloc(constants11.TYPE.RESPONSE);
         this.client = client2;
         this.socket = socket;
         this.timeout = null;
@@ -213929,21 +213929,21 @@ var require_client_h1 = __commonJS({
         this.connectionKeepAlive = false;
         this.maxResponseSize = client2[kMaxResponseSize];
       }
-      setTimeout(delay2, type) {
-        if (delay2 !== this.timeoutValue || type & USE_FAST_TIMER ^ this.timeoutType & USE_FAST_TIMER) {
+      setTimeout(delay3, type) {
+        if (delay3 !== this.timeoutValue || type & USE_FAST_TIMER ^ this.timeoutType & USE_FAST_TIMER) {
           if (this.timeout) {
             timers.clearTimeout(this.timeout);
             this.timeout = null;
           }
-          if (delay2) {
+          if (delay3) {
             if (type & USE_FAST_TIMER) {
-              this.timeout = timers.setFastTimeout(onParserTimeout, delay2, this.timeoutWeakRef);
+              this.timeout = timers.setFastTimeout(onParserTimeout, delay3, this.timeoutWeakRef);
             } else {
-              this.timeout = setTimeout(onParserTimeout, delay2, this.timeoutWeakRef);
+              this.timeout = setTimeout(onParserTimeout, delay3, this.timeoutWeakRef);
               this.timeout?.unref();
             }
           }
-          this.timeoutValue = delay2;
+          this.timeoutValue = delay3;
         } else if (this.timeout) {
           if (this.timeout.refresh) {
             this.timeout.refresh();
@@ -214006,11 +214006,11 @@ var require_client_h1 = __commonJS({
             currentParser = null;
             currentBufferRef = null;
           }
-          if (ret !== constants10.ERROR.OK) {
+          if (ret !== constants11.ERROR.OK) {
             const data = chunk.subarray(llhttp.llhttp_get_error_pos(this.ptr) - currentBufferPtr);
-            if (ret === constants10.ERROR.PAUSED_UPGRADE) {
+            if (ret === constants11.ERROR.PAUSED_UPGRADE) {
               this.onUpgrade(data);
-            } else if (ret === constants10.ERROR.PAUSED) {
+            } else if (ret === constants11.ERROR.PAUSED) {
               this.paused = true;
               socket.unshift(data);
             } else {
@@ -214045,10 +214045,10 @@ var require_client_h1 = __commonJS({
         } finally {
           currentParser = null;
         }
-        if (ret === constants10.ERROR.OK) {
+        if (ret === constants11.ERROR.OK) {
           return null;
         }
-        if (ret === constants10.ERROR.PAUSED || ret === constants10.ERROR.PAUSED_UPGRADE) {
+        if (ret === constants11.ERROR.PAUSED || ret === constants11.ERROR.PAUSED_UPGRADE) {
           this.paused = true;
           return null;
         }
@@ -214065,7 +214065,7 @@ var require_client_h1 = __commonJS({
           const len = new Uint8Array(llhttp.memory.buffer, ptr).indexOf(0);
           message = "Response does not match the HTTP/1.1 protocol (" + Buffer.from(llhttp.memory.buffer, ptr, len).toString() + ")";
         }
-        return new HTTPParserError(message, constants10.ERROR[ret], data);
+        return new HTTPParserError(message, constants11.ERROR[ret], data);
       }
       destroy() {
         assert2(currentParser === null);
@@ -214280,7 +214280,7 @@ var require_client_h1 = __commonJS({
           socket[kBlocking] = false;
           client2[kResume]();
         }
-        return pause ? constants10.ERROR.PAUSED : 0;
+        return pause ? constants11.ERROR.PAUSED : 0;
       }
       /**
        * @param {Buffer} buf
@@ -214306,7 +214306,7 @@ var require_client_h1 = __commonJS({
         }
         this.bytesRead += buf.length;
         if (request.onResponseData(buf) === false) {
-          return constants10.ERROR.PAUSED;
+          return constants11.ERROR.PAUSED;
         }
         return 0;
       }
@@ -214346,13 +214346,13 @@ var require_client_h1 = __commonJS({
         if (socket[kWriting]) {
           assert2(client2[kRunning] === 0);
           util.destroy(socket, new InformationalError("reset"));
-          return constants10.ERROR.PAUSED;
+          return constants11.ERROR.PAUSED;
         } else if (!shouldKeepAlive) {
           util.destroy(socket, new InformationalError("reset"));
-          return constants10.ERROR.PAUSED;
+          return constants11.ERROR.PAUSED;
         } else if (socket[kReset] && client2[kRunning] === 0) {
           util.destroy(socket, new InformationalError("reset"));
-          return constants10.ERROR.PAUSED;
+          return constants11.ERROR.PAUSED;
         } else if (client2[kPipelining] == null || client2[kPipelining] === 1) {
           setImmediate(client2[kResume]);
         } else {
@@ -214868,12 +214868,12 @@ upgrade: ${upgrade}\r
           cb();
         }
       }
-      const waitForDrain = () => new Promise((resolve17, reject) => {
+      const waitForDrain = () => new Promise((resolve18, reject) => {
         assert2(callback === null);
         if (socket[kError]) {
           reject(socket[kError]);
         } else {
-          callback = resolve17;
+          callback = resolve18;
         }
       });
       socket.on("close", onDrain).on("drain", onDrain);
@@ -216139,12 +216139,12 @@ var require_client_h2 = __commonJS({
           cb();
         }
       }
-      const waitForDrain = () => new Promise((resolve17, reject) => {
+      const waitForDrain = () => new Promise((resolve18, reject) => {
         assert2(callback === null);
         if (socket[kError]) {
           reject(socket[kError]);
         } else {
-          callback = resolve17;
+          callback = resolve18;
         }
       });
       h2stream.on("close", onDrain).on("drain", onDrain);
@@ -216469,16 +216469,16 @@ var require_client = __commonJS({
         return this[kNeedDrain] < 2;
       }
       [kClose]() {
-        return new Promise((resolve17) => {
+        return new Promise((resolve18) => {
           if (this[kSize]) {
-            this[kClosedResolve] = resolve17;
+            this[kClosedResolve] = resolve18;
           } else {
-            resolve17(null);
+            resolve18(null);
           }
         });
       }
       [kDestroy](err2) {
-        return new Promise((resolve17) => {
+        return new Promise((resolve18) => {
           const requests = this[kQueue].splice(this[kPendingIdx]);
           for (let i2 = 0; i2 < requests.length; i2++) {
             const request = requests[i2];
@@ -216491,7 +216491,7 @@ var require_client = __commonJS({
               this[kClosedResolve]();
               this[kClosedResolve] = null;
             }
-            resolve17(null);
+            resolve18(null);
           };
           if (this[kHTTPContext]) {
             this[kHTTPContext].destroy(err2, callback);
@@ -216903,8 +216903,8 @@ var require_pool_base = __commonJS({
           }
           return Promise.all(closeAll);
         } else {
-          return new Promise((resolve17) => {
-            this[kClosedResolve] = resolve17;
+          return new Promise((resolve18) => {
+            this[kClosedResolve] = resolve18;
           });
         }
       }
@@ -218781,7 +218781,7 @@ var require_retry_handler = __commonJS({
       }
     };
     var RetryHandler = class _RetryHandler {
-      constructor(opts, { dispatch, handler }) {
+      constructor(opts, { dispatch: dispatch2, handler }) {
         const { retryOptions, ...dispatchOpts } = opts;
         const {
           // Retry scoped
@@ -218798,7 +218798,7 @@ var require_retry_handler = __commonJS({
           throwOnError
         } = retryOptions ?? {};
         this.error = null;
-        this.dispatch = dispatch;
+        this.dispatch = dispatch2;
         this.handler = handler;
         this.opts = { ...dispatchOpts, body: wrapRequestBody(opts.body) };
         this.retryOpts = {
@@ -219390,7 +219390,7 @@ var require_readable = __commonJS({
         if (this._readableState.closeEmitted) {
           return Promise.resolve(null);
         }
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           if (this[kContentLength] && this[kContentLength] > limit2 || this[kBytesRead] > limit2) {
             this.destroy(new AbortError3());
           }
@@ -219404,11 +219404,11 @@ var require_readable = __commonJS({
               if (signal.aborted) {
                 reject(signal.reason ?? new AbortError3());
               } else {
-                resolve17(null);
+                resolve18(null);
               }
             });
           } else {
-            this.on("close", resolve17);
+            this.on("close", resolve18);
           }
           this.on("error", noop5).on("data", () => {
             if (this[kBytesRead] > limit2) {
@@ -219451,7 +219451,7 @@ var require_readable = __commonJS({
     }
     function consume(stream11, type) {
       assert2(!stream11[kConsume]);
-      return new Promise((resolve17, reject) => {
+      return new Promise((resolve18, reject) => {
         if (isUnusable(stream11)) {
           const rState = stream11._readableState;
           if (rState.destroyed && rState.closeEmitted === false) {
@@ -219466,7 +219466,7 @@ var require_readable = __commonJS({
             stream11[kConsume] = {
               type,
               stream: stream11,
-              resolve: resolve17,
+              resolve: resolve18,
               reject,
               length: 0,
               body: []
@@ -219546,18 +219546,18 @@ var require_readable = __commonJS({
       return buffer;
     }
     function consumeEnd(consume2, encoding) {
-      const { type, body, resolve: resolve17, stream: stream11, length } = consume2;
+      const { type, body, resolve: resolve18, stream: stream11, length } = consume2;
       try {
         if (type === "text") {
-          resolve17(chunksDecode(body, length, encoding));
+          resolve18(chunksDecode(body, length, encoding));
         } else if (type === "json") {
-          resolve17(JSON.parse(chunksDecode(body, length, encoding)));
+          resolve18(JSON.parse(chunksDecode(body, length, encoding)));
         } else if (type === "arrayBuffer") {
-          resolve17(chunksConcat(body, length).buffer);
+          resolve18(chunksConcat(body, length).buffer);
         } else if (type === "blob") {
-          resolve17(new Blob(body, { type: stream11[kContentType] }));
+          resolve18(new Blob(body, { type: stream11[kContentType] }));
         } else if (type === "bytes") {
-          resolve17(chunksConcat(body, length));
+          resolve18(chunksConcat(body, length));
         }
         consumeFinish(consume2);
       } catch (err2) {
@@ -219773,9 +219773,9 @@ var require_api_request = __commonJS({
     };
     function request(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           request.call(this, opts, (err2, data) => {
-            return err2 ? reject(err2) : resolve17(data);
+            return err2 ? reject(err2) : resolve18(data);
           });
         });
       }
@@ -220036,9 +220036,9 @@ var require_api_stream = __commonJS({
     };
     function stream11(opts, factory, callback) {
       if (callback === void 0) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           stream11.call(this, opts, factory, (err2, data) => {
-            return err2 ? reject(err2) : resolve17(data);
+            return err2 ? reject(err2) : resolve18(data);
           });
         });
       }
@@ -220338,9 +220338,9 @@ var require_api_upgrade = __commonJS({
     };
     function upgrade(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           upgrade.call(this, opts, (err2, data) => {
-            return err2 ? reject(err2) : resolve17(data);
+            return err2 ? reject(err2) : resolve18(data);
           });
         });
       }
@@ -220434,9 +220434,9 @@ var require_api_connect = __commonJS({
     };
     function connect(opts, callback) {
       if (callback === void 0) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           connect.call(this, opts, (err2, data) => {
-            return err2 ? reject(err2) : resolve17(data);
+            return err2 ? reject(err2) : resolve18(data);
           });
         });
       }
@@ -220706,11 +220706,11 @@ var require_mock_utils = __commonJS({
       return newMockDispatch;
     }
     function deleteMockDispatch(mockDispatches, key) {
-      const index3 = mockDispatches.findIndex((dispatch) => {
-        if (!dispatch.consumed) {
+      const index3 = mockDispatches.findIndex((dispatch2) => {
+        if (!dispatch2.consumed) {
           return false;
         }
-        return matchKey(dispatch, key);
+        return matchKey(dispatch2, key);
       });
       if (index3 !== -1) {
         mockDispatches.splice(index3, 1);
@@ -220790,7 +220790,7 @@ var require_mock_utils = __commonJS({
       return dispatchMockReply(mockDispatches, mockDispatch2, key, opts, handler);
     }
     function dispatchMockReply(mockDispatches, mockDispatch2, key, opts, handler) {
-      const { data: { statusCode, data, headers, trailers, error: error48 }, delay: delay2 } = mockDispatch2;
+      const { data: { statusCode, data, headers, trailers, error: error48 }, delay: delay3 } = mockDispatch2;
       if (error48 !== null) {
         deleteMockDispatch(mockDispatches, key);
         handler.onResponseError(null, error48);
@@ -220821,11 +220821,11 @@ var require_mock_utils = __commonJS({
         }
       };
       handler.onRequestStart?.(controller, null);
-      if (typeof delay2 === "number" && delay2 > 0) {
+      if (typeof delay3 === "number" && delay3 > 0) {
         timer = setTimeout(() => {
           timer = null;
           handleReply(mockDispatches);
-        }, delay2);
+        }, delay3);
       } else {
         handleReply(mockDispatches);
       }
@@ -220857,7 +220857,7 @@ var require_mock_utils = __commonJS({
       const agent = this[kMockAgent];
       const origin = this[kOrigin];
       const originalDispatch = this[kOriginalDispatch];
-      return function dispatch(opts, handler) {
+      return function dispatch2(opts, handler) {
         if (agent.isMockActive) {
           try {
             mockDispatch.call(this, opts, handler);
@@ -221639,7 +221639,7 @@ var require_mock_agent = __commonJS({
       }
       pendingInterceptors() {
         const mockAgentClients = this[kClients];
-        return Array.from(mockAgentClients.entries()).flatMap(([origin, dispatcher]) => dispatcher[kDispatches].map((dispatch) => ({ ...dispatch, origin }))).filter(({ pending }) => pending);
+        return Array.from(mockAgentClients.entries()).flatMap(([origin, dispatcher]) => dispatcher[kDispatches].map((dispatch2) => ({ ...dispatch2, origin }))).filter(({ pending }) => pending);
       }
       assertNoPendingInterceptors({ pendingInterceptorsFormatter = new PendingInterceptorsFormatter() } = {}) {
         const pending = this.pendingInterceptors();
@@ -221750,7 +221750,7 @@ var require_snapshot_recorder = __commonJS({
   "node_modules/@earendil-works/pi-coding-agent/node_modules/undici/lib/mock/snapshot-recorder.js"(exports, module) {
     "use strict";
     var { writeFile: writeFile5, readFile: readFile9, mkdir: mkdir6 } = __require("node:fs/promises");
-    var { dirname: dirname29, resolve: resolve17 } = __require("node:path");
+    var { dirname: dirname29, resolve: resolve18 } = __require("node:path");
     var { setTimeout: setTimeout2, clearTimeout: clearTimeout2 } = __require("node:timers");
     var { InvalidArgumentError, UndiciError } = require_errors2();
     var { hashId, isUrlExcludedFactory, normalizeHeaders, createHeaderFilters } = require_snapshot_utils();
@@ -221966,7 +221966,7 @@ var require_snapshot_recorder = __commonJS({
           throw new InvalidArgumentError("Snapshot path is required");
         }
         try {
-          const data = await readFile9(resolve17(path16), "utf8");
+          const data = await readFile9(resolve18(path16), "utf8");
           const parsed = JSON.parse(data);
           if (Array.isArray(parsed)) {
             this.#snapshots.clear();
@@ -221995,7 +221995,7 @@ var require_snapshot_recorder = __commonJS({
         if (!path16) {
           throw new InvalidArgumentError("Snapshot path is required");
         }
-        const resolvedPath = resolve17(path16);
+        const resolvedPath = resolve18(path16);
         await mkdir6(dirname29(resolvedPath), { recursive: true });
         const data = Array.from(this.#snapshots.entries()).map(([hash2, snapshot]) => ({
           hash: hash2,
@@ -222576,17 +222576,17 @@ var require_redirect_handler = __commonJS({
         if (maxRedirections != null && (!Number.isInteger(maxRedirections) || maxRedirections < 0)) {
           throw new InvalidArgumentError("maxRedirections must be a positive number");
         }
-        const dispatch = dispatcher.dispatch.bind(dispatcher);
-        return (opts, originalHandler) => dispatch(opts, new _RedirectHandler(dispatch, maxRedirections, opts, originalHandler));
+        const dispatch2 = dispatcher.dispatch.bind(dispatcher);
+        return (opts, originalHandler) => dispatch2(opts, new _RedirectHandler(dispatch2, maxRedirections, opts, originalHandler));
       }
-      constructor(dispatch, maxRedirections, opts, handler) {
+      constructor(dispatch2, maxRedirections, opts, handler) {
         if (maxRedirections != null && (!Number.isInteger(maxRedirections) || maxRedirections < 0)) {
           throw new InvalidArgumentError("maxRedirections must be a positive number");
         }
         if (opts.throwOnMaxRedirect != null && typeof opts.throwOnMaxRedirect !== "boolean") {
           throw new InvalidArgumentError("throwOnMaxRedirect must be a boolean");
         }
-        this.dispatch = dispatch;
+        this.dispatch = dispatch2;
         this.location = null;
         const { maxRedirections: _3, stripHeadersOnRedirect, stripHeadersOnCrossOriginRedirect, ...cleanOpts } = opts;
         this.opts = cleanOpts;
@@ -222723,15 +222723,15 @@ var require_redirect = __commonJS({
     "use strict";
     var RedirectHandler = require_redirect_handler();
     function createRedirectInterceptor({ maxRedirections: defaultMaxRedirections, throwOnMaxRedirect: defaultThrowOnMaxRedirect, stripHeadersOnRedirect: defaultStripHeadersOnRedirect, stripHeadersOnCrossOriginRedirect: defaultStripHeadersOnCrossOriginRedirect } = {}) {
-      return (dispatch) => {
+      return (dispatch2) => {
         return function Intercept(opts, handler) {
           const { maxRedirections = defaultMaxRedirections, throwOnMaxRedirect = defaultThrowOnMaxRedirect, stripHeadersOnRedirect = defaultStripHeadersOnRedirect, stripHeadersOnCrossOriginRedirect = defaultStripHeadersOnCrossOriginRedirect, ...rest } = opts;
           if (maxRedirections == null || maxRedirections === 0) {
-            return dispatch(opts, handler);
+            return dispatch2(opts, handler);
           }
           const dispatchOpts = { ...rest, throwOnMaxRedirect, stripHeadersOnRedirect, stripHeadersOnCrossOriginRedirect };
-          const redirectHandler = new RedirectHandler(dispatch, maxRedirections, dispatchOpts, handler);
-          return dispatch(dispatchOpts, redirectHandler);
+          const redirectHandler = new RedirectHandler(dispatch2, maxRedirections, dispatchOpts, handler);
+          return dispatch2(dispatchOpts, redirectHandler);
         };
       };
     }
@@ -222812,9 +222812,9 @@ var require_response_error = __commonJS({
       }
     };
     module.exports = () => {
-      return (dispatch) => {
+      return (dispatch2) => {
         return function Intercept(opts, handler) {
-          return dispatch(opts, new ResponseErrorHandler(opts, { handler }));
+          return dispatch2(opts, new ResponseErrorHandler(opts, { handler }));
         };
       };
     };
@@ -222827,15 +222827,15 @@ var require_retry6 = __commonJS({
     "use strict";
     var RetryHandler = require_retry_handler();
     module.exports = (globalOpts) => {
-      return (dispatch) => {
+      return (dispatch2) => {
         return function retryInterceptor(opts, handler) {
-          return dispatch(
+          return dispatch2(
             opts,
             new RetryHandler(
               { ...opts, retryOptions: { ...globalOpts, ...opts.retryOptions } },
               {
                 handler,
-                dispatch
+                dispatch: dispatch2
               }
             )
           );
@@ -222919,11 +222919,11 @@ var require_dump = __commonJS({
     function createDumpInterceptor({ maxSize: defaultMaxSize } = {
       maxSize: 1024 * 1024
     }) {
-      return (dispatch) => {
+      return (dispatch2) => {
         return function Intercept(opts, handler) {
           const { dumpMaxSize = defaultMaxSize } = opts;
           const dumpHandler = new DumpHandler({ maxSize: dumpMaxSize, signal: opts.signal }, handler);
-          return dispatch(opts, dumpHandler);
+          return dispatch2(opts, dumpHandler);
         };
       };
     }
@@ -223243,13 +223243,13 @@ var require_dns2 = __commonJS({
       #controller = null;
       #newOrigin = null;
       #firstTry = true;
-      constructor(state2, { origin, handler, dispatch, newOrigin }, opts) {
+      constructor(state2, { origin, handler, dispatch: dispatch2, newOrigin }, opts) {
         super(handler);
         this.#origin = origin;
         this.#newOrigin = newOrigin;
         this.#opts = { ...opts };
         this.#state = state2;
-        this.#dispatch = dispatch;
+        this.#dispatch = dispatch2;
       }
       onResponseError(controller, err2) {
         switch (err2.code) {
@@ -223338,14 +223338,14 @@ var require_dns2 = __commonJS({
         storage: interceptorOpts?.storage
       };
       const instance = new DNSInstance(opts);
-      return (dispatch) => {
+      return (dispatch2) => {
         return function dnsInterceptor(origDispatchOpts, handler) {
           if (origDispatchOpts.origin == null) {
-            return dispatch(origDispatchOpts, handler);
+            return dispatch2(origDispatchOpts, handler);
           }
           const origin = origDispatchOpts.origin.constructor === URL ? origDispatchOpts.origin : new URL(origDispatchOpts.origin);
           if (isIP3(origin.hostname) !== 0) {
-            return dispatch(origDispatchOpts, handler);
+            return dispatch2(origDispatchOpts, handler);
           }
           instance.runLookup(origin, origDispatchOpts, (err2, newOrigin) => {
             if (err2) {
@@ -223358,10 +223358,10 @@ var require_dns2 = __commonJS({
               origin: newOrigin.origin,
               headers: withHostHeader(origin.host, origDispatchOpts.headers)
             };
-            dispatch(
+            dispatch2(
               dispatchOpts,
               instance.getHandler(
-                { origin, dispatch, handler, newOrigin },
+                { origin, dispatch: dispatch2, handler, newOrigin },
                 origDispatchOpts
               )
             );
@@ -225371,7 +225371,7 @@ var require_cache2 = __commonJS({
       const staleWhileRevalidateExpiry = result.staleAt + staleWhileRevalidate * 1e3;
       return now <= staleWhileRevalidateExpiry;
     }
-    function handleUncachedResponse(dispatch, globalOpts, cacheKey, handler, opts, reqCacheControl) {
+    function handleUncachedResponse(dispatch2, globalOpts, cacheKey, handler, opts, reqCacheControl) {
       if (reqCacheControl?.["only-if-cached"]) {
         let aborted2 = false;
         const controller = {
@@ -225406,7 +225406,7 @@ var require_cache2 = __commonJS({
         }
         return true;
       }
-      return dispatch(opts, new CacheHandler(globalOpts, cacheKey, handler));
+      return dispatch2(opts, new CacheHandler(globalOpts, cacheKey, handler));
     }
     function sendCachedValue(handler, opts, result, age, context, isStale2) {
       const stream11 = util.isStream(result.body) ? result.body : Readable3.from(result.body ?? []);
@@ -225465,13 +225465,13 @@ var require_cache2 = __commonJS({
         });
       }
     }
-    function handleResult(dispatch, globalOpts, cacheKey, handler, opts, reqCacheControl, result) {
+    function handleResult(dispatch2, globalOpts, cacheKey, handler, opts, reqCacheControl, result) {
       if (!result) {
-        return handleUncachedResponse(dispatch, globalOpts, cacheKey, handler, opts, reqCacheControl);
+        return handleUncachedResponse(dispatch2, globalOpts, cacheKey, handler, opts, reqCacheControl);
       }
       const now = Date.now();
       if (now > result.deleteAt) {
-        return dispatch(opts, new CacheHandler(globalOpts, cacheKey, handler));
+        return dispatch2(opts, new CacheHandler(globalOpts, cacheKey, handler));
       }
       const age = Math.round((now - result.cachedAt) / 1e3);
       const requestMaxAgeExpired = reqCacheControl?.["max-age"] !== void 0 && age >= reqCacheControl["max-age"];
@@ -225479,13 +225479,13 @@ var require_cache2 = __commonJS({
       const revalidate = requestMaxAgeExpired || needsRevalidation(result, reqCacheControl, opts);
       if (stale || revalidate) {
         if (util.isStream(opts.body) && util.bodyLength(opts.body) !== 0) {
-          return dispatch(opts, new CacheHandler(globalOpts, cacheKey, handler));
+          return dispatch2(opts, new CacheHandler(globalOpts, cacheKey, handler));
         }
         if (!revalidate && withinStaleWhileRevalidateWindow(result, globalOpts.type)) {
           sendCachedValue(handler, opts, result, age, null, true);
           queueMicrotask(() => {
             const headers2 = makeRevalidationHeaders(opts, result);
-            dispatch(
+            dispatch2(
               {
                 ...opts,
                 headers: headers2
@@ -225517,7 +225517,7 @@ var require_cache2 = __commonJS({
           }
         }
         const headers = makeRevalidationHeaders(opts, result);
-        return dispatch(
+        return dispatch2(
           {
             ...opts,
             headers
@@ -225531,7 +225531,7 @@ var require_cache2 = __commonJS({
                       result.body.on("error", nop).destroy();
                     }
                     deleteCachedValue(globalOpts.store, cacheKey);
-                    return dispatch(opts, new CacheHandler(globalOpts, cacheKey, handler));
+                    return dispatch2(opts, new CacheHandler(globalOpts, cacheKey, handler));
                   }
                   if (revalidationResponseUpdatesCacheControl(headers2)) {
                     deleteCachedValue(globalOpts.store, cacheKey);
@@ -225585,10 +225585,10 @@ var require_cache2 = __commonJS({
           safeMethodsToNotCache.push(method);
         }
       }
-      return (dispatch) => {
+      return (dispatch2) => {
         return (opts2, handler) => {
           if (!opts2.origin || arrayIncludes(safeMethodsToNotCache, opts2.method)) {
-            return dispatch(opts2, handler);
+            return dispatch2(opts2, handler);
           }
           if (origins !== void 0) {
             const requestOrigin = opts2.origin.toString().toLowerCase();
@@ -225606,7 +225606,7 @@ var require_cache2 = __commonJS({
               }
             }
             if (!isAllowed) {
-              return dispatch(opts2, handler);
+              return dispatch2(opts2, handler);
             }
           }
           opts2 = {
@@ -225615,13 +225615,13 @@ var require_cache2 = __commonJS({
           };
           const reqCacheControl = opts2.headers?.["cache-control"] ? parseCacheControlHeader(opts2.headers["cache-control"]) : hasPragmaNoCache(opts2.headers) ? { "no-cache": true } : void 0;
           if (reqCacheControl?.["no-store"]) {
-            return dispatch(opts2, handler);
+            return dispatch2(opts2, handler);
           }
           const cacheKey = makeCacheKey(opts2);
           const result = store.get(cacheKey);
           if (result && typeof result.then === "function") {
             return result.then((result2) => handleResult(
-              dispatch,
+              dispatch2,
               globalOpts,
               cacheKey,
               handler,
@@ -225631,7 +225631,7 @@ var require_cache2 = __commonJS({
             ));
           } else {
             return handleResult(
-              dispatch,
+              dispatch2,
               globalOpts,
               cacheKey,
               handler,
@@ -225874,13 +225874,13 @@ var require_decompress = __commonJS({
         );
         warningEmitted = true;
       }
-      return (dispatch) => {
+      return (dispatch2) => {
         return (opts, handler) => {
           if (opts.method === "HEAD") {
-            return dispatch(opts, handler);
+            return dispatch2(opts, handler);
           }
           const decompressHandler = new DecompressHandler(handler, options);
-          return dispatch(opts, decompressHandler);
+          return dispatch2(opts, decompressHandler);
         };
       };
     }
@@ -226286,10 +226286,10 @@ var require_deduplicate = __commonJS({
       const skipHeaderNamesSet = new Set(skipHeaderNames.map((name) => name.toLowerCase()));
       const excludeHeaderNamesSet = new Set(excludeHeaderNames.map((name) => name.toLowerCase()));
       const pendingRequests = /* @__PURE__ */ new Map();
-      return (dispatch) => {
+      return (dispatch2) => {
         return (opts2, handler) => {
           if (!opts2.origin || methods2.includes(opts2.method) === false) {
-            return dispatch(opts2, handler);
+            return dispatch2(opts2, handler);
           }
           opts2 = {
             ...opts2,
@@ -226298,7 +226298,7 @@ var require_deduplicate = __commonJS({
           if (skipHeaderNamesSet.size > 0) {
             for (const headerName of Object.keys(opts2.headers)) {
               if (skipHeaderNamesSet.has(headerName.toLowerCase())) {
-                return dispatch(opts2, handler);
+                return dispatch2(opts2, handler);
               }
             }
           }
@@ -226309,7 +226309,7 @@ var require_deduplicate = __commonJS({
             if (pendingHandler.addWaitingHandler(handler)) {
               return true;
             }
-            return dispatch(opts2, handler);
+            return dispatch2(opts2, handler);
           }
           const deduplicationHandler = new DeduplicationHandler(
             handler,
@@ -226325,7 +226325,7 @@ var require_deduplicate = __commonJS({
           if (pendingRequestsChannel.hasSubscribers) {
             pendingRequestsChannel.publish({ size: pendingRequests.size, key: dedupeKey, type: "added" });
           }
-          return dispatch(opts2, deduplicationHandler);
+          return dispatch2(opts2, deduplicationHandler);
         };
       };
     };
@@ -226835,10 +226835,10 @@ var require_headers = __commonJS({
         const lowercaseName = isLowerCase ? name : name.toLowerCase();
         const exists = this.headersMap.get(lowercaseName);
         if (exists) {
-          const delimiter3 = lowercaseName === "cookie" ? "; " : ", ";
+          const delimiter4 = lowercaseName === "cookie" ? "; " : ", ";
           this.headersMap.set(lowercaseName, {
             name: exists.name,
-            value: `${exists.value}${delimiter3}${value2}`
+            value: `${exists.value}${delimiter4}${value2}`
           });
         } else {
           this.headersMap.set(lowercaseName, { name, value: value2 });
@@ -229389,7 +229389,7 @@ var require_fetch = __commonJS({
         })();
       }
       try {
-        const { body, status, statusText, headersList, socket } = await dispatch({ body: requestBody });
+        const { body, status, statusText, headersList, socket } = await dispatch2({ body: requestBody });
         if (socket) {
           response = makeResponse({ status, statusText, headersList, socket });
         } else {
@@ -229485,14 +229485,14 @@ var require_fetch = __commonJS({
         fetchParams.controller.connection.destroy();
       }
       return response;
-      function dispatch({ body }) {
+      function dispatch2({ body }) {
         const url2 = requestCurrentURL(request);
         const agent = fetchParams.controller.dispatcher;
         const path16 = url2.pathname + url2.search;
         const hasTrailingQuestionMark = url2.search.length === 0 && url2.href[url2.href.length - url2.hash.length - 1] === "?";
         return dispatchWithProtocolPreference(body);
         function dispatchWithProtocolPreference(body2, allowH2) {
-          return new Promise((resolve17, reject) => agent.dispatch(
+          return new Promise((resolve18, reject) => agent.dispatch(
             {
               path: hasTrailingQuestionMark ? `${path16}?` : path16,
               origin: url2.origin,
@@ -229575,7 +229575,7 @@ var require_fetch = __commonJS({
                   }
                 }
                 const onError2 = (err2) => this.onResponseError(controller, err2);
-                resolve17({
+                resolve18({
                   status,
                   statusText,
                   headersList,
@@ -229608,7 +229608,7 @@ var require_fetch = __commonJS({
                   fetchParams.controller.off("terminated", this.abort);
                 }
                 if (request.mode === "websocket" && allowH2 !== false && error48?.code === "UND_ERR_INFO" && error48?.message === "HTTP/2: Extended CONNECT protocol not supported by server") {
-                  resolve17(dispatchWithProtocolPreference(body2, false));
+                  resolve18(dispatchWithProtocolPreference(body2, false));
                   return;
                 }
                 this.body?.destroy(error48);
@@ -229622,7 +229622,7 @@ var require_fetch = __commonJS({
                 const rawHeaders = controller?.rawHeaders ?? [];
                 const headersList = new HeadersList();
                 appendHeadersListFromResponseHeaders(headersList, headers, rawHeaders);
-                resolve17({
+                resolve18({
                   status,
                   statusText: STATUS_CODES[status],
                   headersList,
@@ -236646,14 +236646,14 @@ var init_output_accumulator = __esm({
         }
         const stream11 = this.tempFileStream;
         this.tempFileStream = void 0;
-        await new Promise((resolve17, reject) => {
+        await new Promise((resolve18, reject) => {
           const onError2 = (error48) => {
             stream11.off("finish", onFinish);
             reject(error48);
           };
           const onFinish = () => {
             stream11.off("error", onError2);
-            resolve17();
+            resolve18();
           };
           stream11.once("error", onError2);
           stream11.once("finish", onFinish);
@@ -237056,8 +237056,8 @@ ${command}` : command;
         if (!onUpdate)
           return;
         updateDirty = true;
-        const delay2 = BASH_UPDATE_THROTTLE_MS2 - (Date.now() - lastUpdateAt);
-        if (delay2 <= 0) {
+        const delay3 = BASH_UPDATE_THROTTLE_MS2 - (Date.now() - lastUpdateAt);
+        if (delay3 <= 0) {
           clearUpdateTimer();
           emitOutputUpdate();
           return;
@@ -237065,7 +237065,7 @@ ${command}` : command;
         updateTimer ??= setTimeout(() => {
           updateTimer = void 0;
           emitOutputUpdate();
-        }, delay2);
+        }, delay3);
       };
       if (onUpdate) {
         onUpdate({ content: [], details: void 0 });
@@ -237992,7 +237992,7 @@ function createFindToolDefinition(cwd, options) {
     promptSnippet: findToolSystemPromptContribution.snippet,
     parameters: findSchema,
     async execute(_toolCallId, { pattern, path: searchDir, limit: limit2 }, signal, _onUpdate, _ctx) {
-      return new Promise((resolve17, reject) => {
+      return new Promise((resolve18, reject) => {
         if (signal?.aborted) {
           reject(new Error("Operation aborted"));
           return;
@@ -238035,7 +238035,7 @@ function createFindToolDefinition(cwd, options) {
                 return;
               }
               if (results.length === 0) {
-                settle(() => resolve17({
+                settle(() => resolve18({
                   content: [{ type: "text", text: "No files found matching pattern" }],
                   details: void 0
                 }));
@@ -238061,7 +238061,7 @@ function createFindToolDefinition(cwd, options) {
 
 [${notices.join(". ")}]`;
               }
-              settle(() => resolve17({
+              settle(() => resolve18({
                 content: [{ type: "text", text: resultOutput }],
                 details: Object.keys(details).length > 0 ? details : void 0
               }));
@@ -238138,7 +238138,7 @@ function createFindToolDefinition(cwd, options) {
                 }
               }
               if (!output) {
-                settle(() => resolve17({
+                settle(() => resolve18({
                   content: [{ type: "text", text: "No files found matching pattern" }],
                   details: void 0
                 }));
@@ -238170,7 +238170,7 @@ function createFindToolDefinition(cwd, options) {
 
 [${notices.join(". ")}]`;
               }
-              settle(() => resolve17({
+              settle(() => resolve18({
                 content: [{ type: "text", text: resultOutput }],
                 details: Object.keys(details).length > 0 ? details : void 0
               }));
@@ -238291,7 +238291,7 @@ function createGrepToolDefinition(cwd, options) {
     promptSnippet: grepToolSystemPromptContribution.snippet,
     parameters: grepSchema,
     async execute(_toolCallId, { pattern, path: searchDir, glob, ignoreCase, literal: literal2, context, limit: limit2 }, signal, _onUpdate, _ctx) {
-      return new Promise((resolve17, reject) => {
+      return new Promise((resolve18, reject) => {
         if (signal?.aborted) {
           reject(new Error("Operation aborted"));
           return;
@@ -238323,9 +238323,9 @@ function createGrepToolDefinition(cwd, options) {
             const effectiveLimit = Math.max(1, limit2 ?? DEFAULT_LIMIT2);
             const formatPath = (filePath) => {
               if (isDirectory) {
-                const relative9 = path12.relative(searchPath, filePath);
-                if (relative9 && !relative9.startsWith("..")) {
-                  return relative9.replace(/\\/g, "/");
+                const relative10 = path12.relative(searchPath, filePath);
+                if (relative10 && !relative10.startsWith("..")) {
+                  return relative10.replace(/\\/g, "/");
                 }
               }
               return path12.basename(filePath);
@@ -238440,7 +238440,7 @@ function createGrepToolDefinition(cwd, options) {
                 return;
               }
               if (matchCount === 0) {
-                settle(() => resolve17({ content: [{ type: "text", text: "No matches found" }], details: void 0 }));
+                settle(() => resolve18({ content: [{ type: "text", text: "No matches found" }], details: void 0 }));
                 return;
               }
               for (const match2 of matches) {
@@ -238477,7 +238477,7 @@ function createGrepToolDefinition(cwd, options) {
                 output += `
 
 [${notices.join(". ")}]`;
-              settle(() => resolve17({
+              settle(() => resolve18({
                 content: [{ type: "text", text: output }],
                 details: Object.keys(details).length > 0 ? details : void 0
               }));
@@ -238584,7 +238584,7 @@ function createLsToolDefinition(cwd, options) {
     promptSnippet: lsToolSystemPromptContribution.snippet,
     parameters: lsSchema,
     async execute(_toolCallId, { path: path16, limit: limit2 }, signal, _onUpdate, _ctx) {
-      return new Promise((resolve17, reject) => {
+      return new Promise((resolve18, reject) => {
         if (signal?.aborted) {
           reject(new Error("Operation aborted"));
           return;
@@ -238632,7 +238632,7 @@ function createLsToolDefinition(cwd, options) {
             }
             signal?.removeEventListener("abort", onAbort);
             if (results.length === 0) {
-              resolve17({ content: [{ type: "text", text: "(empty directory)" }], details: void 0 });
+              resolve18({ content: [{ type: "text", text: "(empty directory)" }], details: void 0 });
               return;
             }
             const rawOutput = results.join("\n");
@@ -238653,7 +238653,7 @@ function createLsToolDefinition(cwd, options) {
 
 [${notices.join(". ")}]`;
             }
-            resolve17({
+            resolve18({
               content: [{ type: "text", text: output }],
               details: Object.keys(details).length > 0 ? details : void 0
             });
@@ -238925,7 +238925,7 @@ function createReadToolDefinition(cwd, options) {
     parameters: readSchema2,
     constrainedSampling: getExperimentalToolSampling(),
     async execute(_toolCallId, { path: path16, offset, limit: limit2 }, signal, _onUpdate, ctx) {
-      return new Promise((resolve17, reject) => {
+      return new Promise((resolve18, reject) => {
         if (signal?.aborted) {
           reject(new Error("Operation aborted"));
           return;
@@ -239024,7 +239024,7 @@ ${nonVisionImageNote}`;
             if (aborted2)
               return;
             signal?.removeEventListener("abort", onAbort);
-            resolve17({ content, details });
+            resolve18({ content, details });
           } catch (error48) {
             signal?.removeEventListener("abort", onAbort);
             if (!aborted2)
@@ -240582,7 +240582,7 @@ async function applyDetectedStartupTheme(ui2, settingsManager) {
 async function clearStartupTui(ui2) {
   ui2.clear();
   ui2.requestRender();
-  await new Promise((resolve17) => setTimeout(resolve17, 25));
+  await new Promise((resolve18) => setTimeout(resolve18, 25));
 }
 function shouldRunFirstTimeSetup(settingsPath = getSettingsPath()) {
   if (!isOfficialDistribution({
@@ -240602,7 +240602,7 @@ function shouldRunFirstTimeSetup(settingsPath = getSettingsPath()) {
 }
 async function showStartupSelector(settingsManager, title, options) {
   const ui2 = await createStartupTui(settingsManager);
-  return new Promise((resolve17) => {
+  return new Promise((resolve18) => {
     let settled = false;
     const finish = async (result) => {
       if (settled) {
@@ -240611,7 +240611,7 @@ async function showStartupSelector(settingsManager, title, options) {
       settled = true;
       await clearStartupTui(ui2);
       ui2.stop();
-      resolve17(result);
+      resolve18(result);
     };
     const selector = new ExtensionSelectorComponent(title, options.map((option2) => option2.label), (option2) => void finish(options.find((entry) => entry.label === option2)?.value), () => void finish(void 0), { tui: ui2 });
     ui2.addChild(selector);
@@ -240621,7 +240621,7 @@ async function showStartupSelector(settingsManager, title, options) {
 }
 async function showFirstTimeSetup(settingsManager) {
   const ui2 = await createStartupTui(settingsManager);
-  return new Promise((resolve17) => {
+  return new Promise((resolve18) => {
     let settled = false;
     const finish = async (result) => {
       if (settled) {
@@ -240635,7 +240635,7 @@ async function showFirstTimeSetup(settingsManager) {
       }
       await clearStartupTui(ui2);
       ui2.stop();
-      resolve17();
+      resolve18();
     };
     const showSetup = async () => {
       ui2.start();
@@ -240659,7 +240659,7 @@ async function showFirstTimeSetup(settingsManager) {
 }
 async function showStartupInput(settingsManager, title, placeholder) {
   const ui2 = await createStartupTui(settingsManager);
-  return new Promise((resolve17) => {
+  return new Promise((resolve18) => {
     let settled = false;
     const finish = async (result) => {
       if (settled) {
@@ -240669,7 +240669,7 @@ async function showStartupInput(settingsManager, title, placeholder) {
       input2.dispose();
       await clearStartupTui(ui2);
       ui2.stop();
-      resolve17(result);
+      resolve18(result);
     };
     const input2 = new ExtensionInputComponent(title, placeholder, (value2) => void finish(value2), () => void finish(void 0), {
       tui: ui2
@@ -241124,8 +241124,8 @@ var init_session_selector = __esm({
           hintLine2 = "";
         } else {
           const pathState = this.showPath ? "(on)" : "(off)";
-          const sep11 = theme.fg("muted", " \xB7 ");
-          const hint1 = keyHint("tui.input.tab", "scope") + sep11 + theme.fg("muted", 're:<pattern> regex \xB7 "phrase" exact');
+          const sep12 = theme.fg("muted", " \xB7 ");
+          const hint1 = keyHint("tui.input.tab", "scope") + sep12 + theme.fg("muted", 're:<pattern> regex \xB7 "phrase" exact');
           const hint2Parts = [
             keyHint("app.session.toggleSort", "sort"),
             keyHint("app.session.toggleNamedFilter", "named"),
@@ -241135,7 +241135,7 @@ var init_session_selector = __esm({
           if (this.showRenameHint) {
             hint2Parts.push(keyHint("app.session.rename", "rename"));
           }
-          const hint2 = hint2Parts.join(sep11);
+          const hint2 = hint2Parts.join(sep12);
           hintLine1 = truncateToWidth(hint1, width, "\u2026");
           hintLine2 = truncateToWidth(hint2, width, "\u2026");
         }
@@ -241692,7 +241692,7 @@ var init_session_selector = __esm({
 // node_modules/@earendil-works/pi-coding-agent/dist/cli/session-picker.js
 async function selectSession(currentSessionsLoader, allSessionsLoader, settingsManager) {
   const ui2 = await createStartupTui(settingsManager);
-  return new Promise((resolve17) => {
+  return new Promise((resolve18) => {
     const keybindings = KeybindingsManager2.create();
     setKeybindings(keybindings);
     let resolved = false;
@@ -241700,13 +241700,13 @@ async function selectSession(currentSessionsLoader, allSessionsLoader, settingsM
       if (!resolved) {
         resolved = true;
         ui2.stop();
-        resolve17(path16);
+        resolve18(path16);
       }
     }, () => {
       if (!resolved) {
         resolved = true;
         ui2.stop();
-        resolve17(null);
+        resolve18(null);
       }
     }, () => {
       ui2.stop();
@@ -243241,7 +243241,7 @@ function linkSignal(source, target) {
   return () => source.removeEventListener("abort", abort);
 }
 function sleep8(ms2, signal) {
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     if (signal?.aborted) {
       reject(signal.reason ?? new Error("Cancelled"));
       return;
@@ -243252,7 +243252,7 @@ function sleep8(ms2, signal) {
     };
     const timeout = setTimeout(() => {
       signal?.removeEventListener("abort", abort);
-      resolve17();
+      resolve18();
     }, ms2);
     signal?.addEventListener("abort", abort, { once: true });
   });
@@ -243579,8 +243579,8 @@ var init_huggingface3 = __esm({
         if (!response.ok) {
           const fallback = `Hugging Face returned HTTP ${response.status}`;
           if (response.status === 429) {
-            const delay2 = Number(response.headers.get("retry-after")) || parseRateLimitDelay(response.headers.get("ratelimit"));
-            throw new Error(delay2 ? `Hugging Face rate limit reached; retry in ${delay2}s` : "Hugging Face rate limit reached");
+            const delay3 = Number(response.headers.get("retry-after")) || parseRateLimitDelay(response.headers.get("ratelimit"));
+            throw new Error(delay3 ? `Hugging Face rate limit reached; retry in ${delay3}s` : "Hugging Face rate limit reached");
           }
           throw new Error(payloadError(payload, fallback));
         }
@@ -244093,29 +244093,29 @@ var init_ui = __esm({
           })),
           { value: DOWNLOAD_VALUE, label: "Download model\u2026", description: "Hugging Face owner/repository[:quant]" }
         ];
-        return new Promise((resolve17) => {
+        return new Promise((resolve18) => {
           const list = new SelectList(items, Math.min(items.length, 12), selectTheme(this.theme), {
             minPrimaryColumnWidth: 36,
             maxPrimaryColumnWidth: 56
           });
           list.onSelect = (item) => {
             if (item.value === DOWNLOAD_VALUE)
-              resolve17({ type: "download" });
+              resolve18({ type: "download" });
             else {
               const model = byId.get(item.value);
               if (model)
-                resolve17({ type: "model", model });
+                resolve18({ type: "model", model });
             }
           };
-          list.onCancel = () => resolve17({ type: "close" });
+          list.onCancel = () => resolve18({ type: "close" });
           this.setContent(frame(this.theme, "llama.cpp models", [new Text(this.theme.fg("dim", serverUrl), 1, 0), new Spacer(1), list], `${keyHint("tui.select.confirm", "load/unload/download")} \u2022 ${keyHint("tui.select.cancel", "close")}`), list);
         });
       }
       select(title, options) {
-        return new Promise((resolve17) => {
+        return new Promise((resolve18) => {
           const list = new SelectList(options.map((option2) => ({ value: option2, label: option2 })), Math.min(options.length, 12), selectTheme(this.theme));
-          list.onSelect = (item) => resolve17(item.value);
-          list.onCancel = () => resolve17(void 0);
+          list.onSelect = (item) => resolve18(item.value);
+          list.onCancel = () => resolve18(void 0);
           this.setContent(frame(this.theme, title, [new Spacer(1), list], `${keyHint("tui.select.confirm", "select")} \u2022 ${keyHint("tui.select.cancel", "cancel")}`), list);
         });
       }
@@ -244131,8 +244131,8 @@ ${message}`, ["Retry", "Close"]);
         return choice === "Retry" ? "retry" : "close";
       }
       searchModels(search) {
-        return new Promise((resolve17) => {
-          const component = new HuggingFaceSearch(this.tui, this.theme, this.keybindings, search, this.searchCache, resolve17);
+        return new Promise((resolve18) => {
+          const component = new HuggingFaceSearch(this.tui, this.theme, this.keybindings, search, this.searchCache, resolve18);
           this.setContent(frame(this.theme, "Download model", [new Spacer(1), component], `${keyHint("tui.select.confirm", "select")} \u2022 ${keyHint("tui.select.cancel", "back")}`), component, component);
         });
       }
@@ -244141,8 +244141,8 @@ ${message}`, ["Retry", "Close"]);
       }
       progress(state2) {
         if (!this.progressPromise) {
-          this.progressPromise = new Promise((resolve17) => {
-            this.progressResolver = resolve17;
+          this.progressPromise = new Promise((resolve18) => {
+            this.progressResolver = resolve18;
           });
         }
         this.showingProgress = true;
@@ -244170,10 +244170,10 @@ ${message}`, ["Retry", "Close"]);
       }
       handleInput(data) {
         if (this.progressResolver && this.keybindings.matches(data, "tui.select.cancel")) {
-          const resolve17 = this.progressResolver;
+          const resolve18 = this.progressResolver;
           this.progressPromise = void 0;
           this.progressResolver = void 0;
-          resolve17();
+          resolve18();
           return;
         }
         this.inputHandler?.handleInput?.(data);
@@ -244608,13 +244608,13 @@ Move your extensions to the extensions/ directory.`));
   console.log(source_default.yellow(`Documentation: ${EXTENSIONS_DOC_URL}`));
   console.log(source_default.dim(`
 Press any key to continue...`));
-  await new Promise((resolve17) => {
+  await new Promise((resolve18) => {
     process.stdin.setRawMode?.(true);
     process.stdin.resume();
     process.stdin.once("data", () => {
       process.stdin.setRawMode?.(false);
       process.stdin.pause();
-      resolve17();
+      resolve18();
     });
   });
   console.log();
@@ -245282,10 +245282,10 @@ async function copyToClipboard(text4) {
           if (isWayland && hasWaylandDisplay) {
             try {
               execSync3("which wl-copy", { stdio: "ignore" });
-              const wlCopyExit = await new Promise((resolve17) => {
+              const wlCopyExit = await new Promise((resolve18) => {
                 const proc = spawn7("wl-copy", [], { stdio: ["pipe", "ignore", "ignore"] });
-                proc.on("error", () => resolve17(1));
-                proc.on("close", (code) => resolve17(code ?? 1));
+                proc.on("error", () => resolve18(1));
+                proc.on("close", (code) => resolve18(code ?? 1));
                 proc.stdin.on("error", () => {
                 });
                 proc.stdin.write(text4);
@@ -246705,13 +246705,13 @@ async function editInExternalEditor(options) {
     process.stdout.write(`Launching external editor: ${options.command}
 Pi will resume when the editor exits.
 `);
-    const exitCode = await new Promise((resolve17) => {
+    const exitCode = await new Promise((resolve18) => {
       const child = spawn9(editor, [...editorArgs, filePath], {
         stdio: "inherit",
         shell: process.platform === "win32"
       });
-      child.on("error", () => resolve17(null));
-      child.on("close", (code) => resolve17(code));
+      child.on("error", () => resolve18(null));
+      child.on("close", (code) => resolve18(code));
     });
     if (exitCode !== 0) {
       return { status: "failed" };
@@ -247092,8 +247092,8 @@ var init_login_dialog = __esm({
         this.contentContainer.addChild(this.input);
         this.contentContainer.addChild(new Text(`(${keyHint("tui.select.cancel", "to cancel")})`, 1, 0));
         this.tui.requestRender();
-        return new Promise((resolve17, reject) => {
-          this.inputResolver = resolve17;
+        return new Promise((resolve18, reject) => {
+          this.inputResolver = resolve18;
           this.inputRejecter = reject;
         });
       }
@@ -247111,8 +247111,8 @@ var init_login_dialog = __esm({
         this.contentContainer.addChild(new Text(`(${keyHint("tui.select.cancel", "to cancel,")} ${keyHint("tui.select.confirm", "to submit")})`, 1, 0));
         this.input.setValue("");
         this.tui.requestRender();
-        return new Promise((resolve17, reject) => {
-          this.inputResolver = resolve17;
+        return new Promise((resolve18, reject) => {
+          this.inputResolver = resolve18;
           this.inputRejecter = reject;
         });
       }
@@ -249010,7 +249010,7 @@ function countCrossings(edges, ranks, pos) {
   }
   return crossings;
 }
-function assignPositions(byRank, size, sep11, edges, ranks) {
+function assignPositions(byRank, size, sep12, edges, ranks) {
   const n7 = size.length;
   const parents = Array.from({ length: n7 }, () => []);
   const children = Array.from({ length: n7 }, () => []);
@@ -249027,14 +249027,14 @@ function assignPositions(byRank, size, sep11, edges, ranks) {
       const h2 = size[v3] / 2;
       x4 += h2;
       pos[v3] = x4;
-      x4 += h2 + sep11;
+      x4 += h2 + sep12;
     }
   }
   for (let it2 = 0; it2 < 10; it2++) {
     const rows = it2 % 2 === 0 ? byRank : [...byRank].reverse();
     const neigh = it2 % 2 === 0 ? parents : children;
     for (const row of rows)
-      relaxRank(row, neigh, pos, size, sep11);
+      relaxRank(row, neigh, pos, size, sep12);
   }
   let minLeft = Number.POSITIVE_INFINITY;
   for (let v3 = 0; v3 < n7; v3++)
@@ -249043,7 +249043,7 @@ function assignPositions(byRank, size, sep11, edges, ranks) {
     minLeft = 0;
   return Array.from({ length: n7 }, (_3, v3) => Math.max(0, Math.round(pos[v3] - minLeft)));
 }
-function relaxRank(nodes, neigh, pos, size, sep11) {
+function relaxRank(nodes, neigh, pos, size, sep12) {
   const n7 = nodes.length;
   if (n7 === 0)
     return;
@@ -249051,16 +249051,16 @@ function relaxRank(nodes, neigh, pos, size, sep11) {
   const halfOf = (i2) => size[nodes[i2]] / 2;
   const left = new Array(n7);
   for (let i2 = 0; i2 < n7; i2++) {
-    left[i2] = i2 === 0 ? desired[i2] : Math.max(desired[i2], left[i2 - 1] + halfOf(i2 - 1) + sep11 + halfOf(i2));
+    left[i2] = i2 === 0 ? desired[i2] : Math.max(desired[i2], left[i2 - 1] + halfOf(i2 - 1) + sep12 + halfOf(i2));
   }
   const right = new Array(n7);
   for (let i2 = n7 - 1; i2 >= 0; i2--) {
-    right[i2] = i2 === n7 - 1 ? desired[i2] : Math.min(desired[i2], right[i2 + 1] - halfOf(i2 + 1) - sep11 - halfOf(i2));
+    right[i2] = i2 === n7 - 1 ? desired[i2] : Math.min(desired[i2], right[i2 + 1] - halfOf(i2 + 1) - sep12 - halfOf(i2));
   }
   for (let i2 = 0; i2 < n7; i2++)
     pos[nodes[i2]] = (left[i2] + right[i2]) / 2;
   for (let i2 = 1; i2 < n7; i2++) {
-    const minP = pos[nodes[i2 - 1]] + halfOf(i2 - 1) + sep11 + halfOf(i2);
+    const minP = pos[nodes[i2 - 1]] + halfOf(i2 - 1) + sep12 + halfOf(i2);
     if (pos[nodes[i2]] < minP)
       pos[nodes[i2]] = minP;
   }
@@ -249883,9 +249883,9 @@ function statementsOf(src) {
     splitStatements(line, out);
   return out;
 }
-function splitOnce(s2, sep11) {
-  const i2 = s2.indexOf(sep11);
-  return i2 === -1 ? null : [s2.slice(0, i2), s2.slice(i2 + sep11.length)];
+function splitOnce(s2, sep12) {
+  const i2 = s2.indexOf(sep12);
+  return i2 === -1 ? null : [s2.slice(0, i2), s2.slice(i2 + sep12.length)];
 }
 function headerKind(statements) {
   const header = statements[0];
@@ -255053,25 +255053,25 @@ ${onboarding}`, this.getStartupExpansionState(), 1, 0);
         if (!process.env.TMUX)
           return void 0;
         const runTmuxShow = (option2) => {
-          return new Promise((resolve17) => {
+          return new Promise((resolve18) => {
             const proc = spawn10("tmux", ["show", "-gv", option2], {
               stdio: ["ignore", "pipe", "ignore"]
             });
             let stdout = "";
             const timer = setTimeout(() => {
               proc.kill();
-              resolve17(void 0);
+              resolve18(void 0);
             }, 2e3);
             proc.stdout?.on("data", (data) => {
               stdout += data.toString();
             });
             proc.on("error", () => {
               clearTimeout(timer);
-              resolve17(void 0);
+              resolve18(void 0);
             });
             proc.on("close", (code) => {
               clearTimeout(timer);
-              resolve17(code === 0 ? stdout.trim() : void 0);
+              resolve18(code === 0 ? stdout.trim() : void 0);
             });
           });
         };
@@ -256062,24 +256062,24 @@ ${warningLines}`, 0, 0));
        * Show a selector for extensions.
        */
       showExtensionSelector(title, options, opts) {
-        return new Promise((resolve17) => {
+        return new Promise((resolve18) => {
           if (opts?.signal?.aborted) {
-            resolve17(void 0);
+            resolve18(void 0);
             return;
           }
           const onAbort = () => {
             this.hideExtensionSelector();
-            resolve17(void 0);
+            resolve18(void 0);
           };
           opts?.signal?.addEventListener("abort", onAbort, { once: true });
           this.extensionSelector = new ExtensionSelectorComponent(title, options, (option2) => {
             opts?.signal?.removeEventListener("abort", onAbort);
             this.hideExtensionSelector();
-            resolve17(option2);
+            resolve18(option2);
           }, () => {
             opts?.signal?.removeEventListener("abort", onAbort);
             this.hideExtensionSelector();
-            resolve17(void 0);
+            resolve18(void 0);
           }, { tui: this.ui, timeout: opts?.timeout, onToggleToolsExpanded: () => this.toggleToolOutputExpansion() });
           this.disposeActiveSelector();
           this.editorContainer.clear();
@@ -256115,24 +256115,24 @@ ${message}`, ["Yes", "No"], opts);
        * Show a text input for extensions.
        */
       showExtensionInput(title, placeholder, opts) {
-        return new Promise((resolve17) => {
+        return new Promise((resolve18) => {
           if (opts?.signal?.aborted) {
-            resolve17(void 0);
+            resolve18(void 0);
             return;
           }
           const onAbort = () => {
             this.hideExtensionInput();
-            resolve17(void 0);
+            resolve18(void 0);
           };
           opts?.signal?.addEventListener("abort", onAbort, { once: true });
           this.extensionInput = new ExtensionInputComponent(title, placeholder, (value2) => {
             opts?.signal?.removeEventListener("abort", onAbort);
             this.hideExtensionInput();
-            resolve17(value2);
+            resolve18(value2);
           }, () => {
             opts?.signal?.removeEventListener("abort", onAbort);
             this.hideExtensionInput();
-            resolve17(void 0);
+            resolve18(void 0);
           }, { tui: this.ui, timeout: opts?.timeout });
           this.disposeActiveSelector();
           this.editorContainer.clear();
@@ -256156,13 +256156,13 @@ ${message}`, ["Yes", "No"], opts);
        * Show a multi-line editor for extensions (with Ctrl+G support).
        */
       showExtensionEditor(title, prefill) {
-        return new Promise((resolve17) => {
+        return new Promise((resolve18) => {
           this.extensionEditor = new ExtensionEditorComponent(this.ui, this.keybindings, title, prefill, (value2) => {
             this.hideExtensionEditor();
-            resolve17(value2);
+            resolve18(value2);
           }, () => {
             this.hideExtensionEditor();
-            resolve17(void 0);
+            resolve18(void 0);
           }, void 0, this.settingsManager.getExternalEditorCommand());
           this.disposeActiveSelector();
           this.editorContainer.clear();
@@ -256257,7 +256257,7 @@ ${message}`, ["Yes", "No"], opts);
           this.ui.setFocus(this.editor);
           this.ui.requestRender();
         };
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           let component;
           let closed = false;
           const close = (result) => {
@@ -256268,7 +256268,7 @@ ${message}`, ["Yes", "No"], opts);
               this.ui.hideOverlay();
             else
               restoreEditor();
-            resolve17(result);
+            resolve18(result);
             try {
               component?.dispose?.();
             } catch {
@@ -257117,10 +257117,10 @@ ${message}`, ["Yes", "No"], opts);
         if (queuedInput !== void 0) {
           return queuedInput;
         }
-        return new Promise((resolve17) => {
+        return new Promise((resolve18) => {
           this.onInputCallback = (text4) => {
             this.onInputCallback = void 0;
-            resolve17(text4);
+            resolve18(text4);
           };
         });
       }
@@ -258579,7 +258579,7 @@ ${packageLines}`, 1, 0));
         }
       }
       showAuthSelect(dialog, prompt) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           const restoreDialog = () => {
             this.editorContainer.clear();
             this.editorContainer.addChild(dialog);
@@ -258591,7 +258591,7 @@ ${packageLines}`, 1, 0));
             restoreDialog();
             const id = prompt.options.find((option2) => option2.label === optionLabel)?.id;
             if (id)
-              resolve17(id);
+              resolve18(id);
             else
               reject(new Error("Login cancelled"));
           }, () => {
@@ -258702,7 +258702,7 @@ ${packageLines}`, 1, 0));
         this.editorContainer.addChild(reloadBox);
         this.ui.setFocus(reloadBox);
         this.ui.requestRender(true);
-        await new Promise((resolve17) => process.nextTick(resolve17));
+        await new Promise((resolve18) => process.nextTick(resolve18));
         const dismissReloadBox = (editor) => {
           this.editorContainer.clear();
           this.editorContainer.addChild(editor);
@@ -258875,7 +258875,7 @@ ${packageLines}`, 1, 0));
           this.showStatus("Share cancelled");
         };
         try {
-          const result = await new Promise((resolve17) => {
+          const result = await new Promise((resolve18) => {
             proc = spawn10("gh", ["gist", "create", "--public=false", tmpFile]);
             let stdout = "";
             let stderr = "";
@@ -258885,7 +258885,7 @@ ${packageLines}`, 1, 0));
             proc.stderr?.on("data", (data) => {
               stderr += data.toString();
             });
-            proc.on("close", (code) => resolve17({ stdout, stderr, code }));
+            proc.on("close", (code) => resolve18({ stdout, stderr, code }));
           });
           if (loader.signal.aborted)
             return;
@@ -259564,7 +259564,7 @@ var init_rpc_client = __esm({
         this.stopReadingStdout = attachJsonlLineReader(childProcess.stdout, (line) => {
           this.handleLine(line);
         });
-        await new Promise((resolve17) => setTimeout(resolve17, 100));
+        await new Promise((resolve18) => setTimeout(resolve18, 100));
         if (this.process.exitCode !== null) {
           const error48 = this.exitError ?? this.createProcessExitError(this.process.exitCode, this.process.signalCode);
           this.exitError = error48;
@@ -259580,14 +259580,14 @@ var init_rpc_client = __esm({
         this.stopReadingStdout?.();
         this.stopReadingStdout = null;
         this.process.kill("SIGTERM");
-        await new Promise((resolve17) => {
+        await new Promise((resolve18) => {
           const timeout = setTimeout(() => {
             this.process?.kill("SIGKILL");
-            resolve17();
+            resolve18();
           }, 1e3);
           this.process?.on("exit", () => {
             clearTimeout(timeout);
-            resolve17();
+            resolve18();
           });
         });
         this.process = null;
@@ -259841,7 +259841,7 @@ var init_rpc_client = __esm({
        * Resolves when agent_settled event is received.
        */
       waitForIdle(timeout = 6e4) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           const timer = setTimeout(() => {
             unsubscribe();
             reject(new Error(`Timeout waiting for agent to become idle. Stderr: ${this.stderr}`));
@@ -259850,7 +259850,7 @@ var init_rpc_client = __esm({
             if (event.type === "agent_settled") {
               clearTimeout(timer);
               unsubscribe();
-              resolve17();
+              resolve18();
             }
           });
         });
@@ -259859,7 +259859,7 @@ var init_rpc_client = __esm({
        * Collect events until agent becomes idle.
        */
       collectEvents(timeout = 6e4) {
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           const events = [];
           const timer = setTimeout(() => {
             unsubscribe();
@@ -259870,7 +259870,7 @@ var init_rpc_client = __esm({
             if (event.type === "agent_settled") {
               clearTimeout(timer);
               unsubscribe();
-              resolve17(events);
+              resolve18(events);
             }
           });
         });
@@ -259931,7 +259931,7 @@ var init_rpc_client = __esm({
         }
         const id = `req_${++this.requestId}`;
         const fullCommand = { ...command, id };
-        return new Promise((resolve17, reject) => {
+        return new Promise((resolve18, reject) => {
           const timeout = setTimeout(() => {
             this.pendingRequests.delete(id);
             reject(new Error(`Timeout waiting for response to ${command.type}. Stderr: ${this.stderr}`));
@@ -259939,7 +259939,7 @@ var init_rpc_client = __esm({
           this.pendingRequests.set(id, {
             resolve: (response) => {
               clearTimeout(timeout);
-              resolve17(response);
+              resolve18(response);
             },
             reject: (error48) => {
               clearTimeout(timeout);
@@ -259995,7 +259995,7 @@ async function runRpcMode(runtimeHost) {
     if (opts?.signal?.aborted)
       return Promise.resolve(defaultValue);
     const id = crypto3.randomUUID();
-    return new Promise((resolve17, reject) => {
+    return new Promise((resolve18, reject) => {
       let timeoutId;
       const cleanup = () => {
         if (timeoutId)
@@ -260005,19 +260005,19 @@ async function runRpcMode(runtimeHost) {
       };
       const onAbort = () => {
         cleanup();
-        resolve17(defaultValue);
+        resolve18(defaultValue);
       };
       opts?.signal?.addEventListener("abort", onAbort, { once: true });
       if (opts?.timeout) {
         timeoutId = setTimeout(() => {
           cleanup();
-          resolve17(defaultValue);
+          resolve18(defaultValue);
         }, opts.timeout);
       }
       pendingExtensionRequests.set(id, {
         resolve: (response) => {
           cleanup();
-          resolve17(parseResponse2(response));
+          resolve18(parseResponse2(response));
         },
         reject
       });
@@ -260101,15 +260101,15 @@ async function runRpcMode(runtimeHost) {
     },
     async editor(title, prefill) {
       const id = crypto3.randomUUID();
-      return new Promise((resolve17, reject) => {
+      return new Promise((resolve18, reject) => {
         pendingExtensionRequests.set(id, {
           resolve: (response) => {
             if ("cancelled" in response && response.cancelled) {
-              resolve17(void 0);
+              resolve18(void 0);
             } else if ("value" in response) {
-              resolve17(response.value);
+              resolve18(response.value);
             } else {
-              resolve17(void 0);
+              resolve18(void 0);
             }
           },
           reject
@@ -260706,10 +260706,10 @@ var init_config_selector = __esm({
       }
       render(width) {
         const title = theme.bold(this.writeScope === "project" ? "Project Local Resources" : "Global Resources");
-        const sep11 = theme.fg("muted", " \xB7 ");
-        const switchHint = this.projectModeAvailable ? keyHint("tui.input.tab", "switch mode") + sep11 : "";
+        const sep12 = theme.fg("muted", " \xB7 ");
+        const switchHint = this.projectModeAvailable ? keyHint("tui.input.tab", "switch mode") + sep12 : "";
         const actionHint = this.writeScope === "project" ? rawKeyHint("space", "cycle inherit/+/-") : rawKeyHint("space", "toggle");
-        const hint = switchHint + actionHint + sep11 + rawKeyHint("esc", "close");
+        const hint = switchHint + actionHint + sep12 + rawKeyHint("esc", "close");
         const spacing = Math.max(1, width - visibleWidth(title) - visibleWidth(hint));
         const scopeHint = this.writeScope === "project" ? theme.fg("muted", `${CONFIG_DIR_NAME}/settings.json \xB7 inherited global resources are dimmed`) : theme.fg("muted", `~/${CONFIG_DIR_NAME}/agent/settings.json`);
         return [
@@ -261287,7 +261287,7 @@ var init_config_selector = __esm({
 // node_modules/@earendil-works/pi-coding-agent/dist/cli/config-selector.js
 async function selectConfig(options) {
   initTheme(options.settingsManager.getTheme(), true);
-  return new Promise((resolve17) => {
+  return new Promise((resolve18) => {
     const ui2 = new TuiMainScreen(new ProcessTerminal(), void 0, options.agentDir);
     let resolved = false;
     const selector = new ConfigSelectorComponent(options.resolvedPaths, options.settingsManager, options.cwd, options.agentDir, () => {
@@ -261295,7 +261295,7 @@ async function selectConfig(options) {
         resolved = true;
         ui2.stop();
         stopThemeWatcher();
-        resolve17();
+        resolve18();
       }
     }, () => {
       ui2.stop();
@@ -261780,7 +261780,7 @@ async function getSelfUpdatePlan(force) {
 async function runSelfUpdate(command) {
   console.log(source_default.dim(`Updating ${APP_NAME} with ${command.display}...`));
   for (const step of command.steps ?? [command]) {
-    await new Promise((resolve17, reject) => {
+    await new Promise((resolve18, reject) => {
       const child = spawnProcess(step.command, step.args, {
         stdio: "inherit"
       });
@@ -261789,7 +261789,7 @@ async function runSelfUpdate(command) {
       });
       child.on("close", (code, signal) => {
         if (code === 0) {
-          resolve17();
+          resolve18();
         } else if (signal) {
           reject(new Error(`${step.display} terminated by signal ${signal}`));
         } else {
@@ -262144,14 +262144,14 @@ async function readPipedStdin() {
   if (process.stdin.isTTY) {
     return void 0;
   }
-  return new Promise((resolve17) => {
+  return new Promise((resolve18) => {
     let data = "";
     process.stdin.setEncoding("utf8");
     process.stdin.on("data", (chunk) => {
       data += chunk;
     });
     process.stdin.on("end", () => {
-      resolve17(data.trim() || void 0);
+      resolve18(data.trim() || void 0);
     });
     process.stdin.resume();
   });
@@ -262295,14 +262295,14 @@ async function resolveSessionPath(sessionArg, cwd, sessionDir) {
   return { type: "not_found", arg: sessionArg };
 }
 async function promptConfirm(message) {
-  return new Promise((resolve17) => {
+  return new Promise((resolve18) => {
     const rl = createInterface4({
       input: process.stdin,
       output: process.stdout
     });
     rl.question(`${message} [y/N] `, (answer) => {
       rl.close();
-      resolve17(answer.toLowerCase() === "y" || answer.toLowerCase() === "yes");
+      resolve18(answer.toLowerCase() === "y" || answer.toLowerCase() === "yes");
     });
   });
 }
@@ -262785,15 +262785,15 @@ async function main(args, options) {
     if (startupBenchmark) {
       await interactiveMode.init();
       time3("interactiveMode.init");
-      await new Promise((resolve17) => setTimeout(resolve17, 150));
+      await new Promise((resolve18) => setTimeout(resolve18, 150));
       interactiveMode.stop();
       stopThemeWatcher();
       printTimings();
       if (process.stdout.writableLength > 0) {
-        await new Promise((resolve17) => process.stdout.once("drain", resolve17));
+        await new Promise((resolve18) => process.stdout.once("drain", resolve18));
       }
       if (process.stderr.writableLength > 0) {
-        await new Promise((resolve17) => process.stderr.once("drain", resolve17));
+        await new Promise((resolve18) => process.stderr.once("drain", resolve18));
       }
       return;
     }
@@ -263220,7 +263220,7 @@ var init_dist7 = __esm({
 // node_modules/@earendil-works/pi-coding-agent/dist/core/exec.js
 import { spawn as spawn12 } from "node:child_process";
 async function execCommand(command, args, cwd, options) {
-  return new Promise((resolve17) => {
+  return new Promise((resolve18) => {
     const proc = spawn12(command, args, {
       cwd,
       shell: false,
@@ -263265,14 +263265,14 @@ async function execCommand(command, args, cwd, options) {
       if (options?.signal) {
         options.signal.removeEventListener("abort", killProcess);
       }
-      resolve17({ stdout, stderr, code: code ?? 0, killed });
+      resolve18({ stdout, stderr, code: code ?? 0, killed });
     }).catch((_err) => {
       if (timeoutId)
         clearTimeout(timeoutId);
       if (options?.signal) {
         options.signal.removeEventListener("abort", killProcess);
       }
-      resolve17({ stdout, stderr, code: 1, killed });
+      resolve18({ stdout, stderr, code: 1, killed });
     });
   });
 }
@@ -264252,8 +264252,8 @@ var init_agent_session = __esm({
       }
       _getIdleWaitPromise() {
         if (!this._idleWaitPromise) {
-          this._idleWaitPromise = new Promise((resolve17) => {
-            this._resolveIdleWait = resolve17;
+          this._idleWaitPromise = new Promise((resolve18) => {
+            this._resolveIdleWait = resolve18;
           });
         }
         return this._idleWaitPromise;
@@ -264262,10 +264262,10 @@ var init_agent_session = __esm({
         if (this._isAgentRunActive || !this._resolveIdleWait) {
           return;
         }
-        const resolve17 = this._resolveIdleWait;
+        const resolve18 = this._resolveIdleWait;
         this._idleWaitPromise = void 0;
         this._resolveIdleWait = void 0;
-        resolve17();
+        resolve18();
       }
       async _emitAgentSettled() {
         this._isAgentRunActive = false;
@@ -266881,7 +266881,7 @@ function formatErrorDetails(error48) {
 }
 async function startCallbackServer(expectedState) {
   const { createServer: createServer3 } = await getNodeApis();
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     let settleWait;
     const waitForCodePromise = new Promise((resolveWait) => {
       let settled = false;
@@ -266930,7 +266930,7 @@ async function startCallbackServer(expectedState) {
       reject(err2);
     });
     server.listen(CALLBACK_PORT, CALLBACK_HOST, () => {
-      resolve17({
+      resolve18({
         server,
         redirectUri: REDIRECT_URI,
         cancelWait: () => {
@@ -267116,7 +267116,7 @@ var init_anthropic3 = __esm({
 
 // node_modules/@earendil-works/pi-ai/dist/auth/oauth/device-code.js
 function abortableSleep2(ms2, signal, cancelMessage) {
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     if (signal.aborted) {
       reject(new Error(cancelMessage));
       return;
@@ -267127,7 +267127,7 @@ function abortableSleep2(ms2, signal, cancelMessage) {
     };
     const timeout = setTimeout(() => {
       signal.removeEventListener("abort", onAbort);
-      resolve17();
+      resolve18();
     }, ms2);
     signal.addEventListener("abort", onAbort, { once: true });
   });
@@ -267383,13 +267383,13 @@ function startLocalOAuthServer(state2) {
     throw new Error("OpenAI Codex OAuth is only available in Node.js environments");
   }
   let settleWait;
-  const waitForCodePromise = new Promise((resolve17) => {
+  const waitForCodePromise = new Promise((resolve18) => {
     let settled = false;
     settleWait = (value2) => {
       if (settled)
         return;
       settled = true;
-      resolve17(value2);
+      resolve18(value2);
     };
   });
   const server = _http.createServer((req, res) => {
@@ -267424,9 +267424,9 @@ function startLocalOAuthServer(state2) {
       res.end(oauthErrorHtml("Internal error while processing OAuth callback."));
     }
   });
-  return new Promise((resolve17) => {
+  return new Promise((resolve18) => {
     server.listen(1455, getCallbackHost(), () => {
-      resolve17({
+      resolve18({
         close: () => server.close(),
         cancelWait: () => {
           settleWait?.(null);
@@ -267435,7 +267435,7 @@ function startLocalOAuthServer(state2) {
       });
     }).on("error", (_err) => {
       settleWait?.(null);
-      resolve17({
+      resolve18({
         close: () => {
           try {
             server.close();
@@ -268000,8 +268000,8 @@ async function startCallbackServer2(callbackPath, verifier, signal) {
   };
   let rejectCredential = () => {
   };
-  const credential = new Promise((resolve17, reject) => {
-    resolveCredential = resolve17;
+  const credential = new Promise((resolve18, reject) => {
+    resolveCredential = resolve18;
     rejectCredential = reject;
   });
   let server;
@@ -268061,11 +268061,11 @@ async function startCallbackServer2(callbackPath, verifier, signal) {
       }
     })();
   });
-  await new Promise((resolve17, reject) => {
+  await new Promise((resolve18, reject) => {
     server.once("error", reject);
     server.listen(0, callbackHost, () => {
       server.removeListener("error", reject);
-      resolve17();
+      resolve18();
     });
   });
   server.on("error", (error48) => finish({ error: error48 }));
@@ -268307,7 +268307,7 @@ async function pollForToken(oauthHost, device, signal) {
   });
 }
 function sleep9(ms2, signal) {
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     signal.throwIfAborted();
     const onAbort = () => {
       clearTimeout(timeout);
@@ -268315,7 +268315,7 @@ function sleep9(ms2, signal) {
     };
     const timeout = setTimeout(() => {
       signal.removeEventListener("abort", onAbort);
-      resolve17();
+      resolve18();
     }, ms2);
     signal.addEventListener("abort", onAbort, { once: true });
   });
@@ -268652,8 +268652,8 @@ function startOAuthCallbackServer(expectedState, signal) {
   let settle = () => {
   };
   let settled = false;
-  const wait = new Promise((resolve17) => {
-    settle = resolve17;
+  const wait = new Promise((resolve18) => {
+    settle = resolve18;
   });
   const finish = (code) => {
     if (settled) {
@@ -268694,9 +268694,9 @@ function startOAuthCallbackServer(expectedState, signal) {
     sendPage(response, 200, oauthSuccessHtml("Signed in to Radius. You may now close this page."));
     finish(code);
   });
-  return new Promise((resolve17) => {
+  return new Promise((resolve18) => {
     server.listen(CALLBACK_PORT2, CALLBACK_HOST2, () => {
-      resolve17({
+      resolve18({
         waitForCode: () => wait,
         close: () => {
           finish(null);
@@ -268705,7 +268705,7 @@ function startOAuthCallbackServer(expectedState, signal) {
       });
     }).once("error", () => {
       finish(null);
-      resolve17({ waitForCode: async () => null, close: () => {
+      resolve18({ waitForCode: async () => null, close: () => {
       } });
     });
   });
@@ -268944,9 +268944,9 @@ function CodePointLength2(value2) {
 }
 function ConsumeModifiers2(value2, index3) {
   while (index3 < value2.length) {
-    const point = value2.codePointAt(index3);
-    if (IsCombiningMark3(point) || IsVariationSelector2(point)) {
-      index3 += CodePointLength2(point);
+    const point2 = value2.codePointAt(index3);
+    if (IsCombiningMark3(point2) || IsVariationSelector2(point2)) {
+      index3 += CodePointLength2(point2);
     } else {
       break;
     }
@@ -276411,32 +276411,853 @@ var init_build3 = __esm({
   }
 });
 
+// runtime/src/tools/desktop.ts
+import { accessSync as accessSync3, constants as constants8, existsSync as existsSync26, readdirSync as readdirSync11, readFileSync as readFileSync20, statSync as statSync12 } from "node:fs";
+import { execFile as execFile2 } from "node:child_process";
+import { homedir as homedir14 } from "node:os";
+import { delimiter as delimiter3, join as join41, relative as relative9, sep as sep11 } from "node:path";
+function isObject4(value2) {
+  return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
+}
+function boundedText(value2, maximum = 240) {
+  return typeof value2 === "string" && value2 !== "" ? value2.slice(0, maximum) : void 0;
+}
+function boundedInteger(value2) {
+  return typeof value2 === "number" && Number.isInteger(value2) ? value2 : void 0;
+}
+function boundedNumber(value2) {
+  return typeof value2 === "number" && Number.isFinite(value2) ? value2 : void 0;
+}
+function point(value2) {
+  if (!Array.isArray(value2) || value2.length < 2) return void 0;
+  const x4 = boundedInteger(value2[0]);
+  const y2 = boundedInteger(value2[1]);
+  return x4 === void 0 || y2 === void 0 ? void 0 : [x4, y2];
+}
+function jsonObject(output, subject) {
+  try {
+    const value2 = JSON.parse(output);
+    if (isObject4(value2)) return value2;
+  } catch {
+  }
+  throw new DesktopToolError("desktop_state_unavailable", `Hyprland returned invalid ${subject} state`);
+}
+function jsonObjects(output, subject) {
+  try {
+    const value2 = JSON.parse(output);
+    if (Array.isArray(value2)) return value2.filter(isObject4);
+  } catch {
+  }
+  throw new DesktopToolError("desktop_state_unavailable", `Hyprland returned invalid ${subject} state`);
+}
+function parseWindow(value2, includeTitle) {
+  const address = normalizeWindowAddress(boundedText(value2.address, 32));
+  if (address === void 0) return void 0;
+  const workspace = isObject4(value2.workspace) ? boundedInteger(value2.workspace.id) : void 0;
+  const windowClass = boundedText(value2.class);
+  const initialClass = boundedText(value2.initialClass);
+  const title = boundedText(value2.title);
+  const pid = boundedInteger(value2.pid);
+  const monitor = boundedInteger(value2.monitor);
+  const position = point(value2.at);
+  const size = point(value2.size);
+  return {
+    address,
+    ...windowClass === void 0 ? {} : { class: windowClass },
+    ...initialClass === void 0 ? {} : { initialClass },
+    ...!includeTitle || title === void 0 ? {} : { title },
+    ...pid === void 0 ? {} : { pid },
+    ...workspace === void 0 ? {} : { workspace },
+    ...monitor === void 0 ? {} : { monitor },
+    ...position === void 0 ? {} : { position },
+    ...size === void 0 ? {} : { size },
+    floating: value2.floating === true,
+    fullscreen: boundedInteger(value2.fullscreen) ?? 0,
+    pseudo: value2.pseudo === true,
+    pinned: value2.pinned === true,
+    grouped: Array.isArray(value2.grouped) && value2.grouped.length > 0,
+    mapped: value2.mapped === true,
+    hidden: value2.hidden === true
+  };
+}
+function parseWorkspace(value2) {
+  const id = boundedInteger(value2.id);
+  const name = boundedText(value2.name, 80);
+  const monitor = boundedText(value2.monitor, 128);
+  const monitorId = boundedInteger(value2.monitorID);
+  const windows = boundedInteger(value2.windows);
+  return {
+    ...id === void 0 ? {} : { id },
+    ...name === void 0 ? {} : { name },
+    ...monitor === void 0 ? {} : { monitor },
+    ...monitorId === void 0 ? {} : { monitorId },
+    ...windows === void 0 ? {} : { windows },
+    hasFullscreen: value2.hasfullscreen === true
+  };
+}
+function parseMonitor(value2) {
+  const activeWorkspace = isObject4(value2.activeWorkspace) ? boundedInteger(value2.activeWorkspace.id) : void 0;
+  const id = boundedInteger(value2.id);
+  const name = boundedText(value2.name, 128);
+  const description = boundedText(value2.description);
+  const x4 = boundedInteger(value2.x);
+  const y2 = boundedInteger(value2.y);
+  const width = boundedInteger(value2.width);
+  const height = boundedInteger(value2.height);
+  const scale = boundedNumber(value2.scale);
+  return {
+    ...id === void 0 ? {} : { id },
+    ...name === void 0 ? {} : { name },
+    ...description === void 0 ? {} : { description },
+    focused: value2.focused === true,
+    ...activeWorkspace === void 0 ? {} : { activeWorkspace },
+    ...x4 === void 0 || y2 === void 0 ? {} : { position: [x4, y2] },
+    ...width === void 0 || height === void 0 ? {} : { size: [width, height] },
+    ...scale === void 0 ? {} : { scale }
+  };
+}
+async function readDesktopState(run = runDesktopCommand, includeTitles = false, signal) {
+  const [activeWindowResult, activeWorkspaceResult, monitorsResult, workspacesResult, clientsResult] = await Promise.all([
+    run("hyprctl", ["-j", "activewindow"], signal),
+    run("hyprctl", ["-j", "activeworkspace"], signal),
+    run("hyprctl", ["-j", "monitors", "all"], signal),
+    run("hyprctl", ["-j", "workspaces"], signal),
+    run("hyprctl", ["-j", "clients"], signal)
+  ]);
+  const activeWindow = parseWindow(jsonObject(activeWindowResult.stdout, "active-window"), includeTitles);
+  const activeWorkspace = parseWorkspace(jsonObject(activeWorkspaceResult.stdout, "active-workspace"));
+  const windows = jsonObjects(clientsResult.stdout, "window").slice(0, MAX_WINDOWS).map((value2) => parseWindow(value2, includeTitles)).filter((value2) => value2 !== void 0);
+  return {
+    ...activeWindow === void 0 ? {} : { activeWindow },
+    activeWorkspace,
+    monitors: jsonObjects(monitorsResult.stdout, "monitor").slice(0, MAX_MONITORS).map(parseMonitor),
+    workspaces: jsonObjects(workspacesResult.stdout, "workspace").slice(0, MAX_WORKSPACES).map(parseWorkspace),
+    windows
+  };
+}
+function desktopAppDirectories(env2) {
+  const home = env2.HOME ?? homedir14();
+  const configuredDataHome = env2.XDG_DATA_HOME?.trim();
+  const configuredDataDirectories = env2.XDG_DATA_DIRS?.trim();
+  const dataHome = configuredDataHome === void 0 || configuredDataHome === "" ? join41(home, ".local/share") : configuredDataHome;
+  const dataDirectories = (configuredDataDirectories === void 0 || configuredDataDirectories === "" ? "/usr/local/share:/usr/share" : configuredDataDirectories).split(":");
+  return [...new Set([dataHome, ...dataDirectories].filter(Boolean).map((path16) => join41(path16, "applications")))];
+}
+function desktopFiles(directory, depth = 0) {
+  if (depth > 4) return [];
+  let entries;
+  try {
+    entries = readdirSync11(directory, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries.slice(0, MAX_DIRECTORY_ENTRIES).flatMap((entry) => {
+    const path16 = join41(directory, entry.name);
+    if (entry.isDirectory()) return desktopFiles(path16, depth + 1);
+    return (entry.isFile() || entry.isSymbolicLink()) && entry.name.endsWith(".desktop") ? [path16] : [];
+  });
+}
+function parseDesktopApp(path16, id) {
+  try {
+    if (statSync12(path16).size > MAX_DESKTOP_FILE_BYTES) return void 0;
+    const values = /* @__PURE__ */ new Map();
+    let inDesktopEntry = false;
+    for (const line of readFileSync20(path16, "utf8").split(/\r?\n/u)) {
+      if (line.startsWith("[")) {
+        inDesktopEntry = line === "[Desktop Entry]";
+        continue;
+      }
+      if (!inDesktopEntry || line.startsWith("#")) continue;
+      const separator = line.indexOf("=");
+      if (separator > 0) values.set(line.slice(0, separator), line.slice(separator + 1).trim());
+    }
+    if (values.get("Type") !== "Application" || values.get("Hidden") === "true" || values.get("NoDisplay") === "true") return void 0;
+    const name = values.get("Name")?.trim();
+    if (!name) return void 0;
+    const genericName = values.get("GenericName")?.trim();
+    const description = genericName === void 0 || genericName === "" ? values.get("Comment")?.trim() : genericName;
+    const startupWmClass = values.get("StartupWMClass")?.trim();
+    return {
+      kind: "desktop",
+      id,
+      name,
+      ...description ? { description: description.slice(0, 240) } : {},
+      ...startupWmClass ? { startupWmClass: startupWmClass.slice(0, 240) } : {}
+    };
+  } catch {
+    return void 0;
+  }
+}
+function installedDesktopApps(env2) {
+  const seen = /* @__PURE__ */ new Set();
+  const apps = [];
+  for (const root of desktopAppDirectories(env2)) {
+    if (!existsSync26(root)) continue;
+    for (const path16 of desktopFiles(root).slice(0, MAX_CATALOG_ENTRIES)) {
+      const id = relative9(root, path16).split(sep11).join("-").replace(/\.desktop$/u, "");
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const app = parseDesktopApp(path16, id);
+      if (app !== void 0) apps.push(app);
+    }
+  }
+  return apps;
+}
+function installedCliApps(env2) {
+  const seen = /* @__PURE__ */ new Set();
+  const apps = [];
+  for (const directory of (env2.PATH ?? "").split(delimiter3).filter(Boolean)) {
+    let entries;
+    try {
+      entries = readdirSync11(directory, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries.slice(0, MAX_DIRECTORY_ENTRIES)) {
+      if (apps.length >= MAX_CATALOG_ENTRIES) return apps;
+      if (seen.has(entry.name) || !entry.isFile() && !entry.isSymbolicLink()) continue;
+      seen.add(entry.name);
+      try {
+        accessSync3(join41(directory, entry.name), constants8.X_OK);
+      } catch {
+        continue;
+      }
+      apps.push({ kind: "cli", id: entry.name, name: entry.name });
+    }
+  }
+  return apps;
+}
+function discoverInstalledApps(query, kind = "all", limit2 = 20, env2 = process.env) {
+  const needle = query.trim().toLocaleLowerCase();
+  if (needle === "") throw new DesktopToolError("invalid_app_query", "Enter an app name or command to find");
+  const candidates = [
+    ...kind === "cli" ? [] : installedDesktopApps(env2),
+    ...kind === "desktop" ? [] : installedCliApps(env2)
+  ];
+  return candidates.filter((app) => `${app.name}
+${app.id}
+${app.description ?? ""}`.toLocaleLowerCase().includes(needle)).sort((left, right) => {
+    const leftExact = left.id.toLocaleLowerCase() === needle || left.name.toLocaleLowerCase() === needle ? 0 : 1;
+    const rightExact = right.id.toLocaleLowerCase() === needle || right.name.toLocaleLowerCase() === needle ? 0 : 1;
+    return leftExact - rightExact || left.name.localeCompare(right.name) || left.id.localeCompare(right.id);
+  }).slice(0, Math.max(1, Math.min(limit2, 40)));
+}
+function resolveInstalledApp(kind, id, env2) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._+-]{0,255}$/u.test(id)) {
+    throw new DesktopToolError("invalid_app", "Use an exact app ID returned by app_catalog");
+  }
+  const candidates = kind === "desktop" ? installedDesktopApps(env2) : installedCliApps(env2);
+  const app = candidates.find((candidate) => candidate.id === id);
+  if (app === void 0) throw new DesktopToolError("app_unavailable", "That exact installed app is no longer available");
+  return app;
+}
+function normalizeWindowAddress(value2) {
+  if (value2 === void 0 || value2 === "") return void 0;
+  if (!/^0x[0-9a-f]+$/iu.test(value2)) {
+    throw new DesktopToolError("invalid_window", "Use an exact window address returned by desktop_state");
+  }
+  return value2.toLocaleLowerCase();
+}
+function requireWindowAddress(value2) {
+  const address = normalizeWindowAddress(value2);
+  if (address === void 0) throw new DesktopToolError("invalid_window", "Choose a window returned by desktop_state");
+  return address;
+}
+function requireWorkspace(value2) {
+  if (value2 === void 0 || !Number.isInteger(value2) || value2 < 1 || value2 > 99) {
+    throw new DesktopToolError("invalid_workspace", "Choose a numbered workspace from 1 through 99");
+  }
+  return value2;
+}
+function requireWindowPid(value2) {
+  if (value2 === void 0 || !Number.isInteger(value2) || value2 < 1) {
+    throw new DesktopToolError("invalid_window", "Use the exact window PID returned by desktop_state");
+  }
+  return value2;
+}
+function windowActionCommand(input2) {
+  const address = requireWindowAddress(input2.address);
+  requireWindowPid(input2.pid);
+  switch (input2.action) {
+    case "focus":
+      return {
+        file: "hyprctl",
+        args: ["dispatch", `hl.dsp.focus({ window = "address:${address}" })`]
+      };
+    case "move_to_workspace": {
+      const workspace = requireWorkspace(input2.workspace);
+      return {
+        file: "hyprctl",
+        args: ["dispatch", `hl.dsp.window.move({ window = "address:${address}", workspace = ${workspace}, follow = ${input2.follow === false ? "false" : "true"} })`]
+      };
+    }
+    case "resize": {
+      if (input2.width === void 0 || input2.height === void 0) {
+        throw new DesktopToolError("invalid_size", "Choose both the requested width and height");
+      }
+      if (!Number.isInteger(input2.width) || !Number.isInteger(input2.height) || input2.width < 100 || input2.height < 100 || input2.width > 1e4 || input2.height > 1e4) {
+        throw new DesktopToolError("invalid_size", "Choose a width and height from 100 through 10000 pixels");
+      }
+      return {
+        file: "hyprctl",
+        args: ["dispatch", `hl.dsp.window.resize({ window = "address:${address}", x = ${input2.width}, y = ${input2.height} })`]
+      };
+    }
+    case "set_floating":
+      if (input2.enabled === void 0) throw new DesktopToolError("invalid_state", "Choose whether floating should be enabled");
+      return {
+        file: "hyprctl",
+        args: ["dispatch", `hl.dsp.window.float({ window = "address:${address}", action = "toggle" })`]
+      };
+    case "close":
+      return {
+        file: "hyprctl",
+        args: ["dispatch", `hl.dsp.window.close({ window = "address:${address}" })`]
+      };
+    default:
+      throw new DesktopToolError("invalid_window_action", "That window action is unavailable");
+  }
+}
+function workspaceActionCommand(input2) {
+  const workspace = requireWorkspace(input2.workspace);
+  switch (input2.action) {
+    case "focus":
+      return {
+        file: "hyprctl",
+        args: ["dispatch", `hl.dsp.focus({ workspace = ${workspace} })`]
+      };
+    case "move_to_monitor": {
+      const monitor = input2.monitor?.trim();
+      if (monitor === void 0 || monitor === "" || !/^[A-Za-z0-9_.:-]{1,128}$/u.test(monitor)) {
+        throw new DesktopToolError("invalid_monitor", "Use an exact monitor name returned by desktop_state");
+      }
+      return {
+        file: "hyprctl",
+        args: ["dispatch", `hl.dsp.workspace.move({ workspace = ${workspace}, monitor = "${monitor}" })`]
+      };
+    }
+    default:
+      throw new DesktopToolError("invalid_workspace_action", "That workspace action is unavailable");
+  }
+}
+function windowSummary(window2, activeAddress) {
+  if (window2 === void 0) return void 0;
+  return {
+    address: window2.address,
+    ...window2.pid === void 0 ? {} : { pid: window2.pid },
+    ...window2.workspace === void 0 ? {} : { workspace: window2.workspace },
+    ...window2.monitor === void 0 ? {} : { monitor: window2.monitor },
+    ...window2.position === void 0 ? {} : { position: window2.position },
+    ...window2.size === void 0 ? {} : { size: window2.size },
+    floating: window2.floating,
+    active: window2.address === activeAddress
+  };
+}
+function workspaceSummary(workspace, activeWorkspace) {
+  if (workspace === void 0) return void 0;
+  return {
+    ...workspace.id === void 0 ? {} : { id: workspace.id },
+    ...workspace.monitor === void 0 ? {} : { monitor: workspace.monitor },
+    active: workspace.id === activeWorkspace
+  };
+}
+function receiptResult(receipt) {
+  return {
+    content: [{ type: "text", text: JSON.stringify(receipt, void 0, 2) }],
+    details: receipt,
+    ...receipt.verified ? {} : { isError: true }
+  };
+}
+function toolFailure(action, error48) {
+  const message = error48 instanceof DesktopToolError ? error48.message : `${action} failed`;
+  return {
+    content: [{ type: "text", text: message }],
+    details: error48 instanceof DesktopToolError ? { code: error48.code } : {},
+    isError: true
+  };
+}
+async function dispatch(run, command, signal) {
+  const result = await run(command.file, command.args, signal);
+  if (`${result.stdout}
+${result.stderr}`.trim() !== "ok") {
+    throw new DesktopToolError("desktop_action_rejected", "Hyprland did not accept the requested action");
+  }
+}
+function delay(ms2, signal) {
+  return new Promise((resolve18, reject) => {
+    if (signal?.aborted === true) {
+      reject(signal.reason instanceof Error ? signal.reason : new Error("aborted"));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timeout);
+      reject(signal?.reason instanceof Error ? signal.reason : new Error("aborted"));
+    };
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve18();
+    }, ms2);
+    timeout.unref();
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+async function waitForState(run, predicate, signal, attempts = VERIFY_ATTEMPTS, delayMs = VERIFY_DELAY_MS) {
+  let state2 = await readDesktopState(run, false, signal);
+  for (let attempt2 = 0; attempt2 < attempts && !predicate(state2); attempt2 += 1) {
+    await delay(delayMs, signal);
+    state2 = await readDesktopState(run, false, signal);
+  }
+  return state2;
+}
+function normalizedIdentity(value2) {
+  return (value2 ?? "").toLocaleLowerCase().replace(/\.desktop$/u, "");
+}
+function appWindows(app, state2) {
+  const identities = new Set([
+    normalizedIdentity(app.id),
+    normalizedIdentity(app.id.split(".").at(-1)),
+    normalizedIdentity(app.startupWmClass),
+    ...app.kind === "cli" ? [normalizedIdentity(`org.omarchy.${app.id}`)] : []
+  ].filter(Boolean));
+  return state2.windows.filter((window2) => {
+    const classes = [normalizedIdentity(window2.class), normalizedIdentity(window2.initialClass)];
+    return classes.some((candidate) => identities.has(candidate));
+  });
+}
+async function focusAppWindow(run, app, matches, signal) {
+  if (matches.length !== 1) {
+    throw new DesktopToolError(
+      matches.length === 0 ? "app_window_unavailable" : "app_window_ambiguous",
+      matches.length === 0 ? "No matching app window is open" : "More than one matching app window is open; target an exact address"
+    );
+  }
+  const target = matches[0];
+  if (target === void 0) throw new DesktopToolError("app_window_unavailable", "No matching app window is open");
+  const before = await readDesktopState(run, false, signal);
+  const currentTarget = appWindows(app, before).find((window2) => window2.address === target.address);
+  if (currentTarget === void 0) throw new DesktopToolError("app_window_unavailable", "That exact app window is no longer available");
+  if (before.activeWindow?.address === currentTarget.address) {
+    return {
+      action: "focus_existing_app",
+      target: { app: app.id, address: currentTarget.address },
+      requested: {},
+      before: windowSummary(currentTarget, before.activeWindow.address),
+      after: windowSummary(currentTarget, before.activeWindow.address),
+      changed: false,
+      verified: true
+    };
+  }
+  await dispatch(run, {
+    file: "hyprctl",
+    args: ["dispatch", `hl.dsp.focus({ window = "address:${currentTarget.address}" })`]
+  }, signal);
+  const after = await waitForState(run, (state2) => state2.activeWindow?.address === currentTarget.address, signal);
+  return {
+    action: "focus_existing_app",
+    target: { app: app.id, address: currentTarget.address },
+    requested: {},
+    before: windowSummary(currentTarget, before.activeWindow?.address),
+    after: windowSummary(after.windows.find((window2) => window2.address === currentTarget.address), after.activeWindow?.address),
+    changed: before.activeWindow?.address !== after.activeWindow?.address,
+    verified: after.activeWindow?.address === currentTarget.address
+  };
+}
+async function openApp(run, env2, input2, signal) {
+  const app = resolveInstalledApp(input2.kind, input2.id, env2);
+  const mode = input2.mode ?? "focus_or_launch";
+  if (!["focus_or_launch", "focus_existing", "new_window"].includes(mode)) {
+    throw new DesktopToolError("invalid_app_mode", "That app-open mode is unavailable");
+  }
+  const before = await readDesktopState(run, false, signal);
+  const matches = appWindows(app, before);
+  if (mode !== "new_window" && matches.length > 0) return focusAppWindow(run, app, matches, signal);
+  if (mode === "focus_existing") return focusAppWindow(run, app, matches, signal);
+  const previousAddresses = new Set(before.windows.map((window2) => window2.address));
+  if (app.kind === "desktop") await run("uwsm-app", ["--", "gtk-launch", `${app.id}.desktop`], signal);
+  else await run("omarchy", ["launch", "tui", `--app-id=org.omarchy.${app.id}`, app.id], signal);
+  const after = await waitForState(run, (state2) => {
+    return appWindows(app, state2).some((window2) => !previousAddresses.has(window2.address));
+  }, signal, APP_VERIFY_ATTEMPTS, APP_VERIFY_DELAY_MS);
+  const opened = appWindows(app, after).filter((window2) => !previousAddresses.has(window2.address));
+  return {
+    action: "open_app",
+    target: { kind: app.kind, id: app.id },
+    requested: { mode },
+    before: { matchingWindows: matches.map((window2) => window2.address) },
+    after: { newWindows: opened.map((window2) => window2.address) },
+    changed: opened.length > 0,
+    verified: opened.length > 0
+  };
+}
+async function executeWindowAction(run, input2, signal) {
+  const address = requireWindowAddress(input2.address);
+  const beforeState = await readDesktopState(run, false, signal);
+  const beforeWindow = beforeState.windows.find((window2) => window2.address === address);
+  if (beforeWindow === void 0) throw new DesktopToolError("window_unavailable", "That exact window is no longer available");
+  if (beforeWindow.pid !== input2.pid) {
+    throw new DesktopToolError("window_identity_changed", "That window address no longer belongs to the inspected process");
+  }
+  const command = windowActionCommand(input2);
+  const requested = {
+    ...input2.workspace === void 0 ? {} : { workspace: input2.workspace },
+    ...input2.follow === void 0 ? {} : { follow: input2.follow },
+    ...input2.width === void 0 ? {} : { width: input2.width },
+    ...input2.height === void 0 ? {} : { height: input2.height },
+    ...input2.enabled === void 0 ? {} : { enabled: input2.enabled }
+  };
+  const alreadySatisfied = input2.action === "focus" && beforeState.activeWindow?.address === address || input2.action === "resize" && beforeWindow.size?.[0] === input2.width && beforeWindow.size?.[1] === input2.height || input2.action === "set_floating" && beforeWindow.floating === input2.enabled || input2.action === "move_to_workspace" && input2.follow === false && beforeWindow.workspace === input2.workspace;
+  if (alreadySatisfied) {
+    const summary = windowSummary(beforeWindow, beforeState.activeWindow?.address);
+    return {
+      action: input2.action,
+      target: { address, pid: input2.pid },
+      requested,
+      before: summary,
+      after: summary,
+      changed: false,
+      verified: true
+    };
+  }
+  await dispatch(run, command, signal);
+  const predicate = (state2) => {
+    const window2 = state2.windows.find((candidate) => candidate.address === address);
+    switch (input2.action) {
+      case "focus":
+        return state2.activeWindow?.address === address;
+      case "move_to_workspace":
+        return window2?.workspace === input2.workspace;
+      case "resize":
+        return window2?.size?.[0] === input2.width && window2?.size?.[1] === input2.height;
+      case "set_floating":
+        return window2?.floating === input2.enabled;
+      case "close":
+        return window2 === void 0;
+    }
+  };
+  const afterState = await waitForState(run, predicate, signal);
+  const afterWindow = afterState.windows.find((window2) => window2.address === address);
+  const verified = predicate(afterState);
+  const changed = (() => {
+    switch (input2.action) {
+      case "focus":
+        return beforeState.activeWindow?.address !== afterState.activeWindow?.address;
+      case "move_to_workspace":
+        return beforeWindow.workspace !== afterWindow?.workspace;
+      case "resize":
+        return beforeWindow.size?.[0] !== afterWindow?.size?.[0] || beforeWindow.size?.[1] !== afterWindow?.size?.[1];
+      case "set_floating":
+        return beforeWindow.floating !== afterWindow?.floating;
+      case "close":
+        return afterWindow === void 0;
+    }
+  })();
+  return {
+    action: input2.action,
+    target: { address, pid: input2.pid },
+    requested,
+    before: windowSummary(beforeWindow, beforeState.activeWindow?.address),
+    after: windowSummary(afterWindow, afterState.activeWindow?.address),
+    changed,
+    verified
+  };
+}
+async function executeWorkspaceAction(run, input2, signal) {
+  const workspace = requireWorkspace(input2.workspace);
+  const beforeState = await readDesktopState(run, false, signal);
+  const beforeWorkspace = beforeState.workspaces.find((candidate) => candidate.id === workspace);
+  if (input2.action === "focus" && beforeState.activeWorkspace?.id === workspace) {
+    const summary = workspaceSummary(beforeWorkspace, beforeState.activeWorkspace.id);
+    return {
+      action: input2.action,
+      target: { workspace },
+      requested: {},
+      before: summary,
+      after: summary,
+      changed: false,
+      verified: true
+    };
+  }
+  if (input2.action === "move_to_monitor") {
+    const monitor = input2.monitor?.trim();
+    if (!beforeState.monitors.some((candidate) => candidate.name === monitor)) {
+      throw new DesktopToolError("monitor_unavailable", "That exact monitor is no longer available");
+    }
+    if (beforeWorkspace === void 0) throw new DesktopToolError("workspace_unavailable", "That exact workspace is no longer available");
+    if (beforeWorkspace.monitor === monitor) {
+      const summary = workspaceSummary(beforeWorkspace, beforeState.activeWorkspace?.id);
+      return {
+        action: input2.action,
+        target: { workspace },
+        requested: { monitor },
+        before: summary,
+        after: summary,
+        changed: false,
+        verified: true
+      };
+    }
+  }
+  await dispatch(run, workspaceActionCommand(input2), signal);
+  const predicate = (state2) => input2.action === "focus" ? state2.activeWorkspace?.id === workspace : state2.workspaces.find((candidate) => candidate.id === workspace)?.monitor === input2.monitor;
+  const afterState = await waitForState(run, predicate, signal);
+  const afterWorkspace = afterState.workspaces.find((candidate) => candidate.id === workspace);
+  const verified = predicate(afterState);
+  const changed = input2.action === "focus" ? beforeState.activeWorkspace?.id !== afterState.activeWorkspace?.id : beforeWorkspace?.monitor !== afterWorkspace?.monitor;
+  return {
+    action: input2.action,
+    target: { workspace },
+    requested: input2.monitor === void 0 ? {} : { monitor: input2.monitor },
+    before: workspaceSummary(beforeWorkspace, beforeState.activeWorkspace?.id),
+    after: workspaceSummary(afterWorkspace, afterState.activeWorkspace?.id),
+    changed,
+    verified
+  };
+}
+function displayCommand(file2, args) {
+  return [file2, ...args].map((part) => /^[A-Za-z0-9_./:+-]+$/u.test(part) ? part : JSON.stringify(part)).join(" ");
+}
+function reviewDesktopToolInput(name, input2) {
+  if (name === "app_open") {
+    const kind = input2.kind === "desktop" ? "desktop" : "cli";
+    const id = typeof input2.id === "string" ? input2.id : "";
+    const mode = typeof input2.mode === "string" ? input2.mode : "focus_or_launch";
+    return {
+      command: displayCommand("app_open", ["--kind", kind, "--id", id, "--mode", mode]),
+      operation: "app_open",
+      kind,
+      id,
+      mode
+    };
+  }
+  if (name === "window_action") {
+    try {
+      const normalized = {
+        action: typeof input2.action === "string" ? input2.action : "",
+        address: typeof input2.address === "string" ? input2.address : "",
+        pid: typeof input2.pid === "number" ? input2.pid : 0,
+        ...typeof input2.workspace === "number" ? { workspace: input2.workspace } : {},
+        ...typeof input2.follow === "boolean" ? { follow: input2.follow } : {},
+        ...typeof input2.width === "number" ? { width: input2.width } : {},
+        ...typeof input2.height === "number" ? { height: input2.height } : {},
+        ...typeof input2.enabled === "boolean" ? { enabled: input2.enabled } : {}
+      };
+      const command = windowActionCommand(normalized);
+      return { operation: "window_action", command: displayCommand(command.file, command.args), argv: [command.file, ...command.args], ...normalized };
+    } catch {
+      return { operation: "invalid_window_action", ...input2 };
+    }
+  }
+  if (name === "workspace_action") {
+    try {
+      const normalized = {
+        action: typeof input2.action === "string" ? input2.action : "",
+        workspace: typeof input2.workspace === "number" ? input2.workspace : 0,
+        ...typeof input2.monitor === "string" ? { monitor: input2.monitor } : {}
+      };
+      const command = workspaceActionCommand(normalized);
+      return { operation: "workspace_action", command: displayCommand(command.file, command.args), argv: [command.file, ...command.args], ...normalized };
+    } catch {
+      return { operation: "invalid_workspace_action", ...input2 };
+    }
+  }
+  return void 0;
+}
+function desktopToolTitle(name, input2) {
+  if (name === "app_open") return `Open app: ${typeof input2.id === "string" ? input2.id : "app"}`;
+  if (name === "window_action") return `Window: ${typeof input2.action === "string" ? input2.action : "action"}`;
+  if (name === "workspace_action") return `Workspace: ${typeof input2.action === "string" ? input2.action : "action"}`;
+  return void 0;
+}
+function createPersonalAssistantTools(run = runDesktopCommand, env2 = process.env) {
+  const appCatalog = {
+    name: "app_catalog",
+    label: "Find installed apps",
+    description: "Find installed graphical desktop apps and executable CLI commands before opening or claiming an app is unavailable.",
+    promptSnippet: "Search the read-only installed app catalog",
+    parameters: appCatalogParameters,
+    execute(_toolCallId, input2) {
+      try {
+        const apps = discoverInstalledApps(input2.query, input2.kind ?? "all", input2.limit ?? 20, env2);
+        return Promise.resolve({
+          content: [{ type: "text", text: apps.length === 0 ? "No matching installed apps were found." : JSON.stringify(apps, void 0, 2) }],
+          details: { apps }
+        });
+      } catch (error48) {
+        return Promise.resolve(toolFailure("Searching installed apps", error48));
+      }
+    }
+  };
+  const appOpen = {
+    name: "app_open",
+    label: "Open installed app",
+    description: "Focus one unambiguous matching window or launch an exact app returned by app_catalog, then verify the resulting window.",
+    promptSnippet: "Focus or launch a discovered app and verify it",
+    parameters: appOpenParameters,
+    async execute(_toolCallId, input2, signal) {
+      try {
+        return receiptResult(await openApp(run, env2, input2, signal));
+      } catch (error48) {
+        return toolFailure("Opening the app", error48);
+      }
+    }
+  };
+  const desktopState = {
+    name: "desktop_state",
+    label: "Inspect desktop",
+    description: "Read bounded Hyprland monitor, workspace, and exact window state. Titles are omitted unless explicitly requested.",
+    promptSnippet: "Inspect current monitors, workspaces, and windows",
+    parameters: desktopStateParameters,
+    async execute(_toolCallId, input2, signal) {
+      try {
+        const state2 = await readDesktopState(run, input2.includeTitles ?? false, signal);
+        return { content: [{ type: "text", text: JSON.stringify(state2, void 0, 2) }], details: state2 };
+      } catch (error48) {
+        return toolFailure("Reading desktop state", error48);
+      }
+    }
+  };
+  const windowAction = {
+    name: "window_action",
+    label: "Control exact window",
+    description: "Focus, move, resize, float, or close one exact window address. Re-reads the target and verifies post-state internally.",
+    promptSnippet: "Perform and verify one exact window action",
+    parameters: windowActionParameters,
+    async execute(_toolCallId, input2, signal) {
+      try {
+        return receiptResult(await executeWindowAction(run, input2, signal));
+      } catch (error48) {
+        return toolFailure("The window action", error48);
+      }
+    }
+  };
+  const workspaceAction = {
+    name: "workspace_action",
+    label: "Control workspace",
+    description: "Focus a numbered workspace or move it to an exact monitor, then verify the result internally.",
+    promptSnippet: "Perform and verify one exact workspace action",
+    parameters: workspaceActionParameters,
+    async execute(_toolCallId, input2, signal) {
+      try {
+        return receiptResult(await executeWorkspaceAction(run, input2, signal));
+      } catch (error48) {
+        return toolFailure("The workspace action", error48);
+      }
+    }
+  };
+  return [appCatalog, appOpen, desktopState, windowAction, workspaceAction];
+}
+var MAX_COMMAND_OUTPUT, MAX_DESKTOP_FILE_BYTES, MAX_WINDOWS, MAX_WORKSPACES, MAX_MONITORS, MAX_DIRECTORY_ENTRIES, MAX_CATALOG_ENTRIES, VERIFY_ATTEMPTS, VERIFY_DELAY_MS, APP_VERIFY_ATTEMPTS, APP_VERIFY_DELAY_MS, appCatalogParameters, appOpenParameters, desktopStateParameters, windowActionParameters, workspaceActionParameters, DesktopToolError, runDesktopCommand;
+var init_desktop = __esm({
+  "runtime/src/tools/desktop.ts"() {
+    "use strict";
+    init_build3();
+    MAX_COMMAND_OUTPUT = 128 * 1024;
+    MAX_DESKTOP_FILE_BYTES = 256 * 1024;
+    MAX_WINDOWS = 200;
+    MAX_WORKSPACES = 100;
+    MAX_MONITORS = 32;
+    MAX_DIRECTORY_ENTRIES = 5e3;
+    MAX_CATALOG_ENTRIES = 1e4;
+    VERIFY_ATTEMPTS = 30;
+    VERIFY_DELAY_MS = 50;
+    APP_VERIFY_ATTEMPTS = 100;
+    APP_VERIFY_DELAY_MS = 100;
+    appCatalogParameters = typebox_exports2.Object({
+      query: typebox_exports2.String({ description: "App name or command to find", minLength: 1, maxLength: 128 }),
+      kind: typebox_exports2.Optional(typebox_exports2.Union([typebox_exports2.Literal("all"), typebox_exports2.Literal("desktop"), typebox_exports2.Literal("cli")])),
+      limit: typebox_exports2.Optional(typebox_exports2.Integer({ minimum: 1, maximum: 40 }))
+    });
+    appOpenParameters = typebox_exports2.Object({
+      kind: typebox_exports2.Union([typebox_exports2.Literal("desktop"), typebox_exports2.Literal("cli")]),
+      id: typebox_exports2.String({ description: "Exact ID returned by app_catalog", minLength: 1, maxLength: 256 }),
+      mode: typebox_exports2.Optional(typebox_exports2.Union([
+        typebox_exports2.Literal("focus_or_launch"),
+        typebox_exports2.Literal("focus_existing"),
+        typebox_exports2.Literal("new_window")
+      ]))
+    });
+    desktopStateParameters = typebox_exports2.Object({
+      includeTitles: typebox_exports2.Optional(typebox_exports2.Boolean({
+        description: "Include bounded window titles only when they are needed to identify the user's target"
+      }))
+    });
+    windowActionParameters = typebox_exports2.Object({
+      action: typebox_exports2.Union([
+        typebox_exports2.Literal("focus"),
+        typebox_exports2.Literal("move_to_workspace"),
+        typebox_exports2.Literal("resize"),
+        typebox_exports2.Literal("set_floating"),
+        typebox_exports2.Literal("close")
+      ]),
+      address: typebox_exports2.String({ description: "Exact 0x address returned by desktop_state", minLength: 3, maxLength: 32 }),
+      pid: typebox_exports2.Integer({ description: "Exact process ID returned with that window address", minimum: 1 }),
+      workspace: typebox_exports2.Optional(typebox_exports2.Integer({ minimum: 1, maximum: 99 })),
+      follow: typebox_exports2.Optional(typebox_exports2.Boolean({ description: "Follow the window to its destination workspace" })),
+      width: typebox_exports2.Optional(typebox_exports2.Integer({ description: "Requested exact width in pixels", minimum: 100, maximum: 1e4 })),
+      height: typebox_exports2.Optional(typebox_exports2.Integer({ description: "Requested exact height in pixels", minimum: 100, maximum: 1e4 })),
+      enabled: typebox_exports2.Optional(typebox_exports2.Boolean({ description: "Desired state for set_floating" }))
+    });
+    workspaceActionParameters = typebox_exports2.Object({
+      action: typebox_exports2.Union([typebox_exports2.Literal("focus"), typebox_exports2.Literal("move_to_monitor")]),
+      workspace: typebox_exports2.Integer({ description: "Exact numbered workspace returned by desktop_state", minimum: 1, maximum: 99 }),
+      monitor: typebox_exports2.Optional(typebox_exports2.String({ description: "Exact monitor name returned by desktop_state", minLength: 1, maxLength: 128 }))
+    });
+    DesktopToolError = class extends Error {
+      code;
+      constructor(code, message) {
+        super(message);
+        this.name = "DesktopToolError";
+        this.code = code;
+      }
+    };
+    runDesktopCommand = (file2, args, signal) => new Promise((resolve18, reject) => {
+      execFile2(file2, args, {
+        encoding: "utf8",
+        maxBuffer: MAX_COMMAND_OUTPUT,
+        timeout: 1e4,
+        signal
+      }, (error48, stdout, stderr) => {
+        if (error48 !== null) reject(error48);
+        else resolve18({ stdout, stderr });
+      });
+    });
+  }
+});
+
 // runtime/src/pi-harness.ts
 var pi_harness_exports = {};
 __export(pi_harness_exports, {
   BrokerPiError: () => BrokerPiError,
   PiApprovalState: () => PiApprovalState,
   agentDirectory: () => agentDirectory,
+  bundledSkillPaths: () => bundledSkillPaths,
   configDirectory: () => configDirectory,
   createDesktopTools: () => createDesktopTools,
+  createPersonalAssistantTools: () => createPersonalAssistantTools,
   discoverAgentProfiles: () => discoverAgentProfiles,
+  discoverInstalledApps: () => discoverInstalledApps,
   discoverPiAuthMethods: () => discoverPiAuthMethods,
   discoverPiProviders: () => discoverPiProviders,
   existingSkillPaths: () => existingSkillPaths,
   loginPiProvider: () => loginPiProvider,
   logoutPiProvider: () => logoutPiProvider,
   normalizeOpenUrl: () => normalizeOpenUrl,
+  normalizeWindowAddress: () => normalizeWindowAddress,
   omarchyMediaMethod: () => omarchyMediaMethod,
+  readDesktopState: () => readDesktopState,
+  requiresPiPermission: () => requiresPiPermission,
   restorePiProviderCredential: () => restorePiProviderCredential,
   runNestedAgentPrompt: () => runNestedAgentPrompt,
   runPiQuestion: () => runPiQuestion,
-  snapshotPiProviderCredential: () => snapshotPiProviderCredential
+  snapshotPiProviderCredential: () => snapshotPiProviderCredential,
+  windowActionCommand: () => windowActionCommand,
+  workspaceActionCommand: () => workspaceActionCommand
 });
-import { existsSync as existsSync26, mkdirSync as mkdirSync13, readdirSync as readdirSync11, readFileSync as readFileSync20, renameSync as renameSync4, statSync as statSync12, truncateSync, unlinkSync as unlinkSync3, writeFileSync as writeFileSync12 } from "node:fs";
+import { existsSync as existsSync27, mkdirSync as mkdirSync13, readdirSync as readdirSync12, readFileSync as readFileSync21, renameSync as renameSync4, statSync as statSync13, truncateSync, unlinkSync as unlinkSync3, writeFileSync as writeFileSync12 } from "node:fs";
 import { createHash as createHash2, randomUUID as randomUUID7 } from "node:crypto";
-import { execFile as execFile2 } from "node:child_process";
-import { homedir as homedir14 } from "node:os";
-import { basename as basename16, dirname as dirname25, join as join41 } from "node:path";
+import { execFile as execFile3 } from "node:child_process";
+import { homedir as homedir15 } from "node:os";
+import { basename as basename16, dirname as dirname25, join as join42, resolve as resolve15 } from "node:path";
+import { fileURLToPath as fileURLToPath7 } from "node:url";
 function configDirectory(env2) {
   const explicit = env2.OMAPILOT_CONFIG_DIR?.trim();
   if (explicit !== void 0 && explicit.startsWith("/")) return explicit;
@@ -276445,13 +277266,13 @@ function configDirectory(env2) {
 function agentDirectory(env2) {
   const explicit = env2.OMAPILOT_AGENTS_DIR?.trim();
   if (explicit !== void 0 && explicit.startsWith("/")) return explicit;
-  return join41(env2.HOME ?? homedir14(), ".agents");
+  return join42(env2.HOME ?? homedir15(), ".agents");
 }
 async function createRuntime(env2, directory) {
   const runtime = await ModelRuntime.create({
-    authPath: join41(directory, "auth.json"),
-    modelsPath: join41(directory, "models.json"),
-    modelsStorePath: join41(directory, "models-store.json"),
+    authPath: join42(directory, "auth.json"),
+    modelsPath: join42(directory, "models.json"),
+    modelsStorePath: join42(directory, "models-store.json"),
     refreshOnCreate: false,
     allowModelNetwork: false
   });
@@ -276512,14 +277333,14 @@ function fetchWithoutAuthentication(input2, init) {
   return fetch(new Request(request, { headers }));
 }
 function configuredNoAuthProviders(directory) {
-  const path16 = join41(directory, "models.json");
+  const path16 = join42(directory, "models.json");
   try {
-    if (statSync12(path16).size > 1024 * 1024) return [];
-    const value2 = JSON.parse(readFileSync20(path16, "utf8"));
-    if (!isObject4(value2) || !isObject4(value2.providers)) return [];
+    if (statSync13(path16).size > 1024 * 1024) return [];
+    const value2 = JSON.parse(readFileSync21(path16, "utf8"));
+    if (!isObject5(value2) || !isObject5(value2.providers)) return [];
     const providers = [];
     for (const [id, entry] of Object.entries(value2.providers)) {
-      if (!isObject4(entry) || entry.omapilotManaged !== true || entry.omapilotAuthRequired === true) continue;
+      if (!isObject5(entry) || entry.omapilotManaged !== true || entry.omapilotAuthRequired === true) continue;
       const api = typeof entry.api === "string" ? entry.api : "";
       if (api !== "openai-responses" && api !== "openai-completions") continue;
       providers.push({ id, api });
@@ -276541,11 +277362,11 @@ async function logoutPiProvider(env2, providerId) {
   await runtime.logout(providerId);
 }
 function snapshotPiProviderCredential(env2, providerId) {
-  const credential = readStoredCredential(providerId, join41(configDirectory(env2), "auth.json"));
+  const credential = readStoredCredential(providerId, join42(configDirectory(env2), "auth.json"));
   return credential === void 0 ? void 0 : structuredClone(credential);
 }
 async function restorePiProviderCredential(env2, providerId, credential) {
-  const storage = AuthStorage.create(join41(configDirectory(env2), "auth.json"));
+  const storage = AuthStorage.create(join42(configDirectory(env2), "auth.json"));
   if (credential === void 0) {
     await storage.delete(providerId);
     return;
@@ -276603,11 +277424,11 @@ async function discoverPiProviders(env2 = process.env) {
   }];
 }
 function configuredProviderIds(directory) {
-  const path16 = join41(directory, "models.json");
+  const path16 = join42(directory, "models.json");
   try {
-    if (statSync12(path16).size > 1024 * 1024) return [];
-    const value2 = JSON.parse(readFileSync20(path16, "utf8"));
-    if (!isObject4(value2) || !isObject4(value2.providers)) return [];
+    if (statSync13(path16).size > 1024 * 1024) return [];
+    const value2 = JSON.parse(readFileSync21(path16, "utf8"));
+    if (!isObject5(value2) || !isObject5(value2.providers)) return [];
     return Object.keys(value2.providers).filter((id) => /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/u.test(id));
   } catch {
     return [];
@@ -276630,7 +277451,7 @@ function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeou
     const approvalStateKey = `${provider.agentDir}\0${provider.cwd}\0${sessionManager.getSessionId()}`;
     let approvals = sessionApprovals.get(approvalStateKey);
     if (approvals === void 0) {
-      approvals = new PiApprovalState(join41(provider.agentDir, "approvals.json"), provider.cwd);
+      approvals = new PiApprovalState(join42(provider.agentDir, "approvals.json"), provider.cwd);
       sessionApprovals.set(approvalStateKey, approvals);
     }
     const permissionExtension = createPermissionExtension(requestId, requestPermission, approvals);
@@ -276639,7 +277460,7 @@ function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeou
       agentDir: provider.agentDir,
       noExtensions: true,
       noSkills: true,
-      additionalSkillPaths: existingSkillPaths(provider.sharedAgentsDir, provider.cwd),
+      additionalSkillPaths: allSkillPaths(provider),
       extensionFactories: [permissionExtension],
       appendSystemPrompt: [automaticInstructions(), formatAgentProfiles(profiles)]
     });
@@ -276662,7 +277483,7 @@ function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeou
       sessionManager,
       settingsManager: settings3,
       tools: PI_TOOLS,
-      customTools: [agentTool, ...createDesktopTools()]
+      customTools: [agentTool, ...createDesktopTools(), ...createPersonalAssistantTools()]
     });
     activeSession = session;
     let streamedText = "";
@@ -276678,8 +277499,8 @@ function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeou
     timeout.unref();
     const turnStartIndex = session.state.messages.length;
     const sessionFile = sessionManager.getSessionFile();
-    const sessionFileExisted = sessionFile !== void 0 && existsSync26(sessionFile);
-    const sessionFileBytes = sessionFileExisted && sessionFile !== void 0 ? statSync12(sessionFile).size : 0;
+    const sessionFileExisted = sessionFile !== void 0 && existsSync27(sessionFile);
+    const sessionFileBytes = sessionFileExisted && sessionFile !== void 0 ? statSync13(sessionFile).size : 0;
     let promptStarted = false;
     let rollbackTurn = false;
     try {
@@ -276721,7 +277542,7 @@ function runPiQuestion(provider, requestId, prompt, selectedModel, emit2, timeou
       if (rollbackTurn && sessionFile !== void 0) {
         try {
           if (sessionFileExisted) truncateSync(sessionFile, sessionFileBytes);
-          else if (existsSync26(sessionFile)) unlinkSync3(sessionFile);
+          else if (existsSync27(sessionFile)) unlinkSync3(sessionFile);
         } catch (error48) {
           if (provider.agent.env.QUICKCHAT_DEBUG_PI === "1") {
             const message = error48 instanceof Error ? error48.message : String(error48);
@@ -276742,10 +277563,10 @@ function piSessionManager(provider, resumeSessionId) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(resumeSessionId))
     throw new BrokerPiError("session_unavailable", "The saved Pi conversation is unavailable", false);
   const suffix = `_${resumeSessionId}.jsonl`;
-  const file2 = readdirSync11(sessionDir).find((name) => name.endsWith(suffix));
+  const file2 = readdirSync12(sessionDir).find((name) => name.endsWith(suffix));
   if (file2 === void 0)
     throw new BrokerPiError("session_unavailable", "The saved Pi conversation is unavailable", false);
-  return SessionManager.open(join41(sessionDir, file2), sessionDir, provider.cwd);
+  return SessionManager.open(join42(sessionDir, file2), sessionDir, provider.cwd);
 }
 function resolveModel(provider, selected) {
   const models = provider.piProviderIds.flatMap((id) => [...provider.runtime.getModels(id)]);
@@ -276794,7 +277615,7 @@ function commandToolError(action, error48) {
   const message = error48 instanceof BrokerPiError ? error48.message : `${action} failed`;
   return { content: [{ type: "text", text: message }], details: void 0, isError: true };
 }
-function createDesktopTools(run = runDesktopCommand) {
+function createDesktopTools(run = runDesktopCommand2) {
   const openUrl = {
     name: "open_url",
     label: "Open URL",
@@ -276846,9 +277667,9 @@ ${result.stderr}`.trim();
 }
 function readApprovals(path16) {
   try {
-    if (statSync12(path16).size > 1024 * 1024) return { version: 1, allow: [], deny: [] };
-    const value2 = JSON.parse(readFileSync20(path16, "utf8"));
-    if (!isObject4(value2)) return { version: 1, allow: [], deny: [] };
+    if (statSync13(path16).size > 1024 * 1024) return { version: 1, allow: [], deny: [] };
+    const value2 = JSON.parse(readFileSync21(path16, "utf8"));
+    if (!isObject5(value2)) return { version: 1, allow: [], deny: [] };
     const hashes = (candidate) => Array.isArray(candidate) ? candidate.filter((item) => typeof item === "string" && /^[a-f0-9]{64}$/u.test(item)).slice(0, 1e4) : [];
     return { version: 1, allow: hashes(value2.allow), deny: hashes(value2.deny) };
   } catch {
@@ -276857,7 +277678,7 @@ function readApprovals(path16) {
 }
 function stableValue(value2) {
   if (Array.isArray(value2)) return value2.map(stableValue);
-  if (!isObject4(value2)) return value2;
+  if (!isObject5(value2)) return value2;
   return Object.fromEntries(Object.keys(value2).sort().map((key) => [key, stableValue(value2[key])]));
 }
 function createPermissionExtension(requestId, handler, approvals) {
@@ -276866,7 +277687,7 @@ function createPermissionExtension(requestId, handler, approvals) {
     hidden: true,
     factory: (pi2) => {
       pi2.on("tool_call", async (event) => {
-        if (!MUTATING_TOOLS.has(event.toolName)) return void 0;
+        if (!requiresPiPermission(event.toolName)) return void 0;
         if (handler === void 0) return { block: true, reason: "OmaPilot did not provide a permission handler" };
         const rawInput = reviewableToolInput(event.toolName, event.input);
         const approvalKey = approvals.key(event.toolName, rawInput);
@@ -276898,6 +277719,9 @@ function createPermissionExtension(requestId, handler, approvals) {
     }
   };
 }
+function requiresPiPermission(toolName) {
+  return MUTATING_TOOLS.has(toolName);
+}
 function reviewableToolInput(name, input2) {
   if (name === "bash") return { ...input2, command: typeof input2.command === "string" ? input2.command : "" };
   if (name === "open_url") {
@@ -276913,6 +277737,8 @@ function reviewableToolInput(name, input2) {
     }
     return { command: `omarchy-shell media ${method}`, action };
   }
+  const desktopInput = reviewDesktopToolInput(name, input2);
+  if (desktopInput !== void 0) return desktopInput;
   const path16 = typeof input2.path === "string" ? input2.path : "unknown";
   return { command: `${name} ${path16}`, ...input2 };
 }
@@ -276920,34 +277746,47 @@ function toolTitle(name, input2) {
   if (name === "bash") return "Run a command";
   if (name === "open_url") return "Open URL in default browser";
   if (name === "media_control") return `Control media: ${typeof input2.action === "string" ? input2.action : "action"}`;
+  const desktopTitle = desktopToolTitle(name, input2);
+  if (desktopTitle !== void 0) return desktopTitle;
   const path16 = typeof input2.path === "string" ? basename16(input2.path) : "file";
   return `${name === "write" ? "Write" : "Edit"} ${path16}`;
 }
-function existingSkillPaths(directory, cwd) {
+function existingSkillPaths(directory, cwd, home = homedir15()) {
   const candidates = [
-    join41(directory, "skills"),
-    join41(cwd, ".agents/skills"),
-    join41(cwd, ".pi/skills")
+    join42(directory, "skills"),
+    join42(home, ".pi/agent/skills"),
+    join42(cwd, ".agents/skills"),
+    join42(cwd, ".pi/skills")
   ];
-  return [...new Set(candidates.filter((path16) => existsSync26(path16)))];
+  return [...new Set(candidates.filter((path16) => existsSync27(path16)))];
+}
+function bundledSkillPaths() {
+  const path16 = resolve15(dirname25(fileURLToPath7(import.meta.url)), "../../skills");
+  return existsSync27(path16) ? [path16] : [];
+}
+function allSkillPaths(provider) {
+  return [
+    ...existingSkillPaths(provider.sharedAgentsDir, provider.cwd, provider.agent.env.HOME ?? homedir15()),
+    ...bundledSkillPaths()
+  ];
 }
 function discoverAgentProfiles(directory, cwd) {
-  const directories = [.../* @__PURE__ */ new Set([join41(directory, "agents"), join41(cwd, ".agents/agents")])];
+  const directories = [.../* @__PURE__ */ new Set([join42(directory, "agents"), join42(cwd, ".agents/agents")])];
   const profiles = /* @__PURE__ */ new Map();
   for (const path16 of directories) {
-    if (!existsSync26(path16)) continue;
+    if (!existsSync27(path16)) continue;
     let entries;
     try {
-      entries = readdirSync11(path16, { withFileTypes: true });
+      entries = readdirSync12(path16, { withFileTypes: true });
     } catch {
       continue;
     }
     for (const entry of entries) {
       if (!entry.name.endsWith(".md") || !entry.isFile() && !entry.isSymbolicLink()) continue;
-      const filePath = join41(path16, entry.name);
+      const filePath = join42(path16, entry.name);
       try {
-        if (statSync12(filePath).size > MAX_AGENT_FILE_BYTES) continue;
-        const parsed = parseFrontmatter3(readFileSync20(filePath, "utf8"));
+        if (statSync13(filePath).size > MAX_AGENT_FILE_BYTES) continue;
+        const parsed = parseFrontmatter3(readFileSync21(filePath, "utf8"));
         const name = typeof parsed.frontmatter.name === "string" ? parsed.frontmatter.name.trim() : basename16(entry.name, ".md");
         const description = typeof parsed.frontmatter.description === "string" ? parsed.frontmatter.description.trim() : "";
         if (!SAFE_AGENT_NAME.test(name) || description === "") continue;
@@ -276994,7 +277833,7 @@ function createAgentTool(provider, parentModel, profiles, requestId, requestPerm
         agentDir: provider.agentDir,
         noExtensions: true,
         noSkills: true,
-        additionalSkillPaths: existingSkillPaths(provider.sharedAgentsDir, provider.cwd),
+        additionalSkillPaths: allSkillPaths(provider),
         extensionFactories: [createPermissionExtension(requestId, requestPermission, approvals)],
         systemPrompt: [automaticInstructions(), profile.systemPrompt].join("\n\n")
       });
@@ -277054,13 +277893,13 @@ function resolveProfileModel(provider, value2) {
 function terminalAssistantMessage(messages) {
   for (let index3 = messages.length - 1; index3 >= 0; index3 -= 1) {
     const message = messages[index3];
-    if (isObject4(message) && message.role === "assistant") return message;
+    if (isObject5(message) && message.role === "assistant") return message;
   }
   return void 0;
 }
 function assistantText(message) {
   if (message === void 0 || !Array.isArray(message.content)) return "";
-  return message.content.filter((part) => isObject4(part) && part.type === "text" && typeof part.text === "string").map((part) => String(part.text)).join("");
+  return message.content.filter((part) => isObject5(part) && part.type === "text" && typeof part.text === "string").map((part) => String(part.text)).join("");
 }
 function terminalAssistantError(message) {
   if (message === void 0) return void 0;
@@ -277096,11 +277935,11 @@ function terminalAssistantError(message) {
 }
 function assistantDiagnostics(messages) {
   const value2 = messages.flatMap((raw) => {
-    if (!isObject4(raw) || raw.role !== "assistant") return [];
+    if (!isObject5(raw) || raw.role !== "assistant") return [];
     return [{
       stopReason: typeof raw.stopReason === "string" ? boundedDiagnostic(raw.stopReason) : "",
       error: typeof raw.errorMessage === "string" ? boundedDiagnostic(raw.errorMessage) : "",
-      content: Array.isArray(raw.content) ? raw.content.map((part) => isObject4(part) && typeof part.type === "string" ? boundedDiagnostic(part.type) : "unknown") : []
+      content: Array.isArray(raw.content) ? raw.content.map((part) => isObject5(part) && typeof part.type === "string" ? boundedDiagnostic(part.type) : "unknown") : []
     }];
   }).slice(-3);
   return JSON.stringify(value2);
@@ -277108,10 +277947,10 @@ function assistantDiagnostics(messages) {
 function boundedDiagnostic(value2) {
   return value2.replaceAll(/[\u0000-\u001f\u007f-\u009f]/gu, " ").slice(0, 300);
 }
-function isObject4(value2) {
+function isObject5(value2) {
   return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
 }
-var PROVIDER_GROUPS, BUILTIN_PROVIDER_IDS, MUTATING_TOOLS, AGENT_PROFILE_TOOLS, PI_TOOLS, SAFE_AGENT_NAME, MAX_AGENT_FILE_BYTES, sessionApprovals, NO_AUTH_RUNTIME_KEY, MAX_DESKTOP_COMMAND_OUTPUT, openUrlParameters, mediaControlParameters, BrokerPiError, runDesktopCommand, PiApprovalState, agentToolParameters;
+var PROVIDER_GROUPS, BUILTIN_PROVIDER_IDS, MUTATING_TOOLS, AGENT_PROFILE_TOOLS, PI_TOOLS, SAFE_AGENT_NAME, MAX_AGENT_FILE_BYTES, sessionApprovals, NO_AUTH_RUNTIME_KEY, MAX_DESKTOP_COMMAND_OUTPUT, openUrlParameters, mediaControlParameters, BrokerPiError, runDesktopCommand2, PiApprovalState, agentToolParameters;
 var init_pi_harness = __esm({
   "runtime/src/pi-harness.ts"() {
     "use strict";
@@ -277134,15 +277973,36 @@ var init_pi_harness = __esm({
     init_build3();
     init_providers();
     init_paths();
+    init_desktop();
+    init_desktop();
     PROVIDER_GROUPS = [
       { id: "codex", name: "Codex", piProviderIds: ["openai-codex"] },
       { id: "openai", name: "OpenAI", piProviderIds: ["openai"] },
       { id: "grok", name: "Grok", piProviderIds: ["xai"] }
     ];
     BUILTIN_PROVIDER_IDS = /* @__PURE__ */ new Set(["openai-codex", "openai", "xai"]);
-    MUTATING_TOOLS = /* @__PURE__ */ new Set(["bash", "edit", "write", "open_url", "media_control"]);
+    MUTATING_TOOLS = /* @__PURE__ */ new Set([
+      "bash",
+      "edit",
+      "write",
+      "open_url",
+      "media_control",
+      "app_open",
+      "window_action",
+      "workspace_action"
+    ]);
     AGENT_PROFILE_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
-    PI_TOOLS = [...AGENT_PROFILE_TOOLS, "agent", "open_url", "media_control"];
+    PI_TOOLS = [
+      ...AGENT_PROFILE_TOOLS,
+      "agent",
+      "open_url",
+      "media_control",
+      "app_catalog",
+      "app_open",
+      "desktop_state",
+      "window_action",
+      "workspace_action"
+    ];
     SAFE_AGENT_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
     MAX_AGENT_FILE_BYTES = 128 * 1024;
     sessionApprovals = /* @__PURE__ */ new Map();
@@ -277184,15 +278044,15 @@ var init_pi_harness = __esm({
         this.retryable = retryable;
       }
     };
-    runDesktopCommand = (file2, args, signal) => new Promise((resolve17, reject) => {
-      execFile2(file2, args, {
+    runDesktopCommand2 = (file2, args, signal) => new Promise((resolve18, reject) => {
+      execFile3(file2, args, {
         encoding: "utf8",
         maxBuffer: MAX_DESKTOP_COMMAND_OUTPUT,
         timeout: 1e4,
         signal
       }, (error48, stdout, stderr) => {
         if (error48 !== null) reject(error48);
-        else resolve17({ stdout, stderr });
+        else resolve18({ stdout, stderr });
       });
     });
     PiApprovalState = class {
@@ -277247,30 +278107,30 @@ var init_pi_harness = __esm({
 });
 
 // runtime/src/providers.ts
-import { readFileSync as readFileSync21 } from "node:fs";
+import { readFileSync as readFileSync22 } from "node:fs";
 import { access as access5 } from "node:fs/promises";
-import { constants as constants8 } from "node:fs";
-import { dirname as dirname26, resolve as resolve15 } from "node:path";
-import { fileURLToPath as fileURLToPath7 } from "node:url";
+import { constants as constants9 } from "node:fs";
+import { dirname as dirname26, resolve as resolve16 } from "node:path";
+import { fileURLToPath as fileURLToPath8 } from "node:url";
 function isPiProvider(provider) {
   return provider.kind === "pi" && "runtime" in provider && "piProviderIds" in provider;
 }
 async function isExecutable(path16) {
   try {
-    await access5(path16, constants8.X_OK);
+    await access5(path16, constants9.X_OK);
     return true;
   } catch {
     return false;
   }
 }
 function repoRoot() {
-  return resolve15(dirname26(fileURLToPath7(import.meta.url)), "../..");
+  return resolve16(dirname26(fileURLToPath8(import.meta.url)), "../..");
 }
 function automaticInstructionPath() {
-  return resolve15(repoRoot(), "runtime/policies/automatic.md");
+  return resolve16(repoRoot(), "runtime/policies/automatic.md");
 }
 function automaticInstructions() {
-  return readFileSync21(automaticInstructionPath(), "utf8").trim();
+  return readFileSync22(automaticInstructionPath(), "utf8").trim();
 }
 function openCodePolicyEnvironment(env2, disabledMcp = []) {
   const permission = { ...OPEN_CODE_PERMISSION };
@@ -277294,9 +278154,9 @@ async function adapterExecutable(provider, env2) {
   const paths = quickchatPaths(env2);
   const candidates = [
     explicit,
-    resolve15(repoRoot(), `runtime/bin/${binary}`),
-    resolve15(repoRoot(), `node_modules/.bin/${binary}`),
-    resolve15(paths.adapters, `${provider}/current/bin/${binary}`)
+    resolve16(repoRoot(), `runtime/bin/${binary}`),
+    resolve16(repoRoot(), `node_modules/.bin/${binary}`),
+    resolve16(paths.adapters, `${provider}/current/bin/${binary}`)
   ];
   for (const candidate of candidates) {
     if (candidate !== void 0 && await isExecutable(candidate)) return candidate;
@@ -277382,7 +278242,7 @@ async function discoverProviders(env2 = process.env, harness = "builtin") {
 async function validatedOpenCodeEnvironment(path16, baseEnv) {
   const first = await resolvedOpenCodeConfig(path16, baseEnv);
   if (first === void 0) return void 0;
-  const disabledMcp = isObject5(first.mcp) ? Object.keys(first.mcp) : [];
+  const disabledMcp = isObject6(first.mcp) ? Object.keys(first.mcp) : [];
   const env2 = openCodePolicyEnvironment(baseEnv, disabledMcp);
   const resolved = await resolvedOpenCodeConfig(path16, env2);
   return resolved !== void 0 && openCodeConfigIsHardened(resolved) ? env2 : void 0;
@@ -277399,7 +278259,7 @@ async function resolvedOpenCodeConfig(path16, env2) {
   if (start < 0) return void 0;
   try {
     const parsed = JSON.parse(output.slice(start));
-    return isObject5(parsed) ? parsed : void 0;
+    return isObject6(parsed) ? parsed : void 0;
   } catch {
     return void 0;
   }
@@ -277407,16 +278267,16 @@ async function resolvedOpenCodeConfig(path16, env2) {
 function openCodeConfigIsHardened(config2) {
   if (config2.default_agent !== "build") return false;
   if (!permissionRecordIsHardened(config2.permission)) return false;
-  const agent = isObject5(config2.agent) ? config2.agent : void 0;
-  const build = agent !== void 0 && isObject5(agent.build) ? agent.build : void 0;
+  const agent = isObject6(config2.agent) ? config2.agent : void 0;
+  const build = agent !== void 0 && isObject6(agent.build) ? agent.build : void 0;
   if (build === void 0 || !permissionRecordIsHardened(build.permission)) return false;
-  if (isObject5(config2.mcp) && Object.values(config2.mcp).some((value2) => value2 !== false)) return false;
-  const skills = isObject5(config2.skills) ? config2.skills : void 0;
+  if (isObject6(config2.mcp) && Object.values(config2.mcp).some((value2) => value2 !== false)) return false;
+  const skills = isObject6(config2.skills) ? config2.skills : void 0;
   if (skills === void 0 || !Array.isArray(skills.urls) || skills.urls.length !== 0) return false;
   return Array.isArray(config2.instructions) && config2.instructions.includes(automaticInstructionPath());
 }
 function permissionRecordIsHardened(value2) {
-  if (!isObject5(value2)) return false;
+  if (!isObject6(value2)) return false;
   for (const [name, action] of Object.entries(value2)) {
     const reviewed = OPEN_CODE_PERMISSION[name];
     if (reviewed !== void 0) {
@@ -277427,11 +278287,11 @@ function permissionRecordIsHardened(value2) {
       if (action !== "deny") return false;
       continue;
     }
-    if (!isObject5(action) || Object.values(action).some((nested) => nested !== "deny")) return false;
+    if (!isObject6(action) || Object.values(action).some((nested) => nested !== "deny")) return false;
   }
   return Object.entries(OPEN_CODE_PERMISSION).every(([name, action]) => value2[name] === action);
 }
-function isObject5(value2) {
+function isObject6(value2) {
   return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
 }
 async function codexToolLockdownFeatures(path16, env2) {
@@ -277512,7 +278372,7 @@ import { spawn as spawn17 } from "node:child_process";
 // runtime/src/acp.ts
 import { spawn as spawn13 } from "node:child_process";
 import { mkdir as mkdir3, mkdtemp as mkdtemp2, rm as rm3 } from "node:fs/promises";
-import { join as join44 } from "node:path";
+import { join as join45 } from "node:path";
 import { createInterface as createInterface5 } from "node:readline";
 
 // node_modules/@agentclientprotocol/sdk/dist/schema/index.js
@@ -279155,8 +280015,8 @@ function emoji() {
 }
 var ipv4 = /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$/;
 var ipv6 = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/;
-var mac = (delimiter3) => {
-  const escapedDelim = escapeRegex(delimiter3 ?? ":");
+var mac = (delimiter4) => {
+  const escapedDelim = escapeRegex(delimiter4 ?? ":");
   return new RegExp(`^(?:[0-9A-F]{2}${escapedDelim}){5}[0-9A-F]{2}$|^(?:[0-9a-f]{2}${escapedDelim}){5}[0-9a-f]{2}$`);
 };
 var cidrv4 = /^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\/([0-9]|[1-2][0-9]|3[0-2])$/;
@@ -280548,13 +281408,13 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     }
     return propValues;
   });
-  const isObject10 = isObject;
+  const isObject11 = isObject;
   const catchall = def.catchall;
   let value2;
   inst._zod.parse = (payload, ctx) => {
     value2 ?? (value2 = _normalized.value);
     const input2 = payload.value;
-    if (!isObject10(input2)) {
+    if (!isObject11(input2)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -280652,7 +281512,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
     return (payload, ctx) => fn(shape, payload, ctx);
   };
   let fastpass;
-  const isObject10 = isObject;
+  const isObject11 = isObject;
   const jit = !globalConfig.jitless;
   const allowsEval2 = allowsEval;
   const fastEnabled = jit && allowsEval2.value;
@@ -280661,7 +281521,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
   inst._zod.parse = (payload, ctx) => {
     value2 ?? (value2 = _normalized.value);
     const input2 = payload.value;
-    if (!isObject10(input2)) {
+    if (!isObject11(input2)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -293431,11 +294291,11 @@ var Connection = class {
     const id = this.nextRequestId++;
     let cancel = () => {
     };
-    const response = new Promise((resolve17, reject) => {
+    const response = new Promise((resolve18, reject) => {
       const pendingResponse = {
         resolve: (value2) => {
           try {
-            resolve17(mapResponse ? mapResponse(value2) : value2);
+            resolve18(mapResponse ? mapResponse(value2) : value2);
           } catch (error48) {
             reject(error48);
           }
@@ -293492,8 +294352,8 @@ var Connection = class {
     this.stream = stream11;
     this.staticHandlers = handlers;
     this.allowBatches = options?.allowBatches ?? true;
-    this.closedPromise = new Promise((resolve17) => {
-      this.abortController.signal.addEventListener("abort", () => resolve17());
+    this.closedPromise = new Promise((resolve18) => {
+      this.abortController.signal.addEventListener("abort", () => resolve18());
     });
     void this.receive();
   }
@@ -294374,8 +295234,8 @@ var AsyncQueue = class {
     if (this.failed) {
       return Promise.reject(this.failure);
     }
-    return new Promise((resolve17, reject) => {
-      this.waiters.push({ resolve: resolve17, reject });
+    return new Promise((resolve18, reject) => {
+      this.waiters.push({ resolve: resolve18, reject });
     });
   }
 };
@@ -294990,7 +295850,7 @@ import { mkdir, mkdtemp, open as open3, readFile as readFile5, readdir as readdi
 import { get } from "node:https";
 import { isIP as isIP2 } from "node:net";
 import { lookup } from "node:dns/promises";
-import { basename as basename17, extname as extname2, join as join42 } from "node:path";
+import { basename as basename17, extname as extname2, join as join43 } from "node:path";
 var MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 var MAX_IMAGE_DIMENSION = 12e3;
 var MAX_IMAGE_PIXELS = 16e6;
@@ -295033,7 +295893,7 @@ var ImageStore = class {
     const extension2 = MIME_EXTENSIONS.get(detected.mime);
     if (extension2 === void 0) throw new ImagePolicyError("image_mime", "Unsupported normalized image type");
     const filename = `${id}${extension2}`;
-    await writeFile2(join42(this.#paths.images, filename), normalized, { flag: "wx", mode: 384 });
+    await writeFile2(join43(this.#paths.images, filename), normalized, { flag: "wx", mode: 384 });
     const image = {
       id,
       mimeType: detected.mime,
@@ -295048,19 +295908,19 @@ var ImageStore = class {
   }
   async remove(image) {
     if (basename17(image.path) !== image.path || !/^[0-9a-f-]{36}\.(?:png|jpg|webp)$/iu.test(image.path)) return;
-    await rm(join42(this.#paths.images, image.path), { force: true });
+    await rm(join43(this.#paths.images, image.path), { force: true });
   }
 };
 async function normalizeImage2(bytes, mime, paths, env2) {
   const magick = await resolveExecutable("magick", env2);
   if (magick === void 0) throw new ImagePolicyError("image_decoder_unavailable", "Secure image decoding is unavailable");
   await mkdir(paths.runtime, { recursive: true, mode: 448 });
-  const temporary = await mkdtemp(join42(paths.runtime, "image-"));
+  const temporary = await mkdtemp(join43(paths.runtime, "image-"));
   try {
     const extension2 = MIME_EXTENSIONS.get(mime);
     if (extension2 === void 0) throw new ImagePolicyError("image_mime", "Unsupported image type");
-    const input2 = join42(temporary, `source${extension2}`);
-    const output = join42(temporary, `normalized${extension2}`);
+    const input2 = join43(temporary, `source${extension2}`);
+    const output = join43(temporary, `normalized${extension2}`);
     const outputTarget = mime === "image/png" ? `PNG32:${output}` : mime === "image/jpeg" ? `JPEG:${output}` : `WEBP:${output}`;
     await writeFile2(input2, bytes, { flag: "wx", mode: 384 });
     const result = await runCommand(magick, [
@@ -295213,7 +296073,7 @@ async function pruneImageCache(paths = quickchatPaths()) {
   await mkdir(paths.images, { recursive: true, mode: 448 });
   const files = (await Promise.all((await readdir2(paths.images)).map(async (name) => {
     try {
-      const info = await stat5(join42(paths.images, name));
+      const info = await stat5(join43(paths.images, name));
       return info.isFile() ? { name, bytes: info.size, modified: info.mtimeMs } : void 0;
     } catch {
       return void 0;
@@ -295228,12 +296088,12 @@ async function pruneImageCache(paths = quickchatPaths()) {
   }
   if (evicted.length === 0) return;
   await removeEvictedImageReferences(paths, new Set(evicted));
-  await Promise.all(evicted.map((name) => rm(join42(paths.images, name), { force: true })));
+  await Promise.all(evicted.map((name) => rm(join43(paths.images, name), { force: true })));
 }
 async function removeEvictedImageReferences(paths, evicted) {
   await mkdir(paths.records, { recursive: true, mode: 448 });
   for (const name of (await readdir2(paths.records)).filter((value2) => /^[0-9a-f-]{36}\.json$/iu.test(value2))) {
-    const destination = join42(paths.records, name);
+    const destination = join43(paths.records, name);
     let value2;
     try {
       value2 = JSON.parse(await readFile5(destination, "utf8"));
@@ -295355,7 +296215,7 @@ function isAllowedExternalLink(rawUrl) {
 
 // runtime/src/history.ts
 import { mkdir as mkdir2, open as open4, readdir as readdir3, readFile as readFile6, rename as rename2, rm as rm2, unlink as unlink2, writeFile as writeFile3 } from "node:fs/promises";
-import { basename as basename18, join as join43 } from "node:path";
+import { basename as basename18, join as join44 } from "node:path";
 import { pathToFileURL as pathToFileURL4 } from "node:url";
 init_paths();
 var MAX_CHATS = 30;
@@ -295370,7 +296230,7 @@ var HistoryStore = class {
     const records = [];
     for (const name of names2.filter((value2) => /^[0-9a-f-]{36}\.json$/u.test(value2))) {
       try {
-        const parsed = JSON.parse(await readFile6(join43(this.#paths.records, name), "utf8"));
+        const parsed = JSON.parse(await readFile6(join44(this.#paths.records, name), "utf8"));
         if (isChatRecord(parsed)) records.push(parsed);
       } catch {
       }
@@ -295380,7 +296240,7 @@ var HistoryStore = class {
   async get(id) {
     if (!isUuid(id)) return void 0;
     try {
-      const parsed = JSON.parse(await readFile6(join43(this.#paths.records, `${id}.json`), "utf8"));
+      const parsed = JSON.parse(await readFile6(join44(this.#paths.records, `${id}.json`), "utf8"));
       return isChatRecord(parsed) ? parsed : void 0;
     } catch {
       return void 0;
@@ -295388,7 +296248,7 @@ var HistoryStore = class {
   }
   async save(chat) {
     await mkdir2(this.#paths.records, { recursive: true, mode: 448 });
-    const destination = join43(this.#paths.records, `${chat.id}.json`);
+    const destination = join44(this.#paths.records, `${chat.id}.json`);
     const temporary = `${destination}.${process.pid}.tmp`;
     await writeFile3(temporary, `${JSON.stringify(chat)}
 `, { encoding: "utf8", mode: 384, flag: "wx" });
@@ -295404,13 +296264,13 @@ var HistoryStore = class {
     if (!isUuid(id)) return void 0;
     const chat = await this.get(id);
     try {
-      await unlink2(join43(this.#paths.records, `${id}.json`));
+      await unlink2(join44(this.#paths.records, `${id}.json`));
     } catch {
       return void 0;
     }
     if (chat !== void 0) {
       await Promise.all(chat.images.map(async (image) => {
-        if (basename18(image.path) === image.path) await rm2(join43(this.#paths.images, image.path), { force: true });
+        if (basename18(image.path) === image.path) await rm2(join44(this.#paths.images, image.path), { force: true });
       }));
       await this.#removeUnreferencedPiSession(chat);
     }
@@ -295434,7 +296294,7 @@ var HistoryStore = class {
     const names2 = await readdir3(this.#paths.records);
     const records = await Promise.all(names2.filter((name) => name.endsWith(".json")).map(async (name) => {
       try {
-        const parsed = JSON.parse(await readFile6(join43(this.#paths.records, name), "utf8"));
+        const parsed = JSON.parse(await readFile6(join44(this.#paths.records, name), "utf8"));
         return isChatRecord(parsed) ? parsed : void 0;
       } catch {
         return void 0;
@@ -295453,11 +296313,11 @@ var HistoryStore = class {
       return;
     }
     const suffix = `_${sessionId}.jsonl`;
-    await Promise.all(names2.filter((name) => name.endsWith(suffix)).map((name) => rm2(join43(this.#paths.piSessions, name), { force: true })));
+    await Promise.all(names2.filter((name) => name.endsWith(suffix)).map((name) => rm2(join44(this.#paths.piSessions, name), { force: true })));
   }
 };
 function presentImage(image, paths = quickchatPaths()) {
-  return { ...image, path: basename18(image.path), localUrl: pathToFileURL4(join43(paths.images, basename18(image.path))).toString() };
+  return { ...image, path: basename18(image.path), localUrl: pathToFileURL4(join44(paths.images, basename18(image.path))).toString() };
 }
 function presentChat(chat, paths = quickchatPaths()) {
   return {
@@ -295495,7 +296355,7 @@ async function probeAcpModels(provider, timeoutMs = 15e3) {
   });
   const paths = quickchatPaths(provider.agent.env);
   await mkdir3(paths.runtime, { recursive: true, mode: 448 });
-  const cwd = await mkdtemp2(join44(paths.runtime, "probe-"));
+  const cwd = await mkdtemp2(join45(paths.runtime, "probe-"));
   const timeout = setTimeout(() => terminateProcessGroup(child.pid), timeoutMs);
   timeout.unref();
   try {
@@ -295571,7 +296431,7 @@ async function probeCodexModels(provider, timeoutMs) {
         } catch {
           return;
         }
-        if (!isObject6(message) || typeof message.id !== "number") return;
+        if (!isObject7(message) || typeof message.id !== "number") return;
         if (message.id === 1) {
           if ("error" in message) {
             finish(() => rejectCatalog(new Error("Codex initialization failed")));
@@ -295605,12 +296465,12 @@ async function probeCodexModels(provider, timeoutMs) {
   }
 }
 function parseCodexModelCatalog(value2) {
-  if (!isObject6(value2) || !Array.isArray(value2.data)) return { models: [] };
+  if (!isObject7(value2) || !Array.isArray(value2.data)) return { models: [] };
   const models = [];
   const modelIds = /* @__PURE__ */ new Set();
   let defaultModel;
   for (const item of value2.data) {
-    if (!isObject6(item) || item.hidden === true || typeof item.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._:/+-]{0,127}$/u.test(item.id)) continue;
+    if (!isObject7(item) || item.hidden === true || typeof item.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._:/+-]{0,127}$/u.test(item.id)) continue;
     if (modelIds.has(item.id) || models.length >= 100) continue;
     modelIds.add(item.id);
     const name = typeof item.displayName === "string" && item.displayName.trim() !== "" ? item.displayName.trim() : item.id;
@@ -295620,7 +296480,7 @@ function parseCodexModelCatalog(value2) {
   }
   return { models, ...defaultModel === void 0 ? {} : { defaultModel } };
 }
-function isObject6(value2) {
+function isObject7(value2) {
   return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
 }
 async function deleteAcpSession(provider, sessionId, timeoutMs = 15e3) {
@@ -295683,7 +296543,7 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
   const result = (async () => {
     const paths = quickchatPaths(provider.agent.env);
     await mkdir3(paths.runtime, { recursive: true, mode: 448 });
-    const cwd = await mkdtemp2(join44(paths.runtime, "chat-"));
+    const cwd = await mkdtemp2(join45(paths.runtime, "chat-"));
     const turnDeadline = Date.now() + timeoutMs;
     const timeout = setTimeout(() => {
       void cancel();
@@ -296103,7 +296963,7 @@ function exactOpenCodeCommand(value2) {
   return openCodeCommand(value2) !== void 0;
 }
 function openCodeCommand(value2) {
-  if (!isObject6(value2)) return void 0;
+  if (!isObject7(value2)) return void 0;
   return typeof value2.command === "string" && value2.command !== "" ? value2.command : void 0;
 }
 function forbiddenToolError() {
@@ -296185,7 +297045,7 @@ function webReadable(child) {
 init_paths();
 init_process();
 import { mkdir as mkdir4, readFile as readFile7, rm as rm4 } from "node:fs/promises";
-import { join as join45 } from "node:path";
+import { join as join46 } from "node:path";
 var DictationService = class {
   #paths;
   #env;
@@ -296196,7 +297056,7 @@ var DictationService = class {
   constructor(paths = quickchatPaths(), env2 = process.env) {
     this.#paths = paths;
     this.#env = env2;
-    this.#transcript = join45(paths.runtime, "dictation.txt");
+    this.#transcript = join46(paths.runtime, "dictation.txt");
   }
   async available() {
     this.#voxtype ??= await resolveExecutable("voxtype", this.#env);
@@ -296269,10 +297129,10 @@ function dictationStartArgs(transcript) {
 
 // runtime/src/tts.ts
 import { spawn as spawn14 } from "node:child_process";
-import { mkdirSync as mkdirSync14, readFileSync as readFileSync22, renameSync as renameSync5, statSync as statSync13, unlinkSync as unlinkSync4, writeFileSync as writeFileSync13 } from "node:fs";
+import { mkdirSync as mkdirSync14, readFileSync as readFileSync23, renameSync as renameSync5, statSync as statSync14, unlinkSync as unlinkSync4, writeFileSync as writeFileSync13 } from "node:fs";
 import { mkdtemp as mkdtemp3, rm as rm5, writeFile as writeFile4 } from "node:fs/promises";
 import { tmpdir as tmpdir7 } from "node:os";
-import { join as join46 } from "node:path";
+import { join as join47 } from "node:path";
 init_paths();
 init_process();
 var ttsProviderIds = ["kokoro", "elevenlabs", "openai"];
@@ -296380,7 +297240,7 @@ function isTtsProviderId(value2) {
 function isCloudTtsProviderId(value2) {
   return cloudTtsProviderIds.includes(value2);
 }
-function isObject7(value2) {
+function isObject8(value2) {
   return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
 }
 function text(value2) {
@@ -296392,21 +297252,21 @@ function voiceConfigDirectory(env2) {
   return quickchatPaths(env2).config;
 }
 function authPath(env2) {
-  return join46(voiceConfigDirectory(env2), "voice-auth.json");
+  return join47(voiceConfigDirectory(env2), "voice-auth.json");
 }
 function readAuthFile(path16) {
   try {
-    if (statSync13(path16).size > MAX_AUTH_BYTES) {
+    if (statSync14(path16).size > MAX_AUTH_BYTES) {
       throw new VoiceError("tts_auth_invalid", "voice-auth.json is unexpectedly large; not modifying it");
     }
-    const value2 = JSON.parse(readFileSync22(path16, "utf8"));
-    if (!isObject7(value2)) {
+    const value2 = JSON.parse(readFileSync23(path16, "utf8"));
+    if (!isObject8(value2)) {
       throw new VoiceError("tts_auth_invalid", "voice-auth.json must contain a JSON object");
     }
     const file2 = {};
     for (const id of cloudTtsProviderIds) {
       const entry = value2[id];
-      if (!isObject7(entry) || entry.type !== "api_key") continue;
+      if (!isObject8(entry) || entry.type !== "api_key") continue;
       const key = text(entry.key).trim();
       if (key === "") continue;
       file2[id] = { type: "api_key", key };
@@ -296414,12 +297274,12 @@ function readAuthFile(path16) {
     return file2;
   } catch (error48) {
     if (error48 instanceof VoiceError) throw error48;
-    if (isObject7(error48) && error48.code === "ENOENT") return {};
+    if (isObject8(error48) && error48.code === "ENOENT") return {};
     throw new VoiceError("tts_auth_invalid", "voice-auth.json could not be read or parsed");
   }
 }
 function writeAuthFile(path16, file2) {
-  mkdirSync14(join46(path16, ".."), { recursive: true, mode: 448 });
+  mkdirSync14(join47(path16, ".."), { recursive: true, mode: 448 });
   const temporary = `${path16}.${process.pid}.tmp`;
   const body = `${JSON.stringify(file2, null, 2)}
 `;
@@ -296521,7 +297381,7 @@ var VoiceService = class {
       try {
         unlinkSync4(path16);
       } catch (error48) {
-        if (!(isObject7(error48) && error48.code === "ENOENT")) throw error48;
+        if (!(isObject8(error48) && error48.code === "ENOENT")) throw error48;
       }
     } else writeAuthFile(path16, remaining);
     return this.status();
@@ -296539,10 +297399,10 @@ var VoiceService = class {
     if (spoken === "") throw new VoiceError("tts_empty", "There is nothing to speak");
     const controller = new AbortController();
     this.#playback = controller;
-    const root = await mkdtemp3(join46(tmpdir7(), "omapilot-tts-"));
+    const root = await mkdtemp3(join47(tmpdir7(), "omapilot-tts-"));
     try {
       const audio = await this.#synthesize(input2.provider, input2.model, input2.voice, spoken, controller.signal);
-      const path16 = join46(root, audio.extension === "wav" ? "speech.wav" : "speech.mp3");
+      const path16 = join47(root, audio.extension === "wav" ? "speech.wav" : "speech.mp3");
       await writeFile4(path16, audio.bytes, { mode: 384 });
       if (controller.signal.aborted) throw cancelled();
       await this.#playAudio(path16, controller.signal);
@@ -296697,11 +297557,11 @@ async function elevenLabsJson(url2, apiKey, fetcher) {
   return boundedJson(response);
 }
 function parseElevenLabsModels(payload) {
-  const rows = Array.isArray(payload) ? payload : isObject7(payload) && Array.isArray(payload.models) ? payload.models : [];
+  const rows = Array.isArray(payload) ? payload : isObject8(payload) && Array.isArray(payload.models) ? payload.models : [];
   const models = [];
   const seen = /* @__PURE__ */ new Set();
   for (const entry of rows) {
-    if (!isObject7(entry)) continue;
+    if (!isObject8(entry)) continue;
     if (entry.can_do_text_to_speech === false) continue;
     const id = text(entry.model_id ?? entry.id).trim();
     const parsed = option(id, text(entry.name) || id);
@@ -296713,11 +297573,11 @@ function parseElevenLabsModels(payload) {
   return models;
 }
 function parseElevenLabsVoices(payload) {
-  const rows = isObject7(payload) && Array.isArray(payload.voices) ? payload.voices : [];
+  const rows = isObject8(payload) && Array.isArray(payload.voices) ? payload.voices : [];
   const voices = [];
   const seen = /* @__PURE__ */ new Set();
   for (const entry of rows) {
-    if (!isObject7(entry)) continue;
+    if (!isObject8(entry)) continue;
     const id = text(entry.voice_id ?? entry.id).trim();
     const parsed = option(id, text(entry.name) || id);
     if (parsed === void 0 || seen.has(parsed.id)) continue;
@@ -296869,9 +297729,9 @@ async function synthesizeKokoro(voice, text4, env2, signal) {
   if (python === void 0) {
     throw new VoiceError("tts_not_configured", "Kokoro is not installed.");
   }
-  const root = await mkdtemp3(join46(tmpdir7(), "omapilot-kokoro-"));
-  const wavPath = join46(root, "speech.wav");
-  const textPath = join46(root, "speech.txt");
+  const root = await mkdtemp3(join47(tmpdir7(), "omapilot-kokoro-"));
+  const wavPath = join47(root, "speech.wav");
+  const textPath = join47(root, "speech.txt");
   try {
     await writeFile4(textPath, text4, { encoding: "utf8", mode: 384 });
     const result = await runCommand(python, ["-c", KOKORO_SPEAK_SCRIPT, optionOrFallback(voice, "af_heart"), wavPath, textPath], {
@@ -296883,7 +297743,7 @@ async function synthesizeKokoro(voice, text4, env2, signal) {
     if (result.code !== 0) {
       throw new VoiceError("tts_probe_failed", "Kokoro could not speak that answer.");
     }
-    const bytes = readFileSync22(wavPath);
+    const bytes = readFileSync23(wavPath);
     if (bytes.byteLength === 0) throw new VoiceError("tts_probe_failed", "Kokoro returned empty audio");
     return { bytes, extension: "wav" };
   } finally {
@@ -296907,7 +297767,7 @@ async function playAudioFile(path16, env2, signal) {
   throw new VoiceError("tts_playback_failed", "No audio player is available. Install mpv or PipeWire.");
 }
 function runPlayer(executable2, args, env2, signal) {
-  return new Promise((resolve17, reject) => {
+  return new Promise((resolve18, reject) => {
     let settled = false;
     const child = spawn14(executable2, args, {
       env: env2,
@@ -296920,7 +297780,7 @@ function runPlayer(executable2, args, env2, signal) {
       signal.removeEventListener("abort", onAbort);
       clearTimeout(timer);
       if (error48 !== void 0) reject(error48);
-      else resolve17();
+      else resolve18();
     };
     const onAbort = () => {
       terminateProcessGroup(child.pid);
@@ -296947,8 +297807,8 @@ function runPlayer(executable2, args, env2, signal) {
 
 // runtime/src/custom-providers.ts
 init_pi_harness();
-import { mkdirSync as mkdirSync15, readFileSync as readFileSync23, renameSync as renameSync6, statSync as statSync14, writeFileSync as writeFileSync14 } from "node:fs";
-import { join as join47 } from "node:path";
+import { mkdirSync as mkdirSync15, readFileSync as readFileSync24, renameSync as renameSync6, statSync as statSync15, writeFileSync as writeFileSync14 } from "node:fs";
+import { join as join48 } from "node:path";
 var PROVIDER_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 var MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
 var RESERVED_IDS = /* @__PURE__ */ new Set([
@@ -296979,7 +297839,7 @@ var CustomProviderError = class extends Error {
 function invalid(message) {
   throw new CustomProviderError("invalid_custom_provider", message);
 }
-function isObject8(value2) {
+function isObject9(value2) {
   return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
 }
 function text2(value2) {
@@ -297011,7 +297871,7 @@ function normalizeBaseUrl(raw) {
   return url2.origin + url2.pathname.replace(/\/+$/u, "");
 }
 function validateCustomProvider(input2) {
-  if (!isObject8(input2)) return invalid("Provide the server details");
+  if (!isObject9(input2)) return invalid("Provide the server details");
   const id = text2(input2.id).trim().toLowerCase();
   if (!PROVIDER_ID.test(id)) {
     return invalid("Use a short lowercase id: letters, digits, dot, dash, underscore");
@@ -297029,7 +297889,7 @@ function validateCustomProvider(input2) {
   if (rawModels.length > MAX_MODELS2) return invalid(`Add at most ${MAX_MODELS2} models`);
   const seen = /* @__PURE__ */ new Set();
   const models = rawModels.map((entry) => {
-    const source = isObject8(entry) ? entry : { id: entry };
+    const source = isObject9(entry) ? entry : { id: entry };
     const modelId = text2(source.id).trim();
     if (!MODEL_ID.test(modelId)) return invalid(`"${modelId}" is not a valid model id`);
     if (seen.has(modelId)) return invalid(`"${modelId}" is listed twice`);
@@ -297072,7 +297932,7 @@ async function boundedResponseText(response) {
   return new TextDecoder().decode(combined);
 }
 async function probeCustomProvider(input2, fetcher = fetch) {
-  if (!isObject8(input2)) return invalid("Provide the server URL");
+  if (!isObject9(input2)) return invalid("Provide the server URL");
   const baseUrl = normalizeBaseUrl(text2(input2.baseUrl));
   const key = text2(input2.apiKey).trim();
   const headers = new Headers({ accept: "application/json" });
@@ -297106,13 +297966,13 @@ async function probeCustomProvider(input2, fetcher = fetch) {
     if (error48 instanceof CustomProviderError) throw error48;
     throw new CustomProviderError("custom_provider_test_failed", "The /models endpoint did not return valid JSON");
   }
-  if (!isObject8(payload) || !Array.isArray(payload.data)) {
+  if (!isObject9(payload) || !Array.isArray(payload.data)) {
     throw new CustomProviderError("custom_provider_test_failed", "The response must contain a data array of models");
   }
   const seen = /* @__PURE__ */ new Set();
   const models = [];
   for (const entry of payload.data) {
-    if (!isObject8(entry)) continue;
+    if (!isObject9(entry)) continue;
     const id = text2(entry.id).trim();
     if (!MODEL_ID.test(id) || seen.has(id)) continue;
     seen.add(id);
@@ -297131,11 +297991,11 @@ async function probeCustomProvider(input2, fetcher = fetch) {
 }
 function readModelsJson(path16) {
   try {
-    if (statSync14(path16).size > MAX_FILE_BYTES) {
+    if (statSync15(path16).size > MAX_FILE_BYTES) {
       throw new CustomProviderError("models_file_too_large", "models.json is unexpectedly large; not modifying it");
     }
-    const value2 = JSON.parse(readFileSync23(path16, "utf8"));
-    if (!isObject8(value2)) {
+    const value2 = JSON.parse(readFileSync24(path16, "utf8"));
+    if (!isObject9(value2)) {
       throw new CustomProviderError(
         "models_file_invalid",
         "models.json must contain a JSON object; fix it before adding a server"
@@ -297144,7 +298004,7 @@ function readModelsJson(path16) {
     return value2;
   } catch (error48) {
     if (error48 instanceof CustomProviderError) throw error48;
-    if (isObject8(error48) && error48.code === "ENOENT") return {};
+    if (isObject9(error48) && error48.code === "ENOENT") return {};
     throw new CustomProviderError(
       "models_file_invalid",
       "models.json could not be read or parsed; fix it before adding a server"
@@ -297152,24 +298012,24 @@ function readModelsJson(path16) {
   }
 }
 function writeModelsJson(path16, value2) {
-  mkdirSync15(join47(path16, ".."), { recursive: true, mode: 448 });
+  mkdirSync15(join48(path16, ".."), { recursive: true, mode: 448 });
   const temporary = `${path16}.${process.pid}.tmp`;
   writeFileSync14(temporary, `${JSON.stringify(value2, null, 2)}
 `, { encoding: "utf8", mode: 384 });
   renameSync6(temporary, path16);
 }
 function modelsPath(env2) {
-  return join47(configDirectory(env2), "models.json");
+  return join48(configDirectory(env2), "models.json");
 }
 function managed(provider) {
   return provider.omapilotManaged === true;
 }
 function listCustomProviders(env2 = process.env) {
   const file2 = readModelsJson(modelsPath(env2));
-  const providers = isObject8(file2.providers) ? file2.providers : {};
+  const providers = isObject9(file2.providers) ? file2.providers : {};
   const out = [];
   for (const [id, value2] of Object.entries(providers)) {
-    if (!isObject8(value2) || !managed(value2)) continue;
+    if (!isObject9(value2) || !managed(value2)) continue;
     const models = Array.isArray(value2.models) ? value2.models : [];
     out.push({
       id,
@@ -297177,7 +298037,7 @@ function listCustomProviders(env2 = process.env) {
       baseUrl: text2(value2.baseUrl),
       api: text2(value2.api),
       models: models.flatMap((entry) => {
-        if (!isObject8(entry) || typeof entry.id !== "string") return [];
+        if (!isObject9(entry) || typeof entry.id !== "string") return [];
         const contextWindow = Number(entry.contextWindow ?? 0);
         return [{
           id: entry.id,
@@ -297196,9 +298056,9 @@ function addCustomProvider(input2, env2 = process.env) {
   const spec = validateCustomProvider(input2);
   const path16 = modelsPath(env2);
   const file2 = readModelsJson(path16);
-  const providers = isObject8(file2.providers) ? { ...file2.providers } : {};
+  const providers = isObject9(file2.providers) ? { ...file2.providers } : {};
   const existing = providers[spec.id];
-  if (existing !== void 0 && (!isObject8(existing) || !managed(existing))) {
+  if (existing !== void 0 && (!isObject9(existing) || !managed(existing))) {
     throw new CustomProviderError(
       "custom_provider_conflict",
       `models.json already defines "${spec.id}"; rename the server or edit that entry by hand`
@@ -297235,10 +298095,10 @@ function removeCustomProvider(id, env2 = process.env) {
   if (!PROVIDER_ID.test(key)) throw new CustomProviderError("invalid_custom_provider", "Unknown server");
   const path16 = modelsPath(env2);
   const file2 = readModelsJson(path16);
-  const providers = isObject8(file2.providers) ? { ...file2.providers } : {};
+  const providers = isObject9(file2.providers) ? { ...file2.providers } : {};
   const existing = providers[key];
   if (existing === void 0) return;
-  if (!isObject8(existing) || !managed(existing)) {
+  if (!isObject9(existing) || !managed(existing)) {
     throw new CustomProviderError(
       "custom_provider_conflict",
       `"${key}" was not added by OmaPilot; remove it from models.json by hand`
@@ -297252,20 +298112,20 @@ function removeCustomProvider(id, env2 = process.env) {
 
 // runtime/src/voxtype-osd.ts
 init_process();
-import { copyFileSync as copyFileSync3, existsSync as existsSync27, readFileSync as readFileSync24, renameSync as renameSync7, statSync as statSync15, writeFileSync as writeFileSync15 } from "node:fs";
-import { homedir as homedir15 } from "node:os";
-import { join as join48 } from "node:path";
+import { copyFileSync as copyFileSync3, existsSync as existsSync28, readFileSync as readFileSync25, renameSync as renameSync7, statSync as statSync16, writeFileSync as writeFileSync15 } from "node:fs";
+import { homedir as homedir16 } from "node:os";
+import { join as join49 } from "node:path";
 var MAX_CONFIG_BYTES = 512 * 1024;
 var OSD_SECTION = /^[ \t]*\[osd\][ \t]*$/mu;
 var ENABLED_LINE = /^[ \t]*enabled[ \t]*=[ \t]*(true|false)[ \t]*$/mu;
 function voxtypeConfigPath(env2 = process.env) {
-  const base = env2.XDG_CONFIG_HOME?.startsWith("/") === true ? env2.XDG_CONFIG_HOME : join48(env2.HOME ?? homedir15(), ".config");
-  return join48(base, "voxtype", "config.toml");
+  const base = env2.XDG_CONFIG_HOME?.startsWith("/") === true ? env2.XDG_CONFIG_HOME : join49(env2.HOME ?? homedir16(), ".config");
+  return join49(base, "voxtype", "config.toml");
 }
 function readConfig(path16) {
   try {
-    if (statSync15(path16).size > MAX_CONFIG_BYTES) return void 0;
-    return readFileSync24(path16, "utf8");
+    if (statSync16(path16).size > MAX_CONFIG_BYTES) return void 0;
+    return readFileSync25(path16, "utf8");
   } catch {
     return void 0;
   }
@@ -297321,7 +298181,7 @@ async function setVoxtypeOsdEnabled(enabled, env2 = process.env) {
   const next = withOsdEnabled(text4, enabled);
   if (next !== text4) {
     const backup = `${configPath}.omapilot.bak`;
-    if (!existsSync27(backup)) copyFileSync3(configPath, backup);
+    if (!existsSync28(backup)) copyFileSync3(configPath, backup);
     const temporary = `${configPath}.${process.pid}.tmp`;
     writeFileSync15(temporary, next, { encoding: "utf8", mode: 384 });
     renameSync7(temporary, configPath);
@@ -297371,7 +298231,7 @@ function promptWithContextAttachments(question, context, attachmentBlocks) {
 
 // runtime/src/context-attachments.ts
 import { readFile as readFile8 } from "node:fs/promises";
-import { join as join49 } from "node:path";
+import { join as join50 } from "node:path";
 init_paths();
 init_process();
 var ContextAttachmentError = class extends Error {
@@ -297423,7 +298283,7 @@ var ContextAttachmentStore = class {
       });
       if (result.code !== 0) return void 0;
       const value2 = JSON.parse(result.stdout);
-      if (!isObject9(value2)) return void 0;
+      if (!isObject10(value2)) return void 0;
       const x4 = integer2(value2.x);
       const y2 = integer2(value2.y);
       return x4 === void 0 || y2 === void 0 ? void 0 : { x: x4, y: y2 };
@@ -297434,7 +298294,7 @@ var ContextAttachmentStore = class {
   async selectWindow(requestId, localAnchor) {
     const pending = this.#targets.get(requestId);
     if (pending === void 0) throw new ContextAttachmentError("context_expired", "That context capture has expired");
-    const point = { x: pending.monitor.x + localAnchor.x, y: pending.monitor.y + localAnchor.y };
+    const point2 = { x: pending.monitor.x + localAnchor.x, y: pending.monitor.y + localAnchor.y };
     const hyprctl = await resolveExecutable("hyprctl", this.#env);
     if (hyprctl === void 0) throw new ContextAttachmentError("context_window", "Window selection is unavailable");
     const result = await runCommand(hyprctl, ["-j", "clients"], {
@@ -297445,7 +298305,7 @@ var ContextAttachmentStore = class {
     if (result.code !== 0) throw new ContextAttachmentError("context_window", "The window beneath the cursor could not be identified");
     let selected;
     try {
-      selected = windowAtPointFromHyprland(JSON.parse(result.stdout), point);
+      selected = windowAtPointFromHyprland(JSON.parse(result.stdout), point2);
     } catch {
       selected = void 0;
     }
@@ -297610,7 +298470,7 @@ var ContextAttachmentStore = class {
         });
       }
       if (selection.representationIds.includes("image")) {
-        const data = (await readFile8(join49(this.#paths.images, attachment.image.path))).toString("base64");
+        const data = (await readFile8(join50(this.#paths.images, attachment.image.path))).toString("base64");
         blocks.push({ type: "image", data, mimeType: attachment.image.mimeType });
       }
     }
@@ -297637,7 +298497,7 @@ var ContextAttachmentStore = class {
     }
     if (!Array.isArray(parsed)) throw new ContextAttachmentError("context_monitor", "The monitor layout was invalid");
     return parsed.flatMap((value2) => {
-      if (!isObject9(value2)) return [];
+      if (!isObject10(value2)) return [];
       const x4 = integer2(value2.x);
       const y2 = integer2(value2.y);
       const width = integer2(value2.width);
@@ -297658,17 +298518,17 @@ var ContextAttachmentStore = class {
     try {
       const tesseract = await resolveExecutable("tesseract", this.#env);
       if (tesseract === void 0) return void 0;
-      const result = await runCommand(tesseract, [join49(this.#paths.images, image.path), "stdout", "tsv"], {
+      const result = await runCommand(tesseract, [join50(this.#paths.images, image.path), "stdout", "tsv"], {
         env: this.#env,
         timeoutMs: 15e3,
         maxOutput: 2e6
       });
       if (result.code !== 0) return void 0;
-      const point = anchor === void 0 ? void 0 : {
+      const point2 = anchor === void 0 ? void 0 : {
         x: (anchor.x - bounds.x) * image.width / bounds.width,
         y: (anchor.y - bounds.y) * image.height / bounds.height
       };
-      return textAtPointFromTsv(result.stdout, point);
+      return textAtPointFromTsv(result.stdout, point2);
     } catch {
       return void 0;
     }
@@ -297760,7 +298620,7 @@ function visualElement(capture) {
 function imageConfidence(capture) {
   return visualElement(capture) ? 1 : 0.82;
 }
-function textAtPointFromTsv(tsv, point) {
+function textAtPointFromTsv(tsv, point2) {
   const rows = tsv.split("\n").slice(1).flatMap((line) => {
     const fields = line.split("	");
     if (fields.length < 12 || fields[0] !== "5") return [];
@@ -297774,11 +298634,11 @@ function textAtPointFromTsv(tsv, point) {
     return [{ page: fields[1], block: fields[2], paragraph: fields[3], line: fields[4], left, top, width, height, confidence, text: text4 }];
   });
   if (rows.length === 0) return void 0;
-  if (point === void 0) return textFromRows(rows);
-  let selected = rows.find((row) => point.x >= row.left && point.x <= row.left + row.width && point.y >= row.top && point.y <= row.top + row.height);
+  if (point2 === void 0) return textFromRows(rows);
+  let selected = rows.find((row) => point2.x >= row.left && point2.x <= row.left + row.width && point2.y >= row.top && point2.y <= row.top + row.height);
   selected ??= rows.map((row) => ({
     row,
-    distance: rectangleDistance(point, { x: row.left, y: row.top, width: row.width, height: row.height })
+    distance: rectangleDistance(point2, { x: row.left, y: row.top, width: row.width, height: row.height })
   })).filter((value2) => value2.distance <= 36).sort((left, right) => left.distance - right.distance)[0]?.row;
   if (selected === void 0) return void 0;
   const paragraph = rows.filter((row) => row.page === selected.page && row.block === selected.block && row.paragraph === selected.paragraph);
@@ -297803,9 +298663,9 @@ function monitorFor(rectangle, monitors) {
   const center = { x: rectangle.x + rectangle.width / 2, y: rectangle.y + rectangle.height / 2 };
   return monitors.find((monitor) => center.x >= monitor.x && center.x < monitor.x + monitor.width && center.y >= monitor.y && center.y < monitor.y + monitor.height);
 }
-function monitorAtPoint(point, monitors) {
-  if (point === void 0) return void 0;
-  return monitors.find((monitor) => point.x >= monitor.x && point.x < monitor.x + monitor.width && point.y >= monitor.y && point.y < monitor.y + monitor.height);
+function monitorAtPoint(point2, monitors) {
+  if (point2 === void 0) return void 0;
+  return monitors.find((monitor) => point2.x >= monitor.x && point2.x < monitor.x + monitor.width && point2.y >= monitor.y && point2.y < monitor.y + monitor.height);
 }
 function clampRectangle(value2, container) {
   const left = Math.max(value2.x, container.x);
@@ -297821,7 +298681,7 @@ function sensitiveTarget(target) {
   return /(?:password|passphrase|credential|1password|bitwarden|keepass)/iu.test(`${target.appId ?? ""} ${target.title ?? ""}`);
 }
 function windowBoundsFromHyprland(value2, expectedAppId) {
-  if (!isObject9(value2)) return void 0;
+  if (!isObject10(value2)) return void 0;
   const appId = typeof value2.class === "string" ? value2.class : typeof value2.initialClass === "string" ? value2.initialClass : "";
   if (expectedAppId !== void 0 && appId.trim().toLowerCase() !== expectedAppId.trim().toLowerCase()) return void 0;
   const at2 = Array.isArray(value2.at) ? value2.at : [];
@@ -297834,11 +298694,11 @@ function windowBoundsFromHyprland(value2, expectedAppId) {
     return void 0;
   return { x: x4, y: y2, width, height };
 }
-function windowAtPointFromHyprland(value2, point) {
+function windowAtPointFromHyprland(value2, point2) {
   if (!Array.isArray(value2)) return void 0;
   return value2.flatMap((client2, index3) => {
     const bounds = windowBoundsFromHyprland(client2);
-    if (bounds === void 0 || !isObject9(client2) || client2.mapped === false || client2.hidden === true || point.x < bounds.x || point.x >= bounds.x + bounds.width || point.y < bounds.y || point.y >= bounds.y + bounds.height) return [];
+    if (bounds === void 0 || !isObject10(client2) || client2.mapped === false || client2.hidden === true || point2.x < bounds.x || point2.x >= bounds.x + bounds.width || point2.y < bounds.y || point2.y >= bounds.y + bounds.height) return [];
     const appId = typeof client2.class === "string" && client2.class.trim() !== "" ? client2.class.trim() : typeof client2.initialClass === "string" && client2.initialClass.trim() !== "" ? client2.initialClass.trim() : void 0;
     if (/^(?:org\.omarchy\.quickshell|quickshell)$/iu.test(appId ?? "")) return [];
     const title = typeof client2.title === "string" && client2.title.trim() !== "" ? client2.title.trim() : void 0;
@@ -297859,15 +298719,15 @@ function windowAtPointFromHyprland(value2, point) {
     }];
   }).sort((left, right) => right.fullscreen - left.fullscreen || right.floating - left.floating || left.focus - right.focus || left.area - right.area || left.index - right.index)[0];
 }
-function rectangleDistance(point, row) {
-  const dx = Math.max(row.x - point.x, 0, point.x - (row.x + row.width));
-  const dy = Math.max(row.y - point.y, 0, point.y - (row.y + row.height));
+function rectangleDistance(point2, row) {
+  const dx = Math.max(row.x - point2.x, 0, point2.x - (row.x + row.width));
+  const dy = Math.max(row.y - point2.y, 0, point2.y - (row.y + row.height));
   return Math.hypot(dx, dy);
 }
 function integer2(value2) {
   return typeof value2 === "number" && Number.isInteger(value2) ? value2 : void 0;
 }
-function isObject9(value2) {
+function isObject10(value2) {
   return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
 }
 
@@ -297931,12 +298791,12 @@ function transcriptPrompt(chat) {
   ].join("\n");
 }
 async function continueInHerdr(chat, env2 = process.env, dependencies = {}) {
-  const resolve17 = dependencies.resolve ?? resolveExecutable;
+  const resolve18 = dependencies.resolve ?? resolveExecutable;
   const [herdr, launcher, tuiLauncher, hyprctl] = await Promise.all([
-    resolve17("herdr", env2),
-    resolve17("omarchy-launch-or-focus", env2),
-    resolve17("omarchy-launch-tui", env2),
-    resolve17("hyprctl", env2)
+    resolve18("herdr", env2),
+    resolve18("omarchy-launch-or-focus", env2),
+    resolve18("omarchy-launch-tui", env2),
+    resolve18("hyprctl", env2)
   ]);
   if (herdr === void 0) throw new HerdrHandoffError("availability", "herdr_missing");
   if (launcher === void 0 || tuiLauncher === void 0 || hyprctl === void 0)
@@ -297948,7 +298808,7 @@ async function continueInHerdr(chat, env2 = process.env, dependencies = {}) {
     maxOutput: 256e3
   }));
   const launch = dependencies.launch ?? launchDetached2;
-  const wait = dependencies.delay ?? delay;
+  const wait = dependencies.delay ?? delay2;
   const existingWindowAddress = await findHerdrWindow(commands.hyprctl, run);
   if (existingWindowAddress === void 0)
     await openOrFocusHerdr(commands, env2, launch, "launch_spawn_failed");
@@ -298040,7 +298900,7 @@ async function launchDetached2(executable2, args, env2) {
     });
   });
 }
-function delay(milliseconds) {
+function delay2(milliseconds) {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
 async function openOrFocusHerdr(commands, env2, launch, errorCode) {
@@ -298265,7 +299125,7 @@ function herdrErrorMessage(stage, errorCode) {
 function normalizeToolPermission(requestId, permissionId, provider, request) {
   const kind = request.toolCall.kind ?? "other";
   if (kind !== "execute") return void 0;
-  const title = boundedText(request.toolCall.title ?? request.toolCall.name ?? `${kind} tool`, 120);
+  const title = boundedText2(request.toolCall.title ?? request.toolCall.name ?? `${kind} tool`, 120);
   const detail = permissionDetail(kind, request.toolCall.rawInput);
   const reviewable = detail !== void 0;
   const optionIds = {};
@@ -298276,7 +299136,7 @@ function normalizeToolPermission(requestId, permissionId, provider, request) {
     if (provider === "opencode" && decision !== "allow_once" && decision.startsWith("allow_")) continue;
     const id = `option-${index3}`;
     optionIds[id] = option2.optionId;
-    options.push({ id, decision, label: boundedText(option2.name, 48) || defaultLabel(decision) });
+    options.push({ id, decision, label: boundedText2(option2.name, 48) || defaultLabel(decision) });
   }
   return {
     view: {
@@ -298335,7 +299195,7 @@ function hasUnsafeText(value2, seen = /* @__PURE__ */ new Set()) {
   if (Array.isArray(value2)) return value2.some((item) => hasUnsafeText(item, seen));
   return Object.entries(value2).some(([key, item]) => hasUnsafeText(key, seen) || hasUnsafeText(item, seen));
 }
-function boundedText(value2, limit2) {
+function boundedText2(value2, limit2) {
   return value2.replaceAll(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu, " ").trim().slice(0, limit2);
 }
 
@@ -298346,7 +299206,7 @@ init_process();
 // runtime/src/browser-companion.ts
 import { chmod, mkdir as mkdir5, rm as rm6 } from "node:fs/promises";
 import { createServer as createServer2 } from "node:net";
-import { dirname as dirname27, join as join50 } from "node:path";
+import { dirname as dirname27, join as join51 } from "node:path";
 var text3 = (max) => external_exports.string().trim().min(1).max(max);
 var optionalText = (max) => external_exports.string().trim().max(max).optional();
 var semanticNodeSchema = external_exports.lazy(() => external_exports.object({
@@ -298435,8 +299295,8 @@ var BrowserCompanionServer = class {
   #closing = false;
   constructor(env2, callbacks) {
     const configuredRuntimeRoot = env2.XDG_RUNTIME_DIR?.trim();
-    const runtimeRoot = configuredRuntimeRoot === void 0 || configuredRuntimeRoot === "" ? join50(env2.HOME ?? "/tmp", ".cache") : configuredRuntimeRoot;
-    this.socketPath = join50(runtimeRoot, "quickchat", "browser-companion.sock");
+    const runtimeRoot = configuredRuntimeRoot === void 0 || configuredRuntimeRoot === "" ? join51(env2.HOME ?? "/tmp", ".cache") : configuredRuntimeRoot;
+    this.socketPath = join51(runtimeRoot, "quickchat", "browser-companion.sock");
     this.#callbacks = callbacks;
   }
   start() {
@@ -298456,14 +299316,14 @@ var BrowserCompanionServer = class {
     await this.start();
     const sessions = [...this.#sessions].filter((session) => session.family === family && !session.socket.destroyed);
     if (sessions.length === 0) return { status: "unavailable" };
-    return new Promise((resolve17) => {
+    return new Promise((resolve18) => {
       const timer = setTimeout(() => this.#finishProbe(requestId), 350);
       timer.unref();
       this.#pendingProbes.set(requestId, {
         requestId,
         ...targetTitle === void 0 ? {} : { targetTitle },
         responses: [],
-        resolve: resolve17,
+        resolve: resolve18,
         timer
       });
       for (const session of sessions) this.#send(session.socket, { version: 1, type: "probe", requestId });
@@ -298499,7 +299359,7 @@ var BrowserCompanionServer = class {
     this.disconnect();
     const server = this.#server;
     this.#server = void 0;
-    if (server !== void 0) await new Promise((resolve17) => server.close(() => resolve17()));
+    if (server !== void 0) await new Promise((resolve18) => server.close(() => resolve18()));
     await rm6(this.socketPath, { force: true });
   }
   async #listen() {
@@ -298507,11 +299367,11 @@ var BrowserCompanionServer = class {
     await rm6(this.socketPath, { force: true });
     const server = createServer2((socket) => this.#accept(socket));
     this.#server = server;
-    await new Promise((resolve17, reject) => {
+    await new Promise((resolve18, reject) => {
       server.once("error", reject);
       server.listen(this.socketPath, () => {
         server.off("error", reject);
-        resolve17();
+        resolve18();
       });
     });
     await chmod(this.socketPath, 384);
@@ -298650,27 +299510,27 @@ function titleScore(candidate, target) {
 // runtime/src/browser-companion-setup.ts
 init_process();
 import { access as access6 } from "node:fs/promises";
-import { constants as constants9 } from "node:fs";
+import { constants as constants10 } from "node:fs";
 import { spawn as spawn16 } from "node:child_process";
-import { dirname as dirname28, join as join51, resolve as resolve16 } from "node:path";
-import { fileURLToPath as fileURLToPath8 } from "node:url";
+import { dirname as dirname28, join as join52, resolve as resolve17 } from "node:path";
+import { fileURLToPath as fileURLToPath9 } from "node:url";
 function repositoryRoot() {
-  return resolve16(dirname28(fileURLToPath8(import.meta.url)), "../..");
+  return resolve17(dirname28(fileURLToPath9(import.meta.url)), "../..");
 }
 async function executable(path16) {
   try {
-    await access6(path16, constants9.X_OK);
+    await access6(path16, constants10.X_OK);
     return true;
   } catch {
     return false;
   }
 }
 function relayPath(env2) {
-  const dataRoot = env2.XDG_DATA_HOME?.startsWith("/") ? env2.XDG_DATA_HOME : join51(env2.HOME ?? "/tmp", ".local/share");
-  return join51(dataRoot, "omapilot/browser-companion/omapilot-browser-companion-host");
+  const dataRoot = env2.XDG_DATA_HOME?.startsWith("/") ? env2.XDG_DATA_HOME : join52(env2.HOME ?? "/tmp", ".local/share");
+  return join52(dataRoot, "omapilot/browser-companion/omapilot-browser-companion-host");
 }
 async function browserCompanionSetupStatus(env2, root = repositoryRoot()) {
-  const installer = resolve16(root, "scripts/install-browser-companion.sh");
+  const installer = resolve17(root, "scripts/install-browser-companion.sh");
   const [relayInstalled, setupAvailable] = await Promise.all([
     executable(relayPath(env2)),
     executable(installer)
@@ -298678,12 +299538,12 @@ async function browserCompanionSetupStatus(env2, root = repositoryRoot()) {
   return {
     relayInstalled,
     setupAvailable,
-    chromiumExtensionPath: resolve16(root, "browser-companion/dist/chromium"),
-    firefoxExtensionPath: resolve16(root, "browser-companion/dist/firefox")
+    chromiumExtensionPath: resolve17(root, "browser-companion/dist/chromium"),
+    firefoxExtensionPath: resolve17(root, "browser-companion/dist/firefox")
   };
 }
 async function installBrowserCompanion(env2, root = repositoryRoot()) {
-  const installer = resolve16(root, "scripts/install-browser-companion.sh");
+  const installer = resolve17(root, "scripts/install-browser-companion.sh");
   if (!await executable(installer)) return false;
   const result = await runCommand(installer, ["install", "--development", "--no-build"], {
     env: env2,
@@ -298694,7 +299554,7 @@ async function installBrowserCompanion(env2, root = repositoryRoot()) {
   return result.code === 0;
 }
 async function uninstallBrowserCompanion(env2, root = repositoryRoot()) {
-  const installer = resolve16(root, "scripts/install-browser-companion.sh");
+  const installer = resolve17(root, "scripts/install-browser-companion.sh");
   if (!await executable(installer)) return false;
   const result = await runCommand(installer, ["uninstall"], {
     env: env2,
@@ -298963,7 +299823,7 @@ var QuickchatBroker = class {
     if (flow.controller.signal.aborted || this.#authFlow?.id !== flow.id)
       return Promise.reject(new Error("Authentication prompt was cancelled"));
     flow.prompt?.reject(new Error("Authentication prompt was cancelled"));
-    return new Promise((resolve17, reject) => {
+    return new Promise((resolve18, reject) => {
       const promptId = randomUUID9();
       const signals = [flow.controller.signal, prompt.signal].filter((signal2) => signal2 !== void 0);
       const signal = signals.length === 1 ? signals[0] ?? flow.controller.signal : AbortSignal.any(signals);
@@ -298973,7 +299833,7 @@ var QuickchatBroker = class {
         id: promptId,
         resolve: (value2) => {
           cleanup();
-          resolve17(value2);
+          resolve18(value2);
         },
         reject: (error48) => {
           cleanup();

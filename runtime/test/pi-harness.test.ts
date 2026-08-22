@@ -6,8 +6,9 @@ import { createServer } from "node:http";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 import { afterEach, describe, expect, it } from "vitest";
-import { agentDirectory, configDirectory, createDesktopTools, discoverAgentProfiles, discoverPiAuthMethods, discoverPiProviders, existingSkillPaths, loginPiProvider, normalizeOpenUrl, omarchyMediaMethod, PiApprovalState, runNestedAgentPrompt, runPiQuestion } from "../src/pi-harness.js";
+import { agentDirectory, bundledSkillPaths, configDirectory, createDesktopTools, discoverAgentProfiles, discoverPiAuthMethods, discoverPiProviders, existingSkillPaths, loginPiProvider, normalizeOpenUrl, omarchyMediaMethod, PiApprovalState, requiresPiPermission, runNestedAgentPrompt, runPiQuestion } from "../src/pi-harness.js";
 import type { BrokerEvent } from "../src/types.js";
+import { DefaultResourceLoader } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js";
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
@@ -143,9 +144,11 @@ describe("native Pi harness", () => {
     const userSkills = join(agentDir, "skills");
     const projectSkills = join(project, ".agents/skills");
     const piProjectSkills = join(project, ".pi/skills");
+    const globalPiSkills = join(root, ".pi/agent/skills");
     await Promise.all([
       mkdir(join(agentDir, "agents"), { recursive: true }),
       mkdir(userSkills, { recursive: true }),
+      mkdir(join(globalPiSkills, "omarchy"), { recursive: true }),
       mkdir(projectSkills, { recursive: true }),
       mkdir(piProjectSkills, { recursive: true })
     ]);
@@ -154,6 +157,9 @@ describe("native Pi harness", () => {
       "Review carefully."
     ].join("\n"));
     await writeFile(join(agentDir, "agents/invalid.md"), "---\nname: BAD NAME\ndescription: no\n---\nIgnore");
+    await writeFile(join(globalPiSkills, "omarchy/SKILL.md"), [
+      "---", "name: omarchy", "description: Use the official Omarchy system skill.", "---", "Follow Omarchy."
+    ].join("\n"));
 
     expect(discoverAgentProfiles(agentDir, project)).toEqual([expect.objectContaining({
       name: "reviewer",
@@ -162,7 +168,22 @@ describe("native Pi harness", () => {
       model: "openai/test",
       systemPrompt: "Review carefully."
     })]);
-    expect(existingSkillPaths(agentDir, project)).toEqual([userSkills, projectSkills, piProjectSkills]);
+    expect(existingSkillPaths(agentDir, project, root)).toEqual([userSkills, globalPiSkills, projectSkills, piProjectSkills]);
+    expect(bundledSkillPaths()).toEqual([resolve("skills")]);
+    expect(requiresPiPermission("desktop_state")).toBe(false);
+    expect(requiresPiPermission("app_open")).toBe(true);
+    expect(requiresPiPermission("window_action")).toBe(true);
+    expect(requiresPiPermission("workspace_action")).toBe(true);
+    const loader = new DefaultResourceLoader({
+      cwd: project,
+      agentDir: join(root, ".config/omapilot"),
+      noExtensions: true,
+      noSkills: true,
+      additionalSkillPaths: [...existingSkillPaths(agentDir, project, root), ...bundledSkillPaths()]
+    });
+    await loader.reload();
+    expect(loader.getSkills().skills.map((skill) => skill.name)).toEqual(expect.arrayContaining(["omarchy", "omapilot-desktop"]));
+    expect(loader.getSkills().diagnostics).toEqual([]);
   });
 
   it("aborts and disposes a delegated Pi session when its parent is cancelled", async () => {
@@ -273,6 +294,11 @@ describe("native Pi harness", () => {
       expect(JSON.stringify(requests[1])).toContain("What did I ask?");
       expect(JSON.stringify(requests[0])).toContain('"open_url"');
       expect(JSON.stringify(requests[0])).toContain('"media_control"');
+      expect(JSON.stringify(requests[0])).toContain('"app_catalog"');
+      expect(JSON.stringify(requests[0])).toContain('"app_open"');
+      expect(JSON.stringify(requests[0])).toContain('"desktop_state"');
+      expect(JSON.stringify(requests[0])).toContain('"window_action"');
+      expect(JSON.stringify(requests[0])).toContain('"workspace_action"');
       expect(authorizationHeaders).toEqual([undefined, undefined]);
       const sessionDir = join(root, ".local/state/quickchat/pi-sessions");
       const sessionFiles = await readdir(sessionDir);
