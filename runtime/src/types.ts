@@ -169,6 +169,17 @@ const ttsKeyTestCommand = z.object({
   provider: cloudTtsProviderSchema,
   apiKey: z.string().min(1).max(512)
 }).strict();
+const ttsSpeakCommand = z.object({
+  type: z.literal("tts_speak"),
+  id: z.string().min(1).max(128),
+  provider: z.enum(["kokoro", "elevenlabs", "openai"]),
+  model: z.string().min(1).max(128).optional(),
+  voice: z.string().min(1).max(128).optional(),
+  text: z.string().min(1).max(8000)
+}).strict();
+const ttsStopCommand = z.object({
+  type: z.literal("tts_stop")
+}).strict();
 
 export const commandSchema = z.discriminatedUnion("type", [
   initializeCommand,
@@ -195,6 +206,8 @@ export const commandSchema = z.discriminatedUnion("type", [
   ttsKeySetCommand,
   ttsKeyClearCommand,
   ttsKeyTestCommand,
+  ttsSpeakCommand,
+  ttsStopCommand,
   z.object({ type: z.enum(["dictation_start", "dictation_stop", "dictation_cancel", "history_list", "history_clear", "custom_provider_list", "voxtype_osd_status", "voice_status", "shutdown"]) })
 ]);
 export type BrokerCommand = z.infer<typeof commandSchema>;
@@ -327,6 +340,9 @@ export type BrokerEvent =
   | { type: "voice"; dictation: VoiceStatus["dictation"]; tts: TtsProviderStatus[] }
   | { type: "tts_tested"; provider: "elevenlabs" | "openai"; result: TtsProviderStatus }
   | { type: "tts_test_failed"; provider: "elevenlabs" | "openai"; message: string }
+  | { type: "tts_speaking"; id: string }
+  | { type: "tts_spoken"; id: string }
+  | { type: "tts_speak_failed"; id: string; message: string }
   | { type: "auth_methods"; methods: BuiltinAuthMethod[] }
   | { type: "auth"; phase: "starting"; flowId: string; methodId: string; message: string }
   | { type: "auth"; phase: "prompt"; flowId: string; methodId: string; prompt: BuiltinAuthPrompt }

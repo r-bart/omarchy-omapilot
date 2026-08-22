@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import type { AcpRun, PermissionDecision } from "./acp.js";
 import { BrokerAcpError, deleteAcpSession, probeAcpModels, runAcpQuestion } from "./acp.js";
 import { DictationService } from "./dictation.js";
-import { isCloudTtsProviderId, VoiceError, VoiceService } from "./tts.js";
+import { isCloudTtsProviderId, isTtsProviderId, VoiceError, VoiceService } from "./tts.js";
 import { addCustomProvider, CustomProviderError, listCustomProviders, normalizeBaseUrl, probeCustomProvider, removeCustomProvider } from "./custom-providers.js";
 import { setVoxtypeOsdEnabled, voxtypeOsdStatus } from "./voxtype-osd.js";
 import { promptWithContextAttachments } from "./context.js";
@@ -70,6 +70,7 @@ export class QuickchatBroker {
   #browserCompanionSetupBusy = false;
   #browserCompanionSetupPhase: "installing" | "removing" | undefined;
   #browserCompanionStatusRevision = 0;
+  #ttsSpeakId: string | undefined;
 
   constructor(
     emit: (event: BrokerEvent) => void,
@@ -138,6 +139,8 @@ export class QuickchatBroker {
       case "tts_key_set": await this.#ttsKeySet(command.provider, command.apiKey); break;
       case "tts_key_clear": await this.#ttsKeyClear(command.provider); break;
       case "tts_key_test": await this.#ttsKeyTest(command.provider, command.apiKey); break;
+      case "tts_speak": void this.#ttsSpeak(command); break;
+      case "tts_stop": this.#ttsStop(); break;
       case "dictation_start": await this.#dictationStart(); break;
       case "dictation_stop": await this.#dictationStop(); break;
       case "dictation_cancel": await this.#dictationCancel(); break;
@@ -146,6 +149,7 @@ export class QuickchatBroker {
       case "open_link": await this.#openLink(command.url); break;
       case "copy": await this.#copy(command.text); break;
       case "shutdown": {
+        this.#ttsStop();
         this.#cancelAuth(this.#authFlow?.id);
         await Promise.all([...this.#runs.values()].map((run) => run.cancel()));
         await this.#browserCompanion.close();
@@ -637,6 +641,43 @@ export class QuickchatBroker {
         message: error instanceof VoiceError ? error.message : "The API key could not be tested"
       });
     }
+  }
+
+  async #ttsSpeak(command: Extract<BrokerCommand, { type: "tts_speak" }>): Promise<void> {
+    if (!isTtsProviderId(command.provider)) return;
+    this.#voice.stop();
+    this.#ttsSpeakId = command.id;
+    this.#emit({ type: "tts_speaking", id: command.id });
+    try {
+      await this.#voice.speak({
+        provider: command.provider,
+        model: command.model,
+        voice: command.voice,
+        text: command.text
+      });
+      if (this.#ttsSpeakId !== command.id) return;
+      this.#ttsSpeakId = undefined;
+      this.#emit({ type: "tts_spoken", id: command.id });
+    } catch (error) {
+      if (this.#ttsSpeakId !== command.id) return;
+      this.#ttsSpeakId = undefined;
+      if (error instanceof VoiceError && error.code === "tts_cancelled") {
+        this.#emit({ type: "tts_spoken", id: command.id });
+        return;
+      }
+      this.#emit({
+        type: "tts_speak_failed",
+        id: command.id,
+        message: error instanceof VoiceError ? error.message : "Could not speak that answer"
+      });
+    }
+  }
+
+  #ttsStop(): void {
+    const id = this.#ttsSpeakId;
+    this.#ttsSpeakId = undefined;
+    this.#voice.stop();
+    if (id !== undefined) this.#emit({ type: "tts_spoken", id });
   }
 
   #emitCustomProviders(): void {

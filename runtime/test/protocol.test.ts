@@ -62,6 +62,11 @@ describe("NDJSON protocol", () => {
     expect(commandSchema.safeParse({ type: "tts_key_set", provider: "kokoro", apiKey: "sk-test-key" }).success).toBe(false);
     expect(commandSchema.safeParse({ type: "tts_key_clear", provider: "openai" }).success).toBe(true);
     expect(commandSchema.safeParse({ type: "tts_key_test", provider: "openai", apiKey: "sk-test-key" }).success).toBe(true);
+    expect(commandSchema.safeParse({
+      type: "tts_speak", id: "speak-1", provider: "elevenlabs", voice: "wyWA56cQNU2KqUW4eCsI", text: "Hello"
+    }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "tts_speak", id: "speak-1", provider: "kokoro", text: "" }).success).toBe(false);
+    expect(commandSchema.safeParse({ type: "tts_stop" }).success).toBe(true);
     expect(commandSchema.safeParse({ type: "auth_begin", methodId: "openai-codex::oauth" }).success).toBe(true);
     expect(commandSchema.safeParse({ type: "auth_begin", methodId: "openai-codex::shell" }).success).toBe(false);
     expect(commandSchema.safeParse({

@@ -42,6 +42,8 @@ Scope {
   property var ttsTest: null
   property bool ttsTestPending: false
   property string ttsTestError: ""
+  property bool ttsSpeaking: false
+  property string ttsSpeakId: ""
   property bool voiceEnabled: false
   property string ttsProvider: "kokoro"
   property string ttsModel: ""
@@ -77,6 +79,11 @@ Scope {
   property string pendingContextRequestId: ""
   property bool continuationBlocked: false
   property string continuationProvider: ""
+  property string pendingHerdrChatId: ""
+  // A global new-chat hotkey can arrive while a provider turn or dictation is
+  // still active. Keep the old request identity until cancellation settles so
+  // its final events cannot leak into the fresh composer.
+  property bool newChatPending: false
   property var browserCompanionStatus: ({
     phase: "ready", relayInstalled: false, setupAvailable: false,
     chromiumConnected: false, firefoxConnected: false,
@@ -348,6 +355,7 @@ Scope {
   }
 
   function cancel() {
+    stopSpeaking()
     if (dictationPhase !== "") {
       sendCommand(Protocol.command("dictation_cancel"))
       return
@@ -398,7 +406,8 @@ Scope {
       pendingPermission = queued.length > 0 ? queued[0] : null
   }
 
-  function newChat() {
+  function resetChat() {
+    newChatPending = false
     clearContextAttachments()
     currentId = ""
     currentChatId = ""
@@ -411,10 +420,29 @@ Scope {
     transcript = ""
     continuationBlocked = false
     continuationProvider = ""
+    pendingHerdrChatId = ""
     state = initialized ? "composing" : "preparing"
     statusMessage = initialized ? "" : "Starting OmaPilot…"
     focusComposerRequested()
     answerChanged()
+  }
+
+  function newChat() {
+    stopSpeaking()
+    var turnInFlight = dictationPhase !== ""
+      || (pendingHerdrChatId === "" && currentId !== "" && busy)
+    if (turnInFlight) {
+      newChatPending = true
+      cancel()
+      return
+    }
+    resetChat()
+  }
+
+  onBusyChanged: {
+    if (newChatPending && !busy) Qt.callLater(function() {
+      if (root.newChatPending && !root.busy) root.resetChat()
+    })
   }
 
   function startDictation() {
@@ -453,6 +481,26 @@ Scope {
     ttsTestError = ""
     ttsTestPending = true
     sendCommand(Protocol.ttsKeyTestCommand(provider, apiKey))
+  }
+  function speakAnswer(text) {
+    var spoken = String(text || "").trim()
+    if (!voiceEnabled || spoken === "") return false
+    var catalog = Protocol.ttsProviderStatus(voiceStatus, ttsProvider)
+    if (!catalog || catalog.available !== true) return false
+    var model = ttsModel
+    if (!Protocol.ttsModelAvailable(catalog, model)) model = Protocol.ttsDefaultModel(catalog)
+    var voice = ttsVoice
+    if (!Protocol.ttsVoiceAvailable(catalog, model, voice)) voice = Protocol.ttsDefaultVoice(catalog, model)
+    ttsSpeakId = "qml-tts-" + Date.now() + "-" + Math.floor(Math.random() * 100000)
+    ttsSpeaking = true
+    sendCommand(Protocol.ttsSpeakCommand(ttsSpeakId, ttsProvider, model, voice, spoken.slice(0, 8000)))
+    return true
+  }
+  function stopSpeaking() {
+    if (!ttsSpeaking && ttsSpeakId === "") return
+    sendCommand(Protocol.ttsStopCommand())
+    ttsSpeaking = false
+    ttsSpeakId = ""
   }
 
   function requestCustomProviders() { sendCommand(Protocol.command("custom_provider_list")) }
@@ -536,6 +584,7 @@ Scope {
 
   function continueInHerdr() {
     if (!currentChatId) return
+    pendingHerdrChatId = currentChatId
     state = "preparing"
     statusMessage = "Opening in Herdr…"
     sendCommand(Protocol.command("continue_in_herdr", { chatId: currentChatId }))
@@ -655,6 +704,24 @@ Scope {
       ttsTestPending = false
       ttsTest = null
       ttsTestError = String(event.message || "The API key could not be verified")
+      return
+    }
+    if (type === "tts_speaking") {
+      if (event.id && ttsSpeakId !== "" && String(event.id) !== ttsSpeakId) return
+      ttsSpeaking = true
+      return
+    }
+    if (type === "tts_spoken") {
+      if (event.id && ttsSpeakId !== "" && String(event.id) !== ttsSpeakId) return
+      ttsSpeaking = false
+      ttsSpeakId = ""
+      return
+    }
+    if (type === "tts_speak_failed") {
+      if (event.id && ttsSpeakId !== "" && String(event.id) !== ttsSpeakId) return
+      ttsSpeaking = false
+      ttsSpeakId = ""
+      toastRequested(String(event.message || "Could not speak that answer"))
       return
     }
     if (type === "custom_providers") {
@@ -906,8 +973,10 @@ Scope {
       return
     }
     if (type === "herdr") {
+      if (pendingHerdrChatId === "" || String(event.chatId || "") !== pendingHerdrChatId) return
       var outcome = Protocol.herdrOutcome(event)
       if (!outcome) { console.warn("quickchat: unknown Herdr state " + String(event.state || "")); return }
+      if (String(event.state || "") !== "opening") pendingHerdrChatId = ""
       state = outcome.state
       statusMessage = outcome.message
       if (outcome.state === "error") errorDetails = Protocol.normalizedError({
@@ -936,6 +1005,7 @@ Scope {
     function hide() { root.routeIpc("hide") }
     function toggle() { root.routeIpc("toggle") }
     function newChat() { root.routeIpc("newChat") }
+    function continueInHerdr() { root.continueInHerdr() }
     function history() { root.routeIpc("history") }
     function settings() { root.routeIpc("settings") }
   }

@@ -101,6 +101,10 @@ Item {
   Connections {
     target: OmaPilot.QuickchatStore
     function onStateChanged() { root.storeState = OmaPilot.QuickchatStore.state }
+    function onTtsSpeakingChanged() {
+      if (!root.voiceEngaged || root.storeState !== "complete") return
+      if (!OmaPilot.QuickchatStore.ttsSpeaking) root.answerSpoken = true
+    }
   }
 
   // True from the moment a voice turn is armed until its answer is dismissed.
@@ -134,17 +138,29 @@ Item {
   // ---------------------------------------------------------- voice control
   // Set while a talk gesture is waiting for a preempted turn to unwind.
   property bool voiceStartPending: false
+  // Whether that pending gesture must drop the saved continuation before it
+  // starts recording. A fresh-chat hotkey can arrive while a turn or dictation
+  // is still unwinding, so the reset has to wait for the broker to settle.
+  property bool freshVoiceStartPending: false
   // Why the node is lit in its error state, shown as the caption.
   property string voiceNotice: ""
+  // True after this voice turn's answer has been spoken, so the curtain can
+  // linger briefly instead of waiting out a reading-time guess.
+  property bool answerSpoken: false
 
-  function voiceStart() {
-    // Holding the talk key is an unambiguous "I am speaking now". The first
-    // version bailed out whenever the store was busy and still answered "ok" to
-    // IPC, so a held key during an in-flight turn did nothing at all, with no
-    // feedback — indistinguishable from the feature being broken.
-    if (OmaPilot.QuickchatStore.state === "dictating") return "already listening"
+  function beginVoiceChat(freshChat) {
+    // A voice hotkey must always produce visible feedback. The first version
+    // bailed out whenever the store was busy and still answered "ok" to IPC, so
+    // a gesture during an in-flight turn looked indistinguishable from a broken
+    // binding.
+    var freshChatReset = false
 
+    if (!freshChat && OmaPilot.QuickchatStore.state === "dictating")
+      return "already listening"
+
+    OmaPilot.QuickchatStore.stopSpeaking()
     voiceNotice = ""
+    answerSpoken = false
     voiceEngaged = true
 
     if (!OmaPilot.QuickchatStore.voiceEnabled) {
@@ -161,11 +177,27 @@ Item {
       return "not ready"
     }
 
-    if (!OmaPilot.QuickchatStore.providerReady || OmaPilot.QuickchatStore.continuationBlocked) {
+    // A fresh chat deliberately clears a saved conversation's continuation
+    // block, but it still needs the currently selected harness to be ready.
+    if (!OmaPilot.QuickchatStore.providerReady
+        || (!freshChat && OmaPilot.QuickchatStore.continuationBlocked)) {
       voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
         ? OmaPilot.QuickchatStore.statusMessage
         : "Choose an available harness in OmaPilot Settings"
       return "not ready"
+    }
+
+    if (!freshChat && OmaPilot.QuickchatStore.pendingHerdrChatId !== "") {
+      voiceNotice = "Continue in Herdr is still opening"
+      return "busy"
+    }
+
+    // A fresh voice gesture supersedes presentation of an in-flight Herdr
+    // handoff. The external handoff may still finish, but its tagged outcome is
+    // ignored once newChat clears pendingHerdrChatId.
+    if (freshChat && OmaPilot.QuickchatStore.pendingHerdrChatId !== "") {
+      OmaPilot.QuickchatStore.newChat()
+      freshChatReset = true
     }
 
     OmaPilot.QuickchatStore.latchDesktopContext()
@@ -175,9 +207,12 @@ Item {
       // clears busy asynchronously, so arm the start and let the state change
       // below run it once the previous turn has unwound.
       voiceStartPending = true
+      freshVoiceStartPending = freshChat
       OmaPilot.QuickchatStore.cancel()
       return "preempting"
     }
+
+    if (freshChat && !freshChatReset) OmaPilot.QuickchatStore.newChat()
 
     if (!OmaPilot.QuickchatStore.startDictation()) {
       voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
@@ -186,6 +221,10 @@ Item {
     }
     return "listening"
   }
+
+  function voiceStart() { return beginVoiceChat(false) }
+
+  function newVoiceChat() { return beginVoiceChat(true) }
 
   function voiceStop() {
     if (OmaPilot.QuickchatStore.state !== "dictating") return
@@ -213,7 +252,10 @@ Item {
 
   function dismiss() {
     voiceStartPending = false
+    freshVoiceStartPending = false
     voiceNotice = ""
+    answerSpoken = false
+    OmaPilot.QuickchatStore.stopSpeaking()
     // Releasing the surfaces must also release the microphone. Dismissing while
     // dictation is still live would leave a hot mic with no indicator on screen,
     // which is the one failure mode an invisible ambient layer must never have.
@@ -228,14 +270,28 @@ Item {
   // making them confirm it in a text box would defeat the gesture.
   onStoreStateChanged: {
     if (voiceStartPending && !OmaPilot.QuickchatStore.busy) {
+      var freshChat = freshVoiceStartPending
       voiceStartPending = false
-      if (voiceEngaged && !OmaPilot.QuickchatStore.startDictation()) {
-        voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
-          ? OmaPilot.QuickchatStore.statusMessage : "Voice input is not available right now"
-      }
+      freshVoiceStartPending = false
+      // Finish applying the cancellation event before resetting presentation
+      // state or sending the next command. Otherwise the old event can overwrite
+      // the fresh chat's status after this handler returns.
+      Qt.callLater(function() {
+        if (!root.voiceEngaged) return
+        if (freshChat) OmaPilot.QuickchatStore.newChat()
+        if (!OmaPilot.QuickchatStore.startDictation()) {
+          root.voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
+            ? OmaPilot.QuickchatStore.statusMessage : "Voice input is not available right now"
+        }
+      })
       return
     }
     if (!voiceEngaged) return
+    if (storeState === "complete") {
+      var answer = String(OmaPilot.QuickchatStore.answerMarkdown || "").trim()
+      if (answer !== "") OmaPilot.QuickchatStore.speakAnswer(answer)
+      return
+    }
     if (storeState !== "composing") return
     var spoken = String(OmaPilot.QuickchatStore.transcript || "").trim()
     if (spoken === "") { dismiss(); return }
@@ -251,6 +307,7 @@ Item {
   // floor, clamped so a one-liner still lingers and an essay cannot camp on the
   // desktop.
   readonly property int dismissDelay: {
+    if (root.answerSpoken) return 2000
     var words = String(OmaPilot.QuickchatStore.answerMarkdown || "")
       .split(/\s+/).filter(function(w) { return w !== "" }).length
     return Math.max(6000, Math.min(40000, 4500 + words * 240))
@@ -273,15 +330,15 @@ Item {
     // Only armed once the answer has settled, so streaming never races it.
     // Errors stay until dismissed: a failure the user missed is worse than a
     // surface that lingers.
-    running: root.phase === "answering"
+    running: root.phase === "answering" && !OmaPilot.QuickchatStore.ttsSpeaking
     onTriggered: root.dismiss()
   }
 
   // ------------------------------------------------------------------- IPC
   // The voice gesture cannot be a surface keybinding, because the ambient
   // surfaces never take keyboard focus by design. It has to arrive over IPC from
-  // a compositor binding. Hyprland 0.56's `hl.bind` supports `long_press` and
-  // `release`, so one key carries hold-to-talk and tap-for-panel.
+  // a compositor binding. Keep current-chat and fresh-chat gestures as separate
+  // methods so their continuation behavior is explicit at that boundary.
   IpcHandler {
     target: "io.github.spencerbull.omapilot"
     function voiceStart(): string {
@@ -291,6 +348,10 @@ Item {
     function voiceStop(): string { root.voiceStop(); return "ok" }
     function voiceToggle(): string {
       var result = root.voiceToggle()
+      return result ? String(result) : "ok"
+    }
+    function newVoiceChat(): string {
+      var result = root.newVoiceChat()
       return result ? String(result) : "ok"
     }
     function voiceCancel(): string { root.voiceCancel(); return "ok" }

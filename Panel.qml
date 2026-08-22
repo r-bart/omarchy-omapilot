@@ -730,6 +730,7 @@ Panel {
 
               Button {
                 text: "New chat"
+                tooltipText: "New chat \u00b7 Super+Alt+N"
                 foreground: Qt.darker(root.foreground, 1.4)
                 background: root.surface
                 bordered: false
@@ -739,7 +740,7 @@ Panel {
 
               Button {
                 text: "Continue in Herdr"
-                tooltipText: "Continue in Herdr with the native harness permissions"
+                tooltipText: "Continue with native harness permissions \u00b7 Super+Alt+H"
                 visible: Quickchat.QuickchatStore.currentChatId !== ""
                 foreground: Qt.darker(root.foreground, 1.4)
                 background: root.surface

@@ -440,6 +440,39 @@ describe("voice provider status", () => {
     await broker.handle({ type: "tts_key_test", provider: "openai", apiKey: "sk-openai-test-key" });
     expect(events.some((event) => event.type === "tts_tested" && event.provider === "openai" && event.result.available)).toBe(true);
   });
+
+  it("speaks a stored ElevenLabs answer without leaking the key", async () => {
+    const root = await mkdtemp(join(tmpdir(), "quickchat-voice-speak-")); roots.push(root);
+    const config = join(root, ".config/omapilot");
+    const events: BrokerEvent[] = [];
+    const fetcher: typeof fetch = (input, init) => {
+      if (String(init?.method ?? "GET").toUpperCase() === "POST") {
+        return Promise.resolve(new Response(Buffer.from("ID3fake-mp3"), { status: 200 }));
+      }
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes("/v1/models")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      return Promise.resolve(new Response(JSON.stringify({ voices: [] }), { status: 200 }));
+    };
+    const voice = new VoiceService(
+      { HOME: root, OMAPILOT_CONFIG_DIR: config },
+      {
+        dictationAvailable: () => Promise.resolve(true),
+        kokoroAvailable: () => Promise.resolve(false),
+        fetch: fetcher,
+        playAudio: () => Promise.resolve()
+      }
+    );
+    const broker = new QuickchatBroker(events.push.bind(events), { voice, env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config } });
+    await voice.setKey("elevenlabs", "eleven-test-key");
+    await broker.handle({ type: "tts_speak", id: "speak-1", provider: "elevenlabs", text: "Hello **world**" });
+    const deadline = Date.now() + 2_000;
+    while (Date.now() < deadline && !events.some((event) => event.type === "tts_spoken" && event.id === "speak-1")) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(events.some((event) => event.type === "tts_speaking" && event.id === "speak-1")).toBe(true);
+    expect(events.some((event) => event.type === "tts_spoken" && event.id === "speak-1")).toBe(true);
+    expect(JSON.stringify(events)).not.toContain("eleven-test-key");
+  });
 });
 
 async function setup(): Promise<{

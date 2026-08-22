@@ -229,6 +229,23 @@ grep -Fq 'Protocol.command("voice_status")' "$repo_dir/components/QuickchatStore
 grep -Fq 'Protocol.ttsKeySetCommand(provider, apiKey)' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'onVoiceEnabledRequested:' "$repo_dir/Panel.qml"
 grep -Fq 'if (!OmaPilot.QuickchatStore.voiceEnabled)' "$repo_dir/Ambient.qml"
+grep -Fq 'function newVoiceChat(): string {' "$repo_dir/Ambient.qml"
+grep -Fq 'freshVoiceStartPending = freshChat' "$repo_dir/Ambient.qml"
+grep -Fq 'if (freshChat && !freshChatReset) OmaPilot.QuickchatStore.newChat()' \
+  "$repo_dir/Ambient.qml"
+grep -Fq 'function continueInHerdr() { root.continueInHerdr() }' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq '|| (pendingHerdrChatId === "" && currentId !== "" && busy)' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'if (root.newChatPending && !root.busy) root.resetChat()' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'pendingHerdrChatId = currentChatId' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'String(event.chatId || "") !== pendingHerdrChatId' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'SUPER + SHIFT + A' "$repo_dir/README.md"
+grep -Fq 'io.github.spencerbull.omapilot newVoiceChat' "$repo_dir/README.md"
+grep -Fq 'SUPER + ALT + N' "$repo_dir/README.md"
+grep -Fq 'io.github.spencerbull.quickchat continueInHerdr' "$repo_dir/README.md"
 if grep -Fq 'text: "Voice indicator"' "$repo_dir/components/SettingsView.qml"; then
   printf 'Voice settings must own listening and speaking, not only the Voxtype OSD\n' >&2
   exit 1
@@ -236,7 +253,14 @@ fi
 grep -Fq 'voice-auth.json' "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'id: "kokoro"' "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'elevenlabs: "ElevenLabs"' "$repo_dir/runtime/src/tts.ts"
-grep -Fq 'https://api.elevenlabs.io/v1/voices' "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'https://api.elevenlabs.io/v2/voices?page_size=100' "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'wyWA56cQNU2KqUW4eCsI' "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'wyWA56cQNU2KqUW4eCsI' "$repo_dir/components/Protocol.js"
+grep -Fq 'function ttsSpeakCommand' "$repo_dir/components/Protocol.js"
+grep -Fq 'function speakAnswer' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'OmaPilot.QuickchatStore.speakAnswer(answer)' "$repo_dir/Ambient.qml"
+grep -Fq 'https://api.elevenlabs.io/v1/text-to-speech/' "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'https://api.openai.com/v1/audio/speech' "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'https://api.openai.com/v1/models' "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'text: "Browser context"' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'onDesktopContextRequested:' "$repo_dir/Panel.qml"
