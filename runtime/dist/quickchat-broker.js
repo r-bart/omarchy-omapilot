@@ -296353,6 +296353,10 @@ var ELEVENLABS_MODELS = [
   { id: "eleven_flash_v2_5", name: "Flash v2.5" },
   { id: "eleven_v3", name: "Eleven v3" }
 ];
+var ELEVENLABS_DEFAULT_VOICE_ID = "wyWA56cQNU2KqUW4eCsI";
+var ELEVENLABS_DEFAULT_VOICE = { id: ELEVENLABS_DEFAULT_VOICE_ID, name: "Clyde" };
+var ELEVENLABS_VOICES = [ELEVENLABS_DEFAULT_VOICE];
+var ELEVENLABS_VOICES_URL = "https://api.elevenlabs.io/v2/voices?page_size=100";
 var MAX_AUTH_BYTES = 64 * 1024;
 var MAX_PROBE_BYTES = 256 * 1024;
 var PROBE_TIMEOUT_MS = 8e3;
@@ -296554,7 +296558,7 @@ var VoiceService = class {
       configured: key !== void 0,
       message: key === void 0 ? `Add an ${PROVIDER_NAMES[provider]} API key to enable this provider.` : `${PROVIDER_NAMES[provider]} is configured.`,
       models: provider === "openai" ? OPENAI_MODELS2 : ELEVENLABS_MODELS,
-      voices: provider === "openai" ? OPENAI_VOICES : []
+      voices: provider === "openai" ? OPENAI_VOICES : ELEVENLABS_VOICES
     };
     if (key === void 0) return base;
     try {
@@ -296565,7 +296569,7 @@ var VoiceService = class {
         configured: true,
         message: `${PROVIDER_NAMES[provider]} is ready.`,
         models: probed.models.length > 0 ? probed.models : base.models,
-        voices: probed.voices.length > 0 ? probed.voices : base.voices
+        voices: provider === "elevenlabs" ? withElevenLabsDefaultVoice(probed.voices) : probed.voices.length > 0 ? probed.voices : base.voices
       };
     } catch (error48) {
       return {
@@ -296610,13 +296614,14 @@ async function probeOpenAi(apiKey, fetcher) {
   return { models: OPENAI_MODELS2, voices: OPENAI_VOICES };
 }
 async function probeElevenLabs(apiKey, fetcher) {
-  const [models, voices] = await Promise.all([
+  const [modelsResult, voicesResult] = await Promise.allSettled([
     elevenLabsJson("https://api.elevenlabs.io/v1/models", apiKey, fetcher),
-    elevenLabsJson("https://api.elevenlabs.io/v1/voices", apiKey, fetcher)
+    elevenLabsJson(ELEVENLABS_VOICES_URL, apiKey, fetcher)
   ]);
+  if (voicesResult.status === "rejected") throw voicesResult.reason;
   return {
-    models: parseElevenLabsModels(models),
-    voices: parseElevenLabsVoices(voices)
+    models: modelsResult.status === "fulfilled" ? parseElevenLabsModels(modelsResult.value) : [],
+    voices: withElevenLabsDefaultVoice(parseElevenLabsVoices(voicesResult.value))
   };
 }
 async function elevenLabsJson(url2, apiKey, fetcher) {
@@ -296670,6 +296675,14 @@ function parseElevenLabsVoices(payload) {
     if (voices.length >= MAX_VOICES) break;
   }
   return voices;
+}
+function withElevenLabsDefaultVoice(voices) {
+  const preferred = voices.find((voice) => voice.id === ELEVENLABS_DEFAULT_VOICE_ID);
+  const rest = voices.filter((voice) => voice.id !== ELEVENLABS_DEFAULT_VOICE_ID);
+  return [
+    { id: ELEVENLABS_DEFAULT_VOICE_ID, name: preferred?.name ?? ELEVENLABS_DEFAULT_VOICE.name },
+    ...rest
+  ].slice(0, MAX_VOICES);
 }
 
 // runtime/src/custom-providers.ts

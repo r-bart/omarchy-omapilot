@@ -399,6 +399,19 @@ TestCase {
     compare(save.apiKey, "sk-test")
     compare(Protocol.ttsKeyClearCommand("elevenlabs").type, "tts_key_clear")
     compare(Protocol.ttsKeyTestCommand("openai", " sk-test ").apiKey, "sk-test")
+    compare(Protocol.elevenLabsDefaultVoiceId(), "wyWA56cQNU2KqUW4eCsI")
+    var elevenlabs = Protocol.ttsProviderStatus({
+      tts: [{
+        id: "elevenlabs",
+        voices: [
+          { id: "voice-one", name: "Rachel" },
+          { id: "wyWA56cQNU2KqUW4eCsI", name: "Clyde" }
+        ]
+      }]
+    }, "elevenlabs")
+    compare(Protocol.ttsDefaultVoice(elevenlabs, "eleven_multilingual_v2"), "wyWA56cQNU2KqUW4eCsI")
+    compare(Protocol.ttsDefaultVoice({ id: "elevenlabs", voices: [] }, ""), "wyWA56cQNU2KqUW4eCsI")
+    compare(Protocol.emptyVoiceStatus().tts[1].voices[0].id, "wyWA56cQNU2KqUW4eCsI")
   }
 
   function test_customProviderProbeAndSaveKeepDiscoveredModelMetadata() {

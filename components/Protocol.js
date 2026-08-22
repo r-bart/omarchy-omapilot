@@ -525,12 +525,17 @@ function ttsProviderOptions() {
   ]
 }
 
+function elevenLabsDefaultVoiceId() {
+  return "wyWA56cQNU2KqUW4eCsI"
+}
+
 function emptyVoiceStatus() {
   return {
     dictation: { available: false, message: "" },
     tts: [
       { id: "kokoro", name: "Kokoro", kind: "local", available: false, configured: false, message: "", models: [], voices: [] },
-      { id: "elevenlabs", name: "ElevenLabs", kind: "cloud", available: false, configured: false, message: "", models: [], voices: [] },
+      { id: "elevenlabs", name: "ElevenLabs", kind: "cloud", available: false, configured: false, message: "",
+        models: [], voices: [{ id: elevenLabsDefaultVoiceId(), name: "Clyde" }] },
       { id: "openai", name: "OpenAI", kind: "cloud", available: false, configured: false, message: "", models: [], voices: [] }
     ]
   }
@@ -640,6 +645,12 @@ function ttsDefaultModel(catalog) {
 
 function ttsDefaultVoice(catalog, model) {
   var options = ttsVoiceOptions(catalog, model)
+  if (catalog && catalog.id === "elevenlabs") {
+    var preferred = elevenLabsDefaultVoiceId()
+    for (var i = 0; i < options.length; i++)
+      if (options[i].value === preferred) return preferred
+    return preferred
+  }
   return options[0] && options[0].value ? options[0].value : ""
 }
 

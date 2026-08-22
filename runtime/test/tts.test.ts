@@ -2,7 +2,10 @@ import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { VoiceError, VoiceService } from "../src/tts.js";
+import { ELEVENLABS_DEFAULT_VOICE_ID, VoiceError, VoiceService } from "../src/tts.js";
+
+const elevenLabsKey = process.env.ELEVEN_LABS_API_KEY?.trim() ?? "";
+const liveElevenLabs = elevenLabsKey.length >= 8;
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
@@ -46,6 +49,7 @@ describe("voice TTS providers", () => {
     expect(kokoro).toMatchObject({ id: "kokoro", kind: "local", available: true, configured: true });
     expect(kokoro?.voices.some((voiceOption) => voiceOption.id === "af_heart")).toBe(true);
     expect(status.tts[1]).toMatchObject({ id: "elevenlabs", kind: "cloud", available: false, configured: false });
+    expect(status.tts[1]?.voices[0]).toEqual({ id: ELEVENLABS_DEFAULT_VOICE_ID, name: "Clyde" });
     await expect(stat(join(config, "voice-auth.json"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
@@ -54,7 +58,7 @@ describe("voice TTS providers", () => {
     const fetcher: typeof fetch = (input) => {
       const url = requestUrl(input);
       seen.set(url, null);
-      if (url.endsWith("/v1/models")) {
+      if (url.includes("/v1/models")) {
         return Promise.resolve(jsonResponse([
           { model_id: "eleven_multilingual_v2", name: "Multilingual v2", can_do_text_to_speech: true },
           { model_id: "secret-sts", name: "STS", can_do_text_to_speech: false }
@@ -69,12 +73,57 @@ describe("voice TTS providers", () => {
     const elevenlabs = status.tts.find((provider) => provider.id === "elevenlabs");
     expect(elevenlabs).toMatchObject({ available: true, configured: true });
     expect(elevenlabs?.models.map((model) => model.id)).toEqual(["eleven_multilingual_v2"]);
-    expect(elevenlabs?.voices).toEqual([{ id: "voice-one", name: "Rachel" }]);
+    expect(elevenlabs?.voices).toEqual([
+      { id: ELEVENLABS_DEFAULT_VOICE_ID, name: "Clyde" },
+      { id: "voice-one", name: "Rachel" }
+    ]);
     expect(JSON.stringify(status)).not.toContain("eleven-test-key");
     const raw = await readFile(join(config, "voice-auth.json"), "utf8");
     expect(JSON.parse(raw)).toEqual({ elevenlabs: { type: "api_key", key: "eleven-test-key" } });
     expect(raw).not.toContain("secret-sts");
     expect([...seen.keys()].every((url) => url.startsWith("https://api.elevenlabs.io/"))).toBe(true);
+    expect([...seen.keys()].some((url) => url.includes("/v2/voices"))).toBe(true);
+  });
+
+  it("accepts an ElevenLabs key that can list voices even when /v1/models is out of scope", async () => {
+    const fetcher: typeof fetch = (input) => {
+      const url = requestUrl(input);
+      if (url.includes("/v1/models")) return Promise.resolve(jsonResponse({ detail: { status: "unauthorized" } }, 401));
+      return Promise.resolve(jsonResponse({ voices: [{ voice_id: "voice-one", name: "Rachel" }] }));
+    };
+    const { voice } = await service({ fetch: fetcher });
+    const probed = await voice.testKey("elevenlabs", "eleven-test-key");
+    expect(probed).toMatchObject({ id: "elevenlabs", available: true, configured: true });
+    expect(probed.models.map((model) => model.id)).toEqual([
+      "eleven_multilingual_v2",
+      "eleven_turbo_v2_5",
+      "eleven_flash_v2_5",
+      "eleven_v3"
+    ]);
+    expect(probed.voices.map((voiceOption) => voiceOption.id)).toEqual([
+      ELEVENLABS_DEFAULT_VOICE_ID,
+      "voice-one"
+    ]);
+  });
+
+  it("keeps Clyde first when ElevenLabs returns it later in the catalog", async () => {
+    const fetcher: typeof fetch = (input) => {
+      const url = requestUrl(input);
+      if (url.includes("/v1/models")) return Promise.resolve(jsonResponse([]));
+      return Promise.resolve(jsonResponse({
+        voices: [
+          { voice_id: "voice-one", name: "Rachel" },
+          { voice_id: ELEVENLABS_DEFAULT_VOICE_ID, name: "Clyde" }
+        ]
+      }));
+    };
+    const { voice } = await service({ fetch: fetcher });
+    const probed = await voice.testKey("elevenlabs", "eleven-test-key");
+    expect(probed.voices.map((voiceOption) => voiceOption.id)).toEqual([
+      ELEVENLABS_DEFAULT_VOICE_ID,
+      "voice-one"
+    ]);
+    expect(probed.voices[0]).toEqual({ id: ELEVENLABS_DEFAULT_VOICE_ID, name: "Clyde" });
   });
 
   it("validates an OpenAI key against /v1/models and keeps the static TTS catalog", async () => {
@@ -114,4 +163,16 @@ describe("voice TTS providers", () => {
     const status = await voice.status();
     expect(status.tts.find((provider) => provider.id === "elevenlabs")?.configured).toBe(false);
   });
+
+  it.runIf(liveElevenLabs)("probes a real ElevenLabs key and keeps Clyde as the default voice", async () => {
+    const { voice } = await service();
+    const probed = await voice.testKey("elevenlabs", elevenLabsKey);
+    expect(probed.id).toBe("elevenlabs");
+    expect(probed.available, probed.message).toBe(true);
+    expect(probed.configured).toBe(true);
+    expect(probed.models.length).toBeGreaterThan(0);
+    expect(probed.voices[0]?.id).toBe(ELEVENLABS_DEFAULT_VOICE_ID);
+    expect(probed.voices.some((voiceOption) => voiceOption.id === ELEVENLABS_DEFAULT_VOICE_ID)).toBe(true);
+    expect(JSON.stringify(probed).includes(elevenLabsKey)).toBe(false);
+  }, 30_000);
 });

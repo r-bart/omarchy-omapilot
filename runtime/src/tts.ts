@@ -91,6 +91,10 @@ const ELEVENLABS_MODELS: TtsModelOption[] = [
   { id: "eleven_flash_v2_5", name: "Flash v2.5" },
   { id: "eleven_v3", name: "Eleven v3" }
 ];
+export const ELEVENLABS_DEFAULT_VOICE_ID = "wyWA56cQNU2KqUW4eCsI";
+export const ELEVENLABS_DEFAULT_VOICE: VoiceOption = { id: ELEVENLABS_DEFAULT_VOICE_ID, name: "Clyde" };
+const ELEVENLABS_VOICES: VoiceOption[] = [ELEVENLABS_DEFAULT_VOICE];
+const ELEVENLABS_VOICES_URL = "https://api.elevenlabs.io/v2/voices?page_size=100";
 
 const MAX_AUTH_BYTES = 64 * 1024;
 const MAX_PROBE_BYTES = 256 * 1024;
@@ -328,7 +332,7 @@ export class VoiceService {
         ? `Add an ${PROVIDER_NAMES[provider]} API key to enable this provider.`
         : `${PROVIDER_NAMES[provider]} is configured.`,
       models: provider === "openai" ? OPENAI_MODELS : ELEVENLABS_MODELS,
-      voices: provider === "openai" ? OPENAI_VOICES : []
+      voices: provider === "openai" ? OPENAI_VOICES : ELEVENLABS_VOICES
     };
     if (key === undefined) return base;
     try {
@@ -341,7 +345,9 @@ export class VoiceService {
         configured: true,
         message: `${PROVIDER_NAMES[provider]} is ready.`,
         models: probed.models.length > 0 ? probed.models : base.models,
-        voices: probed.voices.length > 0 ? probed.voices : base.voices
+        voices: provider === "elevenlabs"
+          ? withElevenLabsDefaultVoice(probed.voices)
+          : (probed.voices.length > 0 ? probed.voices : base.voices)
       };
     } catch (error) {
       return {
@@ -391,13 +397,14 @@ async function probeOpenAi(apiKey: string, fetcher: typeof fetch): Promise<{ mod
 }
 
 async function probeElevenLabs(apiKey: string, fetcher: typeof fetch): Promise<{ models: TtsModelOption[]; voices: VoiceOption[] }> {
-  const [models, voices] = await Promise.all([
+  const [modelsResult, voicesResult] = await Promise.allSettled([
     elevenLabsJson("https://api.elevenlabs.io/v1/models", apiKey, fetcher),
-    elevenLabsJson("https://api.elevenlabs.io/v1/voices", apiKey, fetcher)
+    elevenLabsJson(ELEVENLABS_VOICES_URL, apiKey, fetcher)
   ]);
+  if (voicesResult.status === "rejected") throw voicesResult.reason;
   return {
-    models: parseElevenLabsModels(models),
-    voices: parseElevenLabsVoices(voices)
+    models: modelsResult.status === "fulfilled" ? parseElevenLabsModels(modelsResult.value) : [],
+    voices: withElevenLabsDefaultVoice(parseElevenLabsVoices(voicesResult.value))
   };
 }
 
@@ -454,4 +461,13 @@ function parseElevenLabsVoices(payload: unknown): VoiceOption[] {
     if (voices.length >= MAX_VOICES) break;
   }
   return voices;
+}
+
+function withElevenLabsDefaultVoice(voices: VoiceOption[]): VoiceOption[] {
+  const preferred = voices.find((voice) => voice.id === ELEVENLABS_DEFAULT_VOICE_ID);
+  const rest = voices.filter((voice) => voice.id !== ELEVENLABS_DEFAULT_VOICE_ID);
+  return [
+    { id: ELEVENLABS_DEFAULT_VOICE_ID, name: preferred?.name ?? ELEVENLABS_DEFAULT_VOICE.name },
+    ...rest
+  ].slice(0, MAX_VOICES);
 }
