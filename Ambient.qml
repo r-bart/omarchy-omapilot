@@ -101,6 +101,10 @@ Item {
   Connections {
     target: OmaPilot.QuickchatStore
     function onStateChanged() { root.storeState = OmaPilot.QuickchatStore.state }
+    function onTtsSpeakingChanged() {
+      if (!root.voiceEngaged || root.storeState !== "complete") return
+      if (!OmaPilot.QuickchatStore.ttsSpeaking) root.answerSpoken = true
+    }
   }
 
   // True from the moment a voice turn is armed until its answer is dismissed.
@@ -136,6 +140,9 @@ Item {
   property bool voiceStartPending: false
   // Why the node is lit in its error state, shown as the caption.
   property string voiceNotice: ""
+  // True after this voice turn's answer has been spoken, so the curtain can
+  // linger briefly instead of waiting out a reading-time guess.
+  property bool answerSpoken: false
 
   function voiceStart() {
     // Holding the talk key is an unambiguous "I am speaking now". The first
@@ -144,7 +151,9 @@ Item {
     // feedback — indistinguishable from the feature being broken.
     if (OmaPilot.QuickchatStore.state === "dictating") return "already listening"
 
+    OmaPilot.QuickchatStore.stopSpeaking()
     voiceNotice = ""
+    answerSpoken = false
     voiceEngaged = true
 
     if (!OmaPilot.QuickchatStore.voiceEnabled) {
@@ -214,6 +223,8 @@ Item {
   function dismiss() {
     voiceStartPending = false
     voiceNotice = ""
+    answerSpoken = false
+    OmaPilot.QuickchatStore.stopSpeaking()
     // Releasing the surfaces must also release the microphone. Dismissing while
     // dictation is still live would leave a hot mic with no indicator on screen,
     // which is the one failure mode an invisible ambient layer must never have.
@@ -236,6 +247,11 @@ Item {
       return
     }
     if (!voiceEngaged) return
+    if (storeState === "complete") {
+      var answer = String(OmaPilot.QuickchatStore.answerMarkdown || "").trim()
+      if (answer !== "") OmaPilot.QuickchatStore.speakAnswer(answer)
+      return
+    }
     if (storeState !== "composing") return
     var spoken = String(OmaPilot.QuickchatStore.transcript || "").trim()
     if (spoken === "") { dismiss(); return }
@@ -251,6 +267,7 @@ Item {
   // floor, clamped so a one-liner still lingers and an essay cannot camp on the
   // desktop.
   readonly property int dismissDelay: {
+    if (root.answerSpoken) return 2000
     var words = String(OmaPilot.QuickchatStore.answerMarkdown || "")
       .split(/\s+/).filter(function(w) { return w !== "" }).length
     return Math.max(6000, Math.min(40000, 4500 + words * 240))
@@ -273,7 +290,7 @@ Item {
     // Only armed once the answer has settled, so streaming never races it.
     // Errors stay until dismissed: a failure the user missed is worse than a
     // surface that lingers.
-    running: root.phase === "answering"
+    running: root.phase === "answering" && !OmaPilot.QuickchatStore.ttsSpeaking
     onTriggered: root.dismiss()
   }
 

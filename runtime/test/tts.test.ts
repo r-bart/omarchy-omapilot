@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { ELEVENLABS_DEFAULT_VOICE_ID, VoiceError, VoiceService } from "../src/tts.js";
+import { ELEVENLABS_DEFAULT_VOICE_ID, spokenText, VoiceError, VoiceService } from "../src/tts.js";
 
 const elevenLabsKey = process.env.ELEVEN_LABS_API_KEY?.trim() ?? "";
 const liveElevenLabs = elevenLabsKey.length >= 8;
@@ -14,6 +14,7 @@ async function service(options: {
   dictation?: boolean;
   kokoro?: boolean;
   fetch?: typeof fetch;
+  playAudio?: (path: string, signal: AbortSignal) => Promise<void>;
 } = {}): Promise<{ voice: VoiceService; config: string }> {
   const root = await mkdtemp(join(tmpdir(), "omapilot-voice-"));
   roots.push(root);
@@ -25,7 +26,8 @@ async function service(options: {
       {
         dictationAvailable: () => Promise.resolve(options.dictation === true),
         kokoroAvailable: () => Promise.resolve(options.kokoro === true),
-        ...(options.fetch !== undefined ? { fetch: options.fetch } : {})
+        ...(options.fetch !== undefined ? { fetch: options.fetch } : {}),
+        ...(options.playAudio !== undefined ? { playAudio: options.playAudio } : {})
       }
     )
   };
@@ -162,6 +164,46 @@ describe("voice TTS providers", () => {
     await expect(stat(join(config, "voice-auth.json"))).rejects.toMatchObject({ code: "ENOENT" });
     const status = await voice.status();
     expect(status.tts.find((provider) => provider.id === "elevenlabs")?.configured).toBe(false);
+  });
+
+  it("strips markdown before speaking", () => {
+    expect(spokenText("Hello **world** and a [link](https://example.com).")).toBe("Hello world and a link.");
+    expect(spokenText("# Title\n\n```js\nsecret()\n```\nDone.")).toBe("Title Done.");
+    expect(spokenText("   ")).toBe("");
+  });
+
+  it("speaks an ElevenLabs answer without returning the key", async () => {
+    let posted: { url: string; body: string } | undefined;
+    const played: string[] = [];
+    const fetcher: typeof fetch = (input, init) => {
+      const url = requestUrl(input);
+      if (String(init?.method ?? "GET").toUpperCase() === "POST") {
+        posted = { url, body: typeof init?.body === "string" ? init.body : "" };
+        return Promise.resolve(new Response(Buffer.from("ID3fake-mp3"), {
+          status: 200,
+          headers: { "content-type": "audio/mpeg" }
+        }));
+      }
+      if (url.includes("/v1/models")) return Promise.resolve(jsonResponse([]));
+      return Promise.resolve(jsonResponse({ voices: [] }));
+    };
+    const { voice } = await service({
+      fetch: fetcher,
+      playAudio: (path) => {
+        played.push(path);
+        return Promise.resolve();
+      }
+    });
+    await voice.setKey("elevenlabs", "eleven-test-key");
+    await voice.speak({ provider: "elevenlabs", text: "Hello **world**" });
+    expect(posted?.url).toContain(`/v1/text-to-speech/${ELEVENLABS_DEFAULT_VOICE_ID}`);
+    expect(JSON.parse(posted?.body ?? "{}")).toMatchObject({ text: "Hello world" });
+    expect(played).toHaveLength(1);
+  });
+
+  it("does not speak when no cloud key is stored", async () => {
+    const { voice } = await service({ playAudio: () => Promise.resolve() });
+    await expect(voice.speak({ provider: "elevenlabs", text: "Hello" })).rejects.toBeInstanceOf(VoiceError);
   });
 
   it.runIf(liveElevenLabs)("probes a real ElevenLabs key and keeps Clyde as the default voice", async () => {

@@ -31061,11 +31061,11 @@ async function executeShellWithCapture(env2, command, options) {
       }
       return err(result.error);
     }
-    const cancelled = options?.abortSignal?.aborted ?? false;
+    const cancelled2 = options?.abortSignal?.aborted ?? false;
     return ok({
       ...progress,
-      exitCode: cancelled ? void 0 : result.value.exitCode,
-      cancelled,
+      exitCode: cancelled2 ? void 0 : result.value.exitCode,
+      cancelled: cancelled2,
       truncated: progress.truncation.truncated
     });
   } catch (error48) {
@@ -63208,7 +63208,7 @@ var require_bignumber = __commonJS({
             return arr.reverse();
           }
           return function(str3, baseIn, baseOut, sign, callerIsToString) {
-            var alphabet, d2, e2, k2, r2, x4, xc, y2, i2 = str3.indexOf("."), dp = DECIMAL_PLACES, rm6 = ROUNDING_MODE;
+            var alphabet, d2, e2, k2, r2, x4, xc, y2, i2 = str3.indexOf("."), dp = DECIMAL_PLACES, rm7 = ROUNDING_MODE;
             if (i2 >= 0) {
               k2 = POW_PRECISION;
               POW_PRECISION = 0;
@@ -63234,7 +63234,7 @@ var require_bignumber = __commonJS({
               x4.c = xc;
               x4.e = e2;
               x4.s = sign;
-              x4 = div(x4, y2, dp, rm6, baseOut);
+              x4 = div(x4, y2, dp, rm7, baseOut);
               xc = x4.c;
               r2 = x4.r;
               e2 = x4.e;
@@ -63243,7 +63243,7 @@ var require_bignumber = __commonJS({
             i2 = xc[d2];
             k2 = baseOut / 2;
             r2 = r2 || d2 < 0 || xc[d2 + 1] != null;
-            r2 = rm6 < 4 ? (i2 != null || r2) && (rm6 == 0 || rm6 == (x4.s < 0 ? 3 : 2)) : i2 > k2 || i2 == k2 && (rm6 == 4 || r2 || rm6 == 6 && xc[d2 - 1] & 1 || rm6 == (x4.s < 0 ? 8 : 7));
+            r2 = rm7 < 4 ? (i2 != null || r2) && (rm7 == 0 || rm7 == (x4.s < 0 ? 3 : 2)) : i2 > k2 || i2 == k2 && (rm7 == 4 || r2 || rm7 == 6 && xc[d2 - 1] & 1 || rm7 == (x4.s < 0 ? 8 : 7));
             if (d2 < 1 || !xc[0]) {
               str3 = r2 ? toFixedPoint(alphabet.charAt(1), -dp, alphabet.charAt(0)) : alphabet.charAt(0);
             } else {
@@ -63301,7 +63301,7 @@ var require_bignumber = __commonJS({
             }
             for (; !a[0] && a.length > 1; a.splice(0, 1)) ;
           }
-          return function(x4, y2, dp, rm6, base) {
+          return function(x4, y2, dp, rm7, base) {
             var cmp, e2, i2, more, n7, prod, prodL, q3, qc, rem, remL, rem0, xi2, xL, yc0, yL, yz, s2 = x4.s == y2.s ? 1 : -1, xc = x4.c, yc = y2.c;
             if (!xc || !xc[0] || !yc || !yc[0]) {
               return new BigNumber2(
@@ -63398,7 +63398,7 @@ var require_bignumber = __commonJS({
             }
             if (base == BASE) {
               for (i2 = 1, s2 = qc[0]; s2 >= 10; s2 /= 10, i2++) ;
-              round(q3, dp + (q3.e = i2 + e2 * LOG_BASE - 1) + 1, rm6, more);
+              round(q3, dp + (q3.e = i2 + e2 * LOG_BASE - 1) + 1, rm7, more);
             } else {
               q3.e = e2;
               q3.r = +more;
@@ -63406,10 +63406,10 @@ var require_bignumber = __commonJS({
             return q3;
           };
         })();
-        function format(n7, i2, rm6, id) {
+        function format(n7, i2, rm7, id) {
           var c0, e2, ne2, len, str3;
-          if (rm6 == null) rm6 = ROUNDING_MODE;
-          else intCheck(rm6, 0, 8);
+          if (rm7 == null) rm7 = ROUNDING_MODE;
+          else intCheck(rm7, 0, 8);
           if (!n7.c) return n7.toString();
           c0 = n7.c[0];
           ne2 = n7.e;
@@ -63417,7 +63417,7 @@ var require_bignumber = __commonJS({
             str3 = coeffToString(n7.c);
             str3 = id == 1 || id == 2 && (ne2 <= TO_EXP_NEG || ne2 >= TO_EXP_POS) ? toExponential(str3, ne2) : toFixedPoint(str3, ne2, "0");
           } else {
-            n7 = round(new BigNumber2(n7), i2, rm6);
+            n7 = round(new BigNumber2(n7), i2, rm7);
             e2 = n7.e;
             str3 = coeffToString(n7.c);
             len = str3.length;
@@ -63490,7 +63490,7 @@ var require_bignumber = __commonJS({
             x4.c = x4.e = null;
           };
         })();
-        function round(x4, sd, rm6, r2) {
+        function round(x4, sd, rm7, r2) {
           var d2, i2, j3, k2, n7, ni2, rd, xc = x4.c, pows10 = POWS_TEN;
           if (xc) {
             out: {
@@ -63525,8 +63525,8 @@ var require_bignumber = __commonJS({
               // The expression  n % pows10[d - j - 1]  returns all digits of n to the right
               // of the digit at j, e.g. if n is 908714 and j is 2, the expression gives 714.
               xc[ni2 + 1] != null || (j3 < 0 ? n7 : n7 % pows10[d2 - j3 - 1]);
-              r2 = rm6 < 4 ? (rd || r2) && (rm6 == 0 || rm6 == (x4.s < 0 ? 3 : 2)) : rd > 5 || rd == 5 && (rm6 == 4 || r2 || rm6 == 6 && // Check whether the digit to the left of the rounding digit is odd.
-              (i2 > 0 ? j3 > 0 ? n7 / pows10[d2 - j3] : 0 : xc[ni2 - 1]) % 10 & 1 || rm6 == (x4.s < 0 ? 8 : 7));
+              r2 = rm7 < 4 ? (rd || r2) && (rm7 == 0 || rm7 == (x4.s < 0 ? 3 : 2)) : rd > 5 || rd == 5 && (rm7 == 4 || r2 || rm7 == 6 && // Check whether the digit to the left of the rounding digit is odd.
+              (i2 > 0 ? j3 > 0 ? n7 / pows10[d2 - j3] : 0 : xc[ni2 - 1]) % 10 & 1 || rm7 == (x4.s < 0 ? 8 : 7));
               if (sd < 1 || !xc[0]) {
                 xc.length = 0;
                 if (r2) {
@@ -63591,13 +63591,13 @@ var require_bignumber = __commonJS({
         P3.comparedTo = function(y2, b2) {
           return compare2(this, new BigNumber2(y2, b2));
         };
-        P3.decimalPlaces = P3.dp = function(dp, rm6) {
+        P3.decimalPlaces = P3.dp = function(dp, rm7) {
           var c, n7, v3, x4 = this;
           if (dp != null) {
             intCheck(dp, 0, MAX);
-            if (rm6 == null) rm6 = ROUNDING_MODE;
-            else intCheck(rm6, 0, 8);
-            return round(new BigNumber2(x4), dp + x4.e + 1, rm6);
+            if (rm7 == null) rm7 = ROUNDING_MODE;
+            else intCheck(rm7, 0, 8);
+            return round(new BigNumber2(x4), dp + x4.e + 1, rm7);
           }
           if (!(c = x4.c)) return null;
           n7 = ((v3 = c.length - 1) - bitFloor(this.e / LOG_BASE)) * LOG_BASE;
@@ -63680,11 +63680,11 @@ var require_bignumber = __commonJS({
           if (nIsNeg) y2 = ONE.div(y2);
           return m3 ? y2.mod(m3) : k2 ? round(y2, POW_PRECISION, ROUNDING_MODE, more) : y2;
         };
-        P3.integerValue = function(rm6) {
+        P3.integerValue = function(rm7) {
           var n7 = new BigNumber2(this);
-          if (rm6 == null) rm6 = ROUNDING_MODE;
-          else intCheck(rm6, 0, 8);
-          return round(n7, n7.e + 1, rm6);
+          if (rm7 == null) rm7 = ROUNDING_MODE;
+          else intCheck(rm7, 0, 8);
+          return round(n7, n7.e + 1, rm7);
         };
         P3.isEqualTo = P3.eq = function(y2, b2) {
           return compare2(this, new BigNumber2(y2, b2)) === 0;
@@ -63911,13 +63911,13 @@ var require_bignumber = __commonJS({
           }
           return normalise(y2, xc, ye3);
         };
-        P3.precision = P3.sd = function(sd, rm6) {
+        P3.precision = P3.sd = function(sd, rm7) {
           var c, n7, v3, x4 = this;
           if (sd != null && sd !== !!sd) {
             intCheck(sd, 1, MAX);
-            if (rm6 == null) rm6 = ROUNDING_MODE;
-            else intCheck(rm6, 0, 8);
-            return round(new BigNumber2(x4), sd, rm6);
+            if (rm7 == null) rm7 = ROUNDING_MODE;
+            else intCheck(rm7, 0, 8);
+            return round(new BigNumber2(x4), sd, rm7);
           }
           if (!(c = x4.c)) return null;
           v3 = c.length - 1;
@@ -63987,36 +63987,36 @@ var require_bignumber = __commonJS({
           }
           return round(r2, r2.e + DECIMAL_PLACES + 1, ROUNDING_MODE, m3);
         };
-        P3.toExponential = function(dp, rm6) {
+        P3.toExponential = function(dp, rm7) {
           if (dp != null) {
             intCheck(dp, 0, MAX);
             dp++;
           }
-          return format(this, dp, rm6, 1);
+          return format(this, dp, rm7, 1);
         };
-        P3.toFixed = function(dp, rm6) {
+        P3.toFixed = function(dp, rm7) {
           if (dp != null) {
             intCheck(dp, 0, MAX);
             dp = dp + this.e + 1;
           }
-          return format(this, dp, rm6);
+          return format(this, dp, rm7);
         };
-        P3.toFormat = function(dp, rm6, format2) {
+        P3.toFormat = function(dp, rm7, format2) {
           var str3, x4 = this;
           if (format2 == null) {
-            if (dp != null && rm6 && typeof rm6 == "object") {
-              format2 = rm6;
-              rm6 = null;
+            if (dp != null && rm7 && typeof rm7 == "object") {
+              format2 = rm7;
+              rm7 = null;
             } else if (dp && typeof dp == "object") {
               format2 = dp;
-              dp = rm6 = null;
+              dp = rm7 = null;
             } else {
               format2 = FORMAT;
             }
           } else if (typeof format2 != "object") {
             throw Error(bignumberError + "Argument not an object: " + format2);
           }
-          str3 = x4.toFixed(dp, rm6);
+          str3 = x4.toFixed(dp, rm7);
           if (x4.c) {
             var i2, arr = str3.split("."), g1 = +format2.groupSize, g2 = +format2.secondaryGroupSize, groupSeparator = format2.groupSeparator || "", intPart = arr[0], fractionPart = arr[1], isNeg = x4.s < 0, intDigits = isNeg ? intPart.slice(1) : intPart, len = intDigits.length;
             if (g2) {
@@ -64084,9 +64084,9 @@ var require_bignumber = __commonJS({
         P3.toNumber = function() {
           return +valueOf(this);
         };
-        P3.toPrecision = function(sd, rm6) {
+        P3.toPrecision = function(sd, rm7) {
           if (sd != null) intCheck(sd, 1, MAX);
-          return format(this, sd, rm6, 2);
+          return format(this, sd, rm7, 2);
         };
         P3.toString = function(b2) {
           var str3, n7 = this, s2 = n7.s, e2 = n7.e;
@@ -103001,7 +103001,7 @@ var require_cross_spawn = __commonJS({
     var cp = __require("child_process");
     var parse6 = require_parse2();
     var enoent = require_enoent();
-    function spawn17(command, args, options) {
+    function spawn18(command, args, options) {
       const parsed = parse6(command, args, options);
       const spawned = cp.spawn(parsed.command, parsed.args, parsed.options);
       enoent.hookChildProcess(spawned, parsed);
@@ -103013,8 +103013,8 @@ var require_cross_spawn = __commonJS({
       result.error = result.error || enoent.verifyENOENTSync(result.status, parsed);
       return result;
     }
-    module.exports = spawn17;
-    module.exports.spawn = spawn17;
+    module.exports = spawn18;
+    module.exports.spawn = spawn18;
     module.exports.sync = spawnSync8;
     module.exports._parse = parse6;
     module.exports._enoent = enoent;
@@ -156349,11 +156349,11 @@ async function executeBashWithOperations(command, cwd, operations, options) {
     if (tempFileStream) {
       tempFileStream.end();
     }
-    const cancelled = options?.signal?.aborted ?? false;
+    const cancelled2 = options?.signal?.aborted ?? false;
     return {
       output: truncationResult.truncated ? truncationResult.content : fullOutput,
-      exitCode: cancelled ? void 0 : result.exitCode ?? void 0,
-      cancelled,
+      exitCode: cancelled2 ? void 0 : result.exitCode ?? void 0,
+      cancelled: cancelled2,
       truncated: truncationResult.truncated,
       fullOutputPath: tempFilePath
     };
@@ -192623,8 +192623,8 @@ var require_graceful_fs = __commonJS({
         }
       }
       var fs$writeFile = fs12.writeFile;
-      fs12.writeFile = writeFile4;
-      function writeFile4(path16, data, options, cb) {
+      fs12.writeFile = writeFile5;
+      function writeFile5(path16, data, options, cb) {
         if (typeof options === "function")
           cb = options, options = null;
         return go$writeFile(path16, data, options, cb);
@@ -221749,7 +221749,7 @@ var require_snapshot_utils = __commonJS({
 var require_snapshot_recorder = __commonJS({
   "node_modules/@earendil-works/pi-coding-agent/node_modules/undici/lib/mock/snapshot-recorder.js"(exports, module) {
     "use strict";
-    var { writeFile: writeFile4, readFile: readFile9, mkdir: mkdir6 } = __require("node:fs/promises");
+    var { writeFile: writeFile5, readFile: readFile9, mkdir: mkdir6 } = __require("node:fs/promises");
     var { dirname: dirname29, resolve: resolve17 } = __require("node:path");
     var { setTimeout: setTimeout2, clearTimeout: clearTimeout2 } = __require("node:timers");
     var { InvalidArgumentError, UndiciError } = require_errors2();
@@ -222001,7 +222001,7 @@ var require_snapshot_recorder = __commonJS({
           hash: hash2,
           snapshot
         }));
-        await writeFile4(resolvedPath, JSON.stringify(data, null, 2), { flush: true });
+        await writeFile5(resolvedPath, JSON.stringify(data, null, 2), { flush: true });
       }
       /**
        * Clears all recorded snapshots
@@ -246083,9 +246083,9 @@ var init_bash_execution = __esm({
         }
         this.updateDisplay();
       }
-      setComplete(exitCode, cancelled, truncationResult, fullOutputPath) {
+      setComplete(exitCode, cancelled2, truncationResult, fullOutputPath) {
         this.exitCode = exitCode;
-        this.status = cancelled ? "cancelled" : exitCode !== 0 && exitCode !== void 0 && exitCode !== null ? "error" : "complete";
+        this.status = cancelled2 ? "cancelled" : exitCode !== 0 && exitCode !== void 0 && exitCode !== null ? "error" : "complete";
         this.truncationResult = truncationResult;
         this.fullOutputPath = fullOutputPath;
         this.loader.stop();
@@ -277507,7 +277507,7 @@ import { createInterface as createInterface6 } from "node:readline";
 
 // runtime/src/broker.ts
 import { randomUUID as randomUUID9 } from "node:crypto";
-import { spawn as spawn16 } from "node:child_process";
+import { spawn as spawn17 } from "node:child_process";
 
 // runtime/src/acp.ts
 import { spawn as spawn13 } from "node:child_process";
@@ -293973,7 +293973,7 @@ var LineBuffer = class {
 function ndJsonStream(output, input2) {
   const textEncoder = new TextEncoder();
   const textDecoder = new TextDecoder();
-  let cancelled = false;
+  let cancelled2 = false;
   let inputReader;
   const readable = new ReadableStream({
     async start(controller) {
@@ -293998,7 +293998,7 @@ function ndJsonStream(output, input2) {
       try {
         while (true) {
           const { value: value2, done } = await reader.read();
-          if (cancelled) {
+          if (cancelled2) {
             return;
           }
           if (done) {
@@ -294009,12 +294009,12 @@ function ndJsonStream(output, input2) {
           }
           for (const line of lines.push(value2)) {
             enqueueLine(line);
-            if (cancelled) {
+            if (cancelled2) {
               return;
             }
           }
         }
-        if (cancelled) {
+        if (cancelled2) {
           return;
         }
         const lastLine = lines.flush();
@@ -294022,7 +294022,7 @@ function ndJsonStream(output, input2) {
           enqueueLine(lastLine);
         }
       } catch (err2) {
-        if (cancelled) {
+        if (cancelled2) {
           return;
         }
         controller.error(err2);
@@ -294033,13 +294033,13 @@ function ndJsonStream(output, input2) {
         }
         reader.releaseLock();
       }
-      if (cancelled) {
+      if (cancelled2) {
         return;
       }
       controller.close();
     },
     cancel(reason) {
-      cancelled = true;
+      cancelled2 = true;
       return inputReader?.cancel(reason);
     }
   });
@@ -295668,12 +295668,12 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
   });
   let cancelSession;
   let activeText;
-  let cancelled = false;
+  let cancelled2 = false;
   let forbiddenToolAttempt = false;
   let unapprovedToolAttempt = false;
   child.stderr?.resume();
   const cancel = async () => {
-    cancelled = true;
+    cancelled2 = true;
     activeText?.discard();
     cancelPermissions?.();
     if (cancelSession !== void 0) await cancelSession().catch(() => void 0);
@@ -295782,7 +295782,7 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
               openCodeToolCalls,
               approvedOpenCodeToolCalls,
               rejectedOpenCodeToolCalls,
-              () => cancelled,
+              () => cancelled2,
               () => forbiddenToolAttempt,
               Math.min(openCodePermissionWaitMs, Math.max(0, turnDeadline - Date.now() - 50))
             )) {
@@ -295798,7 +295798,7 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
           }
           await promptPromise;
           if (forbiddenToolAttempt) throw forbiddenToolError();
-          if (cancelled) text4.discard();
+          if (cancelled2) text4.discard();
           else {
             if (unapprovedToolAttempt && answer.trim() === "") {
               const notCompleted = "The action was not completed because its tool request was not approved.";
@@ -295815,7 +295815,7 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
         }
         session.dispose();
       });
-      if (cancelled) throw new BrokerAcpError("cancelled", "Question was cancelled", false);
+      if (cancelled2) throw new BrokerAcpError("cancelled", "Question was cancelled", false);
       if (forbiddenToolAttempt) throw forbiddenToolError();
       return {
         answer,
@@ -295829,9 +295829,9 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
       if (error48 instanceof BrokerAcpError) throw error48;
       if (error48 instanceof ForbiddenToolMarkupError || forbiddenToolAttempt) throw forbiddenToolError();
       throw new BrokerAcpError(
-        cancelled ? "cancelled" : "agent_failed",
-        cancelled ? "Question was cancelled" : "The selected harness failed to answer",
-        !cancelled
+        cancelled2 ? "cancelled" : "agent_failed",
+        cancelled2 ? "Question was cancelled" : "The selected harness failed to answer",
+        !cancelled2
       );
     } finally {
       activeText?.discard();
@@ -296064,7 +296064,7 @@ function isMarkupPipe(value2) {
 function containsToolMarkup(value2) {
   return /<\/?(?:[|｜]{1,2}\s*DSML\s*[|｜]{1,2}\s*)?(?:tool[_ -]?calls?|function[_ -]?calls?|invoke|parameter)\b/iu.test(value2);
 }
-async function openCodeToolUpdateAllowed(update, calls, approvedCalls, rejectedCalls, cancelled, forbidden, permissionWaitMs) {
+async function openCodeToolUpdateAllowed(update, calls, approvedCalls, rejectedCalls, cancelled2, forbidden, permissionWaitMs) {
   if (update.sessionUpdate !== "tool_call" && update.sessionUpdate !== "tool_call_update") return true;
   const toolCallId = typeof update.toolCallId === "string" ? update.toolCallId : "";
   if (toolCallId === "") return false;
@@ -296078,10 +296078,10 @@ async function openCodeToolUpdateAllowed(update, calls, approvedCalls, rejectedC
   if (classification === void 0) return false;
   if (classification === "device") {
     const deadline = Date.now() + permissionWaitMs;
-    while (!approvedCalls.has(toolCallId) && !rejectedCalls.has(toolCallId) && !cancelled() && !forbidden() && Date.now() < deadline) {
+    while (!approvedCalls.has(toolCallId) && !rejectedCalls.has(toolCallId) && !cancelled2() && !forbidden() && Date.now() < deadline) {
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
     }
-    if (cancelled()) return true;
+    if (cancelled2()) return true;
     if (forbidden()) return false;
     if (rejectedCalls.has(toolCallId)) return update.status !== "completed";
     const approvedCommand = approvedCalls.get(toolCallId);
@@ -296268,10 +296268,14 @@ function dictationStartArgs(transcript) {
 }
 
 // runtime/src/tts.ts
+import { spawn as spawn14 } from "node:child_process";
 import { mkdirSync as mkdirSync14, readFileSync as readFileSync22, renameSync as renameSync5, statSync as statSync13, unlinkSync as unlinkSync4, writeFileSync as writeFileSync13 } from "node:fs";
+import { mkdtemp as mkdtemp3, rm as rm5, writeFile as writeFile4 } from "node:fs/promises";
+import { tmpdir as tmpdir7 } from "node:os";
 import { join as join46 } from "node:path";
 init_paths();
 init_process();
+var ttsProviderIds = ["kokoro", "elevenlabs", "openai"];
 var cloudTtsProviderIds = ["elevenlabs", "openai"];
 var VoiceError = class extends Error {
   code;
@@ -296359,12 +296363,20 @@ var ELEVENLABS_VOICES = [ELEVENLABS_DEFAULT_VOICE];
 var ELEVENLABS_VOICES_URL = "https://api.elevenlabs.io/v2/voices?page_size=100";
 var MAX_AUTH_BYTES = 64 * 1024;
 var MAX_PROBE_BYTES = 256 * 1024;
+var MAX_AUDIO_BYTES = 8 * 1024 * 1024;
+var MAX_SPOKEN_CHARS = 3500;
 var PROBE_TIMEOUT_MS = 8e3;
+var SPEECH_TIMEOUT_MS = 3e4;
+var PLAY_TIMEOUT_MS = 18e4;
 var KOKORO_TIMEOUT_MS = 3e3;
+var KOKORO_SPEAK_TIMEOUT_MS = 12e4;
 var OPTION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 var MAX_MODELS = 32;
 var MAX_VOICES = 100;
 var MAX_KEY_LENGTH = 512;
+function isTtsProviderId(value2) {
+  return ttsProviderIds.includes(value2);
+}
 function isCloudTtsProviderId(value2) {
   return cloudTtsProviderIds.includes(value2);
 }
@@ -296466,11 +296478,14 @@ var VoiceService = class {
   #fetch;
   #dictationAvailable;
   #kokoroAvailable;
+  #playAudio;
+  #playback;
   constructor(env2 = process.env, options = {}) {
     this.#env = env2;
     this.#fetch = options.fetch ?? fetch;
     this.#dictationAvailable = options.dictationAvailable ?? (() => new DictationService(quickchatPaths(env2), env2).available());
     this.#kokoroAvailable = options.kokoroAvailable ?? (() => probeKokoro(env2));
+    this.#playAudio = options.playAudio ?? ((path16, signal) => playAudioFile(path16, env2, signal));
   }
   async status() {
     const [dictation, kokoro, auth] = await Promise.all([
@@ -296513,6 +296528,42 @@ var VoiceService = class {
   }
   async testKey(provider, apiKey) {
     return this.#cloudStatus(provider, normalizeKey(apiKey));
+  }
+  stop() {
+    this.#playback?.abort();
+    this.#playback = void 0;
+  }
+  async speak(input2) {
+    this.stop();
+    const spoken = spokenText(input2.text);
+    if (spoken === "") throw new VoiceError("tts_empty", "There is nothing to speak");
+    const controller = new AbortController();
+    this.#playback = controller;
+    const root = await mkdtemp3(join46(tmpdir7(), "omapilot-tts-"));
+    try {
+      const audio = await this.#synthesize(input2.provider, input2.model, input2.voice, spoken, controller.signal);
+      const path16 = join46(root, audio.extension === "wav" ? "speech.wav" : "speech.mp3");
+      await writeFile4(path16, audio.bytes, { mode: 384 });
+      if (controller.signal.aborted) throw cancelled();
+      await this.#playAudio(path16, controller.signal);
+    } catch (error48) {
+      if (controller.signal.aborted) throw cancelled();
+      throw error48;
+    } finally {
+      if (this.#playback === controller) this.#playback = void 0;
+      await rm5(root, { recursive: true, force: true });
+    }
+  }
+  async #synthesize(provider, model, voice, text4, signal) {
+    if (provider === "kokoro") return synthesizeKokoro(voice, text4, this.#env, signal);
+    const key = storedKey(this.#auth(), provider);
+    if (key === void 0) {
+      throw new VoiceError("tts_not_configured", `Add an ${PROVIDER_NAMES[provider]} API key to speak answers.`);
+    }
+    if (provider === "openai") {
+      return synthesizeOpenAi(key, model, voice, text4, this.#fetch, signal);
+    }
+    return synthesizeElevenLabs(key, model, voice, text4, this.#fetch, signal);
   }
   #auth() {
     return readAuthFile(authPath(this.#env));
@@ -296683,6 +296734,215 @@ function withElevenLabsDefaultVoice(voices) {
     { id: ELEVENLABS_DEFAULT_VOICE_ID, name: preferred?.name ?? ELEVENLABS_DEFAULT_VOICE.name },
     ...rest
   ].slice(0, MAX_VOICES);
+}
+function spokenText(markdown, maxChars = MAX_SPOKEN_CHARS) {
+  let text4 = markdown.replaceAll("\r\n", "\n");
+  text4 = text4.replaceAll(/```[\s\S]*?```/g, " ");
+  text4 = text4.replaceAll(/~~~[\s\S]*?~~~/g, " ");
+  text4 = text4.replaceAll(/!\[[^\]]*]\([^)]*\)/g, " ");
+  text4 = text4.replaceAll(/\[([^\]]+)]\([^)]*\)/g, "$1");
+  text4 = text4.replaceAll(/<[^>]+>/g, " ");
+  text4 = text4.replaceAll(/^#{1,6}\s+/gm, "");
+  text4 = text4.replaceAll(/[*_~`>#]/g, "");
+  text4 = text4.replaceAll(/[\u0000-\u001f\u007f]/g, " ");
+  text4 = text4.replaceAll(/\s+/g, " ").trim();
+  if (text4.length <= maxChars) return text4;
+  const sliced = text4.slice(0, maxChars);
+  const boundary = sliced.lastIndexOf(" ");
+  const clipped = (boundary > maxChars * 0.6 ? sliced.slice(0, boundary) : sliced).trim();
+  return `${clipped}\u2026`;
+}
+function optionOrFallback(value2, fallback) {
+  const id = value2?.trim() ?? "";
+  return OPTION_ID.test(id) ? id : fallback;
+}
+function cancelled() {
+  return new VoiceError("tts_cancelled", "Speaking was cancelled");
+}
+function speechSignal(signal, timeoutMs) {
+  return AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]);
+}
+async function boundedAudio(response) {
+  const declared = Number(response.headers.get("content-length") ?? 0);
+  if (Number.isFinite(declared) && declared > MAX_AUDIO_BYTES) {
+    throw new VoiceError("tts_probe_failed", "The spoken audio is unexpectedly large");
+  }
+  if (response.body === null) throw new VoiceError("tts_probe_failed", "The provider returned an empty body");
+  const reader = response.body.getReader();
+  const chunks = [];
+  let size = 0;
+  while (true) {
+    const next = await reader.read();
+    if (next.done) break;
+    size += next.value.byteLength;
+    if (size > MAX_AUDIO_BYTES) {
+      await reader.cancel();
+      throw new VoiceError("tts_probe_failed", "The spoken audio is unexpectedly large");
+    }
+    chunks.push(next.value);
+  }
+  if (size === 0) throw new VoiceError("tts_probe_failed", "The provider returned empty audio");
+  return Buffer.concat(chunks, size);
+}
+async function synthesizeElevenLabs(apiKey, model, voice, text4, fetcher, signal) {
+  const voiceId = optionOrFallback(voice, ELEVENLABS_DEFAULT_VOICE_ID);
+  const modelId = optionOrFallback(model, ELEVENLABS_MODELS[0]?.id ?? "eleven_multilingual_v2");
+  let response;
+  try {
+    response = await fetcher(
+      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`,
+      {
+        method: "POST",
+        headers: {
+          accept: "audio/mpeg",
+          "content-type": "application/json",
+          "xi-api-key": apiKey
+        },
+        body: JSON.stringify({ text: text4, model_id: modelId }),
+        redirect: "error",
+        signal: speechSignal(signal, SPEECH_TIMEOUT_MS)
+      }
+    );
+  } catch (error48) {
+    if (signal.aborted) throw cancelled();
+    if (error48 instanceof VoiceError) throw error48;
+    throw new VoiceError("tts_probe_failed", "Could not reach ElevenLabs. Check the network and try again.");
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new VoiceError("tts_auth_failed", "ElevenLabs rejected the API key.");
+  }
+  if (!response.ok) {
+    throw new VoiceError("tts_probe_failed", `ElevenLabs returned HTTP ${response.status}.`);
+  }
+  return { bytes: await boundedAudio(response), extension: "mp3" };
+}
+async function synthesizeOpenAi(apiKey, model, voice, text4, fetcher, signal) {
+  const voiceId = optionOrFallback(voice, "alloy");
+  const modelId = optionOrFallback(model, OPENAI_MODELS2[0]?.id ?? "gpt-4o-mini-tts");
+  let response;
+  try {
+    response = await fetcher("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: {
+        accept: "audio/mpeg",
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: modelId,
+        voice: voiceId,
+        input: text4,
+        response_format: "mp3"
+      }),
+      redirect: "error",
+      signal: speechSignal(signal, SPEECH_TIMEOUT_MS)
+    });
+  } catch (error48) {
+    if (signal.aborted) throw cancelled();
+    if (error48 instanceof VoiceError) throw error48;
+    throw new VoiceError("tts_probe_failed", "Could not reach OpenAI. Check the network and try again.");
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new VoiceError("tts_auth_failed", "OpenAI rejected the API key.");
+  }
+  if (!response.ok) {
+    throw new VoiceError("tts_probe_failed", `OpenAI returned HTTP ${response.status}.`);
+  }
+  return { bytes: await boundedAudio(response), extension: "mp3" };
+}
+var KOKORO_SPEAK_SCRIPT = [
+  "import sys",
+  "from pathlib import Path",
+  "import numpy as np",
+  "import soundfile as sf",
+  "from kokoro import KPipeline",
+  "voice, wav_path, text_path = sys.argv[1], sys.argv[2], sys.argv[3]",
+  "text = Path(text_path).read_text(encoding='utf-8')",
+  "pipeline = KPipeline(lang_code='a')",
+  "chunks = [audio for _, _, audio in pipeline(text, voice=voice)]",
+  "audio = np.concatenate(chunks) if chunks else np.zeros(1, dtype=np.float32)",
+  "sf.write(wav_path, audio, 24000)"
+].join("\n");
+async function synthesizeKokoro(voice, text4, env2, signal) {
+  if (signal.aborted) throw cancelled();
+  const python = await resolveExecutable("python3", env2);
+  if (python === void 0) {
+    throw new VoiceError("tts_not_configured", "Kokoro is not installed.");
+  }
+  const root = await mkdtemp3(join46(tmpdir7(), "omapilot-kokoro-"));
+  const wavPath = join46(root, "speech.wav");
+  const textPath = join46(root, "speech.txt");
+  try {
+    await writeFile4(textPath, text4, { encoding: "utf8", mode: 384 });
+    const result = await runCommand(python, ["-c", KOKORO_SPEAK_SCRIPT, optionOrFallback(voice, "af_heart"), wavPath, textPath], {
+      env: env2,
+      timeoutMs: KOKORO_SPEAK_TIMEOUT_MS,
+      maxOutput: 16384
+    });
+    if (signal.aborted) throw cancelled();
+    if (result.code !== 0) {
+      throw new VoiceError("tts_probe_failed", "Kokoro could not speak that answer.");
+    }
+    const bytes = readFileSync22(wavPath);
+    if (bytes.byteLength === 0) throw new VoiceError("tts_probe_failed", "Kokoro returned empty audio");
+    return { bytes, extension: "wav" };
+  } finally {
+    await rm5(root, { recursive: true, force: true });
+  }
+}
+var PLAYERS = [
+  { name: "mpv", args: (path16) => ["--no-video", "--really-quiet", "--no-terminal", "--audio-display=no", path16] },
+  { name: "ffplay", args: (path16) => ["-nodisp", "-autoexit", "-loglevel", "quiet", path16] },
+  { name: "pw-play", args: (path16) => [path16] },
+  { name: "paplay", args: (path16) => [path16] }
+];
+async function playAudioFile(path16, env2, signal) {
+  if (signal.aborted) throw cancelled();
+  for (const player of PLAYERS) {
+    const executable2 = await resolveExecutable(player.name, env2);
+    if (executable2 === void 0) continue;
+    await runPlayer(executable2, player.args(path16), env2, signal);
+    return;
+  }
+  throw new VoiceError("tts_playback_failed", "No audio player is available. Install mpv or PipeWire.");
+}
+function runPlayer(executable2, args, env2, signal) {
+  return new Promise((resolve17, reject) => {
+    let settled = false;
+    const child = spawn14(executable2, args, {
+      env: env2,
+      stdio: "ignore",
+      detached: process.platform !== "win32"
+    });
+    const finish = (error48) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      clearTimeout(timer);
+      if (error48 !== void 0) reject(error48);
+      else resolve17();
+    };
+    const onAbort = () => {
+      terminateProcessGroup(child.pid);
+      finish(cancelled());
+    };
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+    const timer = setTimeout(() => {
+      terminateProcessGroup(child.pid);
+      finish(new VoiceError("tts_playback_failed", "Speaking took too long"));
+    }, PLAY_TIMEOUT_MS);
+    timer.unref();
+    child.once("error", () => finish(new VoiceError("tts_playback_failed", "Could not start the audio player")));
+    child.once("close", (code) => {
+      if (signal.aborted) finish(cancelled());
+      else if (code === 0) finish();
+      else finish(new VoiceError("tts_playback_failed", "The audio player failed"));
+    });
+  });
 }
 
 // runtime/src/custom-providers.ts
@@ -297614,7 +297874,7 @@ function isObject9(value2) {
 // runtime/src/herdr.ts
 init_paths();
 init_process();
-import { spawn as spawn14 } from "node:child_process";
+import { spawn as spawn15 } from "node:child_process";
 var HerdrHandoffError = class extends Error {
   stage;
   errorCode;
@@ -297772,7 +298032,7 @@ async function continueInHerdr(chat, env2 = process.env, dependencies = {}) {
 }
 async function launchDetached2(executable2, args, env2) {
   await new Promise((resolveLaunch, rejectLaunch) => {
-    const child = spawn14(executable2, args, { env: env2, stdio: "ignore", detached: true });
+    const child = spawn15(executable2, args, { env: env2, stdio: "ignore", detached: true });
     child.once("error", rejectLaunch);
     child.once("spawn", () => {
       child.unref();
@@ -298084,7 +298344,7 @@ init_providers();
 init_process();
 
 // runtime/src/browser-companion.ts
-import { chmod, mkdir as mkdir5, rm as rm5 } from "node:fs/promises";
+import { chmod, mkdir as mkdir5, rm as rm6 } from "node:fs/promises";
 import { createServer as createServer2 } from "node:net";
 import { dirname as dirname27, join as join50 } from "node:path";
 var text3 = (max) => external_exports.string().trim().min(1).max(max);
@@ -298240,11 +298500,11 @@ var BrowserCompanionServer = class {
     const server = this.#server;
     this.#server = void 0;
     if (server !== void 0) await new Promise((resolve17) => server.close(() => resolve17()));
-    await rm5(this.socketPath, { force: true });
+    await rm6(this.socketPath, { force: true });
   }
   async #listen() {
     await mkdir5(dirname27(this.socketPath), { recursive: true, mode: 448 });
-    await rm5(this.socketPath, { force: true });
+    await rm6(this.socketPath, { force: true });
     const server = createServer2((socket) => this.#accept(socket));
     this.#server = server;
     await new Promise((resolve17, reject) => {
@@ -298391,7 +298651,7 @@ function titleScore(candidate, target) {
 init_process();
 import { access as access6 } from "node:fs/promises";
 import { constants as constants9 } from "node:fs";
-import { spawn as spawn15 } from "node:child_process";
+import { spawn as spawn16 } from "node:child_process";
 import { dirname as dirname28, join as join51, resolve as resolve16 } from "node:path";
 import { fileURLToPath as fileURLToPath8 } from "node:url";
 function repositoryRoot() {
@@ -298454,7 +298714,7 @@ async function openBrowserCompanionSettings(family, env2) {
   if (executablePath === void 0) return false;
   const url2 = family === "firefox" ? "about:debugging#/runtime/this-firefox" : "chrome://extensions";
   return new Promise((resolveLaunch) => {
-    const child = spawn15(executablePath, [url2], { env: env2, stdio: "ignore", detached: true });
+    const child = spawn16(executablePath, [url2], { env: env2, stdio: "ignore", detached: true });
     child.once("error", () => resolveLaunch(false));
     child.once("spawn", () => {
       child.unref();
@@ -298486,6 +298746,7 @@ var QuickchatBroker = class {
   #browserCompanionSetupBusy = false;
   #browserCompanionSetupPhase;
   #browserCompanionStatusRevision = 0;
+  #ttsSpeakId;
   constructor(emit2, options = {}) {
     this.#emit = emit2;
     this.#history = options.history ?? new HistoryStore();
@@ -298602,6 +298863,12 @@ var QuickchatBroker = class {
       case "tts_key_test":
         await this.#ttsKeyTest(command.provider, command.apiKey);
         break;
+      case "tts_speak":
+        void this.#ttsSpeak(command);
+        break;
+      case "tts_stop":
+        this.#ttsStop();
+        break;
       case "dictation_start":
         await this.#dictationStart();
         break;
@@ -298624,6 +298891,7 @@ var QuickchatBroker = class {
         await this.#copy(command.text);
         break;
       case "shutdown": {
+        this.#ttsStop();
         this.#cancelAuth(this.#authFlow?.id);
         await Promise.all([...this.#runs.values()].map((run) => run.cancel()));
         await this.#browserCompanion.close();
@@ -299126,6 +299394,41 @@ var QuickchatBroker = class {
       });
     }
   }
+  async #ttsSpeak(command) {
+    if (!isTtsProviderId(command.provider)) return;
+    this.#voice.stop();
+    this.#ttsSpeakId = command.id;
+    this.#emit({ type: "tts_speaking", id: command.id });
+    try {
+      await this.#voice.speak({
+        provider: command.provider,
+        model: command.model,
+        voice: command.voice,
+        text: command.text
+      });
+      if (this.#ttsSpeakId !== command.id) return;
+      this.#ttsSpeakId = void 0;
+      this.#emit({ type: "tts_spoken", id: command.id });
+    } catch (error48) {
+      if (this.#ttsSpeakId !== command.id) return;
+      this.#ttsSpeakId = void 0;
+      if (error48 instanceof VoiceError && error48.code === "tts_cancelled") {
+        this.#emit({ type: "tts_spoken", id: command.id });
+        return;
+      }
+      this.#emit({
+        type: "tts_speak_failed",
+        id: command.id,
+        message: error48 instanceof VoiceError ? error48.message : "Could not speak that answer"
+      });
+    }
+  }
+  #ttsStop() {
+    const id = this.#ttsSpeakId;
+    this.#ttsSpeakId = void 0;
+    this.#voice.stop();
+    if (id !== void 0) this.#emit({ type: "tts_spoken", id });
+  }
   #emitCustomProviders() {
     this.#emit({ type: "custom_providers", providers: listCustomProviders(this.#env) });
   }
@@ -299319,7 +299622,7 @@ var QuickchatBroker = class {
       return;
     }
     const copied = await new Promise((resolveCopy) => {
-      const child = spawn16(copy, [], { env: this.#env, stdio: ["pipe", "ignore", "ignore"] });
+      const child = spawn17(copy, [], { env: this.#env, stdio: ["pipe", "ignore", "ignore"] });
       child.stdin.end(text4);
       child.once("error", () => resolveCopy(false));
       child.once("close", (code) => resolveCopy(code === 0));
@@ -299507,6 +299810,17 @@ var ttsKeyTestCommand = external_exports.object({
   provider: cloudTtsProviderSchema,
   apiKey: external_exports.string().min(1).max(512)
 }).strict();
+var ttsSpeakCommand = external_exports.object({
+  type: external_exports.literal("tts_speak"),
+  id: external_exports.string().min(1).max(128),
+  provider: external_exports.enum(["kokoro", "elevenlabs", "openai"]),
+  model: external_exports.string().min(1).max(128).optional(),
+  voice: external_exports.string().min(1).max(128).optional(),
+  text: external_exports.string().min(1).max(8e3)
+}).strict();
+var ttsStopCommand = external_exports.object({
+  type: external_exports.literal("tts_stop")
+}).strict();
 var commandSchema = external_exports.discriminatedUnion("type", [
   initializeCommand,
   submitCommand,
@@ -299532,6 +299846,8 @@ var commandSchema = external_exports.discriminatedUnion("type", [
   ttsKeySetCommand,
   ttsKeyClearCommand,
   ttsKeyTestCommand,
+  ttsSpeakCommand,
+  ttsStopCommand,
   external_exports.object({ type: external_exports.enum(["dictation_start", "dictation_stop", "dictation_cancel", "history_list", "history_clear", "custom_provider_list", "voxtype_osd_status", "voice_status", "shutdown"]) })
 ]);
 

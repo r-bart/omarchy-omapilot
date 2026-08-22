@@ -42,6 +42,8 @@ Scope {
   property var ttsTest: null
   property bool ttsTestPending: false
   property string ttsTestError: ""
+  property bool ttsSpeaking: false
+  property string ttsSpeakId: ""
   property bool voiceEnabled: false
   property string ttsProvider: "kokoro"
   property string ttsModel: ""
@@ -348,6 +350,7 @@ Scope {
   }
 
   function cancel() {
+    stopSpeaking()
     if (dictationPhase !== "") {
       sendCommand(Protocol.command("dictation_cancel"))
       return
@@ -453,6 +456,26 @@ Scope {
     ttsTestError = ""
     ttsTestPending = true
     sendCommand(Protocol.ttsKeyTestCommand(provider, apiKey))
+  }
+  function speakAnswer(text) {
+    var spoken = String(text || "").trim()
+    if (!voiceEnabled || spoken === "") return false
+    var catalog = Protocol.ttsProviderStatus(voiceStatus, ttsProvider)
+    if (!catalog || catalog.available !== true) return false
+    var model = ttsModel
+    if (!Protocol.ttsModelAvailable(catalog, model)) model = Protocol.ttsDefaultModel(catalog)
+    var voice = ttsVoice
+    if (!Protocol.ttsVoiceAvailable(catalog, model, voice)) voice = Protocol.ttsDefaultVoice(catalog, model)
+    ttsSpeakId = "qml-tts-" + Date.now() + "-" + Math.floor(Math.random() * 100000)
+    ttsSpeaking = true
+    sendCommand(Protocol.ttsSpeakCommand(ttsSpeakId, ttsProvider, model, voice, spoken.slice(0, 8000)))
+    return true
+  }
+  function stopSpeaking() {
+    if (!ttsSpeaking && ttsSpeakId === "") return
+    sendCommand(Protocol.ttsStopCommand())
+    ttsSpeaking = false
+    ttsSpeakId = ""
   }
 
   function requestCustomProviders() { sendCommand(Protocol.command("custom_provider_list")) }
@@ -655,6 +678,24 @@ Scope {
       ttsTestPending = false
       ttsTest = null
       ttsTestError = String(event.message || "The API key could not be verified")
+      return
+    }
+    if (type === "tts_speaking") {
+      if (event.id && ttsSpeakId !== "" && String(event.id) !== ttsSpeakId) return
+      ttsSpeaking = true
+      return
+    }
+    if (type === "tts_spoken") {
+      if (event.id && ttsSpeakId !== "" && String(event.id) !== ttsSpeakId) return
+      ttsSpeaking = false
+      ttsSpeakId = ""
+      return
+    }
+    if (type === "tts_speak_failed") {
+      if (event.id && ttsSpeakId !== "" && String(event.id) !== ttsSpeakId) return
+      ttsSpeaking = false
+      ttsSpeakId = ""
+      toastRequested(String(event.message || "Could not speak that answer"))
       return
     }
     if (type === "custom_providers") {

@@ -1,8 +1,11 @@
+import { spawn } from "node:child_process";
 import { mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DictationService } from "./dictation.js";
 import { quickchatPaths } from "./paths.js";
-import { resolveExecutable, runCommand } from "./process.js";
+import { resolveExecutable, runCommand, terminateProcessGroup } from "./process.js";
 
 export const ttsProviderIds = ["kokoro", "elevenlabs", "openai"] as const;
 export type TtsProviderId = (typeof ttsProviderIds)[number];
@@ -98,8 +101,13 @@ const ELEVENLABS_VOICES_URL = "https://api.elevenlabs.io/v2/voices?page_size=100
 
 const MAX_AUTH_BYTES = 64 * 1024;
 const MAX_PROBE_BYTES = 256 * 1024;
+const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
+const MAX_SPOKEN_CHARS = 3_500;
 const PROBE_TIMEOUT_MS = 8_000;
+const SPEECH_TIMEOUT_MS = 30_000;
+const PLAY_TIMEOUT_MS = 180_000;
 const KOKORO_TIMEOUT_MS = 3_000;
+const KOKORO_SPEAK_TIMEOUT_MS = 120_000;
 const OPTION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const MAX_MODELS = 32;
 const MAX_VOICES = 100;
@@ -221,6 +229,7 @@ export type VoiceServiceOptions = {
   fetch?: typeof fetch;
   dictationAvailable?: () => Promise<boolean>;
   kokoroAvailable?: () => Promise<boolean>;
+  playAudio?: (path: string, signal: AbortSignal) => Promise<void>;
 };
 
 export class VoiceService {
@@ -228,6 +237,8 @@ export class VoiceService {
   readonly #fetch: typeof fetch;
   readonly #dictationAvailable: () => Promise<boolean>;
   readonly #kokoroAvailable: () => Promise<boolean>;
+  readonly #playAudio: (path: string, signal: AbortSignal) => Promise<void>;
+  #playback: AbortController | undefined;
 
   constructor(env: NodeJS.ProcessEnv = process.env, options: VoiceServiceOptions = {}) {
     this.#env = env;
@@ -235,6 +246,7 @@ export class VoiceService {
     this.#dictationAvailable = options.dictationAvailable
       ?? (() => new DictationService(quickchatPaths(env), env).available());
     this.#kokoroAvailable = options.kokoroAvailable ?? (() => probeKokoro(env));
+    this.#playAudio = options.playAudio ?? ((path, signal) => playAudioFile(path, env, signal));
   }
 
   async status(): Promise<VoiceStatus> {
@@ -280,6 +292,56 @@ export class VoiceService {
 
   async testKey(provider: CloudTtsProviderId, apiKey: string): Promise<TtsProviderStatus> {
     return this.#cloudStatus(provider, normalizeKey(apiKey));
+  }
+
+  stop(): void {
+    this.#playback?.abort();
+    this.#playback = undefined;
+  }
+
+  async speak(input: {
+    provider: TtsProviderId;
+    model?: string | undefined;
+    voice?: string | undefined;
+    text: string;
+  }): Promise<void> {
+    this.stop();
+    const spoken = spokenText(input.text);
+    if (spoken === "") throw new VoiceError("tts_empty", "There is nothing to speak");
+    const controller = new AbortController();
+    this.#playback = controller;
+    const root = await mkdtemp(join(tmpdir(), "omapilot-tts-"));
+    try {
+      const audio = await this.#synthesize(input.provider, input.model, input.voice, spoken, controller.signal);
+      const path = join(root, audio.extension === "wav" ? "speech.wav" : "speech.mp3");
+      await writeFile(path, audio.bytes, { mode: 0o600 });
+      if (controller.signal.aborted) throw cancelled();
+      await this.#playAudio(path, controller.signal);
+    } catch (error) {
+      if (controller.signal.aborted) throw cancelled();
+      throw error;
+    } finally {
+      if (this.#playback === controller) this.#playback = undefined;
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+
+  async #synthesize(
+    provider: TtsProviderId,
+    model: string | undefined,
+    voice: string | undefined,
+    text: string,
+    signal: AbortSignal
+  ): Promise<{ bytes: Buffer; extension: "mp3" | "wav" }> {
+    if (provider === "kokoro") return synthesizeKokoro(voice, text, this.#env, signal);
+    const key = storedKey(this.#auth(), provider);
+    if (key === undefined) {
+      throw new VoiceError("tts_not_configured", `Add an ${PROVIDER_NAMES[provider]} API key to speak answers.`);
+    }
+    if (provider === "openai") {
+      return synthesizeOpenAi(key, model, voice, text, this.#fetch, signal);
+    }
+    return synthesizeElevenLabs(key, model, voice, text, this.#fetch, signal);
   }
 
   #auth(): AuthFile {
@@ -470,4 +532,249 @@ function withElevenLabsDefaultVoice(voices: VoiceOption[]): VoiceOption[] {
     { id: ELEVENLABS_DEFAULT_VOICE_ID, name: preferred?.name ?? ELEVENLABS_DEFAULT_VOICE.name },
     ...rest
   ].slice(0, MAX_VOICES);
+}
+
+export function spokenText(markdown: string, maxChars = MAX_SPOKEN_CHARS): string {
+  let text = markdown.replaceAll("\r\n", "\n");
+  text = text.replaceAll(/```[\s\S]*?```/g, " ");
+  text = text.replaceAll(/~~~[\s\S]*?~~~/g, " ");
+  text = text.replaceAll(/!\[[^\]]*]\([^)]*\)/g, " ");
+  text = text.replaceAll(/\[([^\]]+)]\([^)]*\)/g, "$1");
+  text = text.replaceAll(/<[^>]+>/g, " ");
+  text = text.replaceAll(/^#{1,6}\s+/gm, "");
+  text = text.replaceAll(/[*_~`>#]/g, "");
+  text = text.replaceAll(/[\u0000-\u001f\u007f]/g, " ");
+  text = text.replaceAll(/\s+/g, " ").trim();
+  if (text.length <= maxChars) return text;
+  const sliced = text.slice(0, maxChars);
+  const boundary = sliced.lastIndexOf(" ");
+  const clipped = (boundary > maxChars * 0.6 ? sliced.slice(0, boundary) : sliced).trim();
+  return `${clipped}…`;
+}
+
+function optionOrFallback(value: string | undefined, fallback: string): string {
+  const id = value?.trim() ?? "";
+  return OPTION_ID.test(id) ? id : fallback;
+}
+
+function cancelled(): VoiceError {
+  return new VoiceError("tts_cancelled", "Speaking was cancelled");
+}
+
+function speechSignal(signal: AbortSignal, timeoutMs: number): AbortSignal {
+  return AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]);
+}
+
+async function boundedAudio(response: Response): Promise<Buffer> {
+  const declared = Number(response.headers.get("content-length") ?? 0);
+  if (Number.isFinite(declared) && declared > MAX_AUDIO_BYTES) {
+    throw new VoiceError("tts_probe_failed", "The spoken audio is unexpectedly large");
+  }
+  if (response.body === null) throw new VoiceError("tts_probe_failed", "The provider returned an empty body");
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const next = await reader.read();
+    if (next.done) break;
+    size += next.value.byteLength;
+    if (size > MAX_AUDIO_BYTES) {
+      await reader.cancel();
+      throw new VoiceError("tts_probe_failed", "The spoken audio is unexpectedly large");
+    }
+    chunks.push(next.value);
+  }
+  if (size === 0) throw new VoiceError("tts_probe_failed", "The provider returned empty audio");
+  return Buffer.concat(chunks, size);
+}
+
+async function synthesizeElevenLabs(
+  apiKey: string,
+  model: string | undefined,
+  voice: string | undefined,
+  text: string,
+  fetcher: typeof fetch,
+  signal: AbortSignal
+): Promise<{ bytes: Buffer; extension: "mp3" }> {
+  const voiceId = optionOrFallback(voice, ELEVENLABS_DEFAULT_VOICE_ID);
+  const modelId = optionOrFallback(model, ELEVENLABS_MODELS[0]?.id ?? "eleven_multilingual_v2");
+  let response: Response;
+  try {
+    response = await fetcher(
+      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`,
+      {
+        method: "POST",
+        headers: {
+          accept: "audio/mpeg",
+          "content-type": "application/json",
+          "xi-api-key": apiKey
+        },
+        body: JSON.stringify({ text, model_id: modelId }),
+        redirect: "error",
+        signal: speechSignal(signal, SPEECH_TIMEOUT_MS)
+      }
+    );
+  } catch (error) {
+    if (signal.aborted) throw cancelled();
+    if (error instanceof VoiceError) throw error;
+    throw new VoiceError("tts_probe_failed", "Could not reach ElevenLabs. Check the network and try again.");
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new VoiceError("tts_auth_failed", "ElevenLabs rejected the API key.");
+  }
+  if (!response.ok) {
+    throw new VoiceError("tts_probe_failed", `ElevenLabs returned HTTP ${response.status}.`);
+  }
+  return { bytes: await boundedAudio(response), extension: "mp3" };
+}
+
+async function synthesizeOpenAi(
+  apiKey: string,
+  model: string | undefined,
+  voice: string | undefined,
+  text: string,
+  fetcher: typeof fetch,
+  signal: AbortSignal
+): Promise<{ bytes: Buffer; extension: "mp3" }> {
+  const voiceId = optionOrFallback(voice, "alloy");
+  const modelId = optionOrFallback(model, OPENAI_MODELS[0]?.id ?? "gpt-4o-mini-tts");
+  let response: Response;
+  try {
+    response = await fetcher("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: {
+        accept: "audio/mpeg",
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: modelId,
+        voice: voiceId,
+        input: text,
+        response_format: "mp3"
+      }),
+      redirect: "error",
+      signal: speechSignal(signal, SPEECH_TIMEOUT_MS)
+    });
+  } catch (error) {
+    if (signal.aborted) throw cancelled();
+    if (error instanceof VoiceError) throw error;
+    throw new VoiceError("tts_probe_failed", "Could not reach OpenAI. Check the network and try again.");
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new VoiceError("tts_auth_failed", "OpenAI rejected the API key.");
+  }
+  if (!response.ok) {
+    throw new VoiceError("tts_probe_failed", `OpenAI returned HTTP ${response.status}.`);
+  }
+  return { bytes: await boundedAudio(response), extension: "mp3" };
+}
+
+const KOKORO_SPEAK_SCRIPT = [
+  "import sys",
+  "from pathlib import Path",
+  "import numpy as np",
+  "import soundfile as sf",
+  "from kokoro import KPipeline",
+  "voice, wav_path, text_path = sys.argv[1], sys.argv[2], sys.argv[3]",
+  "text = Path(text_path).read_text(encoding='utf-8')",
+  "pipeline = KPipeline(lang_code='a')",
+  "chunks = [audio for _, _, audio in pipeline(text, voice=voice)]",
+  "audio = np.concatenate(chunks) if chunks else np.zeros(1, dtype=np.float32)",
+  "sf.write(wav_path, audio, 24000)"
+].join("\n");
+
+async function synthesizeKokoro(
+  voice: string | undefined,
+  text: string,
+  env: NodeJS.ProcessEnv,
+  signal: AbortSignal
+): Promise<{ bytes: Buffer; extension: "wav" }> {
+  if (signal.aborted) throw cancelled();
+  const python = await resolveExecutable("python3", env);
+  if (python === undefined) {
+    throw new VoiceError("tts_not_configured", "Kokoro is not installed.");
+  }
+  const root = await mkdtemp(join(tmpdir(), "omapilot-kokoro-"));
+  const wavPath = join(root, "speech.wav");
+  const textPath = join(root, "speech.txt");
+  try {
+    await writeFile(textPath, text, { encoding: "utf8", mode: 0o600 });
+    const result = await runCommand(python, ["-c", KOKORO_SPEAK_SCRIPT, optionOrFallback(voice, "af_heart"), wavPath, textPath], {
+      env,
+      timeoutMs: KOKORO_SPEAK_TIMEOUT_MS,
+      maxOutput: 16_384
+    });
+    if (signal.aborted) throw cancelled();
+    if (result.code !== 0) {
+      throw new VoiceError("tts_probe_failed", "Kokoro could not speak that answer.");
+    }
+    const bytes = readFileSync(wavPath);
+    if (bytes.byteLength === 0) throw new VoiceError("tts_probe_failed", "Kokoro returned empty audio");
+    return { bytes, extension: "wav" };
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+const PLAYERS: Array<{ name: string; args: (path: string) => string[] }> = [
+  { name: "mpv", args: (path) => ["--no-video", "--really-quiet", "--no-terminal", "--audio-display=no", path] },
+  { name: "ffplay", args: (path) => ["-nodisp", "-autoexit", "-loglevel", "quiet", path] },
+  { name: "pw-play", args: (path) => [path] },
+  { name: "paplay", args: (path) => [path] }
+];
+
+async function playAudioFile(path: string, env: NodeJS.ProcessEnv, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) throw cancelled();
+  for (const player of PLAYERS) {
+    const executable = await resolveExecutable(player.name, env);
+    if (executable === undefined) continue;
+    await runPlayer(executable, player.args(path), env, signal);
+    return;
+  }
+  throw new VoiceError("tts_playback_failed", "No audio player is available. Install mpv or PipeWire.");
+}
+
+function runPlayer(
+  executable: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  signal: AbortSignal
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const child = spawn(executable, args, {
+      env,
+      stdio: "ignore",
+      detached: process.platform !== "win32"
+    });
+    const finish = (error?: VoiceError): void => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      clearTimeout(timer);
+      if (error !== undefined) reject(error);
+      else resolve();
+    };
+    const onAbort = (): void => {
+      terminateProcessGroup(child.pid);
+      finish(cancelled());
+    };
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+    const timer = setTimeout(() => {
+      terminateProcessGroup(child.pid);
+      finish(new VoiceError("tts_playback_failed", "Speaking took too long"));
+    }, PLAY_TIMEOUT_MS);
+    timer.unref();
+    child.once("error", () => finish(new VoiceError("tts_playback_failed", "Could not start the audio player")));
+    child.once("close", (code) => {
+      if (signal.aborted) finish(cancelled());
+      else if (code === 0) finish();
+      else finish(new VoiceError("tts_playback_failed", "The audio player failed"));
+    });
+  });
 }

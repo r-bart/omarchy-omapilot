@@ -412,6 +412,11 @@ TestCase {
     compare(Protocol.ttsDefaultVoice(elevenlabs, "eleven_multilingual_v2"), "wyWA56cQNU2KqUW4eCsI")
     compare(Protocol.ttsDefaultVoice({ id: "elevenlabs", voices: [] }, ""), "wyWA56cQNU2KqUW4eCsI")
     compare(Protocol.emptyVoiceStatus().tts[1].voices[0].id, "wyWA56cQNU2KqUW4eCsI")
+    var speak = Protocol.ttsSpeakCommand("speak-1", "elevenlabs", "eleven_multilingual_v2", "wyWA56cQNU2KqUW4eCsI", "Hello")
+    compare(speak.type, "tts_speak")
+    compare(speak.provider, "elevenlabs")
+    compare(speak.voice, "wyWA56cQNU2KqUW4eCsI")
+    compare(Protocol.ttsStopCommand().type, "tts_stop")
   }
 
   function test_customProviderProbeAndSaveKeepDiscoveredModelMetadata() {

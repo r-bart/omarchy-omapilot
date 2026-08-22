@@ -690,6 +690,23 @@ function ttsKeyTestCommand(provider, apiKey) {
   })
 }
 
+function ttsSpeakCommand(id, provider, model, voice, text) {
+  var payload = {
+    id: String(id || ""),
+    provider: normalizedTtsProvider(provider) || "kokoro",
+    text: String(text || "").slice(0, 8000)
+  }
+  var selectedModel = String(model || "").trim()
+  var selectedVoice = String(voice || "").trim()
+  if (selectedModel !== "") payload.model = selectedModel
+  if (selectedVoice !== "") payload.voice = selectedVoice
+  return command("tts_speak", payload)
+}
+
+function ttsStopCommand() {
+  return command("tts_stop")
+}
+
 function normalizedProvider(value) {
   var provider = String(value || "").toLowerCase()
   return ["builtin", "codex", "opencode"].indexOf(provider) >= 0 ? provider : ""
