@@ -147,6 +147,11 @@ Item {
     voiceNotice = ""
     voiceEngaged = true
 
+    if (!OmaPilot.QuickchatStore.voiceEnabled) {
+      voiceNotice = "Enable voice in OmaPilot Settings"
+      return "disabled"
+    }
+
     if (!OmaPilot.QuickchatStore.initialized) {
       // Light the node instead of failing invisibly, so a hotkey press always
       // produces something on screen.

@@ -66,6 +66,27 @@ ShellRoot {
     property var customProviderSaved: null
     property string customProviderError: ""
     property var voxtypeOsd: ({ available: true, enabled: true, message: "" })
+    property var voiceStatus: ({
+      dictation: { available: true, message: "Voxtype is ready for dictation." },
+      tts: [
+        { id: "kokoro", name: "Kokoro", kind: "local", available: false, configured: false,
+          message: "Kokoro is not installed.",
+          models: [{ id: "kokoro-82m", name: "Kokoro 82M" }],
+          voices: [{ id: "af_heart", name: "Heart (American female)" }] },
+        { id: "elevenlabs", name: "ElevenLabs", kind: "cloud", available: false, configured: false,
+          message: "Add an ElevenLabs API key to enable this provider.", models: [], voices: [] },
+        { id: "openai", name: "OpenAI", kind: "cloud", available: false, configured: false,
+          message: "Add an OpenAI API key to enable this provider.",
+          models: [{ id: "gpt-4o-mini-tts", name: "GPT-4o mini TTS" }],
+          voices: [{ id: "coral", name: "Coral" }] }
+      ]
+    })
+    property var ttsTest: null
+    property string ttsTestError: ""
+    property bool voiceEnabled: false
+    property string ttsProvider: "kokoro"
+    property string ttsModel: "kokoro-82m"
+    property string ttsVoice: "af_heart"
     property var browserCompanionStatus: ({
       phase: "ready", relayInstalled: false, setupAvailable: true,
       chromiumConnected: false, firefoxConnected: false,
@@ -182,6 +203,10 @@ ShellRoot {
           : (root.previewState === "actions-settings" ? "actions" : "agent")
         dangerousAutoApprove: root.previewState === "dangerous-settings"
         desktopContextEnabled: true
+        voiceEnabled: false
+        ttsProvider: "kokoro"
+        ttsModel: "kokoro-82m"
+        ttsVoice: "af_heart"
         quickActions: root.previewState === "actions-settings"
           ? ActionCatalog.addAction(ActionCatalog.defaultActions(true, true),
             "Research this", "Research this topic using current sources.", 42)

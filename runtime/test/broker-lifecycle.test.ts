@@ -7,6 +7,7 @@ import { QuickchatBroker } from "../src/broker.js";
 import * as piHarness from "../src/pi-harness.js";
 import { HerdrHandoffError } from "../src/herdr.js";
 import { HistoryStore } from "../src/history.js";
+import { VoiceService } from "../src/tts.js";
 import { ImageStore } from "../src/images.js";
 import { quickchatPaths } from "../src/paths.js";
 import type { DiscoveredProvider } from "../src/providers.js";
@@ -414,6 +415,30 @@ describe("Herdr handoff serialization", () => {
       errorCode: "window_not_focused",
       message: "The session opened in Herdr, but Quickchat could not focus it"
     }]);
+  });
+});
+
+describe("voice provider status", () => {
+  it("emits a voice catalog without secrets and acknowledges a tested key", async () => {
+    const root = await mkdtemp(join(tmpdir(), "quickchat-voice-")); roots.push(root);
+    const config = join(root, ".config/omapilot");
+    const events: BrokerEvent[] = [];
+    const voice = new VoiceService(
+      { HOME: root, OMAPILOT_CONFIG_DIR: config },
+      {
+        dictationAvailable: () => Promise.resolve(true),
+        kokoroAvailable: () => Promise.resolve(false),
+        fetch: () => Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+      }
+    );
+    const broker = new QuickchatBroker(events.push.bind(events), { voice, env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config } });
+    await broker.handle({ type: "voice_status" });
+    const status = events.find((event) => event.type === "voice");
+    expect(status?.type === "voice" ? status.dictation.available : false).toBe(true);
+    expect(status?.type === "voice" ? status.tts.map((provider) => provider.id) : []).toEqual(["kokoro", "elevenlabs", "openai"]);
+    expect(JSON.stringify(status)).not.toContain("apiKey");
+    await broker.handle({ type: "tts_key_test", provider: "openai", apiKey: "sk-openai-test-key" });
+    expect(events.some((event) => event.type === "tts_tested" && event.provider === "openai" && event.result.available)).toBe(true);
   });
 });
 

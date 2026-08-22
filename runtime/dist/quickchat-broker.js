@@ -9646,8 +9646,8 @@ var init_models = __esm({
 });
 
 // node_modules/@earendil-works/pi-ai/dist/providers/faux.js
-function fauxText(text3) {
-  return { type: "text", text: text3 };
+function fauxText(text4) {
+  return { type: "text", text: text4 };
 }
 function fauxThinking(thinking) {
   return { type: "thinking", thinking };
@@ -9681,8 +9681,8 @@ function fauxAssistantMessage(content, options = {}) {
     timestamp: options.timestamp ?? Date.now()
   };
 }
-function estimateTokens(text3) {
-  return Math.ceil(text3.length / 4);
+function estimateTokens(text4) {
+  return Math.ceil(text4.length / 4);
 }
 function randomId(prefix) {
   return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
@@ -9774,13 +9774,13 @@ function withUsageEstimate(message, context, options, promptCache) {
     }
   };
 }
-function splitStringByTokenSize(text3, minTokenSize, maxTokenSize) {
+function splitStringByTokenSize(text4, minTokenSize, maxTokenSize) {
   const chunks = [];
   let index3 = 0;
-  while (index3 < text3.length) {
+  while (index3 < text4.length) {
     const tokenSize = minTokenSize + Math.floor(Math.random() * (maxTokenSize - minTokenSize + 1));
     const charSize = Math.max(1, tokenSize * 4);
-    chunks.push(text3.slice(index3, index3 + charSize));
+    chunks.push(text4.slice(index3, index3 + charSize));
     index3 += charSize;
   }
   return chunks.length > 0 ? chunks : [""];
@@ -12014,15 +12014,15 @@ var init_dynamicRef2 = __esm({
 
 // node_modules/typebox/build/schema/engine/enum.mjs
 function BuildEnum(_stack, _context, schema, value2) {
-  return emit_exports.ReduceOr(schema.enum.map((option) => {
-    if (guard_exports.IsValueLike(option))
-      return emit_exports.IsEqual(value2, emit_exports.Constant(option));
-    const variable = CreateVariable(option);
+  return emit_exports.ReduceOr(schema.enum.map((option2) => {
+    if (guard_exports.IsValueLike(option2))
+      return emit_exports.IsEqual(value2, emit_exports.Constant(option2));
+    const variable = CreateVariable(option2);
     return emit_exports.IsDeepEqual(value2, variable);
   }));
 }
 function CheckEnum(_stack, _context, schema, value2) {
-  return schema.enum.some((option) => guard_exports.IsValueLike(option) ? guard_exports.IsEqual(value2, option) : guard_exports.IsDeepEqual(value2, option));
+  return schema.enum.some((option2) => guard_exports.IsValueLike(option2) ? guard_exports.IsEqual(value2, option2) : guard_exports.IsDeepEqual(value2, option2));
 }
 function ErrorEnum(stack, context, schemaPath, instancePath, schema, value2) {
   return CheckEnum(stack, context, schema, value2) || context.AddError({
@@ -19338,28 +19338,28 @@ var init_agent_harness = __esm({
 
 // node_modules/@earendil-works/pi-agent-core/dist/harness/messages.js
 function bashExecutionToText(msg) {
-  let text3 = `Ran \`${msg.command}\`
+  let text4 = `Ran \`${msg.command}\`
 `;
   if (msg.output) {
-    text3 += `\`\`\`
+    text4 += `\`\`\`
 ${msg.output}
 \`\`\``;
   } else {
-    text3 += "(no output)";
+    text4 += "(no output)";
   }
   if (msg.cancelled) {
-    text3 += "\n\n(command cancelled)";
+    text4 += "\n\n(command cancelled)";
   } else if (msg.exitCode !== null && msg.exitCode !== void 0 && msg.exitCode !== 0) {
-    text3 += `
+    text4 += `
 
 Command exited with code ${msg.exitCode}`;
   }
   if (msg.truncated && msg.fullOutputPath) {
-    text3 += `
+    text4 += `
 
 [Output truncated. Full output: ${msg.fullOutputPath}]`;
   }
-  return text3;
+  return text4;
 }
 function createBranchSummaryMessage(summary, fromId, timestamp) {
   return {
@@ -21019,11 +21019,11 @@ function safeJsonStringify(value2) {
     return "[unserializable]";
   }
 }
-function truncateForSummary(text3, maxChars) {
-  if (text3.length <= maxChars)
-    return text3;
-  const truncatedChars = text3.length - maxChars;
-  return `${text3.slice(0, maxChars)}
+function truncateForSummary(text4, maxChars) {
+  if (text4.length <= maxChars)
+    return text4;
+  const truncatedChars = text4.length - maxChars;
+  return `${text4.slice(0, maxChars)}
 
 [... ${truncatedChars} more characters truncated]`;
 }
@@ -22778,14 +22778,14 @@ var require_foldFlowLines = __commonJS({
     var FOLD_FLOW = "flow";
     var FOLD_BLOCK = "block";
     var FOLD_QUOTED = "quoted";
-    function foldFlowLines(text3, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
+    function foldFlowLines(text4, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
       if (!lineWidth || lineWidth < 0)
-        return text3;
+        return text4;
       if (lineWidth < minContentWidth)
         minContentWidth = 0;
       const endStep = Math.max(1 + minContentWidth, 1 + lineWidth - indent.length);
-      if (text3.length <= endStep)
-        return text3;
+      if (text4.length <= endStep)
+        return text4;
       const folds = [];
       const escapedFolds = {};
       let end = lineWidth - indent.length;
@@ -22802,14 +22802,14 @@ var require_foldFlowLines = __commonJS({
       let escStart = -1;
       let escEnd = -1;
       if (mode === FOLD_BLOCK) {
-        i2 = consumeMoreIndentedLines(text3, i2, indent.length);
+        i2 = consumeMoreIndentedLines(text4, i2, indent.length);
         if (i2 !== -1)
           end = i2 + endStep;
       }
-      for (let ch; ch = text3[i2 += 1]; ) {
+      for (let ch; ch = text4[i2 += 1]; ) {
         if (mode === FOLD_QUOTED && ch === "\\") {
           escStart = i2;
-          switch (text3[i2 + 1]) {
+          switch (text4[i2 + 1]) {
             case "x":
               i2 += 3;
               break;
@@ -22826,12 +22826,12 @@ var require_foldFlowLines = __commonJS({
         }
         if (ch === "\n") {
           if (mode === FOLD_BLOCK)
-            i2 = consumeMoreIndentedLines(text3, i2, indent.length);
+            i2 = consumeMoreIndentedLines(text4, i2, indent.length);
           end = i2 + indent.length + endStep;
           split = void 0;
         } else {
           if (ch === " " && prev && prev !== " " && prev !== "\n" && prev !== "	") {
-            const next = text3[i2 + 1];
+            const next = text4[i2 + 1];
             if (next && next !== " " && next !== "\n" && next !== "	")
               split = i2;
           }
@@ -22843,12 +22843,12 @@ var require_foldFlowLines = __commonJS({
             } else if (mode === FOLD_QUOTED) {
               while (prev === " " || prev === "	") {
                 prev = ch;
-                ch = text3[i2 += 1];
+                ch = text4[i2 += 1];
                 overflow = true;
               }
               const j3 = i2 > escEnd + 1 ? i2 - 2 : escStart - 1;
               if (escapedFolds[j3])
-                return text3;
+                return text4;
               folds.push(j3);
               escapedFolds[j3] = true;
               end = j3 + endStep;
@@ -22863,39 +22863,39 @@ var require_foldFlowLines = __commonJS({
       if (overflow && onOverflow)
         onOverflow();
       if (folds.length === 0)
-        return text3;
+        return text4;
       if (onFold)
         onFold();
-      let res = text3.slice(0, folds[0]);
+      let res = text4.slice(0, folds[0]);
       for (let i3 = 0; i3 < folds.length; ++i3) {
         const fold = folds[i3];
-        const end2 = folds[i3 + 1] || text3.length;
+        const end2 = folds[i3 + 1] || text4.length;
         if (fold === 0)
           res = `
-${indent}${text3.slice(0, end2)}`;
+${indent}${text4.slice(0, end2)}`;
         else {
           if (mode === FOLD_QUOTED && escapedFolds[fold])
-            res += `${text3[fold]}\\`;
+            res += `${text4[fold]}\\`;
           res += `
-${indent}${text3.slice(fold + 1, end2)}`;
+${indent}${text4.slice(fold + 1, end2)}`;
         }
       }
       return res;
     }
-    function consumeMoreIndentedLines(text3, i2, indent) {
+    function consumeMoreIndentedLines(text4, i2, indent) {
       let end = i2;
       let start = i2 + 1;
-      let ch = text3[start];
+      let ch = text4[start];
       while (ch === " " || ch === "	") {
         if (i2 < start + indent) {
-          ch = text3[++i2];
+          ch = text4[++i2];
         } else {
           do {
-            ch = text3[++i2];
+            ch = text4[++i2];
           } while (ch && ch !== "\n");
           end = i2;
           start = i2 + 1;
-          ch = text3[start];
+          ch = text4[start];
         }
       }
       return end;
@@ -30923,10 +30923,10 @@ function sanitizeBinaryOutput(str3) {
     return true;
   }).join("");
 }
-function trimToLastUtf8Bytes(text3, maxBytes, encoder3) {
-  const bytes = encoder3.encode(text3);
+function trimToLastUtf8Bytes(text4, maxBytes, encoder3) {
+  const bytes = encoder3.encode(text4);
   if (bytes.byteLength <= maxBytes)
-    return text3;
+    return text4;
   let start = bytes.byteLength - maxBytes;
   while (start < bytes.byteLength && ((bytes[start] ?? 0) & 192) === 128)
     start++;
@@ -30945,7 +30945,7 @@ async function executeShellWithCapture(env2, command, options) {
   let acceptingOutput = true;
   let writeChain = Promise.resolve(ok(void 0));
   let captureError;
-  const appendFullOutput = (text3) => {
+  const appendFullOutput = (text4) => {
     if (!fullOutputRequested || captureError)
       return;
     writeChain = writeChain.then(async (previous) => {
@@ -30953,7 +30953,7 @@ async function executeShellWithCapture(env2, command, options) {
         return previous;
       if (!fullOutputPath)
         return err(new ExecutionError("unknown", "Full output path was not created"));
-      const appendResult = await env2.appendFile(fullOutputPath, text3);
+      const appendResult = await env2.appendFile(fullOutputPath, text4);
       return appendResult.ok ? ok(void 0) : err(toExecutionError(appendResult.error));
     });
   };
@@ -30994,29 +30994,29 @@ async function executeShellWithCapture(env2, command, options) {
     if (!acceptingOutput)
       return;
     try {
-      const text3 = sanitizeBinaryOutput(chunk).replace(/\r/g, "");
-      const textBytes = encoder3.encode(text3).byteLength;
+      const text4 = sanitizeBinaryOutput(chunk).replace(/\r/g, "");
+      const textBytes = encoder3.encode(text4).byteLength;
       totalBytes += textBytes;
-      const newlineCount = text3.split("\n").length - 1;
+      const newlineCount = text4.split("\n").length - 1;
       completedLines += newlineCount;
-      const lastNewline = text3.lastIndexOf("\n");
+      const lastNewline = text4.lastIndexOf("\n");
       if (lastNewline >= 0) {
-        const trailingText = text3.slice(lastNewline + 1);
+        const trailingText = text4.slice(lastNewline + 1);
         currentLineBytes = encoder3.encode(trailingText).byteLength;
         hasOpenLine = trailingText.length > 0;
-      } else if (text3.length > 0) {
+      } else if (text4.length > 0) {
         currentLineBytes += textBytes;
         hasOpenLine = true;
       }
-      tailOutput += text3;
+      tailOutput += text4;
       const totalLines = completedLines + (hasOpenLine ? 1 : 0);
       if ((totalBytes > DEFAULT_MAX_BYTES || totalLines > DEFAULT_MAX_LINES) && !fullOutputRequested) {
         ensureFullOutputFile(tailOutput);
       } else if (fullOutputRequested) {
-        appendFullOutput(text3);
+        appendFullOutput(text4);
       }
       tailOutput = trimToLastUtf8Bytes(tailOutput, maxOutputBytes, encoder3);
-      options?.onChunk?.(text3, createProgress);
+      options?.onChunk?.(text4, createProgress);
     } catch (error48) {
       captureError = toExecutionError(error48);
     }
@@ -31931,9 +31931,9 @@ function createTwoFilesPatch(oldFileName, newFileName, oldStr, newStr, oldHeader
     } }));
   }
 }
-function splitLines(text3) {
-  const hasTrailingNl = text3.endsWith("\n");
-  const result = text3.split("\n").map((line) => line + "\n");
+function splitLines(text4) {
+  const hasTrailingNl = text4.endsWith("\n");
+  const result = text4.split("\n").map((line) => line + "\n");
   if (hasTrailingNl) {
     result.pop();
   } else {
@@ -31977,14 +31977,14 @@ function detectLineEnding(content) {
     return "\n";
   return crlfIdx < lfIdx ? "\r\n" : "\n";
 }
-function normalizeToLF(text3) {
-  return text3.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+function normalizeToLF(text4) {
+  return text4.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 }
-function restoreLineEndings(text3, ending) {
-  return ending === "\r\n" ? text3.replace(/\n/g, "\r\n") : text3;
+function restoreLineEndings(text4, ending) {
+  return ending === "\r\n" ? text4.replace(/\n/g, "\r\n") : text4;
 }
-function normalizeForFuzzyMatch(text3) {
-  return text3.normalize("NFKC").split("\n").map((line) => line.trimEnd()).join("\n").replace(/[\u2018\u2019\u201A\u201B]/g, "'").replace(/[\u201C\u201D\u201E\u201F]/g, '"').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, "-").replace(/[\u00A0\u2002-\u200A\u202F\u205F\u3000]/g, " ");
+function normalizeForFuzzyMatch(text4) {
+  return text4.normalize("NFKC").split("\n").map((line) => line.trimEnd()).join("\n").replace(/[\u2018\u2019\u201A\u201B]/g, "'").replace(/[\u201C\u201D\u201E\u201F]/g, '"').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, "-").replace(/[\u00A0\u2002-\u200A\u202F\u205F\u3000]/g, " ");
 }
 function splitLinesWithEndings(content) {
   return content.match(/[^\n]*\n|[^\n]+/g) ?? [];
@@ -32553,11 +32553,11 @@ function startsWith(buffer, bytes) {
     return false;
   return bytes.every((byte, index3) => buffer[index3] === byte);
 }
-function startsWithAscii(buffer, offset, text3) {
-  if (buffer.length < offset + text3.length)
+function startsWithAscii(buffer, offset, text4) {
+  if (buffer.length < offset + text4.length)
     return false;
-  for (let index3 = 0; index3 < text3.length; index3++) {
-    if (buffer[offset + index3] !== text3.charCodeAt(index3))
+  for (let index3 = 0; index3 < text4.length; index3++) {
+    if (buffer[offset + index3] !== text4.charCodeAt(index3))
       return false;
   }
   return true;
@@ -33057,8 +33057,8 @@ function createDefaultScanningHit(metadata, candidate) {
 function createScanningSessionSearch(source, options = {}) {
   const createHit = options.createHit ?? ((metadata, candidate) => createDefaultScanningHit(metadata, candidate));
   return {
-    async *search(text3, searchOptions = {}) {
-      const normalizedText = text3.trim().toLowerCase();
+    async *search(text4, searchOptions = {}) {
+      const normalizedText = text4.trim().toLowerCase();
       if (!normalizedText || searchOptions.limit !== void 0 && searchOptions.limit <= 0)
         return;
       if (searchOptions.entryTypes?.length === 0)
@@ -33455,9 +33455,9 @@ var init_values = __esm({
       }
       return n7;
     };
-    safeJSON = (text3) => {
+    safeJSON = (text4) => {
       try {
-        return JSON.parse(text3);
+        return JSON.parse(text4);
       } catch (err2) {
         return void 0;
       }
@@ -34211,8 +34211,8 @@ async function defaultParseResponse(client2, props) {
       const json2 = await response.json();
       return addRequestID(json2, response);
     }
-    const text3 = await response.text();
-    return text3;
+    const text4 = await response.text();
+    return text4;
   })();
   loggerFor(client2).debug(`[${requestLogID}] response parsed`, formatRequestDetails({
     retryOfRequestLogID,
@@ -40055,8 +40055,8 @@ function getBunSandboxEnvValue(name) {
   if (procEnvCache === null) {
     procEnvCache = /* @__PURE__ */ new Map();
     try {
-      const { readFileSync: readFileSync24 } = __require("node:fs");
-      const data = readFileSync24("/proc/self/environ", "utf-8");
+      const { readFileSync: readFileSync25 } = __require("node:fs");
+      const data = readFileSync25("/proc/self/environ", "utf-8");
       for (const entry of data.split("\0")) {
         const idx = entry.indexOf("=");
         if (idx > 0) {
@@ -40164,8 +40164,8 @@ var init_provider_retry = __esm({
 });
 
 // node_modules/@earendil-works/pi-ai/dist/utils/sanitize-unicode.js
-function sanitizeSurrogates(text3) {
-  return text3.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
+function sanitizeSurrogates(text4) {
+  return text4.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
 }
 var init_sanitize_unicode = __esm({
   "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/utils/sanitize-unicode.js"() {
@@ -40443,8 +40443,8 @@ function estimateTextAndImageContentChars2(content) {
     chars += block.type === "text" ? block.text.length : ESTIMATED_IMAGE_CHARS2;
   return chars;
 }
-function estimateTextTokens(text3) {
-  return Math.ceil(text3.length / CHARS_PER_TOKEN);
+function estimateTextTokens(text4) {
+  return Math.ceil(text4.length / CHARS_PER_TOKEN);
 }
 function estimateTextAndImageContentTokens(content) {
   return Math.ceil(estimateTextAndImageContentChars2(content) / CHARS_PER_TOKEN);
@@ -40906,9 +40906,9 @@ function decodeSseLine(line, state2) {
   }
   return null;
 }
-function nextLineBreakIndex(text3) {
-  const carriageReturnIndex = text3.indexOf("\r");
-  const newlineIndex = text3.indexOf("\n");
+function nextLineBreakIndex(text4) {
+  const carriageReturnIndex = text4.indexOf("\r");
+  const newlineIndex = text4.indexOf("\n");
   if (carriageReturnIndex === -1) {
     return newlineIndex;
   }
@@ -40917,18 +40917,18 @@ function nextLineBreakIndex(text3) {
   }
   return Math.min(carriageReturnIndex, newlineIndex);
 }
-function consumeLine(text3) {
-  const lineBreakIndex = nextLineBreakIndex(text3);
+function consumeLine(text4) {
+  const lineBreakIndex = nextLineBreakIndex(text4);
   if (lineBreakIndex === -1) {
     return null;
   }
   let nextIndex = lineBreakIndex + 1;
-  if (text3[lineBreakIndex] === "\r" && text3[nextIndex] === "\n") {
+  if (text4[lineBreakIndex] === "\r" && text4[nextIndex] === "\n") {
     nextIndex += 1;
   }
   return {
-    line: text3.slice(0, lineBreakIndex),
-    rest: text3.slice(nextIndex)
+    line: text4.slice(0, lineBreakIndex),
+    rest: text4.slice(nextIndex)
   };
 }
 async function* iterateSseMessages(body, signal) {
@@ -41976,9 +41976,9 @@ var init_values2 = __esm({
       }
       return n7;
     };
-    safeJSON2 = (text3) => {
+    safeJSON2 = (text4) => {
       try {
-        return JSON.parse(text3);
+        return JSON.parse(text4);
       } catch (err2) {
         return void 0;
       }
@@ -43115,8 +43115,8 @@ async function defaultParseResponse2(client2, props) {
       const json2 = await response.json();
       return addRequestID2(json2, response);
     }
-    const text3 = await response.text();
-    return text3;
+    const text4 = await response.text();
+    return text4;
   })();
   loggerFor2(client2).debug(`[${requestLogID}] response parsed`, formatRequestDetails2({
     retryOfRequestLogID,
@@ -52791,10 +52791,10 @@ function formatProviderError(norm, prefix) {
   }
   return prefix !== void 0 ? `${prefix} (${norm.status}): ${norm.body}` : `${norm.status}: ${norm.body}`;
 }
-function truncateErrorText(text3, maxChars) {
-  if (text3.length <= maxChars)
-    return text3;
-  return `${text3.slice(0, maxChars)}... [truncated ${text3.length - maxChars} chars]`;
+function truncateErrorText(text4, maxChars) {
+  if (text4.length <= maxChars)
+    return text4;
+  return `${text4.slice(0, maxChars)}... [truncated ${text4.length - maxChars} chars]`;
 }
 function safeJsonStringify4(value2) {
   try {
@@ -54437,8 +54437,8 @@ var require_common = __commonJS({
       }
       function redactString(obj, key) {
         if (typeof obj === "object" && obj !== null && typeof obj[key] === "string") {
-          const text3 = obj[key];
-          if (/grant_type=/i.test(text3) || /assertion=/i.test(text3) || /secret/i.test(text3)) {
+          const text4 = obj[key];
+          if (/grant_type=/i.test(text4) || /assertion=/i.test(text4) || /secret/i.test(text4)) {
             obj[key] = REDACT;
           }
         }
@@ -56139,11 +56139,11 @@ var require_ponyfill_es2018 = __commonJS({
           throw new TypeError(`${context} is not a function.`);
         }
       }
-      function isObject9(x4) {
+      function isObject10(x4) {
         return typeof x4 === "object" && x4 !== null || typeof x4 === "function";
       }
       function assertObject(x4, context) {
-        if (!isObject9(x4)) {
+        if (!isObject10(x4)) {
           throw new TypeError(`${context} is not an object.`);
         }
       }
@@ -61210,8 +61210,8 @@ var init_body = __esm({
        * @return  Promise
        */
       async json() {
-        const text3 = await this.text();
-        return JSON.parse(text3);
+        const text4 = await this.text();
+        return JSON.parse(text4);
       }
       /**
        * Decode response as text
@@ -64363,18 +64363,18 @@ var require_parse = __commonJS({
         n: "\n",
         r: "\r",
         t: "	"
-      }, text3, error48 = function(m3) {
+      }, text4, error48 = function(m3) {
         throw {
           name: "SyntaxError",
           message: m3,
           at: at2,
-          text: text3
+          text: text4
         };
       }, next = function(c) {
         if (c && c !== ch) {
           error48("Expected '" + c + "' instead of '" + ch + "'");
         }
-        ch = text3.charAt(at2);
+        ch = text4.charAt(at2);
         at2 += 1;
         return ch;
       }, number4 = function() {
@@ -64421,12 +64421,12 @@ var require_parse = __commonJS({
           var startAt = at2;
           while (next()) {
             if (ch === '"') {
-              if (at2 - 1 > startAt) string5 += text3.substring(startAt, at2 - 1);
+              if (at2 - 1 > startAt) string5 += text4.substring(startAt, at2 - 1);
               next();
               return string5;
             }
             if (ch === "\\") {
-              if (at2 - 1 > startAt) string5 += text3.substring(startAt, at2 - 1);
+              if (at2 - 1 > startAt) string5 += text4.substring(startAt, at2 - 1);
               next();
               if (ch === "u") {
                 uffff = 0;
@@ -64559,7 +64559,7 @@ var require_parse = __commonJS({
       };
       return function(source, reviver) {
         var result;
-        text3 = source + "";
+        text4 = source + "";
         at2 = 0;
         ch = " ";
         result = value2();
@@ -65461,8 +65461,8 @@ var require_crypto = __commonJS({
         const result = new TextDecoder().decode(uint8array);
         return result;
       }
-      encodeBase64StringUtf8(text3) {
-        const uint8array = new TextEncoder().encode(text3);
+      encodeBase64StringUtf8(text4) {
+        const uint8array = new TextEncoder().encode(text4);
         const result = base64js.fromByteArray(uint8array);
         return result;
       }
@@ -65530,8 +65530,8 @@ var require_crypto2 = __commonJS({
       decodeBase64StringUtf8(base643) {
         return Buffer.from(base643, "base64").toString("utf-8");
       }
-      encodeBase64StringUtf8(text3) {
-        return Buffer.from(text3, "utf-8").toString("base64");
+      encodeBase64StringUtf8(text4) {
+        return Buffer.from(text4, "utf-8").toString("base64");
       }
       /**
        * Computes the SHA-256 hash of the provided string.
@@ -67646,11 +67646,11 @@ var require_verify_stream = __commonJS({
     var toString2 = require_tostring();
     var util = __require("util");
     var JWS_REGEX = /^[a-zA-Z0-9\-_]+?\.[a-zA-Z0-9\-_]+?\.([a-zA-Z0-9\-_]+)?$/;
-    function isObject9(thing) {
+    function isObject10(thing) {
       return Object.prototype.toString.call(thing) === "[object Object]";
     }
     function safeJsonParse(thing) {
-      if (isObject9(thing))
+      if (isObject10(thing))
         return thing;
       try {
         return JSON.parse(thing);
@@ -85599,8 +85599,8 @@ async function defaultParseResponse3(client2, props) {
       const json2 = await response.json();
       return json2;
     }
-    const text3 = await response.text();
-    return text3;
+    const text4 = await response.text();
+    return text4;
   })();
   loggerFor3(client2).debug(`[${requestLogID}] response parsed`, formatRequestDetails3({
     retryOfRequestLogID,
@@ -87175,7 +87175,7 @@ var init_node = __esm({
         if (this.candidates && this.candidates.length > 1) {
           console.warn("there are multiple candidates in the response, returning text from the first one.");
         }
-        let text3 = "";
+        let text4 = "";
         let anyTextPartText = false;
         const nonTextParts = [];
         for (const part of (_h = (_g = (_f = (_e3 = this.candidates) === null || _e3 === void 0 ? void 0 : _e3[0]) === null || _f === void 0 ? void 0 : _f.content) === null || _g === void 0 ? void 0 : _g.parts) !== null && _h !== void 0 ? _h : []) {
@@ -87189,13 +87189,13 @@ var init_node = __esm({
               continue;
             }
             anyTextPartText = true;
-            text3 += part.text;
+            text4 += part.text;
           }
         }
         if (nonTextParts.length > 0) {
           console.warn(`there are non-text parts ${nonTextParts} in the response, returning concatenation of all text parts. Please refer to the non text parts for a full response from model.`);
         }
-        return anyTextPartText ? text3 : void 0;
+        return anyTextPartText ? text4 : void 0;
       }
       /**
        * Returns the concatenation of all inline data parts from the first candidate
@@ -87448,7 +87448,7 @@ var init_node = __esm({
        */
       get text() {
         var _a7, _b, _c;
-        let text3 = "";
+        let text4 = "";
         let anyTextPartFound = false;
         const nonTextParts = [];
         for (const part of (_c = (_b = (_a7 = this.serverContent) === null || _a7 === void 0 ? void 0 : _a7.modelTurn) === null || _b === void 0 ? void 0 : _b.parts) !== null && _c !== void 0 ? _c : []) {
@@ -87462,13 +87462,13 @@ var init_node = __esm({
               continue;
             }
             anyTextPartFound = true;
-            text3 += part.text;
+            text4 += part.text;
           }
         }
         if (nonTextParts.length > 0) {
           console.warn(`there are non-text parts ${nonTextParts} in the response, returning concatenation of all text parts. Please refer to the non text parts for a full response from model.`);
         }
-        return anyTextPartFound ? text3 : void 0;
+        return anyTextPartFound ? text4 : void 0;
       }
       /**
        * Returns the concatenation of all inline data parts from the server content if present.
@@ -92140,9 +92140,9 @@ var init_node = __esm({
       }
       return n7;
     };
-    safeJSON3 = (text3) => {
+    safeJSON3 = (text4) => {
       try {
-        return JSON.parse(text3);
+        return JSON.parse(text4);
       } catch (err2) {
         return void 0;
       }
@@ -95086,10 +95086,10 @@ function formatMistralError(error48) {
   }
   return safeJsonStringify5(error48);
 }
-function truncateErrorText2(text3, maxChars) {
-  if (text3.length <= maxChars)
-    return text3;
-  return `${text3.slice(0, maxChars)}... [truncated ${text3.length - maxChars} chars]`;
+function truncateErrorText2(text4, maxChars) {
+  if (text4.length <= maxChars)
+    return text4;
+  return `${text4.slice(0, maxChars)}... [truncated ${text4.length - maxChars} chars]`;
 }
 function safeJsonStringify5(value2) {
   try {
@@ -95386,7 +95386,7 @@ async function consumeChatStream(model, output, stream11, mistralStream) {
           continue;
         }
         if (item.type === "thinking") {
-          const deltaText = (item.thinking ?? []).map((part) => part.text ?? "").filter((text3) => text3.length > 0).join("");
+          const deltaText = (item.thinking ?? []).map((part) => part.text ?? "").filter((text4) => text4.length > 0).join("");
           const thinkingDelta = sanitizeSurrogates(deltaText);
           if (!thinkingDelta)
             continue;
@@ -95587,8 +95587,8 @@ function toChatMessages(messages, supportsImages) {
   }
   return result;
 }
-function buildToolResultText(text3, hasImages, supportsImages, isError) {
-  const trimmed = text3.trim();
+function buildToolResultText(text4, hasImages, supportsImages, isError) {
+  const trimmed = text4.trim();
   const errorPrefix = isError ? "[tool error] " : "";
   if (trimmed.length > 0) {
     const imageSuffix = hasImages && !supportsImages ? "\n[tool image omitted: model does not support images]" : "";
@@ -96526,14 +96526,14 @@ async function* parseWebSocket(socket, signal, idleTimeoutMs) {
   };
   const onMessage = (event) => {
     void (async () => {
-      let text3 = null;
+      let text4 = null;
       try {
         if (!event || typeof event !== "object" || !("data" in event))
           return;
-        text3 = await decodeWebSocketData(event.data);
-        if (!text3)
+        text4 = await decodeWebSocketData(event.data);
+        if (!text4)
           return;
-        const parsed = JSON.parse(text3);
+        const parsed = JSON.parse(text4);
         const type = typeof parsed.type === "string" ? parsed.type : "";
         if (type === "response.completed" || type === "response.done" || type === "response.incomplete") {
           sawCompletion = true;
@@ -96544,7 +96544,7 @@ async function* parseWebSocket(socket, signal, idleTimeoutMs) {
       } catch (cause) {
         failed = new CodexProtocolError(`Invalid Codex WebSocket JSON: ${formatThrownValue(cause)}`, {
           cause,
-          payload: text3
+          payload: text4
         });
         done = true;
         wake();
@@ -104821,9 +104821,9 @@ Please report this to https://github.com/markedjs/marked.`, e2) {
 });
 
 // node_modules/@earendil-works/pi-tui/dist/fuzzy.js
-function fuzzyMatch(query, text3) {
+function fuzzyMatch(query, text4) {
   const queryLower = query.toLowerCase();
-  const textLower = text3.toLowerCase();
+  const textLower = text4.toLowerCase();
   const matchQuery = (normalizedQuery) => {
     if (normalizedQuery.length === 0) {
       return { matches: true, score: 0 };
@@ -104889,11 +104889,11 @@ function fuzzyFilter(items, query, getText) {
   }
   const results = [];
   for (const item of items) {
-    const text3 = getText(item);
+    const text4 = getText(item);
     let totalScore = 0;
     let allMatch = true;
     for (const token of tokens) {
-      const match2 = fuzzyMatch(token, text3);
+      const match2 = fuzzyMatch(token, text4);
       if (match2.matches) {
         totalScore += match2.score;
       } else {
@@ -104945,19 +104945,19 @@ function buildFdPathQuery(query) {
   }
   return pattern;
 }
-function findLastDelimiter(text3) {
-  for (let i2 = text3.length - 1; i2 >= 0; i2 -= 1) {
-    if (PATH_DELIMITERS.has(text3[i2] ?? "")) {
+function findLastDelimiter(text4) {
+  for (let i2 = text4.length - 1; i2 >= 0; i2 -= 1) {
+    if (PATH_DELIMITERS.has(text4[i2] ?? "")) {
       return i2;
     }
   }
   return -1;
 }
-function findUnclosedQuoteStart(text3) {
+function findUnclosedQuoteStart(text4) {
   let inQuotes = false;
   let quoteStart = -1;
-  for (let i2 = 0; i2 < text3.length; i2 += 1) {
-    if (text3[i2] === '"') {
+  for (let i2 = 0; i2 < text4.length; i2 += 1) {
+    if (text4[i2] === '"') {
       inQuotes = !inQuotes;
       if (inQuotes) {
         quoteStart = i2;
@@ -104966,24 +104966,24 @@ function findUnclosedQuoteStart(text3) {
   }
   return inQuotes ? quoteStart : null;
 }
-function isTokenStart(text3, index3) {
-  return index3 === 0 || PATH_DELIMITERS.has(text3[index3 - 1] ?? "");
+function isTokenStart(text4, index3) {
+  return index3 === 0 || PATH_DELIMITERS.has(text4[index3 - 1] ?? "");
 }
-function extractQuotedPrefix(text3) {
-  const quoteStart = findUnclosedQuoteStart(text3);
+function extractQuotedPrefix(text4) {
+  const quoteStart = findUnclosedQuoteStart(text4);
   if (quoteStart === null) {
     return null;
   }
-  if (quoteStart > 0 && text3[quoteStart - 1] === "@") {
-    if (!isTokenStart(text3, quoteStart - 1)) {
+  if (quoteStart > 0 && text4[quoteStart - 1] === "@") {
+    if (!isTokenStart(text4, quoteStart - 1)) {
       return null;
     }
-    return text3.slice(quoteStart - 1);
+    return text4.slice(quoteStart - 1);
   }
-  if (!isTokenStart(text3, quoteStart)) {
+  if (!isTokenStart(text4, quoteStart)) {
     return null;
   }
-  return text3.slice(quoteStart);
+  return text4.slice(quoteStart);
 }
 function parsePathPrefix(prefix) {
   if (prefix.startsWith('@"')) {
@@ -105234,33 +105234,33 @@ var init_autocomplete = __esm({
         };
       }
       // Extract @ prefix for fuzzy file suggestions
-      extractAtPrefix(text3) {
-        const quotedPrefix = extractQuotedPrefix(text3);
+      extractAtPrefix(text4) {
+        const quotedPrefix = extractQuotedPrefix(text4);
         if (quotedPrefix?.startsWith('@"')) {
           return quotedPrefix;
         }
-        const lastDelimiterIndex = findLastDelimiter(text3);
+        const lastDelimiterIndex = findLastDelimiter(text4);
         const tokenStart = lastDelimiterIndex === -1 ? 0 : lastDelimiterIndex + 1;
-        if (text3[tokenStart] === "@") {
-          return text3.slice(tokenStart);
+        if (text4[tokenStart] === "@") {
+          return text4.slice(tokenStart);
         }
         return null;
       }
       // Extract a path-like prefix from the text before cursor
-      extractPathPrefix(text3, forceExtract = false) {
-        const quotedPrefix = extractQuotedPrefix(text3);
+      extractPathPrefix(text4, forceExtract = false) {
+        const quotedPrefix = extractQuotedPrefix(text4);
         if (quotedPrefix) {
           return quotedPrefix;
         }
-        const lastDelimiterIndex = findLastDelimiter(text3);
-        const pathPrefix = lastDelimiterIndex === -1 ? text3 : text3.slice(lastDelimiterIndex + 1);
+        const lastDelimiterIndex = findLastDelimiter(text4);
+        const pathPrefix = lastDelimiterIndex === -1 ? text4 : text4.slice(lastDelimiterIndex + 1);
         if (forceExtract) {
           return pathPrefix;
         }
         if (pathPrefix.includes("/") || pathPrefix.startsWith(".") || pathPrefix.startsWith("~/")) {
           return pathPrefix;
         }
-        if (pathPrefix === "" && text3.endsWith(" ")) {
+        if (pathPrefix === "" && text4.endsWith(" ")) {
           return pathPrefix;
         }
         return null;
@@ -105616,20 +105616,20 @@ function isPrintableAscii(str3) {
   }
   return true;
 }
-function truncateFragmentToWidth(text3, maxWidth) {
-  if (maxWidth <= 0 || text3.length === 0) {
+function truncateFragmentToWidth(text4, maxWidth) {
+  if (maxWidth <= 0 || text4.length === 0) {
     return { text: "", width: 0 };
   }
-  if (isPrintableAscii(text3)) {
-    const clipped = text3.slice(0, maxWidth);
+  if (isPrintableAscii(text4)) {
+    const clipped = text4.slice(0, maxWidth);
     return { text: clipped, width: clipped.length };
   }
-  const hasAnsi = text3.includes("\x1B");
-  const hasTabs = text3.includes("	");
+  const hasAnsi = text4.includes("\x1B");
+  const hasTabs = text4.includes("	");
   if (!hasAnsi && !hasTabs) {
     let result2 = "";
     let width2 = 0;
-    for (const { segment: segment2 } of graphemeSegmenter.segment(text3)) {
+    for (const { segment: segment2 } of graphemeSegmenter.segment(text4)) {
       const w2 = graphemeWidth(segment2);
       if (width2 + w2 > maxWidth) {
         break;
@@ -105643,14 +105643,14 @@ function truncateFragmentToWidth(text3, maxWidth) {
   let width = 0;
   let i2 = 0;
   let pendingAnsi = "";
-  while (i2 < text3.length) {
-    const ansi = extractAnsiCode(text3, i2);
+  while (i2 < text4.length) {
+    const ansi = extractAnsiCode(text4, i2);
     if (ansi) {
       pendingAnsi += ansi.code;
       i2 += ansi.length;
       continue;
     }
-    if (text3[i2] === "	") {
+    if (text4[i2] === "	") {
       if (width + 3 > maxWidth) {
         break;
       }
@@ -105664,14 +105664,14 @@ function truncateFragmentToWidth(text3, maxWidth) {
       continue;
     }
     let end = i2;
-    while (end < text3.length && text3[end] !== "	") {
-      const nextAnsi = extractAnsiCode(text3, end);
+    while (end < text4.length && text4[end] !== "	") {
+      const nextAnsi = extractAnsiCode(text4, end);
       if (nextAnsi) {
         break;
       }
       end++;
     }
-    for (const { segment: segment2 } of graphemeSegmenter.segment(text3.slice(i2, end))) {
+    for (const { segment: segment2 } of graphemeSegmenter.segment(text4.slice(i2, end))) {
       const w2 = graphemeWidth(segment2);
       if (width + w2 > maxWidth) {
         return { text: result, width };
@@ -105948,10 +105948,10 @@ function getActiveOsc8Close(prefix) {
   }
   return activeHyperlink ? formatOsc8Close(activeHyperlink.terminator) : "";
 }
-function updateTrackerFromText(text3, tracker) {
+function updateTrackerFromText(text4, tracker) {
   let i2 = 0;
-  while (i2 < text3.length) {
-    const ansiResult = extractAnsiCode(text3, i2);
+  while (i2 < text4.length) {
+    const ansiResult = extractAnsiCode(text4, i2);
     if (ansiResult) {
       tracker.process(ansiResult.code);
       i2 += ansiResult.length;
@@ -105960,7 +105960,7 @@ function updateTrackerFromText(text3, tracker) {
     }
   }
 }
-function splitIntoTokensWithAnsi(text3) {
+function splitIntoTokensWithAnsi(text4) {
   const tokens = [];
   let current = "";
   let pendingAnsi = "";
@@ -105974,18 +105974,18 @@ function splitIntoTokensWithAnsi(text3) {
     current = "";
     currentKind = null;
   };
-  while (i2 < text3.length) {
-    const ansiResult = extractAnsiCode(text3, i2);
+  while (i2 < text4.length) {
+    const ansiResult = extractAnsiCode(text4, i2);
     if (ansiResult) {
       pendingAnsi += ansiResult.code;
       i2 += ansiResult.length;
       continue;
     }
     let end = i2;
-    while (end < text3.length && !extractAnsiCode(text3, end)) {
+    while (end < text4.length && !extractAnsiCode(text4, end)) {
       end++;
     }
-    for (const { segment: segment2 } of graphemeSegmenter.segment(text3.slice(i2, end))) {
+    for (const { segment: segment2 } of graphemeSegmenter.segment(text4.slice(i2, end))) {
       const segmentIsSpace = segment2 === " ";
       if (!segmentIsSpace && cjkBreakRegex.test(segment2)) {
         flushCurrent();
@@ -106021,11 +106021,11 @@ function splitIntoTokensWithAnsi(text3) {
   }
   return tokens;
 }
-function wrapTextWithAnsi(text3, width) {
-  if (!text3) {
+function wrapTextWithAnsi(text4, width) {
+  if (!text4) {
     return [""];
   }
-  const inputLines = text3.split(/\r\n|\r|\n/);
+  const inputLines = text4.split(/\r\n|\r|\n/);
   const result = [];
   const tracker = new AnsiCodeTracker();
   for (const inputLine of inputLines) {
@@ -106161,18 +106161,18 @@ function applyBackgroundToLine(line, width, bgFn) {
   const withPadding = line + padding;
   return bgFn(withPadding);
 }
-function truncateToWidth(text3, maxWidth, ellipsis = "...", pad = false) {
+function truncateToWidth(text4, maxWidth, ellipsis = "...", pad = false) {
   if (maxWidth <= 0) {
     return "";
   }
-  if (text3.length === 0) {
+  if (text4.length === 0) {
     return pad ? " ".repeat(maxWidth) : "";
   }
   const ellipsisWidth = visibleWidth(ellipsis);
   if (ellipsisWidth >= maxWidth) {
-    const textWidth = visibleWidth(text3);
+    const textWidth = visibleWidth(text4);
     if (textWidth <= maxWidth) {
-      return pad ? text3 + " ".repeat(maxWidth - textWidth) : text3;
+      return pad ? text4 + " ".repeat(maxWidth - textWidth) : text4;
     }
     const clippedEllipsis = truncateFragmentToWidth(ellipsis, maxWidth);
     if (clippedEllipsis.width === 0) {
@@ -106180,12 +106180,12 @@ function truncateToWidth(text3, maxWidth, ellipsis = "...", pad = false) {
     }
     return finalizeTruncatedResult("", 0, clippedEllipsis.text, clippedEllipsis.width, maxWidth, pad);
   }
-  if (isPrintableAscii(text3)) {
-    if (text3.length <= maxWidth) {
-      return pad ? text3 + " ".repeat(maxWidth - text3.length) : text3;
+  if (isPrintableAscii(text4)) {
+    if (text4.length <= maxWidth) {
+      return pad ? text4 + " ".repeat(maxWidth - text4.length) : text4;
     }
     const targetWidth2 = maxWidth - ellipsisWidth;
-    return finalizeTruncatedResult(text3.slice(0, targetWidth2), targetWidth2, ellipsis, ellipsisWidth, maxWidth, pad);
+    return finalizeTruncatedResult(text4.slice(0, targetWidth2), targetWidth2, ellipsis, ellipsisWidth, maxWidth, pad);
   }
   const targetWidth = maxWidth - ellipsisWidth;
   let result = "";
@@ -106195,10 +106195,10 @@ function truncateToWidth(text3, maxWidth, ellipsis = "...", pad = false) {
   let keepContiguousPrefix = true;
   let overflowed = false;
   let exhaustedInput = false;
-  const hasAnsi = text3.includes("\x1B");
-  const hasTabs = text3.includes("	");
+  const hasAnsi = text4.includes("\x1B");
+  const hasTabs = text4.includes("	");
   if (!hasAnsi && !hasTabs) {
-    for (const { segment: segment2 } of graphemeSegmenter.segment(text3)) {
+    for (const { segment: segment2 } of graphemeSegmenter.segment(text4)) {
       const width = graphemeWidth(segment2);
       if (keepContiguousPrefix && keptWidth + width <= targetWidth) {
         result += segment2;
@@ -106215,14 +106215,14 @@ function truncateToWidth(text3, maxWidth, ellipsis = "...", pad = false) {
     exhaustedInput = !overflowed;
   } else {
     let i2 = 0;
-    while (i2 < text3.length) {
-      const ansi = extractAnsiCode(text3, i2);
+    while (i2 < text4.length) {
+      const ansi = extractAnsiCode(text4, i2);
       if (ansi) {
         pendingAnsi += ansi.code;
         i2 += ansi.length;
         continue;
       }
-      if (text3[i2] === "	") {
+      if (text4[i2] === "	") {
         if (keepContiguousPrefix && keptWidth + 3 <= targetWidth) {
           if (pendingAnsi) {
             result += pendingAnsi;
@@ -106243,14 +106243,14 @@ function truncateToWidth(text3, maxWidth, ellipsis = "...", pad = false) {
         continue;
       }
       let end = i2;
-      while (end < text3.length && text3[end] !== "	") {
-        const nextAnsi = extractAnsiCode(text3, end);
+      while (end < text4.length && text4[end] !== "	") {
+        const nextAnsi = extractAnsiCode(text4, end);
         if (nextAnsi) {
           break;
         }
         end++;
       }
-      for (const { segment: segment2 } of graphemeSegmenter.segment(text3.slice(i2, end))) {
+      for (const { segment: segment2 } of graphemeSegmenter.segment(text4.slice(i2, end))) {
         const width = graphemeWidth(segment2);
         if (keepContiguousPrefix && keptWidth + width <= targetWidth) {
           if (pendingAnsi) {
@@ -106274,10 +106274,10 @@ function truncateToWidth(text3, maxWidth, ellipsis = "...", pad = false) {
       }
       i2 = end;
     }
-    exhaustedInput = i2 >= text3.length;
+    exhaustedInput = i2 >= text4.length;
   }
   if (!overflowed && exhaustedInput) {
-    return pad ? text3 + " ".repeat(Math.max(0, maxWidth - visibleSoFar)) : text3;
+    return pad ? text4 + " ".repeat(Math.max(0, maxWidth - visibleSoFar)) : text4;
   }
   return finalizeTruncatedResult(result, keptWidth, ellipsis, ellipsisWidth, maxWidth, pad);
 }
@@ -107888,14 +107888,14 @@ var init_text2 = __esm({
       cachedText;
       cachedWidth;
       cachedLines;
-      constructor(text3 = "", paddingX = 1, paddingY = 1, customBgFn) {
-        this.text = text3;
+      constructor(text4 = "", paddingX = 1, paddingY = 1, customBgFn) {
+        this.text = text4;
         this.paddingX = paddingX;
         this.paddingY = paddingY;
         this.customBgFn = customBgFn;
       }
-      setText(text3) {
-        this.text = text3;
+      setText(text4) {
+        this.text = text4;
         this.cachedText = void 0;
         this.cachedWidth = void 0;
         this.cachedLines = void 0;
@@ -108072,14 +108072,14 @@ var init_kill_ring = __esm({
        * @param opts.prepend - If accumulating, prepend (backward deletion) or append (forward deletion)
        * @param opts.accumulate - Merge with the most recent entry instead of creating a new one
        */
-      push(text3, opts) {
-        if (!text3)
+      push(text4, opts) {
+        if (!text4)
           return;
         if (opts.accumulate && this.ring.length > 0) {
           const last = this.ring.pop();
-          this.ring.push(opts.prepend ? text3 + last : last + text3);
+          this.ring.push(opts.prepend ? text4 + last : last + text4);
         } else {
-          this.ring.push(text3);
+          this.ring.push(text4);
         }
       }
       /** Get most recent entry without modifying the ring. */
@@ -108566,8 +108566,8 @@ function renderImage(base64Data, imageDimensions, options = {}) {
   }
   return null;
 }
-function hyperlink(text3, url2) {
-  return `\x1B]8;;${url2}\x1B\\${text3}\x1B]8;;\x1B\\`;
+function hyperlink(text4, url2) {
+  return `\x1B]8;;${url2}\x1B\\${text4}\x1B]8;;\x1B\\`;
 }
 function shortenImagePath(filename) {
   const home = homedir5();
@@ -109489,10 +109489,10 @@ var init_undo_stack = __esm({
 });
 
 // node_modules/@earendil-works/pi-tui/dist/word-navigation.js
-function findWordBackward(text3, cursor, options) {
+function findWordBackward(text4, cursor, options) {
   if (cursor <= 0)
     return 0;
-  const textBeforeCursor = text3.slice(0, cursor);
+  const textBeforeCursor = text4.slice(0, cursor);
   const segmentFn = options?.segment;
   const isAtomic = options?.isAtomicSegment;
   const segments = segmentFn ? [...segmentFn(textBeforeCursor)] : [...wordSegmenter2.segment(textBeforeCursor)];
@@ -109521,10 +109521,10 @@ function findWordBackward(text3, cursor, options) {
   }
   return newCursor;
 }
-function findWordForward(text3, cursor, options) {
-  if (cursor >= text3.length)
-    return text3.length;
-  const textAfterCursor = text3.slice(cursor);
+function findWordForward(text4, cursor, options) {
+  if (cursor >= text4.length)
+    return text4.length;
+  const textAfterCursor = text4.slice(cursor);
   const segmentFn = options?.segment;
   const isAtomic = options?.isAtomicSegment;
   const segments = segmentFn ? segmentFn(textAfterCursor) : wordSegmenter2.segment(textAfterCursor);
@@ -109566,7 +109566,7 @@ var init_select_list = __esm({
     DEFAULT_PRIMARY_COLUMN_WIDTH = 32;
     PRIMARY_COLUMN_GAP = 2;
     MIN_DESCRIPTION_WIDTH = 10;
-    normalizeToSingleLine = (text3) => text3.replace(/[\r\n]+/g, " ").trim();
+    normalizeToSingleLine = (text4) => text4.replace(/[\r\n]+/g, " ").trim();
     clamp = (value2, min, max) => Math.max(min, Math.min(value2, max));
     SelectList = class {
       items = [];
@@ -109710,21 +109710,21 @@ var init_select_list = __esm({
 function isPasteMarker(segment2) {
   return segment2.length >= 10 && PASTE_MARKER_SINGLE.test(segment2);
 }
-function segmentWithMarkers(text3, baseSegmenter, validIds) {
-  if (validIds.size === 0 || !text3.includes("[paste #")) {
-    return baseSegmenter.segment(text3);
+function segmentWithMarkers(text4, baseSegmenter, validIds) {
+  if (validIds.size === 0 || !text4.includes("[paste #")) {
+    return baseSegmenter.segment(text4);
   }
   const markers = [];
-  for (const m3 of text3.matchAll(PASTE_MARKER_REGEX)) {
+  for (const m3 of text4.matchAll(PASTE_MARKER_REGEX)) {
     const id = Number.parseInt(m3[1], 10);
     if (!validIds.has(id))
       continue;
     markers.push({ start: m3.index, end: m3.index + m3[0].length });
   }
   if (markers.length === 0) {
-    return baseSegmenter.segment(text3);
+    return baseSegmenter.segment(text4);
   }
-  const baseSegments = baseSegmenter.segment(text3);
+  const baseSegments = baseSegmenter.segment(text4);
   const result = [];
   let markerIdx = 0;
   for (const seg of baseSegments) {
@@ -109734,11 +109734,11 @@ function segmentWithMarkers(text3, baseSegmenter, validIds) {
     const marker = markerIdx < markers.length ? markers[markerIdx] : null;
     if (marker && seg.index >= marker.start && seg.index < marker.end) {
       if (seg.index === marker.start) {
-        const markerText = text3.slice(marker.start, marker.end);
+        const markerText = text4.slice(marker.start, marker.end);
         result.push({
           segment: markerText,
           index: marker.start,
-          input: text3
+          input: text4
         });
       }
     } else {
@@ -109923,8 +109923,8 @@ var init_editor = __esm({
         return new Set(this.pastes.keys());
       }
       /** Segment text with paste-marker awareness, only merging markers with valid IDs. */
-      segment(text3, mode) {
-        return segmentWithMarkers(text3, mode === "word" ? wordSegmenter3 : graphemeSegmenter2, this.validPasteIds());
+      segment(text4, mode) {
+        return segmentWithMarkers(text4, mode === "word" ? wordSegmenter3 : graphemeSegmenter2, this.validPasteIds());
       }
       getPaddingX() {
         return this.paddingX;
@@ -109955,8 +109955,8 @@ var init_editor = __esm({
        * Add a prompt to history for up/down arrow navigation.
        * Called after successful submission.
        */
-      addToHistory(text3) {
-        const trimmed = text3.trim();
+      addToHistory(text4) {
+        const trimmed = text4.trim();
         if (!trimmed)
           return;
         if (this.history.length > 0 && this.history[0] === trimmed)
@@ -110013,8 +110013,8 @@ var init_editor = __esm({
         this.historyDraft = null;
       }
       /** Internal setText that doesn't reset history state - used by navigateHistory */
-      setTextInternal(text3, cursorPlacement = "end") {
-        const lines = text3.split("\n");
+      setTextInternal(text4, cursorPlacement = "end") {
+        const lines = text4.split("\n");
         this.state.lines = lines.length === 0 ? [""] : lines;
         this.state.cursorLine = cursorPlacement === "start" ? 0 : this.state.lines.length - 1;
         this.setCursorCol(cursorPlacement === "start" ? 0 : this.state.lines[this.state.cursorLine]?.length || 0);
@@ -110401,8 +110401,8 @@ var init_editor = __esm({
       getText() {
         return this.state.lines.join("\n");
       }
-      expandPasteMarkers(text3) {
-        let result = text3;
+      expandPasteMarkers(text4) {
+        let result = text4;
         for (const [pasteId, pasteContent] of this.pastes) {
           const markerRegex = new RegExp(`\\[paste #${pasteId}( (\\+\\d+ lines|\\d+ chars))?\\]`, "g");
           result = result.replace(markerRegex, () => pasteContent);
@@ -110422,11 +110422,11 @@ var init_editor = __esm({
       getCursor() {
         return { line: this.state.cursorLine, col: this.state.cursorCol };
       }
-      setText(text3) {
+      setText(text4) {
         this.cancelAutocomplete();
         this.lastAction = null;
         this.exitHistoryBrowsing();
-        const normalized = this.normalizeText(text3);
+        const normalized = this.normalizeText(text4);
         if (this.getText() !== normalized) {
           this.pushUndoSnapshot();
         }
@@ -110439,32 +110439,32 @@ var init_editor = __esm({
        * Used for programmatic insertion (e.g., clipboard image markers).
        * This is atomic for undo - single undo restores entire pre-insert state.
        */
-      insertTextAtCursor(text3) {
-        if (!text3)
+      insertTextAtCursor(text4) {
+        if (!text4)
           return;
         this.cancelAutocomplete();
         this.pushUndoSnapshot();
         this.lastAction = null;
         this.exitHistoryBrowsing();
-        this.insertTextAtCursorInternal(text3);
+        this.insertTextAtCursorInternal(text4);
       }
       /**
        * Normalize text for editor storage:
        * - Normalize line endings (\r\n and \r -> \n)
        * - Expand tabs to 4 spaces
        */
-      normalizeText(text3) {
-        return text3.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\t/g, "    ");
+      normalizeText(text4) {
+        return text4.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\t/g, "    ");
       }
       /**
        * Internal text insertion at cursor. Handles single and multi-line text.
        * Does not push undo snapshots or trigger autocomplete - caller is responsible.
        * Normalizes line endings and calls onChange once at the end.
        */
-      insertTextAtCursorInternal(text3) {
-        if (!text3)
+      insertTextAtCursorInternal(text4) {
+        if (!text4)
           return;
-        const normalized = this.normalizeText(text3);
+        const normalized = this.normalizeText(text4);
         const insertedLines = normalized.split("\n");
         const currentLine = this.state.lines[this.state.cursorLine] || "";
         const beforeCursor = currentLine.slice(0, this.state.cursorCol);
@@ -111037,7 +111037,7 @@ var init_editor = __esm({
           return;
         }
         this.setCursorCol(findWordBackward(currentLine, this.state.cursorCol, {
-          segment: (text3) => this.segment(text3, "word"),
+          segment: (text4) => this.segment(text4, "word"),
           isAtomicSegment: isPasteMarker
         }));
       }
@@ -111048,8 +111048,8 @@ var init_editor = __esm({
         if (this.killRing.length === 0)
           return;
         this.pushUndoSnapshot();
-        const text3 = this.killRing.peek();
-        this.insertYankedText(text3);
+        const text4 = this.killRing.peek();
+        this.insertYankedText(text4);
         this.lastAction = "yank";
       }
       /**
@@ -111062,22 +111062,22 @@ var init_editor = __esm({
         this.pushUndoSnapshot();
         this.deleteYankedText();
         this.killRing.rotate();
-        const text3 = this.killRing.peek();
-        this.insertYankedText(text3);
+        const text4 = this.killRing.peek();
+        this.insertYankedText(text4);
         this.lastAction = "yank";
       }
       /**
        * Insert text at cursor position (used by yank operations).
        */
-      insertYankedText(text3) {
+      insertYankedText(text4) {
         this.exitHistoryBrowsing();
-        const lines = text3.split("\n");
+        const lines = text4.split("\n");
         if (lines.length === 1) {
           const currentLine = this.state.lines[this.state.cursorLine] || "";
           const before = currentLine.slice(0, this.state.cursorCol);
           const after = currentLine.slice(this.state.cursorCol);
-          this.state.lines[this.state.cursorLine] = before + text3 + after;
-          this.setCursorCol(this.state.cursorCol + text3.length);
+          this.state.lines[this.state.cursorLine] = before + text4 + after;
+          this.setCursorCol(this.state.cursorCol + text4.length);
         } else {
           const currentLine = this.state.lines[this.state.cursorLine] || "";
           const before = currentLine.slice(0, this.state.cursorCol);
@@ -111174,7 +111174,7 @@ var init_editor = __esm({
           return;
         }
         this.setCursorCol(findWordForward(currentLine, this.state.cursorCol, {
-          segment: (text3) => this.segment(text3, "word"),
+          segment: (text4) => this.segment(text4, "word"),
           isAtomicSegment: isPasteMarker
         }));
       }
@@ -111866,12 +111866,12 @@ var init_input = __esm({
         this.value = this.value.slice(0, this.cursor) + this.value.slice(deleteTo);
       }
       yank() {
-        const text3 = this.killRing.peek();
-        if (!text3)
+        const text4 = this.killRing.peek();
+        if (!text4)
           return;
         this.pushUndo();
-        this.value = this.value.slice(0, this.cursor) + text3 + this.value.slice(this.cursor);
-        this.cursor += text3.length;
+        this.value = this.value.slice(0, this.cursor) + text4 + this.value.slice(this.cursor);
+        this.cursor += text4.length;
         this.lastAction = "yank";
       }
       yankPop() {
@@ -111882,9 +111882,9 @@ var init_input = __esm({
         this.value = this.value.slice(0, this.cursor - prevText.length) + this.value.slice(this.cursor);
         this.cursor -= prevText.length;
         this.killRing.rotate();
-        const text3 = this.killRing.peek() || "";
-        this.value = this.value.slice(0, this.cursor) + text3 + this.value.slice(this.cursor);
-        this.cursor += text3.length;
+        const text4 = this.killRing.peek() || "";
+        this.value = this.value.slice(0, this.cursor) + text4 + this.value.slice(this.cursor);
+        this.cursor += text4.length;
         this.lastAction = "yank";
       }
       pushUndo() {
@@ -112051,8 +112051,8 @@ function renderLayout(source, nodes) {
         const trimmed = (previousNode ? sliced.trimStart() : sliced).trimEnd();
         const preserveLeadingSpace = previousNode?.type === "matrix" && /^\s/.test(sliced);
         const preserveTrailingSpace = node.type === "matrix" && /\s$/.test(sliced);
-        const text3 = trimmed ? `${preserveLeadingSpace ? " " : ""}${trimmed}${preserveTrailingSpace ? " " : ""}` : preserveLeadingSpace || preserveTrailingSpace ? " " : "";
-        layouts.push({ lines: [text3], width: visibleWidth(text3), baseline: 0 });
+        const text4 = trimmed ? `${preserveLeadingSpace ? " " : ""}${trimmed}${preserveTrailingSpace ? " " : ""}` : preserveLeadingSpace || preserveTrailingSpace ? " " : "";
+        layouts.push({ lines: [text4], width: visibleWidth(text4), baseline: 0 });
       }
       if (node.type === "fraction") {
         const numerator = renderLayout(node.numerator, nodes);
@@ -112097,8 +112097,8 @@ function renderLayout(source, nodes) {
     if (position < sourceLine.length) {
       const sliced = sourceLine.slice(position);
       const trimmed = previousNode ? sliced.trimStart() : sliced;
-      const text3 = previousNode?.type === "matrix" && /^\s/.test(sliced) ? ` ${trimmed}` : trimmed;
-      layouts.push({ lines: [text3], width: visibleWidth(text3), baseline: 0 });
+      const text4 = previousNode?.type === "matrix" && /^\s/.test(sliced) ? ` ${trimmed}` : trimmed;
+      layouts.push({ lines: [text4], width: visibleWidth(text4), baseline: 0 });
     }
     const lineLayout = joinLayouts(layouts);
     if (renderedLines.length === 0) {
@@ -113234,12 +113234,12 @@ function tokenizeInlineLatex(source) {
     }
     return void 0;
   }
-  const text3 = source.slice(opening.length, closingIndex);
-  if (!text3 || text3.includes("\n")) {
+  const text4 = source.slice(opening.length, closingIndex);
+  if (!text4 || text4.includes("\n")) {
     return void 0;
   }
   const raw = source.slice(0, closingIndex + closing.length);
-  return { type: "latex", raw, text: text3 };
+  return { type: "latex", raw, text: text4 };
 }
 function tokenizeBlockLatex(source) {
   const dollarMatch = /^ {0,3}\$\$[ \t]*(?:\n)?([\s\S]*?)\$\$[ \t]*(?:\n|$)/.exec(source);
@@ -113294,12 +113294,12 @@ var init_markdown = __esm({
         if (!match2) {
           return void 0;
         }
-        const text3 = match2[2];
+        const text4 = match2[2];
         return {
           type: "del",
           raw: match2[0],
-          text: text3,
-          tokens: this.lexer.inlineTokens(text3)
+          text: text4,
+          tokens: this.lexer.inlineTokens(text4)
         };
       }
     };
@@ -113342,16 +113342,16 @@ var init_markdown = __esm({
       cachedText;
       cachedWidth;
       cachedLines;
-      constructor(text3, paddingX, paddingY, theme2, defaultTextStyle, options) {
-        this.text = text3;
+      constructor(text4, paddingX, paddingY, theme2, defaultTextStyle, options) {
+        this.text = text4;
         this.paddingX = paddingX;
         this.paddingY = paddingY;
         this.theme = theme2;
         this.defaultTextStyle = defaultTextStyle;
         this.options = options ? { ...options } : {};
       }
-      setText(text3) {
-        this.text = text3;
+      setText(text4) {
+        this.text = text4;
         this.invalidate();
       }
       invalidate() {
@@ -113364,15 +113364,15 @@ var init_markdown = __esm({
           return this.cachedLines;
         }
         const contentWidth = Math.max(1, width - this.paddingX * 2);
-        const text3 = this.options.transform?.(this.text, contentWidth) ?? this.text;
-        if (!text3 || text3.trim() === "") {
+        const text4 = this.options.transform?.(this.text, contentWidth) ?? this.text;
+        if (!text4 || text4.trim() === "") {
           const result2 = [];
           this.cachedText = this.text;
           this.cachedWidth = width;
           this.cachedLines = result2;
           return result2;
         }
-        const normalizedText = text3.replace(/\t/g, "   ");
+        const normalizedText = text4.replace(/\t/g, "   ");
         const tokens = markdownParser.lexer(normalizedText);
         trimPartialClosingFences(tokens);
         const renderedLines = [];
@@ -113430,11 +113430,11 @@ var init_markdown = __esm({
        * NOTE: Background color is NOT applied here - it's applied at the padding stage
        * to ensure it extends to the full line width.
        */
-      applyDefaultStyle(text3) {
+      applyDefaultStyle(text4) {
         if (!this.defaultTextStyle) {
-          return text3;
+          return text4;
         }
-        let styled = text3;
+        let styled = text4;
         if (this.defaultTextStyle.color) {
           styled = this.defaultTextStyle.color(styled);
         }
@@ -113488,7 +113488,7 @@ var init_markdown = __esm({
       }
       getDefaultInlineStyleContext() {
         return {
-          applyText: (text3) => this.applyDefaultStyle(text3),
+          applyText: (text4) => this.applyDefaultStyle(text4),
           stylePrefix: this.getDefaultStylePrefix()
         };
       }
@@ -113500,9 +113500,9 @@ var init_markdown = __esm({
             const headingPrefix = `${"#".repeat(headingLevel)} `;
             let headingStyleFn;
             if (headingLevel === 1) {
-              headingStyleFn = (text3) => this.theme.heading(this.theme.bold(this.theme.underline(text3)));
+              headingStyleFn = (text4) => this.theme.heading(this.theme.bold(this.theme.underline(text4)));
             } else {
-              headingStyleFn = (text3) => this.theme.heading(this.theme.bold(text3));
+              headingStyleFn = (text4) => this.theme.heading(this.theme.bold(text4));
             }
             const headingStyleContext = {
               applyText: headingStyleFn,
@@ -113569,7 +113569,7 @@ var init_markdown = __esm({
             break;
           }
           case "blockquote": {
-            const quoteStyle = (text3) => this.theme.quote(this.theme.italic(text3));
+            const quoteStyle = (text4) => this.theme.quote(this.theme.italic(text4));
             const quoteStylePrefix = this.getStylePrefix(quoteStyle);
             const applyQuoteStyle = (line) => {
               if (!quoteStylePrefix) {
@@ -113580,7 +113580,7 @@ var init_markdown = __esm({
             };
             const quoteContentWidth = Math.max(1, width - 2);
             const quoteInlineStyleContext = {
-              applyText: (text3) => text3,
+              applyText: (text4) => text4,
               stylePrefix: quoteStylePrefix
             };
             const quoteTokens = token.tokens || [];
@@ -113630,8 +113630,8 @@ var init_markdown = __esm({
         let result = "";
         const resolvedStyleContext = styleContext ?? this.getDefaultInlineStyleContext();
         const { applyText, stylePrefix } = resolvedStyleContext;
-        const applyTextWithNewlines = (text3) => {
-          const segments = text3.split("\n");
+        const applyTextWithNewlines = (text4) => {
+          const segments = text4.split("\n");
           return segments.map((segment2) => applyText(segment2)).join("\n");
         };
         for (const token of tokens) {
@@ -113759,8 +113759,8 @@ var init_markdown = __esm({
       /**
        * Get the visible width of the longest word in a string.
        */
-      getLongestWordWidth(text3, maxWidth) {
-        const words2 = text3.split(/\s+/).filter((word) => word.length > 0);
+      getLongestWordWidth(text4, maxWidth) {
+        const words2 = text4.split(/\s+/).filter((word) => word.length > 0);
         let longest = 0;
         for (const word of words2) {
           longest = Math.max(longest, visibleWidth(word));
@@ -113776,8 +113776,8 @@ var init_markdown = __esm({
        * Delegates to wrapTextWithAnsi() so ANSI codes + long tokens are handled
        * consistently with the rest of the renderer.
        */
-      wrapCellText(text3, maxWidth) {
-        return wrapTextWithAnsi(text3, Math.max(1, maxWidth));
+      wrapCellText(text4, maxWidth) {
+        return wrapTextWithAnsi(text4, Math.max(1, maxWidth));
       }
       /**
        * Render a table with width-aware cell wrapping.
@@ -113873,14 +113873,14 @@ var init_markdown = __esm({
         const topBorderCells = columnWidths.map((w2) => "\u2500".repeat(w2));
         lines.push(`\u250C\u2500${topBorderCells.join("\u2500\u252C\u2500")}\u2500\u2510`);
         const headerCellLines = token.header.map((cell, i2) => {
-          const text3 = this.renderInlineTokens(cell.tokens || [], styleContext);
-          return this.wrapCellText(text3, columnWidths[i2]);
+          const text4 = this.renderInlineTokens(cell.tokens || [], styleContext);
+          return this.wrapCellText(text4, columnWidths[i2]);
         });
         const headerLineCount = Math.max(...headerCellLines.map((c) => c.length));
         for (let lineIdx = 0; lineIdx < headerLineCount; lineIdx++) {
           const rowParts = headerCellLines.map((cellLines, colIdx) => {
-            const text3 = cellLines[lineIdx] || "";
-            const padded = text3 + " ".repeat(Math.max(0, columnWidths[colIdx] - visibleWidth(text3)));
+            const text4 = cellLines[lineIdx] || "";
+            const padded = text4 + " ".repeat(Math.max(0, columnWidths[colIdx] - visibleWidth(text4)));
             return this.theme.bold(padded);
           });
           lines.push(`\u2502 ${rowParts.join(" \u2502 ")} \u2502`);
@@ -113891,14 +113891,14 @@ var init_markdown = __esm({
         for (let rowIndex = 0; rowIndex < token.rows.length; rowIndex++) {
           const row = token.rows[rowIndex];
           const rowCellLines = row.map((cell, i2) => {
-            const text3 = this.renderInlineTokens(cell.tokens || [], styleContext);
-            return this.wrapCellText(text3, columnWidths[i2]);
+            const text4 = this.renderInlineTokens(cell.tokens || [], styleContext);
+            return this.wrapCellText(text4, columnWidths[i2]);
           });
           const rowLineCount = Math.max(...rowCellLines.map((c) => c.length));
           for (let lineIdx = 0; lineIdx < rowLineCount; lineIdx++) {
             const rowParts = rowCellLines.map((cellLines, colIdx) => {
-              const text3 = cellLines[lineIdx] || "";
-              return text3 + " ".repeat(Math.max(0, columnWidths[colIdx] - visibleWidth(text3)));
+              const text4 = cellLines[lineIdx] || "";
+              return text4 + " ".repeat(Math.max(0, columnWidths[colIdx] - visibleWidth(text4)));
             });
             lines.push(`\u2502 ${rowParts.join(" \u2502 ")} \u2502`);
           }
@@ -113952,7 +113952,7 @@ var init_scroll_view = __esm({
         this.primary = options.primary ?? false;
         this.overscroll = options.overscroll ?? "chain";
         this.currentScrollbar = options.scrollbar ?? "hidden";
-        this.scrollbarStyle = options.scrollbarStyle ?? ((text3) => `\x1B[100m${text3}\x1B[49m`);
+        this.scrollbarStyle = options.scrollbarStyle ?? ((text4) => `\x1B[100m${text4}\x1B[49m`);
         this.scrollbarHideDelayMs = Math.max(0, Math.floor(options.scrollbarHideDelayMs ?? 1e3));
       }
       get scrollTop() {
@@ -114308,8 +114308,8 @@ var init_truncated_text = __esm({
       text;
       paddingX;
       paddingY;
-      constructor(text3, paddingX = 0, paddingY = 0) {
-        this.text = text3;
+      constructor(text4, paddingX = 0, paddingY = 0) {
+        this.text = text4;
         this.paddingX = paddingX;
         this.paddingY = paddingY;
       }
@@ -115123,9 +115123,9 @@ var init_terminal = __esm({
 });
 
 // node_modules/@earendil-works/pi-tui/dist/alt-screen-search.js
-function appendMappedText(text3, span, corpus) {
-  corpus.text += text3;
-  for (let index3 = 0; index3 < text3.length; index3++)
+function appendMappedText(text4, span, corpus) {
+  corpus.text += text4;
+  for (let index3 = 0; index3 < text4.length; index3++)
     corpus.source.push(span);
 }
 function buildSearchCorpus(lines) {
@@ -115135,9 +115135,9 @@ function buildSearchCorpus(lines) {
     const line = stripTerminalSequences(lines[row] ?? "");
     let column = 0;
     for (const grapheme of segmenter2.segment(line)) {
-      const text3 = grapheme.segment;
-      const width = visibleWidth(text3);
-      if (/^\s+$/u.test(text3)) {
+      const text4 = grapheme.segment;
+      const width = visibleWidth(text4);
+      if (/^\s+$/u.test(text4)) {
         if (corpus.text.length > 0)
           pendingSeparator = true;
         column += width;
@@ -115147,7 +115147,7 @@ function buildSearchCorpus(lines) {
         appendMappedText(" ", void 0, corpus);
         pendingSeparator = false;
       }
-      appendMappedText(text3, { row, startCol: column, endCol: column + width }, corpus);
+      appendMappedText(text4, { row, startCol: column, endCol: column + width }, corpus);
       column += width;
     }
     if (corpus.text.length > 0)
@@ -115158,8 +115158,8 @@ function buildSearchCorpus(lines) {
 function normalizeQuery(query) {
   return query.replace(/\s+/gu, " ").trim();
 }
-function escapeRegExp(text3) {
-  return text3.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegExp(text4) {
+  return text4.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function findAltScreenSearchMatches(lines, query) {
   const normalizedQuery = normalizeQuery(query);
@@ -115688,8 +115688,8 @@ var init_tui_alt_screen = __esm({
         this.flashes = new AltScreenFlashContainer(() => this.requestRender());
         this.wheelScrollLines = Math.max(1, Math.floor(options.wheelScrollLines ?? 1));
         this.mouseEnabled = options.mouse ?? true;
-        this.searchMatchStyle = options.searchMatchStyle ?? ((text3) => `\x1B[4m${text3}\x1B[24m`);
-        this.searchCurrentMatchStyle = options.searchCurrentMatchStyle ?? ((text3) => `\x1B[1;7m${text3}\x1B[22;27m`);
+        this.searchMatchStyle = options.searchMatchStyle ?? ((text4) => `\x1B[4m${text4}\x1B[24m`);
+        this.searchCurrentMatchStyle = options.searchCurrentMatchStyle ?? ((text4) => `\x1B[1;7m${text4}\x1B[22;27m`);
         this.openUrl = options.openUrl;
         this.onRightClickPaste = options.onRightClickPaste;
         this.copySelection = options.copySelection;
@@ -116463,36 +116463,36 @@ var init_tui_alt_screen = __esm({
           const columns = this.getSelectionColumns(line, row, selection);
           lines.push(stripTerminalSequences(sliceByColumn(line, columns.start, Math.max(0, columns.end - columns.start), true)).trimEnd());
         }
-        const text3 = lines.join("\n");
-        if (text3.length === 0)
+        const text4 = lines.join("\n");
+        if (text4.length === 0)
           return;
         if (this.copySelection) {
-          const ok2 = await this.copySelection(text3);
+          const ok2 = await this.copySelection(text4);
           this.flash(ok2 ? "Copied!" : "Copy failed");
           return;
         }
-        this.terminal.write(`\x1B]52;c;${Buffer.from(text3).toString("base64")}\x07`);
+        this.terminal.write(`\x1B]52;c;${Buffer.from(text4).toString("base64")}\x07`);
         this.flash("Copied!");
       }
-      applySearchTextHighlight(text3, current) {
+      applySearchTextHighlight(text4, current) {
         const style = current ? this.searchCurrentMatchStyle : this.searchMatchStyle;
         let result = "";
         let plainStart = 0;
         let index3 = 0;
-        while (index3 < text3.length) {
-          const ansi = extractAnsiCode(text3, index3);
+        while (index3 < text4.length) {
+          const ansi = extractAnsiCode(text4, index3);
           if (!ansi) {
             index3 += 1;
             continue;
           }
           if (index3 > plainStart)
-            result += style(text3.slice(plainStart, index3));
+            result += style(text4.slice(plainStart, index3));
           result += ansi.code;
           index3 += ansi.length;
           plainStart = index3;
         }
-        if (plainStart < text3.length)
-          result += style(text3.slice(plainStart));
+        if (plainStart < text4.length)
+          result += style(text4.slice(plainStart));
         return result;
       }
       applySearchHighlights(screen, layout) {
@@ -116543,13 +116543,13 @@ var init_tui_alt_screen = __esm({
         }
         return result;
       }
-      applySelectionHighlight(text3) {
+      applySelectionHighlight(text4) {
         let result = "\x1B[7m";
         let index3 = 0;
-        while (index3 < text3.length) {
-          const ansi = extractAnsiCode(text3, index3);
+        while (index3 < text4.length) {
+          const ansi = extractAnsiCode(text4, index3);
           if (!ansi) {
-            result += text3[index3];
+            result += text4[index3];
             index3 += 1;
             continue;
           }
@@ -117909,8 +117909,8 @@ var require_core = __commonJS({
        * Adds texts to the output stream
        *
        * @param {string} text */
-      addText(text3) {
-        this.buffer += escapeHTML(text3);
+      addText(text4) {
+        this.buffer += escapeHTML(text4);
       }
       /**
        * Adds a node open to the output stream (if needed)
@@ -118028,22 +118028,22 @@ var require_core = __commonJS({
        * @param {string} text
        * @param {string} kind
        */
-      addKeyword(text3, kind) {
-        if (text3 === "") {
+      addKeyword(text4, kind) {
+        if (text4 === "") {
           return;
         }
         this.openNode(kind);
-        this.addText(text3);
+        this.addText(text4);
         this.closeNode();
       }
       /**
        * @param {string} text
        */
-      addText(text3) {
-        if (text3 === "") {
+      addText(text4) {
+        if (text4 === "") {
           return;
         }
-        this.add(text3);
+        this.add(text4);
       }
       /**
        * @param {Emitter & {root: DataNode}} emitter
@@ -118087,7 +118087,7 @@ var require_core = __commonJS({
       return match2 && match2.index === 0;
     }
     var BACKREF_RE = /\[(?:[^\\\]]|\\.)*\]|\(\??|\\([1-9][0-9]*)|\\./;
-    function join51(regexps, separator = "|") {
+    function join52(regexps, separator = "|") {
       let numCaptures = 0;
       return regexps.map((regex2) => {
         numCaptures += 1;
@@ -118391,7 +118391,7 @@ var require_core = __commonJS({
             this.exec = () => null;
           }
           const terminators = this.regexes.map((el) => el[1]);
-          this.matcherRe = langRe(join51(terminators), true);
+          this.matcherRe = langRe(join52(terminators), true);
           this.lastIndex = 0;
         }
         /** @param {string} s */
@@ -118627,12 +118627,12 @@ var require_core = __commonJS({
       return { Component, VuePlugin };
     }
     var mergeHTMLPlugin = {
-      "after:highlightElement": ({ el, result, text: text3 }) => {
+      "after:highlightElement": ({ el, result, text: text4 }) => {
         const originalStream = nodeStream(el);
         if (!originalStream.length) return;
         const resultNode = document.createElement("div");
         resultNode.innerHTML = result.value;
-        result.value = mergeStreams(originalStream, nodeStream(resultNode), text3);
+        result.value = mergeStreams(originalStream, nodeStream(resultNode), text4);
       }
     };
     function tag(node) {
@@ -119157,9 +119157,9 @@ var require_core = __commonJS({
           { el: element, language }
         );
         node = element;
-        const text3 = node.textContent;
-        const result = language ? highlight3(text3, { language, ignoreIllegals: true }) : highlightAuto(text3);
-        fire("after:highlightElement", { el: element, result, text: text3 });
+        const text4 = node.textContent;
+        const result = language ? highlight3(text4, { language, ignoreIllegals: true }) : highlightAuto(text4);
+        fire("after:highlightElement", { el: element, result, text: text4 });
         element.innerHTML = result.value;
         updateClassName(element, language, result.language);
         element.result = {
@@ -153575,20 +153575,20 @@ function getLanguageFromPath(filePath) {
 }
 function getMarkdownTheme() {
   return {
-    heading: (text3) => theme.fg("mdHeading", text3),
-    link: (text3) => theme.fg("mdLink", text3),
-    linkUrl: (text3) => theme.fg("mdLinkUrl", text3),
-    code: (text3) => theme.fg("mdCode", text3),
-    codeBlock: (text3) => theme.fg("mdCodeBlock", text3),
-    codeBlockBorder: (text3) => theme.fg("mdCodeBlockBorder", text3),
-    quote: (text3) => theme.fg("mdQuote", text3),
-    quoteBorder: (text3) => theme.fg("mdQuoteBorder", text3),
-    hr: (text3) => theme.fg("mdHr", text3),
-    listBullet: (text3) => theme.fg("mdListBullet", text3),
-    bold: (text3) => theme.bold(text3),
-    italic: (text3) => theme.italic(text3),
-    underline: (text3) => theme.underline(text3),
-    strikethrough: (text3) => source_default.strikethrough(text3),
+    heading: (text4) => theme.fg("mdHeading", text4),
+    link: (text4) => theme.fg("mdLink", text4),
+    linkUrl: (text4) => theme.fg("mdLinkUrl", text4),
+    code: (text4) => theme.fg("mdCode", text4),
+    codeBlock: (text4) => theme.fg("mdCodeBlock", text4),
+    codeBlockBorder: (text4) => theme.fg("mdCodeBlockBorder", text4),
+    quote: (text4) => theme.fg("mdQuote", text4),
+    quoteBorder: (text4) => theme.fg("mdQuoteBorder", text4),
+    hr: (text4) => theme.fg("mdHr", text4),
+    listBullet: (text4) => theme.fg("mdListBullet", text4),
+    bold: (text4) => theme.bold(text4),
+    italic: (text4) => theme.italic(text4),
+    underline: (text4) => theme.underline(text4),
+    strikethrough: (text4) => source_default.strikethrough(text4),
     highlightCode: (code, lang) => {
       const validLang = lang && supportsLanguage(lang) ? lang : void 0;
       if (!validLang) {
@@ -153609,26 +153609,26 @@ function getMarkdownTheme() {
 }
 function getSelectListTheme() {
   return {
-    selectedPrefix: (text3) => theme.fg("accent", text3),
-    selectedText: (text3) => theme.fg("accent", text3),
-    description: (text3) => theme.fg("muted", text3),
-    scrollInfo: (text3) => theme.fg("muted", text3),
-    noMatch: (text3) => theme.fg("muted", text3)
+    selectedPrefix: (text4) => theme.fg("accent", text4),
+    selectedText: (text4) => theme.fg("accent", text4),
+    description: (text4) => theme.fg("muted", text4),
+    scrollInfo: (text4) => theme.fg("muted", text4),
+    noMatch: (text4) => theme.fg("muted", text4)
   };
 }
 function getEditorTheme() {
   return {
-    borderColor: (text3) => theme.fg("borderMuted", text3),
+    borderColor: (text4) => theme.fg("borderMuted", text4),
     selectList: getSelectListTheme()
   };
 }
 function getSettingsListTheme() {
   return {
-    label: (text3, selected) => selected ? theme.fg("accent", text3) : text3,
-    value: (text3, selected) => selected ? theme.fg("accent", text3) : theme.fg("muted", text3),
-    description: (text3) => theme.fg("dim", text3),
+    label: (text4, selected) => selected ? theme.fg("accent", text4) : text4,
+    value: (text4, selected) => selected ? theme.fg("accent", text4) : theme.fg("muted", text4),
+    description: (text4) => theme.fg("dim", text4),
     cursor: theme.fg("accent", "\u2192 "),
-    hint: (text3) => theme.fg("dim", text3)
+    hint: (text4) => theme.fg("dim", text4)
   };
 }
 var ColorValueSchema, ThemeJsonSchema, validateThemeJson, CUBE_VALUES, GRAY_VALUES, Theme, BUILTIN_THEMES, THEME_KEY, THEME_KEY_OLD, theme, currentThemeName, themeWatcher, themeReloadTimer, onThemeChangeCallback, registeredThemes, cachedHighlightThemeFor, cachedCliHighlightTheme;
@@ -153755,32 +153755,32 @@ var init_theme = __esm({
           this.bgColors.set(key, bgAnsi(value2, mode));
         }
       }
-      fg(color, text3) {
+      fg(color, text4) {
         const ansi = this.fgColors.get(color);
         if (!ansi)
           throw new Error(`Unknown theme color: ${color}`);
-        return `${ansi}${text3}\x1B[39m`;
+        return `${ansi}${text4}\x1B[39m`;
       }
-      bg(color, text3) {
+      bg(color, text4) {
         const ansi = this.bgColors.get(color);
         if (!ansi)
           throw new Error(`Unknown theme background color: ${color}`);
-        return `${ansi}${text3}\x1B[49m`;
+        return `${ansi}${text4}\x1B[49m`;
       }
-      bold(text3) {
-        return source_default.bold(text3);
+      bold(text4) {
+        return source_default.bold(text4);
       }
-      italic(text3) {
-        return source_default.italic(text3);
+      italic(text4) {
+        return source_default.italic(text4);
       }
-      underline(text3) {
-        return source_default.underline(text3);
+      underline(text4) {
+        return source_default.underline(text4);
       }
-      inverse(text3) {
-        return source_default.inverse(text3);
+      inverse(text4) {
+        return source_default.inverse(text4);
       }
-      strikethrough(text3) {
-        return source_default.strikethrough(text3);
+      strikethrough(text4) {
+        return source_default.strikethrough(text4);
       }
       getFgAnsi(color) {
         const ansi = this.fgColors.get(color);
@@ -154780,15 +154780,15 @@ ${val.stack}`;
       var ptr1 = color_b.__destroy_into_raw();
       wasm.duotone(photon_image.__wbg_ptr, ptr0, ptr1);
     };
-    module.exports.draw_text_with_border = function(photon_img, text3, x4, y2, font_size) {
+    module.exports.draw_text_with_border = function(photon_img, text4, x4, y2, font_size) {
       _assertClass(photon_img, PhotonImage);
-      const ptr0 = passStringToWasm0(text3, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+      const ptr0 = passStringToWasm0(text4, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
       const len0 = WASM_VECTOR_LEN;
       wasm.draw_text_with_border(photon_img.__wbg_ptr, ptr0, len0, x4, y2, font_size);
     };
-    module.exports.draw_text = function(photon_img, text3, x4, y2, font_size) {
+    module.exports.draw_text = function(photon_img, text4, x4, y2, font_size) {
       _assertClass(photon_img, PhotonImage);
-      const ptr0 = passStringToWasm0(text3, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+      const ptr0 = passStringToWasm0(text4, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
       const len0 = WASM_VECTOR_LEN;
       wasm.draw_text(photon_img.__wbg_ptr, ptr0, len0, x4, y2, font_size);
     };
@@ -156319,21 +156319,21 @@ async function executeBashWithOperations(command, cwd, operations, options) {
   const decoder = new TextDecoder();
   const onData = (data) => {
     totalBytes += data.length;
-    const text3 = sanitizeBinaryOutput2(stripAnsi2(decoder.decode(data, { stream: true }))).replace(/\r/g, "");
+    const text4 = sanitizeBinaryOutput2(stripAnsi2(decoder.decode(data, { stream: true }))).replace(/\r/g, "");
     if (totalBytes > DEFAULT_MAX_BYTES3) {
       ensureTempFile();
     }
     if (tempFileStream) {
-      tempFileStream.write(text3);
+      tempFileStream.write(text4);
     }
-    outputChunks.push(text3);
-    outputBytes += text3.length;
+    outputChunks.push(text4);
+    outputBytes += text4.length;
     while (outputBytes > maxOutputBytes && outputChunks.length > 1) {
       const removed = outputChunks.shift();
       outputBytes -= removed.length;
     }
     if (options?.onChunk) {
-      options.onChunk(text3);
+      options.onChunk(text4);
     }
   };
   try {
@@ -156391,28 +156391,28 @@ var init_bash_executor = __esm({
 
 // node_modules/@earendil-works/pi-coding-agent/dist/core/messages.js
 function bashExecutionToText2(msg) {
-  let text3 = `Ran \`${msg.command}\`
+  let text4 = `Ran \`${msg.command}\`
 `;
   if (msg.output) {
-    text3 += `\`\`\`
+    text4 += `\`\`\`
 ${msg.output}
 \`\`\``;
   } else {
-    text3 += "(no output)";
+    text4 += "(no output)";
   }
   if (msg.cancelled) {
-    text3 += "\n\n(command cancelled)";
+    text4 += "\n\n(command cancelled)";
   } else if (msg.exitCode !== null && msg.exitCode !== void 0 && msg.exitCode !== 0) {
-    text3 += `
+    text4 += `
 
 Command exited with code ${msg.exitCode}`;
   }
   if (msg.truncated && msg.fullOutputPath) {
-    text3 += `
+    text4 += `
 
 [Output truncated. Full output: ${msg.fullOutputPath}]`;
   }
-  return text3;
+  return text4;
 }
 function createBranchSummaryMessage2(summary, fromId, timestamp) {
   return {
@@ -157779,11 +157779,11 @@ ${modifiedFiles.join("\n")}
 
 ${sections.join("\n\n")}`;
 }
-function truncateForSummary2(text3, maxChars) {
-  if (text3.length <= maxChars)
-    return text3;
-  const truncatedChars = text3.length - maxChars;
-  return `${text3.slice(0, maxChars)}
+function truncateForSummary2(text4, maxChars) {
+  if (text4.length <= maxChars)
+    return text4;
+  const truncatedChars = text4.length - maxChars;
+  return `${text4.slice(0, maxChars)}
 
 [... ${truncatedChars} more characters truncated]`;
 }
@@ -158780,8 +158780,8 @@ function color256ToHex(index3) {
   const grayHex = gray.toString(16).padStart(2, "0");
   return `#${grayHex}${grayHex}${grayHex}`;
 }
-function escapeHtml(text3) {
-  return text3.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+function escapeHtml(text4) {
+  return text4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 function createEmptyStyle() {
   return {
@@ -158876,15 +158876,15 @@ function applySgrCode(params, style) {
     i2++;
   }
 }
-function ansiToHtml(text3) {
+function ansiToHtml(text4) {
   const style = createEmptyStyle();
   let result = "";
   let lastIndex = 0;
   let inSpan = false;
   ANSI_REGEX.lastIndex = 0;
-  let match2 = ANSI_REGEX.exec(text3);
+  let match2 = ANSI_REGEX.exec(text4);
   while (match2 !== null) {
-    const beforeText = text3.slice(lastIndex, match2.index);
+    const beforeText = text4.slice(lastIndex, match2.index);
     if (beforeText) {
       result += escapeHtml(beforeText);
     }
@@ -158900,9 +158900,9 @@ function ansiToHtml(text3) {
       inSpan = true;
     }
     lastIndex = match2.index + match2[0].length;
-    match2 = ANSI_REGEX.exec(text3);
+    match2 = ANSI_REGEX.exec(text4);
   }
-  const remainingText = text3.slice(lastIndex);
+  const remainingText = text4.slice(lastIndex);
   if (remainingText) {
     result += escapeHtml(remainingText);
   }
@@ -193955,9 +193955,9 @@ var init_resolve_config_value = __esm({
 import { chmodSync, existsSync as existsSync6, mkdirSync as mkdirSync3, readFileSync as readFileSync4, writeFileSync as writeFileSync4 } from "fs";
 import { dirname as dirname7, join as join15 } from "path";
 import { setTimeout as sleep7 } from "timers/promises";
-function readStoredCredential(providerId, authPath = join15(getAgentDir(), "auth.json")) {
+function readStoredCredential(providerId, authPath2 = join15(getAgentDir(), "auth.json")) {
   try {
-    const data = JSON.parse(readFileSync4(normalizePath(authPath), "utf-8"));
+    const data = JSON.parse(readFileSync4(normalizePath(authPath2), "utf-8"));
     return data[providerId];
   } catch {
     return void 0;
@@ -193974,8 +193974,8 @@ var init_auth_storage = __esm({
     AUTH_FILE_WRITE_OPTIONS = { encoding: "utf-8", mode: 384 };
     FileAuthStorageBackend = class {
       authPath;
-      constructor(authPath = join15(getAgentDir(), "auth.json")) {
-        this.authPath = normalizePath(authPath);
+      constructor(authPath2 = join15(getAgentDir(), "auth.json")) {
+        this.authPath = normalizePath(authPath2);
       }
       ensureParentDir() {
         const dir = dirname7(this.authPath);
@@ -194107,8 +194107,8 @@ var init_auth_storage = __esm({
     ReadOnlyAuthStorage = class {
       authPath;
       data;
-      constructor(authPath = join15(getAgentDir(), "auth.json")) {
-        this.authPath = normalizePath(authPath);
+      constructor(authPath2 = join15(getAgentDir(), "auth.json")) {
+        this.authPath = normalizePath(authPath2);
       }
       load() {
         if (this.data)
@@ -194203,22 +194203,22 @@ var init_auth_storage = __esm({
       storage;
       authPath;
       readState;
-      constructor(storage, authPath) {
+      constructor(storage, authPath2) {
         this.storage = storage;
-        this.authPath = authPath;
-        this.readState = authPath && sharedAuthFileReadState?.authPath === authPath ? sharedAuthFileReadState.readState : { data: {} };
-        if (authPath && !sharedAuthFileReadState) {
-          sharedAuthFileReadState = { authPath, readState: this.readState };
+        this.authPath = authPath2;
+        this.readState = authPath2 && sharedAuthFileReadState?.authPath === authPath2 ? sharedAuthFileReadState.readState : { data: {} };
+        if (authPath2 && !sharedAuthFileReadState) {
+          sharedAuthFileReadState = { authPath: authPath2, readState: this.readState };
         }
-        if (authPath) {
-          const revision = getFileRevision(authPath);
+        if (authPath2) {
+          const revision = getFileRevision(authPath2);
           if (revision !== void 0 && revision === this.readState.revision)
             return;
         }
         this.reload();
       }
-      static create(authPath = join15(getAgentDir(), "auth.json")) {
-        const normalizedAuthPath = normalizePath(authPath);
+      static create(authPath2 = join15(getAgentDir(), "auth.json")) {
+        const normalizedAuthPath = normalizePath(authPath2);
         return new _AuthStorage(new FileAuthStorageBackend(normalizedAuthPath), normalizedAuthPath);
       }
       static fromStorage(storage) {
@@ -204550,12 +204550,12 @@ function getRawStdoutWrite() {
   }
   return process.stdout.write.bind(process.stdout);
 }
-async function writeRawStdoutChunk(text3) {
+async function writeRawStdoutChunk(text4) {
   while (true) {
     try {
       await new Promise((resolve17, reject) => {
         try {
-          getRawStdoutWrite()(text3, (error48) => {
+          getRawStdoutWrite()(text4, (error48) => {
             if (error48)
               reject(error48);
             else
@@ -204605,11 +204605,11 @@ function restoreStdout() {
 function isStdoutTakenOver() {
   return stdoutTakeoverState !== void 0;
 }
-function writeRawStdout(text3) {
-  if (text3.length === 0) {
+function writeRawStdout(text4) {
+  if (text4.length === 0) {
     return;
   }
-  rawStdoutWriteTail = rawStdoutWriteTail.then(() => writeRawStdoutChunk(text3));
+  rawStdoutWriteTail = rawStdoutWriteTail.then(() => writeRawStdoutChunk(text4));
   void rawStdoutWriteTail.catch(() => {
     process.exit(1);
   });
@@ -206827,11 +206827,11 @@ var init_footer_data_provider = __esm({
         return () => this.branchChangeCallbacks.delete(callback);
       }
       /** Internal: set extension status */
-      setExtensionStatus(key, text3) {
-        if (text3 === void 0) {
+      setExtensionStatus(key, text4) {
+        if (text4 === void 0) {
           this.extensionStatuses.delete(key);
         } else {
-          this.extensionStatuses.set(key, text3);
+          this.extensionStatuses.set(key, text4);
         }
       }
       /** Internal: clear extension statuses */
@@ -207221,12 +207221,12 @@ function loadPromptTemplates2(options) {
   }
   return templates;
 }
-function expandPromptTemplate(text3, templates) {
-  if (!text3.startsWith("/"))
-    return text3;
-  const match2 = text3.match(/^\/([^\s]+)(?:\s+([\s\S]*))?$/);
+function expandPromptTemplate(text4, templates) {
+  if (!text4.startsWith("/"))
+    return text4;
+  const match2 = text4.match(/^\/([^\s]+)(?:\s+([\s\S]*))?$/);
   if (!match2)
-    return text3;
+    return text4;
   const templateName = match2[1];
   const argsString = match2[2] ?? "";
   const template = templates.find((t2) => t2.name === templateName);
@@ -207234,7 +207234,7 @@ function expandPromptTemplate(text3, templates) {
     const args = parseCommandArgs2(argsString);
     return substituteArgs2(template.content, args);
   }
-  return text3;
+  return text4;
 }
 var init_prompt_templates2 = __esm({
   "node_modules/@earendil-works/pi-coding-agent/dist/core/prompt-templates.js"() {
@@ -236162,14 +236162,14 @@ function detectLineEnding2(content) {
     return "\n";
   return crlfIdx < lfIdx ? "\r\n" : "\n";
 }
-function normalizeToLF2(text3) {
-  return text3.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+function normalizeToLF2(text4) {
+  return text4.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 }
-function restoreLineEndings2(text3, ending) {
-  return ending === "\r\n" ? text3.replace(/\n/g, "\r\n") : text3;
+function restoreLineEndings2(text4, ending) {
+  return ending === "\r\n" ? text4.replace(/\n/g, "\r\n") : text4;
 }
-function normalizeForFuzzyMatch2(text3) {
-  return text3.normalize("NFKC").split("\n").map((line) => line.trimEnd()).join("\n").replace(/[\u2018\u2019\u201A\u201B]/g, "'").replace(/[\u201C\u201D\u201E\u201F]/g, '"').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, "-").replace(/[\u00A0\u2002-\u200A\u202F\u205F\u3000]/g, " ");
+function normalizeForFuzzyMatch2(text4) {
+  return text4.normalize("NFKC").split("\n").map((line) => line.trimEnd()).join("\n").replace(/[\u2018\u2019\u201A\u201B]/g, "'").replace(/[\u201C\u201D\u201E\u201F]/g, '"').replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, "-").replace(/[\u00A0\u2002-\u200A\u202F\u205F\u3000]/g, " ");
 }
 function splitLinesWithEndings2(content) {
   return content.match(/[^\n]*\n|[^\n]+/g) ?? [];
@@ -236518,11 +236518,11 @@ var init_keybinding_hints = __esm({
 });
 
 // node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/components/visual-truncate.js
-function truncateToVisualLines(text3, maxVisualLines, width, paddingX = 0) {
-  if (!text3) {
+function truncateToVisualLines(text4, maxVisualLines, width, paddingX = 0) {
+  if (!text4) {
     return { visualLines: [], skippedCount: 0 };
   }
-  const tempText = new Text(text3, paddingX, 0);
+  const tempText = new Text(text4, paddingX, 0);
   const allVisualLines = tempText.render(width);
   if (allVisualLines.length <= maxVisualLines) {
     return { visualLines: allVisualLines, skippedCount: 0 };
@@ -236560,8 +236560,8 @@ function defaultTempFilePath(prefix) {
   const id = randomBytes2(8).toString("hex");
   return join24(tmpdir3(), `${prefix}-${id}.log`);
 }
-function byteLength(text3) {
-  return Buffer.byteLength(text3, "utf-8");
+function byteLength(text4) {
+  return Buffer.byteLength(text4, "utf-8");
 }
 var OutputAccumulator;
 var init_output_accumulator = __esm({
@@ -236663,20 +236663,20 @@ var init_output_accumulator = __esm({
       getLastLineBytes() {
         return this.currentLineBytes;
       }
-      appendDecodedText(text3) {
-        if (text3.length === 0) {
+      appendDecodedText(text4) {
+        if (text4.length === 0) {
           return;
         }
-        const bytes = byteLength(text3);
+        const bytes = byteLength(text4);
         this.totalDecodedBytes += bytes;
-        this.tailText += text3;
+        this.tailText += text4;
         this.tailBytes += bytes;
         if (this.tailBytes > this.maxRollingBytes * 2) {
           this.trimTail();
         }
         let newlines = 0;
         let lastNewline = -1;
-        for (let i2 = text3.indexOf("\n"); i2 !== -1; i2 = text3.indexOf("\n", i2 + 1)) {
+        for (let i2 = text4.indexOf("\n"); i2 !== -1; i2 = text4.indexOf("\n", i2 + 1)) {
           newlines++;
           lastNewline = i2;
         }
@@ -236685,7 +236685,7 @@ var init_output_accumulator = __esm({
           this.hasOpenLine = true;
         } else {
           this.completedLines += newlines;
-          const tail = text3.slice(lastNewline + 1);
+          const tail = text4.slice(lastNewline + 1);
           this.currentLineBytes = byteLength(tail);
           this.hasOpenLine = tail.length > 0;
         }
@@ -236755,11 +236755,11 @@ function str2(value2) {
     return "";
   return null;
 }
-function replaceTabs(text3) {
-  return text3.replace(/\t/g, "   ");
+function replaceTabs(text4) {
+  return text4.replace(/\t/g, "   ");
 }
-function normalizeDisplayText(text3) {
-  return text3.replace(/\r/g, "");
+function normalizeDisplayText(text4) {
+  return text4.replace(/\r/g, "");
 }
 function getTextOutput(result, showImages) {
   if (!result)
@@ -237087,7 +237087,7 @@ ${command}` : command;
       };
       const formatOutput = (snapshot, emptyText = "(no output)") => {
         const truncation = snapshot.truncation;
-        let text3 = snapshot.content || emptyText;
+        let text4 = snapshot.content || emptyText;
         let details;
         if (truncation.truncated) {
           details = { truncation, fullOutputPath: snapshot.fullOutputPath };
@@ -237095,22 +237095,22 @@ ${command}` : command;
           const endLine = truncation.totalLines;
           if (truncation.lastLinePartial) {
             const lastLineSize = formatSize2(output.getLastLineBytes());
-            text3 += `
+            text4 += `
 
 [Showing last ${formatSize2(truncation.outputBytes)} of line ${endLine} (line is ${lastLineSize}). Full output: ${snapshot.fullOutputPath}]`;
           } else if (truncation.truncatedBy === "lines") {
-            text3 += `
+            text4 += `
 
 [Showing lines ${startLine}-${endLine} of ${truncation.totalLines}. Full output: ${snapshot.fullOutputPath}]`;
           } else {
-            text3 += `
+            text4 += `
 
 [Showing lines ${startLine}-${endLine} of ${truncation.totalLines} (${formatSize2(DEFAULT_MAX_BYTES3)} limit). Full output: ${snapshot.fullOutputPath}]`;
           }
         }
-        return { text: text3, details };
+        return { text: text4, details };
       };
-      const appendStatus = (text3, status) => `${text3 ? `${text3}
+      const appendStatus = (text4, status) => `${text4 ? `${text4}
 
 ` : ""}${status}`;
       try {
@@ -237125,13 +237125,13 @@ ${command}` : command;
           exitCode = result.exitCode;
         } catch (err2) {
           const snapshot2 = await finishOutput();
-          const { text: text3 } = formatOutput(snapshot2, "");
+          const { text: text4 } = formatOutput(snapshot2, "");
           if (err2 instanceof Error && err2.message === "aborted") {
-            throw new Error(appendStatus(text3, "Command aborted"));
+            throw new Error(appendStatus(text4, "Command aborted"));
           }
           if (err2 instanceof Error && err2.message.startsWith("timeout:")) {
             const timeoutSecs = err2.message.split(":")[1];
-            throw new Error(appendStatus(text3, `Command timed out after ${timeoutSecs} seconds`));
+            throw new Error(appendStatus(text4, `Command timed out after ${timeoutSecs} seconds`));
           }
           throw err2;
         }
@@ -237151,9 +237151,9 @@ ${command}` : command;
         state2.startedAt = Date.now();
         state2.endedAt = void 0;
       }
-      const text3 = context.lastComponent ?? new Text("", 0, 0);
-      text3.setText(formatBashCall(args));
-      return text3;
+      const text4 = context.lastComponent ?? new Text("", 0, 0);
+      text4.setText(formatBashCall(args));
+      return text4;
     },
     renderResult(result, options2, _theme, context) {
       const state2 = context.state;
@@ -237227,8 +237227,8 @@ function parseDiffLine(line) {
     return null;
   return { prefix: match2[1], lineNum: match2[2], content: match2[3] };
 }
-function replaceTabs2(text3) {
-  return text3.replace(/\t/g, "   ");
+function replaceTabs2(text4) {
+  return text4.replace(/\t/g, "   ");
 }
 function renderIntraLineDiff(oldContent, newContent) {
   const wordDiff2 = diffWords(oldContent, newContent);
@@ -237407,7 +237407,7 @@ function validateEditInput2(input2) {
   return { path: input2.path, edits: input2.edits };
 }
 function createEditCallRenderComponent() {
-  return Object.assign(new Box(1, 1, (text3) => text3), {
+  return Object.assign(new Box(1, 1, (text4) => text4), {
     preview: void 0,
     previewArgsKey: void 0,
     previewPending: false,
@@ -237467,14 +237467,14 @@ function formatEditResult(args, preview, result, theme2, isError) {
 function getEditHeaderBg(preview, settledError, theme2) {
   if (preview) {
     if ("error" in preview) {
-      return (text3) => theme2.bg("toolErrorBg", text3);
+      return (text4) => theme2.bg("toolErrorBg", text4);
     }
-    return (text3) => theme2.bg("toolSuccessBg", text3);
+    return (text4) => theme2.bg("toolSuccessBg", text4);
   }
   if (settledError) {
-    return (text3) => theme2.bg("toolErrorBg", text3);
+    return (text4) => theme2.bg("toolErrorBg", text4);
   }
-  return (text3) => theme2.bg("toolPendingBg", text3);
+  return (text4) => theme2.bg("toolPendingBg", text4);
 }
 function buildEditCallComponent(component, args, theme2, cwd) {
   component.setBgFn(getEditHeaderBg(component.preview, component.settledError, theme2));
@@ -237949,24 +237949,24 @@ function formatFindCall(args, theme2) {
   const path16 = rawPath !== null ? shortenPath(rawPath || ".") : null;
   const limit2 = args?.limit;
   const invalidArg = invalidArgText(theme2);
-  let text3 = theme2.fg("toolTitle", theme2.bold("find")) + " " + (pattern === null ? invalidArg : theme2.fg("accent", pattern || "")) + theme2.fg("toolOutput", ` in ${path16 === null ? invalidArg : path16}`);
+  let text4 = theme2.fg("toolTitle", theme2.bold("find")) + " " + (pattern === null ? invalidArg : theme2.fg("accent", pattern || "")) + theme2.fg("toolOutput", ` in ${path16 === null ? invalidArg : path16}`);
   if (limit2 !== void 0) {
-    text3 += theme2.fg("toolOutput", ` (limit ${limit2})`);
+    text4 += theme2.fg("toolOutput", ` (limit ${limit2})`);
   }
-  return text3;
+  return text4;
 }
 function formatFindResult(result, options, theme2, showImages) {
   const output = getTextOutput(result, showImages).trim();
-  let text3 = "";
+  let text4 = "";
   if (output) {
     const lines = output.split("\n");
     const maxLines = options.expanded ? lines.length : 20;
     const displayLines = lines.slice(0, maxLines);
     const remaining = lines.length - maxLines;
-    text3 += `
+    text4 += `
 ${displayLines.map((line) => theme2.fg("toolOutput", line)).join("\n")}`;
     if (remaining > 0) {
-      text3 += `${theme2.fg("muted", `
+      text4 += `${theme2.fg("muted", `
 ... (${remaining} more lines,`)} ${keyHint("app.tools.expand", "to expand")}${theme2.fg("muted", ")")}`;
     }
   }
@@ -237978,10 +237978,10 @@ ${displayLines.map((line) => theme2.fg("toolOutput", line)).join("\n")}`;
       warnings.push(`${resultLimit} results limit`);
     if (truncation?.truncated)
       warnings.push(`${formatSize2(truncation.maxBytes ?? DEFAULT_MAX_BYTES3)} limit`);
-    text3 += `
+    text4 += `
 ${theme2.fg("warning", `[Truncated: ${warnings.join(", ")}]`)}`;
   }
-  return text3;
+  return text4;
 }
 function createFindToolDefinition(cwd, options) {
   const customOps = options?.operations;
@@ -238187,14 +238187,14 @@ function createFindToolDefinition(cwd, options) {
       });
     },
     renderCall(args, theme2, context) {
-      const text3 = context.lastComponent ?? new Text("", 0, 0);
-      text3.setText(formatFindCall(args, theme2));
-      return text3;
+      const text4 = context.lastComponent ?? new Text("", 0, 0);
+      text4.setText(formatFindCall(args, theme2));
+      return text4;
     },
     renderResult(result, options2, theme2, context) {
-      const text3 = context.lastComponent ?? new Text("", 0, 0);
-      text3.setText(formatFindResult(result, options2, theme2, context.showImages));
-      return text3;
+      const text4 = context.lastComponent ?? new Text("", 0, 0);
+      text4.setText(formatFindResult(result, options2, theme2, context.showImages));
+      return text4;
     }
   };
 }
@@ -238244,25 +238244,25 @@ function formatGrepCall(args, theme2) {
   const glob = str2(args?.glob);
   const limit2 = args?.limit;
   const invalidArg = invalidArgText(theme2);
-  let text3 = theme2.fg("toolTitle", theme2.bold("grep")) + " " + (pattern === null ? invalidArg : theme2.fg("accent", `/${pattern || ""}/`)) + theme2.fg("toolOutput", ` in ${path16 === null ? invalidArg : path16}`);
+  let text4 = theme2.fg("toolTitle", theme2.bold("grep")) + " " + (pattern === null ? invalidArg : theme2.fg("accent", `/${pattern || ""}/`)) + theme2.fg("toolOutput", ` in ${path16 === null ? invalidArg : path16}`);
   if (glob)
-    text3 += theme2.fg("toolOutput", ` (${glob})`);
+    text4 += theme2.fg("toolOutput", ` (${glob})`);
   if (limit2 !== void 0)
-    text3 += theme2.fg("toolOutput", ` limit ${limit2}`);
-  return text3;
+    text4 += theme2.fg("toolOutput", ` limit ${limit2}`);
+  return text4;
 }
 function formatGrepResult(result, options, theme2, showImages) {
   const output = getTextOutput(result, showImages).trim();
-  let text3 = "";
+  let text4 = "";
   if (output) {
     const lines = output.split("\n");
     const maxLines = options.expanded ? lines.length : 15;
     const displayLines = lines.slice(0, maxLines);
     const remaining = lines.length - maxLines;
-    text3 += `
+    text4 += `
 ${displayLines.map((line) => theme2.fg("toolOutput", line)).join("\n")}`;
     if (remaining > 0) {
-      text3 += `${theme2.fg("muted", `
+      text4 += `${theme2.fg("muted", `
 ... (${remaining} more lines,`)} ${keyHint("app.tools.expand", "to expand")}${theme2.fg("muted", ")")}`;
     }
   }
@@ -238277,10 +238277,10 @@ ${displayLines.map((line) => theme2.fg("toolOutput", line)).join("\n")}`;
       warnings.push(`${formatSize2(truncation.maxBytes ?? DEFAULT_MAX_BYTES3)} limit`);
     if (linesTruncated)
       warnings.push("some lines truncated");
-    text3 += `
+    text4 += `
 ${theme2.fg("warning", `[Truncated: ${warnings.join(", ")}]`)}`;
   }
-  return text3;
+  return text4;
 }
 function createGrepToolDefinition(cwd, options) {
   const customOps = options?.operations;
@@ -238489,14 +238489,14 @@ function createGrepToolDefinition(cwd, options) {
       });
     },
     renderCall(args, theme2, context) {
-      const text3 = context.lastComponent ?? new Text("", 0, 0);
-      text3.setText(formatGrepCall(args, theme2));
-      return text3;
+      const text4 = context.lastComponent ?? new Text("", 0, 0);
+      text4.setText(formatGrepCall(args, theme2));
+      return text4;
     },
     renderResult(result, options2, theme2, context) {
-      const text3 = context.lastComponent ?? new Text("", 0, 0);
-      text3.setText(formatGrepResult(result, options2, theme2, context.showImages));
-      return text3;
+      const text4 = context.lastComponent ?? new Text("", 0, 0);
+      text4.setText(formatGrepResult(result, options2, theme2, context.showImages));
+      return text4;
     }
   };
 }
@@ -238541,24 +238541,24 @@ import nodePath from "path";
 function formatLsCall(args, theme2, cwd) {
   const limit2 = args?.limit;
   const pathDisplay = renderToolPath(str2(args?.path), theme2, cwd, { emptyFallback: "." });
-  let text3 = `${theme2.fg("toolTitle", theme2.bold("ls"))} ${pathDisplay}`;
+  let text4 = `${theme2.fg("toolTitle", theme2.bold("ls"))} ${pathDisplay}`;
   if (limit2 !== void 0) {
-    text3 += theme2.fg("toolOutput", ` (limit ${limit2})`);
+    text4 += theme2.fg("toolOutput", ` (limit ${limit2})`);
   }
-  return text3;
+  return text4;
 }
 function formatLsResult(result, options, theme2, showImages) {
   const output = getTextOutput(result, showImages).trim();
-  let text3 = "";
+  let text4 = "";
   if (output) {
     const lines = output.split("\n");
     const maxLines = options.expanded ? lines.length : 20;
     const displayLines = lines.slice(0, maxLines);
     const remaining = lines.length - maxLines;
-    text3 += `
+    text4 += `
 ${displayLines.map((line) => theme2.fg("toolOutput", line)).join("\n")}`;
     if (remaining > 0) {
-      text3 += `${theme2.fg("muted", `
+      text4 += `${theme2.fg("muted", `
 ... (${remaining} more lines,`)} ${keyHint("app.tools.expand", "to expand")}${theme2.fg("muted", ")")}`;
     }
   }
@@ -238570,10 +238570,10 @@ ${displayLines.map((line) => theme2.fg("toolOutput", line)).join("\n")}`;
       warnings.push(`${entryLimit} entries limit`);
     if (truncation?.truncated)
       warnings.push(`${formatSize2(truncation.maxBytes ?? DEFAULT_MAX_BYTES3)} limit`);
-    text3 += `
+    text4 += `
 ${theme2.fg("warning", `[Truncated: ${warnings.join(", ")}]`)}`;
   }
-  return text3;
+  return text4;
 }
 function createLsToolDefinition(cwd, options) {
   const ops = options?.operations ?? defaultLsOperations;
@@ -238665,14 +238665,14 @@ function createLsToolDefinition(cwd, options) {
       });
     },
     renderCall(args, theme2, context) {
-      const text3 = context.lastComponent ?? new Text("", 0, 0);
-      text3.setText(formatLsCall(args, theme2, context.cwd));
-      return text3;
+      const text4 = context.lastComponent ?? new Text("", 0, 0);
+      text4.setText(formatLsCall(args, theme2, context.cwd));
+      return text4;
     },
     renderResult(result, options2, theme2, context) {
-      const text3 = context.lastComponent ?? new Text("", 0, 0);
-      text3.setText(formatLsResult(result, options2, theme2, context.showImages));
-      return text3;
+      const text4 = context.lastComponent ?? new Text("", 0, 0);
+      text4.setText(formatLsResult(result, options2, theme2, context.showImages));
+      return text4;
     }
   };
 }
@@ -238796,11 +238796,11 @@ function startsWith2(buffer, bytes) {
     return false;
   return bytes.every((byte, index3) => buffer[index3] === byte);
 }
-function startsWithAscii2(buffer, offset, text3) {
-  if (buffer.length < offset + text3.length)
+function startsWithAscii2(buffer, offset, text4) {
+  if (buffer.length < offset + text4.length)
     return false;
-  for (let index3 = 0; index3 < text3.length; index3++) {
-    if (buffer[offset + index3] !== text3.charCodeAt(index3))
+  for (let index3 = 0; index3 < text4.length; index3++) {
+    if (buffer[offset + index3] !== text4.charCodeAt(index3))
       return false;
   }
   return true;
@@ -238892,26 +238892,26 @@ function formatReadResult(args, result, options, theme2, showImages, _cwd, isErr
   const maxLines = options.expanded ? lines.length : 10;
   const displayLines = lines.slice(0, maxLines);
   const remaining = lines.length - maxLines;
-  let text3 = `
+  let text4 = `
 ${displayLines.map((line) => lang ? replaceTabs(line) : theme2.fg("toolOutput", replaceTabs(line))).join("\n")}`;
   if (remaining > 0) {
-    text3 += `${theme2.fg("muted", `
+    text4 += `${theme2.fg("muted", `
 ... (${remaining} more lines,`)} ${keyHint("app.tools.expand", "to expand")}${theme2.fg("muted", ")")}`;
   }
   const truncation = result.details?.truncation;
   if (truncation?.truncated) {
     if (truncation.firstLineExceedsLimit) {
-      text3 += `
+      text4 += `
 ${theme2.fg("warning", `[First line exceeds ${formatSize2(truncation.maxBytes ?? DEFAULT_MAX_BYTES3)} limit]`)}`;
     } else if (truncation.truncatedBy === "lines") {
-      text3 += `
+      text4 += `
 ${theme2.fg("warning", `[Truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines (${truncation.maxLines ?? DEFAULT_MAX_LINES2} line limit)]`)}`;
     } else {
-      text3 += `
+      text4 += `
 ${theme2.fg("warning", `[Truncated: ${truncation.outputLines} lines shown (${formatSize2(truncation.maxBytes ?? DEFAULT_MAX_BYTES3)} limit)]`)}`;
     }
   }
-  return text3;
+  return text4;
 }
 function createReadToolDefinition(cwd, options) {
   const autoResizeImages = options?.autoResizeImages ?? true;
@@ -239034,15 +239034,15 @@ ${nonVisionImageNote}`;
       });
     },
     renderCall(args, theme2, context) {
-      const text3 = context.lastComponent ?? new Text("", 0, 0);
+      const text4 = context.lastComponent ?? new Text("", 0, 0);
       const classification = !context.expanded ? getCompactReadClassification(args, context.cwd) : void 0;
-      text3.setText(classification ? formatCompactReadCall(classification, args, theme2) : formatReadCall(args, theme2, context.cwd));
-      return text3;
+      text4.setText(classification ? formatCompactReadCall(classification, args, theme2) : formatReadCall(args, theme2, context.cwd));
+      return text4;
     },
     renderResult(result, options2, theme2, context) {
-      const text3 = context.lastComponent ?? new Text("", 0, 0);
-      text3.setText(formatReadResult(context.args, result, options2, theme2, context.showImages, context.cwd, context.isError));
-      return text3;
+      const text4 = context.lastComponent ?? new Text("", 0, 0);
+      text4.setText(formatReadResult(context.args, result, options2, theme2, context.showImages, context.cwd, context.isError));
+      return text4;
     }
   };
 }
@@ -239156,9 +239156,9 @@ function formatWriteCall(args, options, theme2, cache, cwd) {
   const rawPath = str2(args?.file_path ?? args?.path);
   const fileContent = str2(args?.content);
   const pathDisplay = renderToolPath(rawPath, theme2, cwd);
-  let text3 = `${theme2.fg("toolTitle", theme2.bold("write"))} ${pathDisplay}`;
+  let text4 = `${theme2.fg("toolTitle", theme2.bold("write"))} ${pathDisplay}`;
   if (fileContent === null) {
-    text3 += `
+    text4 += `
 
 ${theme2.fg("error", "[invalid content arg - expected string]")}`;
   } else if (fileContent) {
@@ -239169,15 +239169,15 @@ ${theme2.fg("error", "[invalid content arg - expected string]")}`;
     const maxLines = options.expanded ? lines.length : 10;
     const displayLines = lines.slice(0, maxLines);
     const remaining = lines.length - maxLines;
-    text3 += `
+    text4 += `
 
 ${displayLines.map((line) => lang ? line : theme2.fg("toolOutput", replaceTabs(line))).join("\n")}`;
     if (remaining > 0) {
-      text3 += `${theme2.fg("muted", `
+      text4 += `${theme2.fg("muted", `
 ... (${remaining} more lines, ${totalLines} total,`)} ${keyHint("app.tools.expand", "to expand")}${theme2.fg("muted", ")")}`;
     }
   }
-  return text3;
+  return text4;
 }
 function formatWriteResult(result, theme2) {
   if (!result.isError) {
@@ -239239,9 +239239,9 @@ function createWriteToolDefinition(cwd, options) {
         component.clear();
         return component;
       }
-      const text3 = context.lastComponent ?? new Text("", 0, 0);
-      text3.setText(output);
-      return text3;
+      const text4 = context.lastComponent ?? new Text("", 0, 0);
+      text4.setText(output);
+      return text4;
     }
   };
 }
@@ -239590,8 +239590,8 @@ function validateAuthCommandArgs(args, kind) {
   const provider = args.provider?.trim() || void 0;
   const model = args.model?.trim() || void 0;
   if (args.unknownFlags.size > 0) {
-    const option = args.unknownFlags.keys().next().value;
-    throw new AuthCommandError(`Unknown option --${option} for "${getAuthCommandName(kind)}".`);
+    const option2 = args.unknownFlags.keys().next().value;
+    throw new AuthCommandError(`Unknown option --${option2} for "${getAuthCommandName(kind)}".`);
   }
   if (args.apiKey !== void 0 || args.messages.length > 0 || args.fileArgs.length > 0) {
     throw new AuthCommandError("Auth commands only accept --provider and --model");
@@ -239758,7 +239758,7 @@ import { access as access4, readFile as readFile3, stat as stat4 } from "node:fs
 import { resolve as resolve9 } from "path";
 async function processFileArguments(fileArgs, options) {
   const autoResizeImages = options?.autoResizeImages ?? true;
-  let text3 = "";
+  let text4 = "";
   const images = [];
   for (const fileArg of fileArgs) {
     const absolutePath = resolve9(resolveReadPath(fileArg, process.cwd()));
@@ -239777,7 +239777,7 @@ async function processFileArguments(fileArgs, options) {
       const content = await readFile3(absolutePath);
       const processed = await processImage(content, mimeType, { autoResizeImages });
       if (!processed.ok) {
-        text3 += `<file name="${absolutePath}">${processed.message}</file>
+        text4 += `<file name="${absolutePath}">${processed.message}</file>
 `;
         continue;
       }
@@ -239788,16 +239788,16 @@ async function processFileArguments(fileArgs, options) {
       };
       images.push(attachment);
       if (processed.hints.length > 0) {
-        text3 += `<file name="${absolutePath}">${processed.hints.join("\n")}</file>
+        text4 += `<file name="${absolutePath}">${processed.hints.join("\n")}</file>
 `;
       } else {
-        text3 += `<file name="${absolutePath}"></file>
+        text4 += `<file name="${absolutePath}"></file>
 `;
       }
     } else {
       try {
         const content = await readFile3(absolutePath, "utf-8");
-        text3 += `<file name="${absolutePath}">
+        text4 += `<file name="${absolutePath}">
 ${content}
 </file>
 `;
@@ -239808,7 +239808,7 @@ ${content}
       }
     }
   }
-  return { text: text3, images };
+  return { text: text4, images };
 }
 var init_file_processor = __esm({
   "node_modules/@earendil-works/pi-coding-agent/dist/cli/file-processor.js"() {
@@ -240394,8 +240394,8 @@ var init_extension_selector = __esm({
         this.listContainer.clear();
         for (let i2 = 0; i2 < this.options.length; i2++) {
           const isSelected = i2 === this.selectedIndex;
-          const text3 = isSelected ? theme.fg("accent", "\u2192 ") + theme.fg("accent", this.options[i2]) : `  ${theme.fg("text", this.options[i2])}`;
-          this.listContainer.addChild(new Text(text3, 1, 0));
+          const text4 = isSelected ? theme.fg("accent", "\u2192 ") + theme.fg("accent", this.options[i2]) : `  ${theme.fg("text", this.options[i2])}`;
+          this.listContainer.addChild(new Text(text4, 1, 0));
         }
       }
       handleInput(keyData) {
@@ -240449,7 +240449,7 @@ var init_first_time_setup = __esm({
       constructor(options) {
         super();
         this.options = options;
-        this.themeIndex = Math.max(0, THEME_OPTIONS.findIndex((option) => option.value === options.detectedTheme));
+        this.themeIndex = Math.max(0, THEME_OPTIONS.findIndex((option2) => option2.value === options.detectedTheme));
         this.update();
       }
       // Rebuild the whole dialog on every change so theme previews recolor all text.
@@ -240465,12 +240465,12 @@ var init_first_time_setup = __esm({
           this.addChild(new Text(theme.fg("text", "Pick a theme."), 1, 0));
           this.addChild(new Text(theme.fg("muted", `Detected system appearance: ${this.options.detectedTheme}`), 1, 0));
           this.addChild(new Spacer(1));
-          this.addOptionList(THEME_OPTIONS.map((option) => option.label), this.themeIndex);
+          this.addOptionList(THEME_OPTIONS.map((option2) => option2.label), this.themeIndex);
         } else {
           this.addChild(new Text(theme.fg("text", "Opt-in to anonymous usage data sharing?"), 1, 0));
           this.addChild(new Text(theme.fg("muted", "Opting in stores a tracking identifier in settings.json and enables anonymous\nusage analytics. This helps us to better debug, reproduce, and resolve issues\nand bugs within Pi. You can observe what is shared using /privacy and make\nchanges anytime in settings.json."), 1, 0));
           this.addChild(new Spacer(1));
-          this.addOptionList(ANALYTICS_OPTIONS.map((option) => option.label), this.analyticsIndex);
+          this.addOptionList(ANALYTICS_OPTIONS.map((option2) => option2.label), this.analyticsIndex);
         }
         this.addChild(new Spacer(1));
         this.addChild(new Text(rawKeyHint("\u2191\u2193", "navigate") + "  " + keyHint("tui.select.confirm", this.step === "theme" ? "continue" : "finish") + "  " + keyHint("tui.select.cancel", "skip setup"), 1, 0));
@@ -240613,7 +240613,7 @@ async function showStartupSelector(settingsManager, title, options) {
       ui2.stop();
       resolve17(result);
     };
-    const selector = new ExtensionSelectorComponent(title, options.map((option) => option.label), (option) => void finish(options.find((entry) => entry.label === option)?.value), () => void finish(void 0), { tui: ui2 });
+    const selector = new ExtensionSelectorComponent(title, options.map((option2) => option2.label), (option2) => void finish(options.find((entry) => entry.label === option2)?.value), () => void finish(void 0), { tui: ui2 });
     ui2.addChild(selector);
     ui2.setFocus(selector);
     startStartupTui(ui2, settingsManager);
@@ -240712,7 +240712,7 @@ function createProjectTrustContext(options) {
         if (options.mode !== "interactive") {
           return void 0;
         }
-        return showStartupSelector(options.settingsManager, title, selectOptions.map((option) => ({ label: option, value: option })));
+        return showStartupSelector(options.settingsManager, title, selectOptions.map((option2) => ({ label: option2, value: option2 })));
       },
       confirm: async (title, message) => {
         if (!options.hasUI) {
@@ -240753,8 +240753,8 @@ var init_project_trust = __esm({
 });
 
 // node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/components/session-selector-search.js
-function normalizeWhitespaceLower(text3) {
-  return text3.toLowerCase().replace(/\s+/g, " ").trim();
+function normalizeWhitespaceLower(text4) {
+  return text4.toLowerCase().replace(/\s+/g, " ").trim();
 }
 function getSessionSearchText(session) {
   return `${session.id} ${session.name ?? ""} ${session.allMessagesText} ${session.cwd}`;
@@ -240827,12 +240827,12 @@ function parseSearchQuery(query) {
   return { mode: "tokens", tokens, regex: null };
 }
 function matchSession(session, parsed) {
-  const text3 = getSessionSearchText(session);
+  const text4 = getSessionSearchText(session);
   if (parsed.mode === "regex") {
     if (!parsed.regex) {
       return { matches: false, score: 0 };
     }
-    const idx = text3.search(parsed.regex);
+    const idx = text4.search(parsed.regex);
     if (idx < 0)
       return { matches: false, score: 0 };
     return { matches: true, score: idx * 0.1 };
@@ -240845,7 +240845,7 @@ function matchSession(session, parsed) {
   for (const token of parsed.tokens) {
     if (token.kind === "phrase") {
       if (normalizedText === null) {
-        normalizedText = normalizeWhitespaceLower(text3);
+        normalizedText = normalizeWhitespaceLower(text4);
       }
       const phrase = normalizeWhitespaceLower(token.value);
       if (!phrase)
@@ -240856,7 +240856,7 @@ function matchSession(session, parsed) {
       totalScore += idx * 0.1;
       continue;
     }
-    const m3 = fuzzyMatch(token.value, text3);
+    const m3 = fuzzyMatch(token.value, text4);
     if (!m3.matches)
       return { matches: false, score: 0 };
     totalScore += m3.score;
@@ -242643,9 +242643,9 @@ var init_runner = __esm({
         return { skillPaths, promptPaths, themePaths };
       }
       /** Emit input event. Transforms chain, "handled" short-circuits. */
-      async emitInput(text3, images, source, streamingBehavior) {
+      async emitInput(text4, images, source, streamingBehavior) {
         const ctx = this.createContext();
-        let currentText = text3;
+        let currentText = text4;
         let currentImages = images;
         for (const ext2 of this.extensions) {
           for (const handler of ext2.handlers.get("input") ?? []) {
@@ -242674,7 +242674,7 @@ var init_runner = __esm({
             }
           }
         }
-        return currentText !== text3 || currentImages !== images ? { action: "transform", text: currentText, images: currentImages } : { action: "continue" };
+        return currentText !== text4 || currentImages !== images ? { action: "transform", text: currentText, images: currentImages } : { action: "continue" };
       }
     };
   }
@@ -243153,8 +243153,8 @@ This allows ${APP_NAME} to load ${CONFIG_DIR_NAME} settings and resources, insta
 }
 async function selectProjectTrustOption(cwd, ctx) {
   const options = getProjectTrustOptions(cwd, { includeSessionOnly: true });
-  const selected = await ctx.ui.select(formatProjectTrustPrompt(cwd), options.map((option) => option.label));
-  return options.find((option) => option.label === selected);
+  const selected = await ctx.ui.select(formatProjectTrustPrompt(cwd), options.map((option2) => option2.label));
+  return options.find((option2) => option2.label === selected);
 }
 function saveProjectTrustPromptResult(trustStore, result) {
   if (result.updates.length > 0) {
@@ -243803,16 +243803,16 @@ function modelDescription(model) {
 }
 function selectTheme(theme2) {
   return {
-    selectedPrefix: (text3) => theme2.fg("accent", text3),
-    selectedText: (text3) => theme2.fg("accent", text3),
-    description: (text3) => theme2.fg("muted", text3),
-    scrollInfo: (text3) => theme2.fg("dim", text3),
-    noMatch: (text3) => theme2.fg("warning", text3)
+    selectedPrefix: (text4) => theme2.fg("accent", text4),
+    selectedText: (text4) => theme2.fg("accent", text4),
+    description: (text4) => theme2.fg("muted", text4),
+    scrollInfo: (text4) => theme2.fg("dim", text4),
+    noMatch: (text4) => theme2.fg("warning", text4)
   };
 }
 function frame(theme2, title, body, footer) {
   const container = new Container();
-  container.addChild(new DynamicBorder((text3) => theme2.fg("accent", text3)));
+  container.addChild(new DynamicBorder((text4) => theme2.fg("accent", text4)));
   container.addChild(new Text(theme2.fg("accent", theme2.bold(title)), 1, 0));
   for (const child of body)
     container.addChild(child);
@@ -243820,7 +243820,7 @@ function frame(theme2, title, body, footer) {
     container.addChild(new Spacer(1));
     container.addChild(new Text(theme2.fg("dim", footer), 1, 0));
   }
-  container.addChild(new DynamicBorder((text3) => theme2.fg("accent", text3)));
+  container.addChild(new DynamicBorder((text4) => theme2.fg("accent", text4)));
   return container;
 }
 function compactCount(value2) {
@@ -244113,7 +244113,7 @@ var init_ui = __esm({
       }
       select(title, options) {
         return new Promise((resolve17) => {
-          const list = new SelectList(options.map((option) => ({ value: option, label: option })), Math.min(options.length, 12), selectTheme(this.theme));
+          const list = new SelectList(options.map((option2) => ({ value: option2, label: option2 })), Math.min(options.length, 12), selectTheme(this.theme));
           list.onSelect = (item) => resolve17(item.value);
           list.onCancel = () => resolve17(void 0);
           this.setContent(frame(this.theme, title, [new Spacer(1), list], `${keyHint("tui.select.confirm", "select")} \u2022 ${keyHint("tui.select.cancel", "cancel")}`), list);
@@ -244424,10 +244424,10 @@ import { existsSync as existsSync20, mkdirSync as mkdirSync9, readdirSync as rea
 import { dirname as dirname18, join as join31 } from "path";
 function migrateAuthToAuthJson() {
   const agentDir = getAgentDir();
-  const authPath = join31(agentDir, "auth.json");
+  const authPath2 = join31(agentDir, "auth.json");
   const oauthPath = join31(agentDir, "oauth.json");
   const settingsPath = join31(agentDir, "settings.json");
-  if (existsSync20(authPath))
+  if (existsSync20(authPath2))
     return [];
   const migrated = {};
   const providers = [];
@@ -244460,8 +244460,8 @@ function migrateAuthToAuthJson() {
     }
   }
   if (Object.keys(migrated).length > 0) {
-    mkdirSync9(dirname18(authPath), { recursive: true });
-    writeFileSync8(authPath, JSON.stringify(migrated, null, 2), { mode: 384 });
+    mkdirSync9(dirname18(authPath2), { recursive: true });
+    writeFileSync8(authPath2, JSON.stringify(migrated, null, 2), { mode: 384 });
   }
   return providers;
 }
@@ -245211,8 +245211,8 @@ function copyToX11Clipboard(options) {
 function isRemoteSession(env2 = process.env) {
   return Boolean(env2.SSH_CONNECTION || env2.SSH_CLIENT || env2.MOSH_CONNECTION);
 }
-function emitOsc52(text3) {
-  const encoded = Buffer.from(text3).toString("base64");
+function emitOsc52(text4) {
+  const encoded = Buffer.from(text4).toString("base64");
   if (encoded.length > MAX_OSC52_ENCODED_LENGTH) {
     return false;
   }
@@ -245221,8 +245221,8 @@ function emitOsc52(text3) {
 }
 function readWaylandClipboardText() {
   try {
-    const text3 = execFileSync("wl-paste", ["--no-newline", "--type", "text"], READ_CLIPBOARD_OPTIONS);
-    return { ok: true, text: text3 || null };
+    const text4 = execFileSync("wl-paste", ["--no-newline", "--type", "text"], READ_CLIPBOARD_OPTIONS);
+    return { ok: true, text: text4 || null };
   } catch {
     return { ok: false };
   }
@@ -245238,18 +245238,18 @@ async function readClipboardText() {
     return null;
   }
   try {
-    const text3 = await clipboard.getText();
-    return text3 || null;
+    const text4 = await clipboard.getText();
+    return text4 || null;
   } catch {
     return null;
   }
 }
-async function copyToClipboard(text3) {
+async function copyToClipboard(text4) {
   let copied = false;
   const p = platform2();
   try {
     if (clipboard && p !== "linux") {
-      await clipboard.setText(text3);
+      await clipboard.setText(text4);
       copied = true;
     }
   } catch {
@@ -245258,7 +245258,7 @@ async function copyToClipboard(text3) {
   if (copied && !remote) {
     return;
   }
-  const options = { input: text3, timeout: 5e3, stdio: ["pipe", "ignore", "ignore"] };
+  const options = { input: text4, timeout: 5e3, stdio: ["pipe", "ignore", "ignore"] };
   if (!copied) {
     try {
       if (p === "darwin") {
@@ -245288,7 +245288,7 @@ async function copyToClipboard(text3) {
                 proc.on("close", (code) => resolve17(code ?? 1));
                 proc.stdin.on("error", () => {
                 });
-                proc.stdin.write(text3);
+                proc.stdin.write(text4);
                 proc.stdin.end();
               });
               if (wlCopyExit === 0) {
@@ -245313,7 +245313,7 @@ async function copyToClipboard(text3) {
     }
   }
   if (remote || !copied) {
-    const osc52Copied = emitOsc52(text3);
+    const osc52Copied = emitOsc52(text4);
     copied = copied || osc52Copied;
   }
   if (!copied) {
@@ -245992,7 +245992,7 @@ var init_assistant_message = __esm({
               this.contentContainer.addChild(new Text(theme.italic(theme.fg("thinkingText", this.hiddenThinkingLabel)), this.outputPad, 0));
             } else {
               this.contentContainer.addChild(new Markdown(thinkingBlocks.join("\n\n"), this.outputPad, 0, this.markdownTheme, {
-                color: (text3) => theme.fg("thinkingText", text3),
+                color: (text4) => theme.fg("thinkingText", text4),
                 italic: true
               }, {
                 transform: createMarkdownTransform("assistant-thinking", this.isStreaming, this.markdownTransformers)
@@ -246057,7 +246057,7 @@ var init_bash_execution = __esm({
         this.addChild(this.contentContainer);
         const header = new Text(theme.fg(colorKey, theme.bold(`$ ${command}`)), 1, 0);
         this.contentContainer.addChild(header);
-        this.loader = new Loader(ui2, (spinner) => theme.fg(colorKey, spinner), (text3) => theme.fg("muted", text3), `Running... (${keyText("tui.select.cancel")} to cancel)`);
+        this.loader = new Loader(ui2, (spinner) => theme.fg(colorKey, spinner), (text4) => theme.fg("muted", text4), `Running... (${keyText("tui.select.cancel")} to cancel)`);
         this.contentContainer.addChild(this.loader);
         this.addChild(new DynamicBorder(borderColor));
       }
@@ -246262,7 +246262,7 @@ var init_branch_summary_message = __esm({
         if (this.expanded) {
           const header = "**Branch Summary**\n\n";
           this.addChild(new Markdown(header + this.message.summary, 0, 0, this.markdownTheme, {
-            color: (text3) => theme.fg("customMessageText", text3)
+            color: (text4) => theme.fg("customMessageText", text4)
           }));
         } else {
           this.addChild(new Text(theme.fg("customMessageText", "Branch summary (") + theme.fg("dim", keyText("app.tools.expand")) + theme.fg("customMessageText", " to expand)"), 0, 0));
@@ -246308,7 +246308,7 @@ var init_compaction_summary_message = __esm({
 
 `;
           this.addChild(new Markdown(header + this.message.summary, 0, 0, this.markdownTheme, {
-            color: (text3) => theme.fg("customMessageText", text3)
+            color: (text4) => theme.fg("customMessageText", text4)
           }));
         } else {
           this.addChild(new Text(theme.fg("customMessageText", `Compacted from ${tokenStr} tokens (`) + theme.fg("dim", keyText("app.tools.expand")) + theme.fg("customMessageText", " to expand)"), 0, 0));
@@ -246423,7 +246423,7 @@ var init_custom_entry = __esm({
           component = this.renderer(this.entry, { expanded: this._expanded }, theme);
         } catch (error48) {
           const message = error48 instanceof Error ? error48.message : String(error48);
-          const box2 = new Box(1, 1, (text3) => theme.bg("customMessageBg", text3));
+          const box2 = new Box(1, 1, (text4) => theme.bg("customMessageBg", text4));
           box2.addChild(new Text(theme.fg("error", `[${this.entry.customType}] renderer failed: ${message}`), 0, 0));
           component = box2;
         }
@@ -246500,14 +246500,14 @@ var init_custom_message = __esm({
         const label = theme.fg("customMessageLabel", `\x1B[1m[${this.message.customType}]\x1B[22m`);
         this.box.addChild(new Text(label, 0, 0));
         this.box.addChild(new Spacer(1));
-        let text3;
+        let text4;
         if (typeof this.message.content === "string") {
-          text3 = this.message.content;
+          text4 = this.message.content;
         } else {
-          text3 = this.message.content.filter((c) => c.type === "text").map((c) => c.text).join("\n");
+          text4 = this.message.content.filter((c) => c.type === "text").map((c) => c.text).join("\n");
         }
-        this.box.addChild(new Markdown(text3, 0, 0, this.markdownTheme, {
-          color: (text4) => theme.fg("customMessageText", text4)
+        this.box.addChild(new Markdown(text4, 0, 0, this.markdownTheme, {
+          color: (text5) => theme.fg("customMessageText", text5)
         }));
       }
     };
@@ -246674,7 +246674,7 @@ var init_earendil_announcement = __esm({
     EarendilAnnouncementComponent = class extends Container {
       constructor() {
         super();
-        this.addChild(new DynamicBorder((text3) => theme.fg("accent", text3)));
+        this.addChild(new DynamicBorder((text4) => theme.fg("accent", text4)));
         this.addChild(new Text(theme.bold(theme.fg("accent", "pi has joined Earendil")), 1, 0));
         this.addChild(new Spacer(1));
         this.addChild(new Text(theme.fg("muted", "Read the blog post:"), 1, 0));
@@ -246682,10 +246682,10 @@ var init_earendil_announcement = __esm({
         this.addChild(new Spacer(1));
         const imageBase64 = loadImageBase64();
         if (imageBase64) {
-          this.addChild(new Image(imageBase64, "image/png", { fallbackColor: (text3) => theme.fg("muted", text3) }, { maxWidthCells: 56, filename: IMAGE_FILENAME }));
+          this.addChild(new Image(imageBase64, "image/png", { fallbackColor: (text4) => theme.fg("muted", text4) }, { maxWidthCells: 56, filename: IMAGE_FILENAME }));
           this.addChild(new Spacer(1));
         }
-        this.addChild(new DynamicBorder((text3) => theme.fg("accent", text3)));
+        this.addChild(new DynamicBorder((text4) => theme.fg("accent", text4)));
       }
     };
   }
@@ -246768,8 +246768,8 @@ var init_extension_editor = __esm({
         if (prefill) {
           this.editor.setText(prefill);
         }
-        this.editor.onSubmit = (text3) => {
-          this.onSubmitCallback(text3);
+        this.editor.onSubmit = (text4) => {
+          this.onSubmitCallback(text4);
         };
         this.addChild(this.editor);
         this.addChild(new Spacer(1));
@@ -246812,8 +246812,8 @@ var init_extension_editor = __esm({
 
 // node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/components/footer.js
 import { isAbsolute as isAbsolute5, relative as relative5, resolve as resolve11, sep as sep9 } from "node:path";
-function sanitizeStatusText(text3) {
-  return text3.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
+function sanitizeStatusText(text4) {
+  return text4.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
 }
 function formatTokens(count) {
   if (count < 1e3)
@@ -246973,7 +246973,7 @@ var init_footer = __esm({
         const lines = [pwdLine, dimStatsLeft + dimRemainder];
         const extensionStatuses = this.footerData.getExtensionStatuses();
         if (extensionStatuses.size > 0) {
-          const sortedStatuses = Array.from(extensionStatuses.entries()).sort(([a], [b2]) => a.localeCompare(b2)).map(([, text3]) => sanitizeStatusText(text3));
+          const sortedStatuses = Array.from(extensionStatuses.entries()).sort(([a], [b2]) => a.localeCompare(b2)).map(([, text4]) => sanitizeStatusText(text4));
           const statusLine = sortedStatuses.join(" ");
           lines.push(truncateToWidth(statusLine, width, theme.fg("dim", "...")));
         }
@@ -247130,8 +247130,8 @@ var init_login_dialog = __esm({
         this.contentContainer.addChild(new Spacer(1));
         this.contentContainer.addChild(new Text(theme.fg("text", message), 1, 0));
         for (const link of links) {
-          const text3 = link.label ? `${link.label}: ${link.url}` : link.url;
-          const hyperlink2 = `\x1B]8;;${link.url}\x07${text3}\x1B]8;;\x07`;
+          const text4 = link.label ? `${link.label}: ${link.url}` : link.url;
+          const hyperlink2 = `\x1B]8;;${link.url}\x07${text4}\x1B]8;;\x07`;
           this.contentContainer.addChild(new Text(theme.fg("accent", hyperlink2), 1, 0));
         }
         if (showCloseHint) {
@@ -248473,9 +248473,9 @@ function reverseSlice(arr, start, end) {
     [arr[i2], arr[j3]] = [arr[j3], arr[i2]];
   }
 }
-function drawText(canvas, text3, x4, y2, cls) {
+function drawText(canvas, text4, x4, y2, cls) {
   let cur = x4;
-  for (const [cluster, cw] of measured(text3)) {
+  for (const [cluster, cw] of measured(text4)) {
     if (cw === 0)
       continue;
     canvas.set(cur, y2, cluster, cls);
@@ -248484,9 +248484,9 @@ function drawText(canvas, text3, x4, y2, cls) {
     cur += cw;
   }
 }
-function drawTextOverEdges(canvas, text3, x4, y2, cls) {
+function drawTextOverEdges(canvas, text4, x4, y2, cls) {
   let cur = x4;
-  for (const [cluster, cw] of measured(text3)) {
+  for (const [cluster, cw] of measured(text4)) {
     if (cw === 0)
       continue;
     for (let k2 = 0; k2 < cw; k2++) {
@@ -249479,9 +249479,9 @@ function drawBox(canvas, p, lines, shape) {
   }
   const inner = Math.max(1, sat(w2, 2 * PAD + 2));
   lines.forEach((line, li2) => {
-    const text3 = fitLabel(line, inner);
-    const textX = x4 + 1 + PAD + half(sat(inner, stringWidth(text3)));
-    drawText(canvas, text3, textX, y2 + 1 + li2, "text");
+    const text4 = fitLabel(line, inner);
+    const textX = x4 + 1 + PAD + half(sat(inner, stringWidth(text4)));
+    drawText(canvas, text4, textX, y2 + 1 + li2, "text");
   });
 }
 function drawClassBox(canvas, p, sections) {
@@ -249501,9 +249501,9 @@ function drawClassBox(canvas, p, sections) {
     }
     first = false;
     for (const line of section) {
-      const text3 = fitLabel(line, inner);
-      const tx = si2 === 0 ? p.x + 1 + PAD + half(sat(inner, stringWidth(text3))) : p.x + 1 + PAD;
-      drawTextOverEdges(canvas, text3, tx, row, "text");
+      const text4 = fitLabel(line, inner);
+      const tx = si2 === 0 ? p.x + 1 + PAD + half(sat(inner, stringWidth(text4))) : p.x + 1 + PAD;
+      drawTextOverEdges(canvas, text4, tx, row, "text");
       row++;
     }
   });
@@ -249631,9 +249631,9 @@ function routeBackLr(canvas, from, to, edge, laneY) {
 function placeLabel(canvas, label, row, startX) {
   if (row >= canvas.h)
     return;
-  const text3 = fitLabel(label, MAX_LABEL);
+  const text4 = fitLabel(label, MAX_LABEL);
   let x4 = startX;
-  for (const [c, cw] of measured(text3)) {
+  for (const [c, cw] of measured(text4)) {
     if (cw === 0)
       continue;
     if (x4 + cw > canvas.w)
@@ -249817,10 +249817,10 @@ function drawMessage(canvas, item, xs2, r2) {
     drawTextOverEdges(canvas, t2, lo + 1 + half2(sat2(span, stringWidth(t2))), r2, "text");
   }
 }
-function drawDivider(canvas, text3, r2, canvasW) {
+function drawDivider(canvas, text4, r2, canvasW) {
   for (let x4 = 0; x4 < canvasW; x4++)
     canvas.set(x4, r2, "\u2500", "edge");
-  drawTextOverEdges(canvas, ` ${fitLabel(text3, sat2(canvasW, 4))} `, 2, r2, "edgeLabel");
+  drawTextOverEdges(canvas, ` ${fitLabel(text4, sat2(canvasW, 4))} `, 2, r2, "edgeLabel");
 }
 var PAD2, SEQ_GAP, MAX_CANVAS_CELLS2, sat2, half2, itemTextW, box;
 var init_layout_seq = __esm({
@@ -249834,7 +249834,7 @@ var init_layout_seq = __esm({
     MAX_CANVAS_CELLS2 = 1 << 21;
     sat2 = (a, b2) => Math.max(0, a - b2);
     half2 = (n7) => Math.floor(n7 / 2);
-    itemTextW = (text3) => text3 === null ? 0 : stringWidth(text3);
+    itemTextW = (text4) => text4 === null ? 0 : stringWidth(text4);
     box = (x4, y2, w2, h2) => ({
       x: x4,
       y: y2,
@@ -250079,23 +250079,23 @@ function readShape(chars, start, closer, shape) {
     j3++;
   const quoted = chars[j3] === '"';
   let i2 = start;
-  let text3 = "";
+  let text4 = "";
   let inQuotes = false;
   while (i2 < chars.length) {
     const c = chars[i2];
     if (quoted && c === '"') {
       inQuotes = !inQuotes;
-      text3 += c;
+      text4 += c;
       i2++;
       continue;
     }
     if (!inQuotes && chars.slice(i2, i2 + closer.length).join("") === closer) {
-      return { shape, label: cleanLabel(text3), after: i2 + closer.length };
+      return { shape, label: cleanLabel(text4), after: i2 + closer.length };
     }
-    text3 += c;
+    text4 += c;
     i2++;
   }
-  return { shape, label: cleanLabel(text3), after: chars.length, unclosed: closer };
+  return { shape, label: cleanLabel(text4), after: chars.length, unclosed: closer };
 }
 function parseLink(chars, start) {
   let i2 = skipSpaces(chars, start);
@@ -250137,7 +250137,7 @@ function parseLink(chars, start) {
     while (j3 < chars.length && !isLinkChar(chars[j3]))
       j3++;
     if (j3 < chars.length && j3 > textStart && chars[j3] !== "<") {
-      const text3 = chars.slice(textStart, j3).join("");
+      const text4 = chars.slice(textStart, j3).join("");
       const op2Start = j3;
       while (j3 < chars.length && isLinkChar(chars[j3]))
         j3++;
@@ -250153,7 +250153,7 @@ function parseLink(chars, start) {
       }
       if (line === "solid")
         line = lineKind(op2);
-      return { left, right, line, label: nonEmpty(cleanLabel(text3)), next: j3 };
+      return { left, right, line, label: nonEmpty(cleanLabel(text4)), next: j3 };
     }
   }
   return { left, right, line, label: null, next: i2 };
@@ -250387,13 +250387,13 @@ function parseClass2(src) {
     const member = splitOnce(st3, ":");
     if (member) {
       const id = member[0].trim();
-      const text3 = member[1].trim();
-      if (id === "" || /\s/.test(id) || text3 === "")
+      const text4 = member[1].trim();
+      if (id === "" || /\s/.test(id) || text4 === "")
         return null;
       const idx = declare(id);
       if (idx === null)
         return null;
-      pushMember(infos[idx], text3);
+      pushMember(infos[idx], text4);
       continue;
     }
     return null;
@@ -250688,10 +250688,10 @@ function parseSequence(src) {
     const msg = parseSeqMessage(st3, seq);
     if (!msg)
       return null;
-    let text3 = msg.text;
+    let text4 = msg.text;
     if (autonumber) {
       msgCount++;
-      text3 = text3 === null ? `${msgCount}.` : `${msgCount}. ${text3}`;
+      text4 = text4 === null ? `${msgCount}.` : `${msgCount}. ${text4}`;
     }
     if (seq.items.length >= MAX_EDGES)
       return null;
@@ -250699,7 +250699,7 @@ function parseSequence(src) {
       kind: "message",
       from: msg.from,
       to: msg.to,
-      text: text3,
+      text: text4,
       dashed: msg.dashed,
       head: msg.head
     });
@@ -250725,7 +250725,7 @@ function parseNoteAnchor(rest, seq) {
   const split = splitOnce(idsAndText, ":");
   if (!split)
     return null;
-  const text3 = decodeHtmlEntities(split[1].trim());
+  const text4 = decodeHtmlEntities(split[1].trim());
   const parts = split[0].split(",").map((s2) => s2.trim()).filter((s2) => s2 !== "");
   if (parts.length === 0)
     return null;
@@ -250733,7 +250733,7 @@ function parseNoteAnchor(rest, seq) {
   if (a === null)
     return null;
   if (kind !== "over")
-    return { text: text3, anchor: { kind, at: a } };
+    return { text: text4, anchor: { kind, at: a } };
   let b2 = a;
   if (parts[1] !== void 0) {
     const second = seq.participant(parts[1], null);
@@ -250741,7 +250741,7 @@ function parseNoteAnchor(rest, seq) {
       return null;
     b2 = second;
   }
-  return { text: text3, anchor: { kind: "over", from: Math.min(a, b2), to: Math.max(a, b2) } };
+  return { text: text4, anchor: { kind: "over", from: Math.min(a, b2), to: Math.max(a, b2) } };
 }
 function parseSeqMessage(st3, seq) {
   const chars = [...st3];
@@ -250763,7 +250763,7 @@ function parseSeqMessage(st3, seq) {
   const rest = chars.slice(found.pos + [...found.op].length).join("").trimStart().replace(/^[+-]+/, "");
   const split = splitOnce(rest, ":");
   const toId = (split ? split[0] : rest).trim();
-  const text3 = split ? nonEmpty(decodeHtmlEntities(split[1].trim())) : null;
+  const text4 = split ? nonEmpty(decodeHtmlEntities(split[1].trim())) : null;
   if (toId === "")
     return null;
   const from = seq.participant(fromId, null);
@@ -250772,7 +250772,7 @@ function parseSeqMessage(st3, seq) {
   const to = seq.participant(toId, null);
   if (to === null)
     return null;
-  return { from, to, text: text3, dashed: found.dashed, head: found.head };
+  return { from, to, text: text4, dashed: found.dashed, head: found.head };
 }
 var firstWord, words, nonEmpty, isLinkChar, CLASS_OPS, MAX_CLASS_OP, isAscii, SEQ_OPS, MAX_SEQ_OP, Sequence;
 var init_parse6 = __esm({
@@ -251394,11 +251394,11 @@ var init_oauth_selector = __esm({
           let line = "";
           if (isSelected) {
             const prefix = theme.fg("accent", "\u2192 ");
-            const text3 = theme.fg("accent", provider.name);
-            line = prefix + text3 + authTypeLabel + statusIndicator;
+            const text4 = theme.fg("accent", provider.name);
+            line = prefix + text4 + authTypeLabel + statusIndicator;
           } else {
-            const text3 = `  ${theme.fg("text", provider.name)}`;
-            line = text3 + authTypeLabel + statusIndicator;
+            const text4 = `  ${theme.fg("text", provider.name)}`;
+            line = text4 + authTypeLabel + statusIndicator;
           }
           this.listContainer.addChild(new TruncatedText(line, 1, 0));
         }
@@ -252397,7 +252397,7 @@ var init_skill_invocation_message = __esm({
 
 `;
           this.addChild(new Markdown(header + this.skillBlock.content, 0, 0, this.markdownTheme, {
-            color: (text3) => theme.fg("customMessageText", text3)
+            color: (text4) => theme.fg("customMessageText", text4)
           }));
         } else {
           const line = theme.fg("customMessageLabel", `\x1B[1m[skill]\x1B[22m `) + theme.fg("customMessageText", this.skillBlock.name) + theme.fg("dim", ` (${keyText("app.tools.expand")} to expand)`);
@@ -252428,14 +252428,14 @@ var init_status_indicator = __esm({
     };
     WorkingStatusIndicator = class extends StatusIndicator {
       constructor(ui2, message, indicator) {
-        super("working", ui2, (spinner) => theme.fg("accent", spinner), (text3) => theme.fg("muted", text3), message, indicator);
+        super("working", ui2, (spinner) => theme.fg("accent", spinner), (text4) => theme.fg("muted", text4), message, indicator);
       }
     };
     RetryStatusIndicator = class extends StatusIndicator {
       countdown;
       constructor(ui2, attempt2, maxAttempts, delayMs) {
         const retryMessage = (seconds) => `Retrying (${attempt2}/${maxAttempts}) in ${seconds}s... (${keyText("app.interrupt")} to cancel)`;
-        super("retry", ui2, (spinner) => theme.fg("warning", spinner), (text3) => theme.fg("muted", text3), retryMessage(Math.ceil(delayMs / 1e3)));
+        super("retry", ui2, (spinner) => theme.fg("warning", spinner), (text4) => theme.fg("muted", text4), retryMessage(Math.ceil(delayMs / 1e3)));
         this.countdown = new CountdownTimer(delayMs, ui2, (seconds) => {
           this.setMessage(retryMessage(seconds));
         }, () => {
@@ -252452,12 +252452,12 @@ var init_status_indicator = __esm({
       constructor(ui2, reason) {
         const cancelHint = `(${keyText("app.interrupt")} to cancel)`;
         const label = reason === "manual" ? `Compacting context... ${cancelHint}` : `${reason === "overflow" ? "Context overflow detected, " : ""}Auto-compacting... ${cancelHint}`;
-        super("compaction", ui2, (spinner) => theme.fg("accent", spinner), (text3) => theme.fg("muted", text3), label);
+        super("compaction", ui2, (spinner) => theme.fg("accent", spinner), (text4) => theme.fg("muted", text4), label);
       }
     };
     BranchSummaryStatusIndicator = class extends StatusIndicator {
       constructor(ui2) {
-        super("branchSummary", ui2, (spinner) => theme.fg("accent", spinner), (text3) => theme.fg("muted", text3), `Summarizing branch... (${keyText("app.interrupt")} to cancel)`);
+        super("branchSummary", ui2, (spinner) => theme.fg("accent", spinner), (text4) => theme.fg("muted", text4), `Summarizing branch... (${keyText("app.interrupt")} to cancel)`);
       }
     };
     IdleStatus = class {
@@ -252519,8 +252519,8 @@ var init_tool_execution = __esm({
         this.ui = ui2;
         this.cwd = cwd;
         this.addChild(new Spacer(1));
-        this.contentBox = new Box(1, 1, (text3) => theme.bg("toolPendingBg", text3));
-        this.contentText = new Text("", 1, 1, (text3) => theme.bg("toolPendingBg", text3));
+        this.contentBox = new Box(1, 1, (text4) => theme.bg("toolPendingBg", text4));
+        this.contentText = new Text("", 1, 1, (text4) => theme.bg("toolPendingBg", text4));
         this.selfRenderContainer = new Container();
         if (this.hasRendererDefinition()) {
           this.addChild(this.getRenderShell() === "self" ? this.selfRenderContainer : this.contentBox);
@@ -252589,12 +252589,12 @@ var init_tool_execution = __esm({
         const lines = output.split("\n");
         const displayLines = this.expanded ? lines : lines.slice(0, FALLBACK_PREVIEW_LINES);
         const remaining = lines.length - displayLines.length;
-        let text3 = displayLines.map((line) => theme.fg("toolOutput", line)).join("\n");
+        let text4 = displayLines.map((line) => theme.fg("toolOutput", line)).join("\n");
         if (remaining > 0) {
-          text3 += `${theme.fg("muted", `
+          text4 += `${theme.fg("muted", `
 ... (${remaining} more lines,`)} ${keyHint("app.tools.expand", "to expand")}${theme.fg("muted", ")")}`;
         }
-        return new Text(text3, 0, 0);
+        return new Text(text4, 0, 0);
       }
       updateArgs(args) {
         this.args = args;
@@ -252686,7 +252686,7 @@ var init_tool_execution = __esm({
         return super.render(width);
       }
       updateDisplay() {
-        const bgFn = this.isPartial ? (text3) => theme.bg("toolPendingBg", text3) : this.result?.isError ? (text3) => theme.bg("toolErrorBg", text3) : (text3) => theme.bg("toolSuccessBg", text3);
+        const bgFn = this.isPartial ? (text4) => theme.bg("toolPendingBg", text4) : this.result?.isError ? (text4) => theme.bg("toolErrorBg", text4) : (text4) => theme.bg("toolSuccessBg", text4);
         let hasContent = false;
         this.hideComponent = false;
         if (this.hasRendererDefinition()) {
@@ -252776,19 +252776,19 @@ var init_tool_execution = __esm({
         return getTextOutput(this.result, this.showImages);
       }
       formatToolExecution() {
-        let text3 = theme.fg("toolTitle", theme.bold(this.toolName));
+        let text4 = theme.fg("toolTitle", theme.bold(this.toolName));
         const content = JSON.stringify(this.args, null, 2);
         if (content) {
-          text3 += `
+          text4 += `
 
 ${content}`;
         }
         const output = this.getTextOutput();
         if (output) {
-          text3 += `
+          text4 += `
 ${output}`;
         }
-        return text3;
+        return text4;
       }
     };
   }
@@ -253440,29 +253440,29 @@ var init_tree_selector = __esm({
       }
       getEntryCopyText(node) {
         const entry = node.entry;
-        let text3;
+        let text4;
         switch (entry.type) {
           case "message":
             if (entry.message.role === "bashExecution") {
-              text3 = entry.message.command;
+              text4 = entry.message.command;
             } else if ("content" in entry.message) {
-              text3 = this.extractFullContent(entry.message.content);
-              if (!text3 && entry.message.role === "assistant") {
-                text3 = entry.message.errorMessage;
+              text4 = this.extractFullContent(entry.message.content);
+              if (!text4 && entry.message.role === "assistant") {
+                text4 = entry.message.errorMessage;
               }
             }
             break;
           case "custom_message":
-            text3 = this.extractFullContent(entry.content);
+            text4 = this.extractFullContent(entry.content);
             break;
           case "compaction":
-            text3 = entry.summary;
+            text4 = entry.summary;
             break;
           case "branch_summary":
-            text3 = entry.summary;
+            text4 = entry.summary;
             break;
         }
-        return text3?.trim() ? text3 : void 0;
+        return text4?.trim() ? text4 : void 0;
       }
       hasTextContent(content) {
         if (typeof content === "string")
@@ -253470,8 +253470,8 @@ var init_tree_selector = __esm({
         if (Array.isArray(content)) {
           for (const c of content) {
             if (typeof c === "object" && c !== null && "type" in c && c.type === "text") {
-              const text3 = c.text;
-              if (text3 && text3.trim().length > 0)
+              const text4 = c.text;
+              if (text4 && text4.trim().length > 0)
                 return true;
             }
           }
@@ -253704,10 +253704,10 @@ var init_tree_selector = __esm({
       }
       render(width) {
         const items = TREE_HELP_ITEMS.map(({ keys, label, labelFirst }) => {
-          const text3 = formatHelpKeys(keys);
-          if (!text3)
+          const text4 = formatHelpKeys(keys);
+          if (!text4)
             return label;
-          return labelFirst ? `${label} ${text3}` : `${text3} ${label}`;
+          return labelFirst ? `${label} ${text4}` : `${text4} ${label}`;
         });
         const availableWidth = Math.max(1, width);
         const indent = "  ";
@@ -253818,7 +253818,7 @@ var init_tree_selector = __esm({
         this.treeList = new TreeList(tree, currentLeafId, maxVisibleLines, initialSelectedId, initialFilterMode);
         this.treeList.onSelect = onSelect;
         this.treeList.onCancel = onCancel;
-        this.treeList.onCopy = (text3) => this.onCopy?.(text3);
+        this.treeList.onCopy = (text4) => this.onCopy?.(text4);
         this.treeList.onLabelEdit = (entryId, currentLabel) => this.showLabelInput(entryId, currentLabel);
         this.treeContainer = new Container();
         this.treeContainer.addChild(this.treeList);
@@ -253901,7 +253901,7 @@ var init_trust_selector = __esm({
         super();
         this.savedDecision = options.savedDecision;
         this.trustOptions = getProjectTrustOptions(options.cwd);
-        this.selectedIndex = Math.max(0, this.trustOptions.findIndex((option) => this.isSavedOption(option)));
+        this.selectedIndex = Math.max(0, this.trustOptions.findIndex((option2) => this.isSavedOption(option2)));
         this.onSelectCallback = options.onSelect;
         this.onCancelCallback = options.onCancel;
         this.addChild(new DynamicBorder());
@@ -253920,21 +253920,21 @@ var init_trust_selector = __esm({
         this.addChild(new DynamicBorder());
         this.updateList();
       }
-      isSavedOption(option) {
-        return option.savedPath !== void 0 && this.savedDecision?.decision === option.trusted && this.savedDecision.path === option.savedPath;
+      isSavedOption(option2) {
+        return option2.savedPath !== void 0 && this.savedDecision?.decision === option2.trusted && this.savedDecision.path === option2.savedPath;
       }
       updateList() {
         this.listContainer.clear();
         for (let i2 = 0; i2 < this.trustOptions.length; i2++) {
-          const option = this.trustOptions[i2];
-          if (!option) {
+          const option2 = this.trustOptions[i2];
+          if (!option2) {
             continue;
           }
           const isSelected = i2 === this.selectedIndex;
-          const isCurrent = this.isSavedOption(option);
+          const isCurrent = this.isSavedOption(option2);
           const checkmark = isCurrent ? theme.fg("success", " \u2713") : "";
           const prefix = isSelected ? theme.fg("accent", "\u2192 ") : "  ";
-          const label = isSelected ? theme.fg("accent", option.label) : theme.fg("text", option.label);
+          const label = isSelected ? theme.fg("accent", option2.label) : theme.fg("text", option2.label);
           this.listContainer.addChild(new Text(`${prefix}${label}${checkmark}`, 1, 0));
         }
       }
@@ -253974,9 +253974,9 @@ var init_user_message = __esm({
       markdownTheme;
       outputPad;
       markdownTransformers;
-      constructor(text3, markdownTheme = getMarkdownTheme(), outputPad = 1, markdownTransformers = []) {
+      constructor(text4, markdownTheme = getMarkdownTheme(), outputPad = 1, markdownTransformers = []) {
         super();
-        this.text = text3;
+        this.text = text4;
         this.markdownTheme = markdownTheme;
         this.outputPad = outputPad;
         this.markdownTransformers = markdownTransformers;
@@ -254323,15 +254323,15 @@ function formatLoginProviderCompletionDescription(provider) {
 function createInteractiveTui(options) {
   const terminal = options.terminal ?? new ProcessTerminal();
   if (options.tuiMode === "fullscreen") {
-    const styleSearchMatch = (text3) => theme.bg("searchMatchBg", theme.fg("searchMatchText", text3));
+    const styleSearchMatch = (text4) => theme.bg("searchMatchBg", theme.fg("searchMatchText", text4));
     return new TuiAltScreen(terminal, options.showHardwareCursor, options.logDirectory, {
-      searchMatchStyle: (text3) => theme.underline(styleSearchMatch(text3)),
-      searchCurrentMatchStyle: (text3) => theme.bold(theme.inverse(styleSearchMatch(text3))),
+      searchMatchStyle: (text4) => theme.underline(styleSearchMatch(text4)),
+      searchCurrentMatchStyle: (text4) => theme.bold(theme.inverse(styleSearchMatch(text4))),
       openUrl: openBrowser,
       onRightClickPaste: options.onRightClickPaste,
-      copySelection: async (text3) => {
+      copySelection: async (text4) => {
         try {
-          await copyToClipboard(text3);
+          await copyToClipboard(text4);
           return true;
         } catch {
           return false;
@@ -254851,7 +254851,7 @@ var init_interactive_mode = __esm({
           primary: true,
           overscroll: "chain",
           scrollbar: this.settingsManager.getFullscreenScrollbar(),
-          scrollbarStyle: (text3) => theme.bg("scrollbarThumb", text3)
+          scrollbarStyle: (text4) => theme.bg("scrollbarThumb", text4)
         });
         const dock = new VStack([
           { component: this.pendingMessagesContainer, shrink: 1, minSize: 0 },
@@ -254876,7 +254876,7 @@ var init_interactive_mode = __esm({
         ]);
         this.defaultEditor.onAction("app.clear", () => this.handleCtrlC());
         this.defaultEditor.onCtrlD = () => this.handleCtrlD();
-        this.defaultEditor.onSubmit = (text3) => this.handleStartupSubmit(text3);
+        this.defaultEditor.onSubmit = (text4) => this.handleStartupSubmit(text4);
         this.ui.setFocus(this.editor);
         this.ui.start();
         this.isInitialized = true;
@@ -255052,9 +255052,9 @@ ${onboarding}`, this.getStartupExpansionState(), 1, 0);
       async checkTmuxKeyboardSetup() {
         if (!process.env.TMUX)
           return void 0;
-        const runTmuxShow = (option) => {
+        const runTmuxShow = (option2) => {
           return new Promise((resolve17) => {
-            const proc = spawn10("tmux", ["show", "-gv", option], {
+            const proc = spawn10("tmux", ["show", "-gv", option2], {
               stdio: ["ignore", "pipe", "ignore"]
             });
             let stdout = "";
@@ -255764,8 +255764,8 @@ ${warningLines}`, 0, 0));
       /**
        * Set extension status text in the footer.
        */
-      setExtensionStatus(key, text3) {
-        this.footerDataProvider.setExtensionStatus(key, text3);
+      setExtensionStatus(key, text4) {
+        this.footerDataProvider.setExtensionStatus(key, text4);
         this.ui.requestRender();
       }
       showStatusIndicator(indicator) {
@@ -256012,7 +256012,7 @@ ${warningLines}`, 0, 0));
           input: (title, placeholder, opts) => this.showExtensionInput(title, placeholder, opts),
           notify: (message, type) => this.showExtensionNotify(message, type),
           onTerminalInput: (handler) => this.addExtensionTerminalInputListener(handler),
-          setStatus: (key, text3) => this.setExtensionStatus(key, text3),
+          setStatus: (key, text4) => this.setExtensionStatus(key, text4),
           setWorkingMessage: (message) => {
             this.workingMessage = message;
             if (this.activeStatusIndicator?.kind === "working") {
@@ -256027,8 +256027,8 @@ ${warningLines}`, 0, 0));
           setHeader: (factory) => this.setExtensionHeader(factory),
           setTitle: (title) => this.ui.terminal.setTitle(title),
           custom: (factory, options) => this.showExtensionCustom(factory, options),
-          pasteToEditor: (text3) => this.editor.handleInput(`\x1B[200~${text3}\x1B[201~`),
-          setEditorText: (text3) => this.editor.setText(text3),
+          pasteToEditor: (text4) => this.editor.handleInput(`\x1B[200~${text4}\x1B[201~`),
+          setEditorText: (text4) => this.editor.setText(text4),
           getEditorText: () => this.editor.getExpandedText?.() ?? this.editor.getText(),
           editor: (title, prefill) => this.showExtensionEditor(title, prefill),
           addAutocompleteProvider: (factory) => {
@@ -256072,10 +256072,10 @@ ${warningLines}`, 0, 0));
             resolve17(void 0);
           };
           opts?.signal?.addEventListener("abort", onAbort, { once: true });
-          this.extensionSelector = new ExtensionSelectorComponent(title, options, (option) => {
+          this.extensionSelector = new ExtensionSelectorComponent(title, options, (option2) => {
             opts?.signal?.removeEventListener("abort", onAbort);
             this.hideExtensionSelector();
-            resolve17(option);
+            resolve17(option2);
           }, () => {
             opts?.signal?.removeEventListener("abort", onAbort);
             this.hideExtensionSelector();
@@ -256368,9 +256368,9 @@ ${message}`, ["Yes", "No"], opts);
         this.defaultEditor.onAction("app.session.tree", () => this.showTreeSelector());
         this.defaultEditor.onAction("app.session.fork", () => this.showUserMessageSelector());
         this.defaultEditor.onAction("app.session.resume", () => this.showSessionSelector());
-        this.defaultEditor.onChange = (text3) => {
+        this.defaultEditor.onChange = (text4) => {
           const wasBashMode = this.isBashMode;
-          this.isBashMode = text3.trimStart().startsWith("!");
+          this.isBashMode = text4.trimStart().startsWith("!");
           if (wasBashMode !== this.isBashMode) {
             this.updateEditorBorderColor();
           }
@@ -256385,10 +256385,10 @@ ${message}`, ["Yes", "No"], opts);
         if (!target || !handleInput)
           return;
         try {
-          const text3 = await readClipboardText();
-          if (!text3 || this.renderer.getFocusedComponent() !== target)
+          const text4 = await readClipboardText();
+          if (!text4 || this.renderer.getFocusedComponent() !== target)
             return;
-          handleInput.call(target, `\x1B[200~${text3}\x1B[201~`);
+          handleInput.call(target, `\x1B[200~${text4}\x1B[201~`);
           this.ui.requestRender();
         } catch {
         }
@@ -256406,161 +256406,161 @@ ${message}`, ["Yes", "No"], opts);
             this.ui.requestRender();
             return;
           }
-          const text3 = await readClipboardText();
-          if (text3) {
-            this.editor.insertTextAtCursor?.(text3);
+          const text4 = await readClipboardText();
+          if (text4) {
+            this.editor.insertTextAtCursor?.(text4);
             this.ui.requestRender();
           }
         } catch {
         }
       }
-      handleStartupSubmit(text3) {
-        this.editor.setText(text3);
+      handleStartupSubmit(text4) {
+        this.editor.setText(text4);
         this.showStatus("Startup is still in progress");
       }
       setupEditorSubmitHandler() {
-        this.defaultEditor.onSubmit = async (text3) => {
-          text3 = text3.trim();
-          if (!text3)
+        this.defaultEditor.onSubmit = async (text4) => {
+          text4 = text4.trim();
+          if (!text4)
             return;
-          if (text3 === "/settings") {
+          if (text4 === "/settings") {
             this.showSettingsSelector();
             this.editor.setText("");
             return;
           }
-          if (text3 === "/scoped-models") {
+          if (text4 === "/scoped-models") {
             this.editor.setText("");
             await this.showModelsSelector();
             return;
           }
-          if (text3 === "/model" || text3.startsWith("/model ")) {
-            const searchTerm = text3.startsWith("/model ") ? text3.slice(7).trim() : void 0;
+          if (text4 === "/model" || text4.startsWith("/model ")) {
+            const searchTerm = text4.startsWith("/model ") ? text4.slice(7).trim() : void 0;
             this.editor.setText("");
             await this.handleModelCommand(searchTerm);
             return;
           }
-          if (text3 === "/export" || text3.startsWith("/export ")) {
-            await this.handleExportCommand(text3);
+          if (text4 === "/export" || text4.startsWith("/export ")) {
+            await this.handleExportCommand(text4);
             this.editor.setText("");
             return;
           }
-          if (text3 === "/import" || text3.startsWith("/import ")) {
-            await this.handleImportCommand(text3);
+          if (text4 === "/import" || text4.startsWith("/import ")) {
+            await this.handleImportCommand(text4);
             this.editor.setText("");
             return;
           }
-          if (text3 === "/share") {
+          if (text4 === "/share") {
             await this.handleShareCommand();
             this.editor.setText("");
             return;
           }
-          if (text3 === "/copy") {
+          if (text4 === "/copy") {
             await this.handleCopyCommand();
             this.editor.setText("");
             return;
           }
-          if (text3 === "/name" || text3.startsWith("/name ")) {
-            this.handleNameCommand(text3);
+          if (text4 === "/name" || text4.startsWith("/name ")) {
+            this.handleNameCommand(text4);
             this.editor.setText("");
             return;
           }
-          if (text3 === "/session") {
+          if (text4 === "/session") {
             this.handleSessionCommand();
             this.editor.setText("");
             return;
           }
-          if (text3 === "/changelog") {
+          if (text4 === "/changelog") {
             this.handleChangelogCommand();
             this.editor.setText("");
             return;
           }
-          if (text3 === "/hotkeys") {
+          if (text4 === "/hotkeys") {
             this.handleHotkeysCommand();
             this.editor.setText("");
             return;
           }
-          if (text3 === "/fork") {
+          if (text4 === "/fork") {
             this.showUserMessageSelector();
             this.editor.setText("");
             return;
           }
-          if (text3 === "/clone") {
+          if (text4 === "/clone") {
             this.editor.setText("");
             await this.handleCloneCommand();
             return;
           }
-          if (text3 === "/tree") {
+          if (text4 === "/tree") {
             this.showTreeSelector();
             this.editor.setText("");
             return;
           }
-          if (text3 === "/trust") {
+          if (text4 === "/trust") {
             this.showTrustSelector();
             this.editor.setText("");
             return;
           }
-          if (text3 === "/login" || text3.startsWith("/login ")) {
-            const providerRef = text3.startsWith("/login ") ? text3.slice(7).trim() : void 0;
+          if (text4 === "/login" || text4.startsWith("/login ")) {
+            const providerRef = text4.startsWith("/login ") ? text4.slice(7).trim() : void 0;
             this.editor.setText("");
             await this.handleLoginCommand(providerRef);
             return;
           }
-          if (text3 === "/logout") {
+          if (text4 === "/logout") {
             this.showOAuthSelector("logout");
             this.editor.setText("");
             return;
           }
-          if (text3 === "/new") {
+          if (text4 === "/new") {
             this.editor.setText("");
             await this.handleClearCommand();
             return;
           }
-          if (text3 === "/compact" || text3.startsWith("/compact ")) {
-            const customInstructions = text3.startsWith("/compact ") ? text3.slice(9).trim() : void 0;
+          if (text4 === "/compact" || text4.startsWith("/compact ")) {
+            const customInstructions = text4.startsWith("/compact ") ? text4.slice(9).trim() : void 0;
             this.editor.setText("");
             await this.handleCompactCommand(customInstructions);
             return;
           }
-          if (text3 === "/reload") {
+          if (text4 === "/reload") {
             this.editor.setText("");
             await this.handleReloadCommand();
             return;
           }
-          if (text3 === "/debug") {
+          if (text4 === "/debug") {
             this.handleDebugCommand();
             this.editor.setText("");
             return;
           }
-          if (text3 === "/arminsayshi") {
+          if (text4 === "/arminsayshi") {
             this.handleArminSaysHi();
             this.editor.setText("");
             return;
           }
-          if (text3 === "/dementedelves") {
+          if (text4 === "/dementedelves") {
             this.handleDementedDelves();
             this.editor.setText("");
             return;
           }
-          if (text3 === "/resume") {
+          if (text4 === "/resume") {
             this.showSessionSelector();
             this.editor.setText("");
             return;
           }
-          if (text3 === "/quit") {
+          if (text4 === "/quit") {
             this.editor.setText("");
             await this.shutdown();
             return;
           }
-          if (text3.startsWith("!")) {
-            const isExcluded = text3.startsWith("!!");
-            const command = isExcluded ? text3.slice(2).trim() : text3.slice(1).trim();
+          if (text4.startsWith("!")) {
+            const isExcluded = text4.startsWith("!!");
+            const command = isExcluded ? text4.slice(2).trim() : text4.slice(1).trim();
             if (command) {
               if (this.session.isBashRunning) {
                 this.showWarning("A bash command is already running. Press Esc to cancel it first.");
-                this.editor.setText(text3);
+                this.editor.setText(text4);
                 return;
               }
-              this.editor.addToHistory?.(text3);
+              this.editor.addToHistory?.(text4);
               await this.handleBashCommand(command, isExcluded);
               this.isBashMode = false;
               this.updateEditorBorderColor();
@@ -256568,30 +256568,30 @@ ${message}`, ["Yes", "No"], opts);
             }
           }
           if (this.session.isCompacting) {
-            if (this.isExtensionCommand(text3)) {
-              this.editor.addToHistory?.(text3);
+            if (this.isExtensionCommand(text4)) {
+              this.editor.addToHistory?.(text4);
               this.editor.setText("");
-              await this.session.prompt(text3);
+              await this.session.prompt(text4);
             } else {
-              this.queueCompactionMessage(text3, "steer");
+              this.queueCompactionMessage(text4, "steer");
             }
             return;
           }
           if (this.session.isStreaming) {
-            this.editor.addToHistory?.(text3);
+            this.editor.addToHistory?.(text4);
             this.editor.setText("");
-            await this.session.prompt(text3, { streamingBehavior: "steer" });
+            await this.session.prompt(text4, { streamingBehavior: "steer" });
             this.updatePendingMessagesDisplay();
             this.ui.requestRender();
             return;
           }
           this.flushPendingBashComponents();
           if (this.onInputCallback) {
-            this.onInputCallback(text3);
+            this.onInputCallback(text4);
           } else {
-            this.pendingUserInputs.push(text3);
+            this.pendingUserInputs.push(text4);
           }
-          this.editor.addToHistory?.(text3);
+          this.editor.addToHistory?.(text4);
         };
       }
       subscribeToAgent() {
@@ -256890,11 +256890,11 @@ ${message}`, ["Yes", "No"], opts);
           return;
         }
         const spacer = new Spacer(1);
-        const text3 = new Text(theme.fg("dim", message), 1, 0);
+        const text4 = new Text(theme.fg("dim", message), 1, 0);
         this.chatContainer.addChild(spacer);
-        this.chatContainer.addChild(text3);
+        this.chatContainer.addChild(text4);
         this.lastStatusSpacer = spacer;
-        this.lastStatusText = text3;
+        this.lastStatusText = text4;
         this.ui.requestRender();
       }
       addCustomEntryToChat(entry) {
@@ -257085,9 +257085,9 @@ ${message}`, ["Yes", "No"], opts);
         } else if (miss.idleMs >= CACHE_TTL_MS) {
           label = `Cache miss after ${Math.round(miss.idleMs / 6e4)}m idle`;
         }
-        const text3 = theme.fg("warning", `${label}: ${reBilled}`);
+        const text4 = theme.fg("warning", `${label}: ${reBilled}`);
         this.chatContainer.addChild(new Spacer(1));
-        this.chatContainer.addChild(new Text(text3, 1, 0));
+        this.chatContainer.addChild(new Text(text4, 1, 0));
       }
       renderInitialMessages() {
         const entries = this.sessionManager.buildContextEntries();
@@ -257118,9 +257118,9 @@ ${message}`, ["Yes", "No"], opts);
           return queuedInput;
         }
         return new Promise((resolve17) => {
-          this.onInputCallback = (text3) => {
+          this.onInputCallback = (text4) => {
             this.onInputCallback = void 0;
-            resolve17(text3);
+            resolve17(text4);
           };
         });
       }
@@ -257277,28 +257277,28 @@ ${message}`, ["Yes", "No"], opts);
         }
       }
       async handleFollowUp() {
-        const text3 = (this.editor.getExpandedText?.() ?? this.editor.getText()).trim();
-        if (!text3)
+        const text4 = (this.editor.getExpandedText?.() ?? this.editor.getText()).trim();
+        if (!text4)
           return;
         if (this.session.isCompacting) {
-          if (this.isExtensionCommand(text3)) {
-            this.editor.addToHistory?.(text3);
+          if (this.isExtensionCommand(text4)) {
+            this.editor.addToHistory?.(text4);
             this.editor.setText("");
-            await this.session.prompt(text3);
+            await this.session.prompt(text4);
           } else {
-            this.queueCompactionMessage(text3, "followUp");
+            this.queueCompactionMessage(text4, "followUp");
           }
           return;
         }
         if (this.session.isStreaming) {
-          this.editor.addToHistory?.(text3);
+          this.editor.addToHistory?.(text4);
           this.editor.setText("");
-          await this.session.prompt(text3, { streamingBehavior: "followUp" });
+          await this.session.prompt(text4, { streamingBehavior: "followUp" });
           this.updatePendingMessagesDisplay();
           this.ui.requestRender();
         } else if (this.editor.onSubmit) {
           this.editor.setText("");
-          this.editor.onSubmit(text3);
+          this.editor.onSubmit(text4);
         }
       }
       handleDequeue() {
@@ -257419,18 +257419,18 @@ ${message}`, ["Yes", "No"], opts);
         const changelogLine = theme.fg("muted", "Changelog: ") + changelogLink;
         const note = release.note?.trim();
         this.chatContainer.addChild(new Spacer(1));
-        this.chatContainer.addChild(new DynamicBorder((text3) => theme.fg("warning", text3)));
+        this.chatContainer.addChild(new DynamicBorder((text4) => theme.fg("warning", text4)));
         this.chatContainer.addChild(new Text(`${theme.bold(theme.fg("warning", "Update Available"))}
 ${updateInstruction}`, 1, 0));
         if (note) {
           this.chatContainer.addChild(new Spacer(1));
           this.chatContainer.addChild(new Markdown(note, 1, 0, this.getMarkdownThemeWithSettings(), {
-            color: (text3) => theme.fg("muted", text3)
+            color: (text4) => theme.fg("muted", text4)
           }));
           this.chatContainer.addChild(new Spacer(1));
         }
         this.chatContainer.addChild(new Text(changelogLine, 1, 0));
-        this.chatContainer.addChild(new DynamicBorder((text3) => theme.fg("warning", text3)));
+        this.chatContainer.addChild(new DynamicBorder((text4) => theme.fg("warning", text4)));
         this.ui.requestRender();
       }
       showPackageUpdateNotification(packages) {
@@ -257438,12 +257438,12 @@ ${updateInstruction}`, 1, 0));
         const updateInstruction = theme.fg("muted", "Package updates are available. Run ") + action;
         const packageLines = packages.map((pkg2) => `- ${pkg2}`).join("\n");
         this.chatContainer.addChild(new Spacer(1));
-        this.chatContainer.addChild(new DynamicBorder((text3) => theme.fg("warning", text3)));
+        this.chatContainer.addChild(new DynamicBorder((text4) => theme.fg("warning", text4)));
         this.chatContainer.addChild(new Text(`${theme.bold(theme.fg("warning", "Package Updates Available"))}
 ${updateInstruction}
 ${theme.fg("muted", "Packages:")}
 ${packageLines}`, 1, 0));
-        this.chatContainer.addChild(new DynamicBorder((text3) => theme.fg("warning", text3)));
+        this.chatContainer.addChild(new DynamicBorder((text4) => theme.fg("warning", text4)));
         this.ui.requestRender();
       }
       /**
@@ -257482,12 +257482,12 @@ ${packageLines}`, 1, 0));
         if (steeringMessages.length > 0 || followUpMessages.length > 0) {
           this.pendingMessagesContainer.addChild(new Spacer(1));
           for (const message of steeringMessages) {
-            const text3 = theme.fg("dim", `Steering: ${message}`);
-            this.pendingMessagesContainer.addChild(new TruncatedText(text3, 1, 0));
+            const text4 = theme.fg("dim", `Steering: ${message}`);
+            this.pendingMessagesContainer.addChild(new TruncatedText(text4, 1, 0));
           }
           for (const message of followUpMessages) {
-            const text3 = theme.fg("dim", `Follow-up: ${message}`);
-            this.pendingMessagesContainer.addChild(new TruncatedText(text3, 1, 0));
+            const text4 = theme.fg("dim", `Follow-up: ${message}`);
+            this.pendingMessagesContainer.addChild(new TruncatedText(text4, 1, 0));
           }
           const dequeueHint = this.getAppKeyDisplay("app.message.dequeue");
           const hintText = theme.fg("dim", `\u21B3 ${dequeueHint} to edit all queued messages`);
@@ -257514,19 +257514,19 @@ ${packageLines}`, 1, 0));
         }
         return allQueued.length;
       }
-      queueCompactionMessage(text3, mode) {
-        this.compactionQueuedMessages.push({ text: text3, mode });
-        this.editor.addToHistory?.(text3);
+      queueCompactionMessage(text4, mode) {
+        this.compactionQueuedMessages.push({ text: text4, mode });
+        this.editor.addToHistory?.(text4);
         this.editor.setText("");
         this.updatePendingMessagesDisplay();
         this.showStatus("Queued message for after compaction");
       }
-      isExtensionCommand(text3) {
-        if (!text3.startsWith("/"))
+      isExtensionCommand(text4) {
+        if (!text4.startsWith("/"))
           return false;
         const extensionRunner = this.session.extensionRunner;
-        const spaceIndex = text3.indexOf(" ");
-        const commandName = spaceIndex === -1 ? text3.slice(1) : text3.slice(1, spaceIndex);
+        const spaceIndex = text4.indexOf(" ");
+        const commandName = spaceIndex === -1 ? text4.slice(1) : text4.slice(1, spaceIndex);
         return !!extensionRunner.getCommand(commandName);
       }
       async flushCompactionQueue(options) {
@@ -258217,13 +258217,13 @@ ${packageLines}`, 1, 0));
             this.sessionManager.appendLabelChange(entryId, label);
             this.ui.requestRender();
           }, initialSelectedId, initialFilterMode);
-          selector.onCopy = async (text3) => {
-            if (!text3) {
+          selector.onCopy = async (text4) => {
+            if (!text4) {
               this.showError("Selected entry has no text to copy");
               return;
             }
             try {
-              await copyToClipboard(text3);
+              await copyToClipboard(text4);
               this.showStatus("Copied selected message to clipboard");
             } catch (error48) {
               this.showError(error48 instanceof Error ? error48.message : String(error48));
@@ -258387,9 +258387,9 @@ ${packageLines}`, 1, 0));
         }
         const title = providerOptions?.[0] ? `Select authentication method for ${providerOptions[0].name}:` : "Select authentication method:";
         this.showSelector((done) => {
-          const selector = new ExtensionSelectorComponent(title, options, (option) => {
+          const selector = new ExtensionSelectorComponent(title, options, (option2) => {
             done();
-            const authType = option === subscriptionLabel ? "oauth" : "api_key";
+            const authType = option2 === subscriptionLabel ? "oauth" : "api_key";
             if (providerOptions) {
               const providerOption = providerOptions.find((provider) => provider.authType === authType);
               if (providerOption) {
@@ -258586,10 +258586,10 @@ ${packageLines}`, 1, 0));
             this.ui.setFocus(dialog);
             this.ui.requestRender();
           };
-          const labels = prompt.options.map((option) => option.label);
+          const labels = prompt.options.map((option2) => option2.label);
           const selector = new ExtensionSelectorComponent(prompt.message, labels, (optionLabel) => {
             restoreDialog();
-            const id = prompt.options.find((option) => option.label === optionLabel)?.id;
+            const id = prompt.options.find((option2) => option2.label === optionLabel)?.id;
             if (id)
               resolve17(id);
             else
@@ -258753,8 +258753,8 @@ ${packageLines}`, 1, 0));
           this.showError(`Reload failed: ${error48 instanceof Error ? error48.message : String(error48)}`);
         }
       }
-      async handleExportCommand(text3) {
-        const outputPath = this.getPathCommandArgument(text3, "/export");
+      async handleExportCommand(text4) {
+        const outputPath = this.getPathCommandArgument(text4, "/export");
         try {
           if (outputPath?.endsWith(".jsonl")) {
             const filePath = this.session.exportToJsonl(outputPath);
@@ -258769,14 +258769,14 @@ ${packageLines}`, 1, 0));
           this.showError(`Failed to export session: ${error48 instanceof Error ? error48.message : "Unknown error"}`);
         }
       }
-      getPathCommandArgument(text3, command) {
-        if (text3 === command) {
+      getPathCommandArgument(text4, command) {
+        if (text4 === command) {
           return void 0;
         }
-        if (!text3.startsWith(`${command} `)) {
+        if (!text4.startsWith(`${command} `)) {
           return void 0;
         }
-        const argsString = text3.slice(command.length + 1).trimStart();
+        const argsString = text4.slice(command.length + 1).trimStart();
         if (!argsString) {
           return void 0;
         }
@@ -258794,8 +258794,8 @@ ${packageLines}`, 1, 0));
         }
         return argsString.slice(0, firstWhitespaceIndex);
       }
-      async handleImportCommand(text3) {
-        const inputPath = this.getPathCommandArgument(text3, "/import");
+      async handleImportCommand(text4) {
+        const inputPath = this.getPathCommandArgument(text4, "/import");
         if (!inputPath) {
           this.showError("Usage: /import <path.jsonl>");
           return;
@@ -258912,13 +258912,13 @@ Gist: ${gistUrl}`);
         }
       }
       async handleCopyCommand(options = {}) {
-        const text3 = this.session.getLastAssistantText();
-        if (!text3) {
+        const text4 = this.session.getLastAssistantText();
+        if (!text4) {
           this.showError("No agent messages to copy yet.");
           return;
         }
         try {
-          await copyToClipboard(text3);
+          await copyToClipboard(text4);
           if (options.flashConfirmation && this.ui instanceof TuiAltScreen) {
             this.ui.flash("Copied!");
           } else {
@@ -258928,8 +258928,8 @@ Gist: ${gistUrl}`);
           this.showError(error48 instanceof Error ? error48.message : String(error48));
         }
       }
-      handleNameCommand(text3) {
-        const name = text3.replace(/^\/name\s*/, "").trim();
+      handleNameCommand(text4) {
+        const name = text4.replace(/^\/name\s*/, "").trim();
         if (!name) {
           const currentName = this.sessionManager.getSessionName();
           if (currentName) {
@@ -260041,13 +260041,13 @@ async function runRpcMode(runtimeHost) {
       return () => {
       };
     },
-    setStatus(key, text3) {
+    setStatus(key, text4) {
       output({
         type: "extension_ui_request",
         id: crypto3.randomUUID(),
         method: "setStatus",
         statusKey: key,
-        statusText: text3
+        statusText: text4
       });
     },
     setWorkingMessage(_message) {
@@ -260085,15 +260085,15 @@ async function runRpcMode(runtimeHost) {
     async custom() {
       return void 0;
     },
-    pasteToEditor(text3) {
-      this.setEditorText(text3);
+    pasteToEditor(text4) {
+      this.setEditorText(text4);
     },
-    setEditorText(text3) {
+    setEditorText(text4) {
       output({
         type: "extension_ui_request",
         id: crypto3.randomUUID(),
         method: "set_editor_text",
-        text: text3
+        text: text4
       });
     },
     getEditorText() {
@@ -260431,8 +260431,8 @@ async function runRpcMode(runtimeHost) {
         return success2(id, "get_tree", { tree: sessionManager.getTree(), leafId: sessionManager.getLeafId() });
       }
       case "get_last_assistant_text": {
-        const text3 = session.getLastAssistantText();
-        return success2(id, "get_last_assistant_text", { text: text3 });
+        const text4 = session.getLastAssistantText();
+        return success2(id, "get_last_assistant_text", { text: text4 });
       }
       case "set_session_name": {
         const name = command.name.trim();
@@ -262119,20 +262119,20 @@ var init_package_manager_cli = __esm({
     init_version_check();
     init_windows_self_update();
     SELF_UPDATE_NOTE_MARKDOWN_THEME = {
-      heading: (text3) => source_default.bold(source_default.yellow(text3)),
-      link: (text3) => source_default.cyan(text3),
-      linkUrl: (text3) => source_default.dim(text3),
-      code: (text3) => source_default.yellow(text3),
-      codeBlock: (text3) => source_default.dim(text3),
-      codeBlockBorder: (text3) => source_default.dim(text3),
-      quote: (text3) => source_default.dim(text3),
-      quoteBorder: (text3) => source_default.dim(text3),
-      hr: (text3) => source_default.dim(text3),
-      listBullet: (text3) => source_default.yellow(text3),
-      bold: (text3) => source_default.bold(text3),
-      italic: (text3) => source_default.italic(text3),
-      strikethrough: (text3) => source_default.strikethrough(text3),
-      underline: (text3) => source_default.underline(text3)
+      heading: (text4) => source_default.bold(source_default.yellow(text4)),
+      link: (text4) => source_default.cyan(text4),
+      linkUrl: (text4) => source_default.dim(text4),
+      code: (text4) => source_default.yellow(text4),
+      codeBlock: (text4) => source_default.dim(text4),
+      codeBlockBorder: (text4) => source_default.dim(text4),
+      quote: (text4) => source_default.dim(text4),
+      quoteBorder: (text4) => source_default.dim(text4),
+      hr: (text4) => source_default.dim(text4),
+      listBullet: (text4) => source_default.yellow(text4),
+      bold: (text4) => source_default.bold(text4),
+      italic: (text4) => source_default.italic(text4),
+      strikethrough: (text4) => source_default.strikethrough(text4),
+      underline: (text4) => source_default.underline(text4)
     };
     CONFIG_COMMAND_USAGE = `${APP_NAME} config [-l] [--approve|--no-approve]`;
   }
@@ -262210,8 +262210,8 @@ async function runAuthCommand(args) {
     return false;
   const parsed = parseArgs(command.args);
   if (parsed.unknownFlags.size > 0) {
-    const option = parsed.unknownFlags.keys().next().value;
-    console.error(source_default.red(`Unknown option --${option} for "${getAuthCommandName(command.kind)}".`));
+    const option2 = parsed.unknownFlags.keys().next().value;
+    console.error(source_default.red(`Unknown option --${option2} for "${getAuthCommandName(command.kind)}".`));
     console.error(source_default.dim(`Use "${APP_NAME} --help" or "${getAuthCommandUsage(command.kind)}".`));
     process.exitCode = 1;
     return true;
@@ -262265,10 +262265,10 @@ async function prepareInitialMessage(parsed, autoResizeImages, stdinContent) {
   if (parsed.fileArgs.length === 0) {
     return buildInitialMessage({ parsed, stdinContent });
   }
-  const { text: text3, images } = await processFileArguments(parsed.fileArgs, { autoResizeImages });
+  const { text: text4, images } = await processFileArguments(parsed.fileArgs, { autoResizeImages });
   return buildInitialMessage({
     parsed,
-    fileText: text3,
+    fileText: text4,
     fileImages: images,
     stdinContent
   });
@@ -263983,8 +263983,8 @@ var init_system_prompt2 = __esm({
 // node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
 import { existsSync as existsSync25, mkdirSync as mkdirSync12, readFileSync as readFileSync19, writeFileSync as writeFileSync11 } from "node:fs";
 import { basename as basename15, dirname as dirname24 } from "node:path";
-function parseSkillBlock(text3) {
-  const match2 = text3.match(/^<skill name="([^"]+)" location="([^"]+)">\n([\s\S]*?)\n<\/skill>(?:\n\n([\s\S]+))?$/);
+function parseSkillBlock(text4) {
+  const match2 = text4.match(/^<skill name="([^"]+)" location="([^"]+)">\n([\s\S]*?)\n<\/skill>(?:\n\n([\s\S]+))?$/);
   if (!match2)
     return null;
   return {
@@ -264582,10 +264582,10 @@ var init_agent_session = __esm({
       get promptTemplates() {
         return this._resourceLoader.getPrompts().prompts;
       }
-      _normalizePromptSnippet(text3) {
-        if (!text3)
+      _normalizePromptSnippet(text4) {
+        if (!text4)
           return void 0;
-        const oneLine = text3.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+        const oneLine = text4.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
         return oneLine.length > 0 ? oneLine : void 0;
       }
       _normalizePromptGuidelines(guidelines) {
@@ -264680,13 +264680,13 @@ var init_agent_session = __esm({
        * @throws Error if streaming and no streamingBehavior specified
        * @throws Error if no model selected or no API key available (when not streaming)
        */
-      async prompt(text3, options) {
+      async prompt(text4, options) {
         const expandPromptTemplates = options?.expandPromptTemplates ?? true;
         const preflightResult = options?.preflightResult;
         let messages;
         try {
-          if (expandPromptTemplates && text3.startsWith("/")) {
-            const handled = await this._tryExecuteExtensionCommand(text3);
+          if (expandPromptTemplates && text4.startsWith("/")) {
+            const handled = await this._tryExecuteExtensionCommand(text4);
             if (handled) {
               preflightResult?.(true);
               return;
@@ -264695,7 +264695,7 @@ var init_agent_session = __esm({
           if (this._compactionAbortController !== void 0) {
             throw new Error("Cannot submit a prompt while compaction is in progress. Wait for compaction to finish and retry.");
           }
-          let currentText = text3;
+          let currentText = text4;
           let currentImages = options?.images;
           if (this._extensionRunner.hasHandlers("input")) {
             const inputResult = await this._extensionRunner.emitInput(currentText, currentImages, options?.source ?? "interactive", this.isStreaming ? options?.streamingBehavior : void 0);
@@ -264789,10 +264789,10 @@ var init_agent_session = __esm({
       /**
        * Try to execute an extension command. Returns true if command was found and executed.
        */
-      async _tryExecuteExtensionCommand(text3) {
-        const spaceIndex = text3.indexOf(" ");
-        const commandName = spaceIndex === -1 ? text3.slice(1) : text3.slice(1, spaceIndex);
-        const args = spaceIndex === -1 ? "" : text3.slice(spaceIndex + 1);
+      async _tryExecuteExtensionCommand(text4) {
+        const spaceIndex = text4.indexOf(" ");
+        const commandName = spaceIndex === -1 ? text4.slice(1) : text4.slice(1, spaceIndex);
+        const args = spaceIndex === -1 ? "" : text4.slice(spaceIndex + 1);
         const command = this._extensionRunner.getCommand(commandName);
         if (!command)
           return false;
@@ -264814,15 +264814,15 @@ var init_agent_session = __esm({
        * Returns the expanded text, or the original text if not a skill command or skill not found.
        * Emits errors via extension runner if file read fails.
        */
-      _expandSkillCommand(text3) {
-        if (!text3.startsWith("/skill:"))
-          return text3;
-        const spaceIndex = text3.indexOf(" ");
-        const skillName = spaceIndex === -1 ? text3.slice(7) : text3.slice(7, spaceIndex);
-        const args = spaceIndex === -1 ? "" : text3.slice(spaceIndex + 1).trim();
+      _expandSkillCommand(text4) {
+        if (!text4.startsWith("/skill:"))
+          return text4;
+        const spaceIndex = text4.indexOf(" ");
+        const skillName = spaceIndex === -1 ? text4.slice(7) : text4.slice(7, spaceIndex);
+        const args = spaceIndex === -1 ? "" : text4.slice(spaceIndex + 1).trim();
         const skill = this.resourceLoader.getSkills().skills.find((s2) => s2.name === skillName);
         if (!skill)
-          return text3;
+          return text4;
         try {
           const content = readFileSync19(skill.filePath, "utf-8");
           const body = stripFrontmatter(content).trim();
@@ -264840,7 +264840,7 @@ ${args}` : skillBlock;
             event: "skill_expansion",
             error: err2 instanceof Error ? err2.message : String(err2)
           });
-          return text3;
+          return text4;
         }
       }
       /**
@@ -264851,11 +264851,11 @@ ${args}` : skillBlock;
        * @param images Optional image attachments to include with the message
        * @throws Error if text is an extension command
        */
-      async steer(text3, images) {
-        if (text3.startsWith("/")) {
-          this._throwIfExtensionCommand(text3);
+      async steer(text4, images) {
+        if (text4.startsWith("/")) {
+          this._throwIfExtensionCommand(text4);
         }
-        let expandedText = this._expandSkillCommand(text3);
+        let expandedText = this._expandSkillCommand(text4);
         expandedText = expandPromptTemplate(expandedText, [...this.promptTemplates]);
         await this._queueSteer(expandedText, images);
       }
@@ -264866,21 +264866,21 @@ ${args}` : skillBlock;
        * @param images Optional image attachments to include with the message
        * @throws Error if text is an extension command
        */
-      async followUp(text3, images) {
-        if (text3.startsWith("/")) {
-          this._throwIfExtensionCommand(text3);
+      async followUp(text4, images) {
+        if (text4.startsWith("/")) {
+          this._throwIfExtensionCommand(text4);
         }
-        let expandedText = this._expandSkillCommand(text3);
+        let expandedText = this._expandSkillCommand(text4);
         expandedText = expandPromptTemplate(expandedText, [...this.promptTemplates]);
         await this._queueFollowUp(expandedText, images);
       }
       /**
        * Internal: Queue a steering message (already expanded, no extension command check).
        */
-      async _queueSteer(text3, images) {
-        this._steeringMessages.push(text3);
+      async _queueSteer(text4, images) {
+        this._steeringMessages.push(text4);
         this._emitQueueUpdate();
-        const content = [{ type: "text", text: text3 }];
+        const content = [{ type: "text", text: text4 }];
         if (images) {
           content.push(...images);
         }
@@ -264893,10 +264893,10 @@ ${args}` : skillBlock;
       /**
        * Internal: Queue a follow-up message (already expanded, no extension command check).
        */
-      async _queueFollowUp(text3, images) {
-        this._followUpMessages.push(text3);
+      async _queueFollowUp(text4, images) {
+        this._followUpMessages.push(text4);
         this._emitQueueUpdate();
-        const content = [{ type: "text", text: text3 }];
+        const content = [{ type: "text", text: text4 }];
         if (images) {
           content.push(...images);
         }
@@ -264909,9 +264909,9 @@ ${args}` : skillBlock;
       /**
        * Throw an error if the text is an extension command.
        */
-      _throwIfExtensionCommand(text3) {
-        const spaceIndex = text3.indexOf(" ");
-        const commandName = spaceIndex === -1 ? text3.slice(1) : text3.slice(1, spaceIndex);
+      _throwIfExtensionCommand(text4) {
+        const spaceIndex = text4.indexOf(" ");
+        const commandName = spaceIndex === -1 ? text4.slice(1) : text4.slice(1, spaceIndex);
         const command = this._extensionRunner.getCommand(commandName);
         if (command) {
           throw new Error(`Extension command "/${commandName}" cannot be queued. Use prompt() or execute the command when not streaming.`);
@@ -264965,10 +264965,10 @@ ${args}` : skillBlock;
        * @param options.expandPromptTemplates Whether to dispatch extension commands and expand skill commands and prompt templates. Default: false.
        */
       async sendUserMessage(content, options) {
-        let text3;
+        let text4;
         let images;
         if (typeof content === "string") {
-          text3 = content;
+          text4 = content;
         } else {
           const textParts = [];
           images = [];
@@ -264979,11 +264979,11 @@ ${args}` : skillBlock;
               images.push(part);
             }
           }
-          text3 = textParts.join("\n");
+          text4 = textParts.join("\n");
           if (images.length === 0)
             images = void 0;
         }
-        await this.prompt(text3, {
+        await this.prompt(text4, {
           expandPromptTemplates: options?.expandPromptTemplates ?? false,
           streamingBehavior: options?.deliverAs,
           images,
@@ -266214,9 +266214,9 @@ ${command}` : command;
             continue;
           if (entry.message.role !== "user")
             continue;
-          const text3 = contentText(entry.message.content, "");
-          if (text3) {
-            result.push({ entryId: entry.id, text: text3 });
+          const text4 = contentText(entry.message.content, "");
+          if (text4) {
+            result.push({ entryId: entry.id, text: text4 });
           }
         }
         return result;
@@ -266382,13 +266382,13 @@ ${command}` : command;
         });
         if (!lastAssistant)
           return void 0;
-        let text3 = "";
+        let text4 = "";
         for (const content of lastAssistant.content) {
           if (content.type === "text") {
-            text3 += content.text;
+            text4 += content.text;
           }
         }
-        return text3.trim() || void 0;
+        return text4.trim() || void 0;
       }
       // =========================================================================
       // Extension System
@@ -266496,9 +266496,9 @@ async function createAgentSession(options = {}) {
   const cwd = resolvePath(options.cwd ?? options.sessionManager?.getCwd() ?? process.cwd());
   const agentDir = options.agentDir ? resolvePath(options.agentDir) : getDefaultAgentDir();
   let resourceLoader = options.resourceLoader;
-  const authPath = options.agentDir ? join40(agentDir, "auth.json") : void 0;
+  const authPath2 = options.agentDir ? join40(agentDir, "auth.json") : void 0;
   const modelsPath2 = options.agentDir ? join40(agentDir, "models.json") : void 0;
-  const modelRuntime = options.modelRuntime ?? await ModelRuntime.create({ authPath, modelsPath: modelsPath2 });
+  const modelRuntime = options.modelRuntime ?? await ModelRuntime.create({ authPath: authPath2, modelsPath: modelsPath2 });
   const settingsManager = options.settingsManager ?? SettingsManager.create(cwd, agentDir);
   const sessionManager = options.sessionManager ?? SessionManager.create(cwd, getDefaultSessionDir(cwd, agentDir));
   if (!resourceLoader) {
@@ -267236,8 +267236,8 @@ async function fetchWithLoginCancellation(input2, init) {
 }
 async function readTokenResponse(response, operation) {
   if (!response.ok) {
-    const text3 = await response.text().catch(() => "");
-    throw new Error(`OpenAI Codex token ${operation} failed (${response.status}): ${text3 || response.statusText}`);
+    const text4 = await response.text().catch(() => "");
+    throw new Error(`OpenAI Codex token ${operation} failed (${response.status}): ${text4 || response.statusText}`);
   }
   const rawJson = await response.json();
   const json2 = rawJson;
@@ -267686,8 +267686,8 @@ async function fetchAvailableGitHubCopilotModelIds(copilotToken, enterpriseDomai
 async function fetchJson(url2, init) {
   const response = await fetch(url2, init);
   if (!response.ok) {
-    const text3 = await response.text();
-    throw new Error(`${response.status} ${response.statusText}: ${text3}`);
+    const text4 = await response.text();
+    throw new Error(`${response.status} ${response.statusText}: ${text4}`);
   }
   return response.json();
 }
@@ -268211,8 +268211,8 @@ async function startDeviceAuthorization(oauthHost, signal) {
     signal: requestSignal(signal)
   });
   if (!response.ok) {
-    const text3 = await response.text().catch(() => "");
-    throw new Error(`Kimi Code device authorization failed with status ${response.status}${text3 ? `: ${text3}` : ""}`);
+    const text4 = await response.text().catch(() => "");
+    throw new Error(`Kimi Code device authorization failed with status ${response.status}${text4 ? `: ${text4}` : ""}`);
   }
   const json2 = await readJson(response);
   const deviceCode = json2?.device_code;
@@ -268267,10 +268267,10 @@ async function pollForToken(oauthHost, device, signal) {
         signal: requestSignal(signal)
       });
       if (response.status >= 500) {
-        const text3 = await response.text().catch(() => "");
+        const text4 = await response.text().catch(() => "");
         return {
           status: "failed",
-          message: `Kimi Code device token request failed with status ${response.status}${text3 ? `: ${text3}` : ""}`
+          message: `Kimi Code device token request failed with status ${response.status}${text4 ? `: ${text4}` : ""}`
         };
       }
       const json2 = await readJson(response);
@@ -268363,8 +268363,8 @@ async function refreshToken(oauthHost, refreshTokenValue, signal) {
       lastError = new Error(`Kimi Code token refresh failed with status ${response.status}`);
       continue;
     }
-    const text3 = JSON.stringify(json2);
-    throw new Error(`Kimi Code token refresh failed with status ${response.status}${text3 ? `: ${text3}` : ""}`);
+    const text4 = JSON.stringify(json2);
+    throw new Error(`Kimi Code token refresh failed with status ${response.status}${text4 ? `: ${text4}` : ""}`);
   }
   throw lastError ?? new Error("Kimi Code token refresh failed");
 }
@@ -268604,16 +268604,16 @@ async function loadRadiusOAuthDiscovery(gateway, signal) {
   return { authorizationEndpoint: discovery.authorizationEndpoint };
 }
 async function readOAuthResponseError(response, message) {
-  const text3 = await response.text().catch(() => "");
+  const text4 = await response.text().catch(() => "");
   let oauthError;
   let description;
-  if (text3) {
+  if (text4) {
     try {
-      const data = JSON.parse(text3);
+      const data = JSON.parse(text4);
       oauthError = typeof data.error === "string" ? data.error : void 0;
       description = typeof data.error_description === "string" ? data.error_description : void 0;
     } catch {
-      description = text3;
+      description = text4;
     }
   }
   return new OAuthResponseError(response.status, oauthError, description, message);
@@ -276889,11 +276889,11 @@ function createPermissionExtension(requestId, handler, approvals) {
           ]
         };
         const decision = await handler(request);
-        const option = typeof decision === "string" ? decision : decision?.optionId;
-        if (option === `session-${event.toolCallId}`) approvals.allowSession(approvalKey);
-        if (option === `always-${event.toolCallId}`) approvals.allowAlways(approvalKey);
-        if (option === `reject-always-${event.toolCallId}`) approvals.denyAlways(approvalKey);
-        return option === `allow-${event.toolCallId}` || option === `session-${event.toolCallId}` || option === `always-${event.toolCallId}` ? void 0 : { block: true, reason: "The user denied this tool call" };
+        const option2 = typeof decision === "string" ? decision : decision?.optionId;
+        if (option2 === `session-${event.toolCallId}`) approvals.allowSession(approvalKey);
+        if (option2 === `always-${event.toolCallId}`) approvals.allowAlways(approvalKey);
+        if (option2 === `reject-always-${event.toolCallId}`) approvals.denyAlways(approvalKey);
+        return option2 === `allow-${event.toolCallId}` || option2 === `session-${event.toolCallId}` || option2 === `always-${event.toolCallId}` ? void 0 : { block: true, reason: "The user denied this tool call" };
       });
     }
   };
@@ -280548,13 +280548,13 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     }
     return propValues;
   });
-  const isObject9 = isObject;
+  const isObject10 = isObject;
   const catchall = def.catchall;
   let value2;
   inst._zod.parse = (payload, ctx) => {
     value2 ?? (value2 = _normalized.value);
     const input2 = payload.value;
-    if (!isObject9(input2)) {
+    if (!isObject10(input2)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -280652,7 +280652,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
     return (payload, ctx) => fn(shape, payload, ctx);
   };
   let fastpass;
-  const isObject9 = isObject;
+  const isObject10 = isObject;
   const jit = !globalConfig.jitless;
   const allowsEval2 = allowsEval;
   const fastEnabled = jit && allowsEval2.value;
@@ -280661,7 +280661,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
   inst._zod.parse = (payload, ctx) => {
     value2 ?? (value2 = _normalized.value);
     const input2 = payload.value;
-    if (!isObject9(input2)) {
+    if (!isObject10(input2)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -280707,7 +280707,7 @@ var $ZodUnion = /* @__PURE__ */ $constructor("$ZodUnion", (inst, def) => {
   defineLazy(inst._zod, "optout", () => def.options.some((o) => o._zod.optout === "optional") ? "optional" : void 0);
   defineLazy(inst._zod, "values", () => {
     if (def.options.every((o) => o._zod.values)) {
-      return new Set(def.options.flatMap((option) => Array.from(option._zod.values)));
+      return new Set(def.options.flatMap((option2) => Array.from(option2._zod.values)));
     }
     return void 0;
   });
@@ -280726,8 +280726,8 @@ var $ZodUnion = /* @__PURE__ */ $constructor("$ZodUnion", (inst, def) => {
     }
     let async = false;
     const results = [];
-    for (const option of def.options) {
-      const result = option._zod.run({
+    for (const option2 of def.options) {
+      const result = option2._zod.run({
         value: payload.value,
         issues: []
       }, ctx);
@@ -280782,8 +280782,8 @@ var $ZodXor = /* @__PURE__ */ $constructor("$ZodXor", (inst, def) => {
     }
     let async = false;
     const results = [];
-    for (const option of def.options) {
-      const result = option._zod.run({
+    for (const option2 of def.options) {
+      const result = option2._zod.run({
         value: payload.value,
         issues: []
       }, ctx);
@@ -280807,10 +280807,10 @@ var $ZodDiscriminatedUnion = /* @__PURE__ */ $constructor("$ZodDiscriminatedUnio
   const _super = inst._zod.parse;
   defineLazy(inst._zod, "propValues", () => {
     const propValues = {};
-    for (const option of def.options) {
-      const pv = option._zod.propValues;
+    for (const option2 of def.options) {
+      const pv = option2._zod.propValues;
       if (!pv || Object.keys(pv).length === 0)
-        throw new Error(`Invalid discriminated union option at index "${def.options.indexOf(option)}"`);
+        throw new Error(`Invalid discriminated union option at index "${def.options.indexOf(option2)}"`);
       for (const [k2, v3] of Object.entries(pv)) {
         if (!propValues[k2])
           propValues[k2] = /* @__PURE__ */ new Set();
@@ -284799,8 +284799,8 @@ function ko_default() {
 }
 
 // node_modules/zod/v4/locales/lt.js
-var capitalizeFirstCharacter = (text3) => {
-  return text3.charAt(0).toUpperCase() + text3.slice(1);
+var capitalizeFirstCharacter = (text4) => {
+  return text4.charAt(0).toUpperCase() + text4.slice(1);
 };
 function getUnitTypeFromNumber(number4) {
   const abs = Math.abs(number4);
@@ -288770,8 +288770,8 @@ function isTransforming(_schema, _ctx) {
     return false;
   }
   if (def.type === "union") {
-    for (const option of def.options) {
-      if (isTransforming(option, ctx))
+    for (const option2 of def.options) {
+      if (isTransforming(option2, ctx))
         return true;
     }
     return false;
@@ -295701,8 +295701,8 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
       const openCodeToolCalls = /* @__PURE__ */ new Map();
       const approvedOpenCodeToolCalls = /* @__PURE__ */ new Map();
       const rejectedOpenCodeToolCalls = /* @__PURE__ */ new Set();
-      const text3 = new GuardedTextEmitter(requestId, emit2);
-      activeText = text3;
+      const text4 = new GuardedTextEmitter(requestId, emit2);
+      activeText = text4;
       const app = client({ name: "omarchy-quickchat" }).onRequest(methods.client.session.requestPermission, async ({ params }) => {
         if (requestPermission === void 0) {
           forbiddenToolAttempt = true;
@@ -295714,7 +295714,7 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
           return { outcome: { outcome: "cancelled" } };
         }
         const optionId2 = typeof decision === "string" ? decision : decision?.optionId;
-        const optionKind = params.options.find((option) => option.optionId === optionId2)?.kind;
+        const optionKind = params.options.find((option2) => option2.optionId === optionId2)?.kind;
         if (optionKind !== "allow_once" && optionKind !== "allow_always") unapprovedToolAttempt = true;
         if (provider.id === "opencode") {
           if (optionKind === "allow_once") {
@@ -295759,7 +295759,7 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
         if (provider.id === "codex") {
           await ctx.request(methods.agent.session.setMode, { sessionId: session.sessionId, modeId: "read-only" });
         }
-        if (model !== void 0 && modelConfig.configId !== void 0 && modelConfig.models.some((option) => option.id === model)) {
+        if (model !== void 0 && modelConfig.configId !== void 0 && modelConfig.models.some((option2) => option2.id === model)) {
           await ctx.request(methods.agent.session.setConfigOption, {
             sessionId: session.sessionId,
             configId: modelConfig.configId,
@@ -295792,23 +295792,23 @@ function runAcpQuestion(provider, requestId, question, model, emit2, timeoutMs =
             }
             const content = update.update.sessionUpdate === "agent_message_chunk" ? update.update.content : void 0;
             if (content === void 0) continue;
-            const handled = await handleContent(content, requestId, text3, emit2, imageStore, images.length);
+            const handled = await handleContent(content, requestId, text4, emit2, imageStore, images.length);
             if (handled.text !== void 0) answer += handled.text;
             if (handled.image !== void 0) images.push(handled.image);
           }
           await promptPromise;
           if (forbiddenToolAttempt) throw forbiddenToolError();
-          if (cancelled) text3.discard();
+          if (cancelled) text4.discard();
           else {
             if (unapprovedToolAttempt && answer.trim() === "") {
               const notCompleted = "The action was not completed because its tool request was not approved.";
-              text3.write(notCompleted);
+              text4.write(notCompleted);
               answer = notCompleted;
             }
-            text3.finish();
+            text4.finish();
           }
         } catch (error48) {
-          text3.discard();
+          text4.discard();
           await ctx.notify(methods.agent.session.cancel, { sessionId: session.sessionId }).catch(() => void 0);
           await promptPromise.catch(() => void 0);
           throw error48;
@@ -295891,34 +295891,34 @@ function providerSessionRequest(provider, cwd) {
   return { cwd, mcpServers: [] };
 }
 function modelConfiguration(options) {
-  const option = options.find((item) => item.type === "select" && (item.category === "model" || item.id.toLowerCase().includes("model")));
-  if (option === void 0 || option.type !== "select") return { models: [] };
-  const flat = option.options.flatMap((item) => "options" in item ? item.options : [item]);
+  const option2 = options.find((item) => item.type === "select" && (item.category === "model" || item.id.toLowerCase().includes("model")));
+  if (option2 === void 0 || option2.type !== "select") return { models: [] };
+  const flat = option2.options.flatMap((item) => "options" in item ? item.options : [item]);
   return {
-    configId: option.id,
-    current: option.currentValue,
+    configId: option2.id,
+    current: option2.currentValue,
     models: flat.map((item) => ({ id: item.value, name: item.name, ...item.description === void 0 || item.description === null ? {} : { description: item.description } }))
   };
 }
-async function handleContent(content, requestId, text3, emit2, imageStore, imageCount) {
+async function handleContent(content, requestId, text4, emit2, imageStore, imageCount) {
   if (content.type === "text") {
-    text3.write(content.text);
+    text4.write(content.text);
     return { text: content.text };
   }
   if (content.type === "image" && imageCount < 4) {
-    text3.finish();
+    text4.finish();
     const image = await imageStore.saveBase64(content.data, content.mimeType, content.uri ?? void 0);
     emit2({ type: "image", id: requestId, image: presentImage(image) });
     return { image };
   }
   if (content.type === "resource_link") {
-    text3.finish();
+    text4.finish();
     const markdown = `[${escapeMarkdown(content.title ?? content.name)}](${content.uri})`;
     emit2({ type: "content", id: requestId, delta: markdown });
     return { text: markdown };
   }
   if (content.type === "resource" && "text" in content.resource) {
-    text3.write(content.resource.text);
+    text4.write(content.resource.text);
     return { text: content.resource.text };
   }
   return {};
@@ -296232,10 +296232,10 @@ var DictationService = class {
     while (Date.now() < deadline) {
       if (generation !== this.#generation) throw new DictationCancelledError();
       try {
-        const text3 = (await readFile7(this.#transcript, "utf8")).trim();
-        if (text3 !== "") {
+        const text4 = (await readFile7(this.#transcript, "utf8")).trim();
+        if (text4 !== "") {
           await rm4(this.#transcript, { force: true });
-          return text3;
+          return text4;
         }
       } catch {
       }
@@ -296267,10 +296267,415 @@ function dictationStartArgs(transcript) {
   return ["record", "start", `--file=${transcript}`, "--no-auto-submit", "--no-smart-auto-submit"];
 }
 
+// runtime/src/tts.ts
+import { mkdirSync as mkdirSync14, readFileSync as readFileSync22, renameSync as renameSync5, statSync as statSync13, unlinkSync as unlinkSync4, writeFileSync as writeFileSync13 } from "node:fs";
+import { join as join46 } from "node:path";
+init_paths();
+init_process();
+var cloudTtsProviderIds = ["elevenlabs", "openai"];
+var VoiceError = class extends Error {
+  code;
+  constructor(code, message) {
+    super(message);
+    this.name = "VoiceError";
+    this.code = code;
+  }
+};
+var PROVIDER_NAMES = {
+  kokoro: "Kokoro",
+  elevenlabs: "ElevenLabs",
+  openai: "OpenAI"
+};
+var KOKORO_MODELS = [{ id: "kokoro-82m", name: "Kokoro 82M" }];
+var KOKORO_VOICES = [
+  { id: "af_heart", name: "Heart (American female)" },
+  { id: "af_bella", name: "Bella (American female)" },
+  { id: "af_nicole", name: "Nicole (American female)" },
+  { id: "af_sarah", name: "Sarah (American female)" },
+  { id: "af_kore", name: "Kore (American female)" },
+  { id: "af_aoede", name: "Aoede (American female)" },
+  { id: "af_alloy", name: "Alloy (American female)" },
+  { id: "af_nova", name: "Nova (American female)" },
+  { id: "af_sky", name: "Sky (American female)" },
+  { id: "am_michael", name: "Michael (American male)" },
+  { id: "am_fenrir", name: "Fenrir (American male)" },
+  { id: "am_puck", name: "Puck (American male)" },
+  { id: "am_echo", name: "Echo (American male)" },
+  { id: "bf_emma", name: "Emma (British female)" },
+  { id: "bf_isabella", name: "Isabella (British female)" },
+  { id: "bm_george", name: "George (British male)" },
+  { id: "bm_fable", name: "Fable (British male)" }
+];
+var OPENAI_MODELS2 = [
+  { id: "gpt-4o-mini-tts", name: "GPT-4o mini TTS" },
+  { id: "tts-1-hd", name: "TTS-1 HD" },
+  { id: "tts-1", name: "TTS-1" }
+];
+var OPENAI_STANDARD_VOICE_IDS = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+var OPENAI_MINI_VOICE_IDS = [
+  "alloy",
+  "ash",
+  "ballad",
+  "coral",
+  "echo",
+  "fable",
+  "onyx",
+  "nova",
+  "sage",
+  "shimmer",
+  "verse",
+  "marin",
+  "cedar"
+];
+var OPENAI_VOICE_NAMES = {
+  alloy: "Alloy",
+  ash: "Ash",
+  ballad: "Ballad",
+  coral: "Coral",
+  echo: "Echo",
+  fable: "Fable",
+  onyx: "Onyx",
+  nova: "Nova",
+  sage: "Sage",
+  shimmer: "Shimmer",
+  verse: "Verse",
+  marin: "Marin",
+  cedar: "Cedar"
+};
+var OPENAI_VOICES = OPENAI_MINI_VOICE_IDS.map((id) => ({
+  id,
+  name: OPENAI_VOICE_NAMES[id] ?? id,
+  models: OPENAI_STANDARD_VOICE_IDS.includes(id) ? ["gpt-4o-mini-tts", "tts-1-hd", "tts-1"] : ["gpt-4o-mini-tts"]
+}));
+var ELEVENLABS_MODELS = [
+  { id: "eleven_multilingual_v2", name: "Multilingual v2" },
+  { id: "eleven_turbo_v2_5", name: "Turbo v2.5" },
+  { id: "eleven_flash_v2_5", name: "Flash v2.5" },
+  { id: "eleven_v3", name: "Eleven v3" }
+];
+var MAX_AUTH_BYTES = 64 * 1024;
+var MAX_PROBE_BYTES = 256 * 1024;
+var PROBE_TIMEOUT_MS = 8e3;
+var KOKORO_TIMEOUT_MS = 3e3;
+var OPTION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+var MAX_MODELS = 32;
+var MAX_VOICES = 100;
+var MAX_KEY_LENGTH = 512;
+function isCloudTtsProviderId(value2) {
+  return cloudTtsProviderIds.includes(value2);
+}
+function isObject7(value2) {
+  return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
+}
+function text(value2) {
+  return typeof value2 === "string" ? value2 : "";
+}
+function voiceConfigDirectory(env2) {
+  const explicit = env2.OMAPILOT_CONFIG_DIR?.trim();
+  if (explicit !== void 0 && explicit.startsWith("/")) return explicit;
+  return quickchatPaths(env2).config;
+}
+function authPath(env2) {
+  return join46(voiceConfigDirectory(env2), "voice-auth.json");
+}
+function readAuthFile(path16) {
+  try {
+    if (statSync13(path16).size > MAX_AUTH_BYTES) {
+      throw new VoiceError("tts_auth_invalid", "voice-auth.json is unexpectedly large; not modifying it");
+    }
+    const value2 = JSON.parse(readFileSync22(path16, "utf8"));
+    if (!isObject7(value2)) {
+      throw new VoiceError("tts_auth_invalid", "voice-auth.json must contain a JSON object");
+    }
+    const file2 = {};
+    for (const id of cloudTtsProviderIds) {
+      const entry = value2[id];
+      if (!isObject7(entry) || entry.type !== "api_key") continue;
+      const key = text(entry.key).trim();
+      if (key === "") continue;
+      file2[id] = { type: "api_key", key };
+    }
+    return file2;
+  } catch (error48) {
+    if (error48 instanceof VoiceError) throw error48;
+    if (isObject7(error48) && error48.code === "ENOENT") return {};
+    throw new VoiceError("tts_auth_invalid", "voice-auth.json could not be read or parsed");
+  }
+}
+function writeAuthFile(path16, file2) {
+  mkdirSync14(join46(path16, ".."), { recursive: true, mode: 448 });
+  const temporary = `${path16}.${process.pid}.tmp`;
+  const body = `${JSON.stringify(file2, null, 2)}
+`;
+  writeFileSync13(temporary, body, { encoding: "utf8", mode: 384 });
+  renameSync5(temporary, path16);
+}
+function storedKey(file2, provider) {
+  const key = file2[provider]?.key.trim();
+  return key === void 0 || key === "" ? void 0 : key;
+}
+function normalizeKey(raw) {
+  const key = raw.trim();
+  if (key.length < 8) throw new VoiceError("invalid_tts_key", "Enter a complete API key");
+  if (key.length > MAX_KEY_LENGTH) throw new VoiceError("invalid_tts_key", "That API key is unexpectedly long");
+  if (/[\u0000-\u001f\u007f]/.test(key)) throw new VoiceError("invalid_tts_key", "The API key contains control characters");
+  return key;
+}
+async function boundedJson(response) {
+  const declared = Number(response.headers.get("content-length") ?? 0);
+  if (Number.isFinite(declared) && declared > MAX_PROBE_BYTES) {
+    throw new VoiceError("tts_probe_failed", "The provider response is unexpectedly large");
+  }
+  if (response.body === null) throw new VoiceError("tts_probe_failed", "The provider returned an empty body");
+  const reader = response.body.getReader();
+  const chunks = [];
+  let size = 0;
+  while (true) {
+    const next = await reader.read();
+    if (next.done) break;
+    size += next.value.byteLength;
+    if (size > MAX_PROBE_BYTES) {
+      await reader.cancel();
+      throw new VoiceError("tts_probe_failed", "The provider response is unexpectedly large");
+    }
+    chunks.push(next.value);
+  }
+  const combined = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder().decode(combined));
+  } catch {
+    throw new VoiceError("tts_probe_failed", "The provider did not return valid JSON");
+  }
+}
+function option(id, name, models) {
+  if (!OPTION_ID.test(id)) return void 0;
+  const label = name.trim().slice(0, 64) || id;
+  return models === void 0 ? { id, name: label } : { id, name: label, models };
+}
+var VoiceService = class {
+  #env;
+  #fetch;
+  #dictationAvailable;
+  #kokoroAvailable;
+  constructor(env2 = process.env, options = {}) {
+    this.#env = env2;
+    this.#fetch = options.fetch ?? fetch;
+    this.#dictationAvailable = options.dictationAvailable ?? (() => new DictationService(quickchatPaths(env2), env2).available());
+    this.#kokoroAvailable = options.kokoroAvailable ?? (() => probeKokoro(env2));
+  }
+  async status() {
+    const [dictation, kokoro, auth] = await Promise.all([
+      this.#dictationStatus(),
+      this.#kokoroStatus(),
+      Promise.resolve(this.#auth())
+    ]);
+    const elevenlabs = await this.#cloudStatus("elevenlabs", storedKey(auth, "elevenlabs"));
+    const openai = await this.#cloudStatus("openai", storedKey(auth, "openai"));
+    return { dictation, tts: [kokoro, elevenlabs, openai] };
+  }
+  async setKey(provider, apiKey) {
+    const key = normalizeKey(apiKey);
+    const probed = await this.#cloudStatus(provider, key);
+    if (!probed.available) {
+      throw new VoiceError("tts_auth_failed", probed.message || "The API key was rejected");
+    }
+    const file2 = this.#auth();
+    file2[provider] = { type: "api_key", key };
+    writeAuthFile(authPath(this.#env), file2);
+    return this.status();
+  }
+  async clearKey(provider) {
+    const file2 = this.#auth();
+    const remaining = {};
+    for (const id of cloudTtsProviderIds) {
+      if (id === provider) continue;
+      const entry = file2[id];
+      if (entry !== void 0) remaining[id] = entry;
+    }
+    const path16 = authPath(this.#env);
+    if (Object.keys(remaining).length === 0) {
+      try {
+        unlinkSync4(path16);
+      } catch (error48) {
+        if (!(isObject7(error48) && error48.code === "ENOENT")) throw error48;
+      }
+    } else writeAuthFile(path16, remaining);
+    return this.status();
+  }
+  async testKey(provider, apiKey) {
+    return this.#cloudStatus(provider, normalizeKey(apiKey));
+  }
+  #auth() {
+    return readAuthFile(authPath(this.#env));
+  }
+  async #dictationStatus() {
+    try {
+      const available = await this.#dictationAvailable();
+      return {
+        available,
+        message: available ? "Voxtype is ready for dictation." : "Voxtype is not installed or not ready. Install it, then reopen settings. OmaPilot uses it for listening and does not install it for you."
+      };
+    } catch {
+      return {
+        available: false,
+        message: "Voxtype could not be reached. Install it, then reopen settings."
+      };
+    }
+  }
+  async #kokoroStatus() {
+    let available = false;
+    try {
+      available = await this.#kokoroAvailable();
+    } catch {
+      available = false;
+    }
+    return {
+      id: "kokoro",
+      name: PROVIDER_NAMES.kokoro,
+      kind: "local",
+      available,
+      configured: available,
+      message: available ? "Kokoro is installed locally." : "Kokoro is not installed. Use Python 3.10\u20133.12 with `pip install kokoro soundfile`, and install espeak-ng. OmaPilot does not download the model for you.",
+      models: KOKORO_MODELS,
+      voices: KOKORO_VOICES
+    };
+  }
+  async #cloudStatus(provider, key) {
+    const base = {
+      id: provider,
+      name: PROVIDER_NAMES[provider],
+      kind: "cloud",
+      available: false,
+      configured: key !== void 0,
+      message: key === void 0 ? `Add an ${PROVIDER_NAMES[provider]} API key to enable this provider.` : `${PROVIDER_NAMES[provider]} is configured.`,
+      models: provider === "openai" ? OPENAI_MODELS2 : ELEVENLABS_MODELS,
+      voices: provider === "openai" ? OPENAI_VOICES : []
+    };
+    if (key === void 0) return base;
+    try {
+      const probed = provider === "openai" ? await probeOpenAi(key, this.#fetch) : await probeElevenLabs(key, this.#fetch);
+      return {
+        ...base,
+        available: true,
+        configured: true,
+        message: `${PROVIDER_NAMES[provider]} is ready.`,
+        models: probed.models.length > 0 ? probed.models : base.models,
+        voices: probed.voices.length > 0 ? probed.voices : base.voices
+      };
+    } catch (error48) {
+      return {
+        ...base,
+        available: false,
+        configured: true,
+        message: error48 instanceof VoiceError ? error48.message : `${PROVIDER_NAMES[provider]} could not be reached.`
+      };
+    }
+  }
+};
+async function probeKokoro(env2) {
+  const python = await resolveExecutable("python3", env2);
+  if (python === void 0) return false;
+  const result = await runCommand(python, ["-c", "import kokoro"], {
+    env: env2,
+    timeoutMs: KOKORO_TIMEOUT_MS,
+    maxOutput: 4096
+  });
+  return result.code === 0;
+}
+async function probeOpenAi(apiKey, fetcher) {
+  let response;
+  try {
+    response = await fetcher("https://api.openai.com/v1/models", {
+      method: "GET",
+      headers: { accept: "application/json", authorization: `Bearer ${apiKey}` },
+      redirect: "error",
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS)
+    });
+  } catch (error48) {
+    if (error48 instanceof VoiceError) throw error48;
+    throw new VoiceError("tts_probe_failed", "Could not reach OpenAI. Check the network and try again.");
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new VoiceError("tts_auth_failed", "OpenAI rejected the API key.");
+  }
+  if (!response.ok) {
+    throw new VoiceError("tts_probe_failed", `OpenAI returned HTTP ${response.status}.`);
+  }
+  await boundedJson(response);
+  return { models: OPENAI_MODELS2, voices: OPENAI_VOICES };
+}
+async function probeElevenLabs(apiKey, fetcher) {
+  const [models, voices] = await Promise.all([
+    elevenLabsJson("https://api.elevenlabs.io/v1/models", apiKey, fetcher),
+    elevenLabsJson("https://api.elevenlabs.io/v1/voices", apiKey, fetcher)
+  ]);
+  return {
+    models: parseElevenLabsModels(models),
+    voices: parseElevenLabsVoices(voices)
+  };
+}
+async function elevenLabsJson(url2, apiKey, fetcher) {
+  let response;
+  try {
+    response = await fetcher(url2, {
+      method: "GET",
+      headers: { accept: "application/json", "xi-api-key": apiKey },
+      redirect: "error",
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS)
+    });
+  } catch (error48) {
+    if (error48 instanceof VoiceError) throw error48;
+    throw new VoiceError("tts_probe_failed", "Could not reach ElevenLabs. Check the network and try again.");
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new VoiceError("tts_auth_failed", "ElevenLabs rejected the API key.");
+  }
+  if (!response.ok) {
+    throw new VoiceError("tts_probe_failed", `ElevenLabs returned HTTP ${response.status}.`);
+  }
+  return boundedJson(response);
+}
+function parseElevenLabsModels(payload) {
+  const rows = Array.isArray(payload) ? payload : isObject7(payload) && Array.isArray(payload.models) ? payload.models : [];
+  const models = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const entry of rows) {
+    if (!isObject7(entry)) continue;
+    if (entry.can_do_text_to_speech === false) continue;
+    const id = text(entry.model_id ?? entry.id).trim();
+    const parsed = option(id, text(entry.name) || id);
+    if (parsed === void 0 || seen.has(parsed.id)) continue;
+    seen.add(parsed.id);
+    models.push({ id: parsed.id, name: parsed.name });
+    if (models.length >= MAX_MODELS) break;
+  }
+  return models;
+}
+function parseElevenLabsVoices(payload) {
+  const rows = isObject7(payload) && Array.isArray(payload.voices) ? payload.voices : [];
+  const voices = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const entry of rows) {
+    if (!isObject7(entry)) continue;
+    const id = text(entry.voice_id ?? entry.id).trim();
+    const parsed = option(id, text(entry.name) || id);
+    if (parsed === void 0 || seen.has(parsed.id)) continue;
+    seen.add(parsed.id);
+    voices.push({ id: parsed.id, name: parsed.name });
+    if (voices.length >= MAX_VOICES) break;
+  }
+  return voices;
+}
+
 // runtime/src/custom-providers.ts
 init_pi_harness();
-import { mkdirSync as mkdirSync14, readFileSync as readFileSync22, renameSync as renameSync5, statSync as statSync13, writeFileSync as writeFileSync13 } from "node:fs";
-import { join as join46 } from "node:path";
+import { mkdirSync as mkdirSync15, readFileSync as readFileSync23, renameSync as renameSync6, statSync as statSync14, writeFileSync as writeFileSync14 } from "node:fs";
+import { join as join47 } from "node:path";
 var PROVIDER_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 var MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
 var RESERVED_IDS = /* @__PURE__ */ new Set([
@@ -296286,10 +296691,10 @@ var RESERVED_IDS = /* @__PURE__ */ new Set([
   "radius",
   "builtin"
 ]);
-var MAX_MODELS = 200;
+var MAX_MODELS2 = 200;
 var MAX_FILE_BYTES = 1024 * 1024;
-var MAX_PROBE_BYTES = 1024 * 1024;
-var PROBE_TIMEOUT_MS = 1e4;
+var MAX_PROBE_BYTES2 = 1024 * 1024;
+var PROBE_TIMEOUT_MS2 = 1e4;
 var CustomProviderError = class extends Error {
   code;
   constructor(code, message) {
@@ -296301,10 +296706,10 @@ var CustomProviderError = class extends Error {
 function invalid(message) {
   throw new CustomProviderError("invalid_custom_provider", message);
 }
-function isObject7(value2) {
+function isObject8(value2) {
   return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
 }
-function text(value2) {
+function text2(value2) {
   if (typeof value2 === "string") return value2;
   if (typeof value2 === "number" && Number.isFinite(value2)) return String(value2);
   return "";
@@ -296333,30 +296738,30 @@ function normalizeBaseUrl(raw) {
   return url2.origin + url2.pathname.replace(/\/+$/u, "");
 }
 function validateCustomProvider(input2) {
-  if (!isObject7(input2)) return invalid("Provide the server details");
-  const id = text(input2.id).trim().toLowerCase();
+  if (!isObject8(input2)) return invalid("Provide the server details");
+  const id = text2(input2.id).trim().toLowerCase();
   if (!PROVIDER_ID.test(id)) {
     return invalid("Use a short lowercase id: letters, digits, dot, dash, underscore");
   }
   if (RESERVED_IDS.has(id)) return invalid(`"${id}" is reserved for a built-in provider`);
-  const name = text(input2.name).trim() || id;
+  const name = text2(input2.name).trim() || id;
   if (name.length > 64) return invalid("Keep the display name under 64 characters");
-  const api = text(input2.api);
+  const api = text2(input2.api);
   if (api !== "openai-responses" && api !== "openai-completions") {
     return invalid("Choose either the /responses or the /chat/completions API");
   }
-  const baseUrl = normalizeBaseUrl(text(input2.baseUrl));
+  const baseUrl = normalizeBaseUrl(text2(input2.baseUrl));
   const rawModels = Array.isArray(input2.models) ? input2.models : [];
   if (rawModels.length === 0) return invalid("Add at least one model id");
-  if (rawModels.length > MAX_MODELS) return invalid(`Add at most ${MAX_MODELS} models`);
+  if (rawModels.length > MAX_MODELS2) return invalid(`Add at most ${MAX_MODELS2} models`);
   const seen = /* @__PURE__ */ new Set();
   const models = rawModels.map((entry) => {
-    const source = isObject7(entry) ? entry : { id: entry };
-    const modelId = text(source.id).trim();
+    const source = isObject8(entry) ? entry : { id: entry };
+    const modelId = text2(source.id).trim();
     if (!MODEL_ID.test(modelId)) return invalid(`"${modelId}" is not a valid model id`);
     if (seen.has(modelId)) return invalid(`"${modelId}" is listed twice`);
     seen.add(modelId);
-    const modelName = text(source.name).trim() || modelId;
+    const modelName = text2(source.name).trim() || modelId;
     const contextWindow = Number(source.contextWindow ?? 0);
     return {
       id: modelId,
@@ -296368,7 +296773,7 @@ function validateCustomProvider(input2) {
 }
 async function boundedResponseText(response) {
   const declared = Number(response.headers.get("content-length") ?? 0);
-  if (Number.isFinite(declared) && declared > MAX_PROBE_BYTES) {
+  if (Number.isFinite(declared) && declared > MAX_PROBE_BYTES2) {
     throw new CustomProviderError("custom_provider_test_failed", "The /models response is unexpectedly large");
   }
   if (response.body === null) return "";
@@ -296379,7 +296784,7 @@ async function boundedResponseText(response) {
     const next = await reader.read();
     if (next.done) break;
     size += next.value.byteLength;
-    if (size > MAX_PROBE_BYTES) {
+    if (size > MAX_PROBE_BYTES2) {
       await reader.cancel();
       throw new CustomProviderError("custom_provider_test_failed", "The /models response is unexpectedly large");
     }
@@ -296394,9 +296799,9 @@ async function boundedResponseText(response) {
   return new TextDecoder().decode(combined);
 }
 async function probeCustomProvider(input2, fetcher = fetch) {
-  if (!isObject7(input2)) return invalid("Provide the server URL");
-  const baseUrl = normalizeBaseUrl(text(input2.baseUrl));
-  const key = text(input2.apiKey).trim();
+  if (!isObject8(input2)) return invalid("Provide the server URL");
+  const baseUrl = normalizeBaseUrl(text2(input2.baseUrl));
+  const key = text2(input2.apiKey).trim();
   const headers = new Headers({ accept: "application/json" });
   if (key !== "") headers.set("authorization", `Bearer ${key}`);
   let response;
@@ -296405,7 +296810,7 @@ async function probeCustomProvider(input2, fetcher = fetch) {
       method: "GET",
       headers,
       redirect: "error",
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS)
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS2)
     });
   } catch (error48) {
     if (error48 instanceof CustomProviderError) throw error48;
@@ -296428,23 +296833,23 @@ async function probeCustomProvider(input2, fetcher = fetch) {
     if (error48 instanceof CustomProviderError) throw error48;
     throw new CustomProviderError("custom_provider_test_failed", "The /models endpoint did not return valid JSON");
   }
-  if (!isObject7(payload) || !Array.isArray(payload.data)) {
+  if (!isObject8(payload) || !Array.isArray(payload.data)) {
     throw new CustomProviderError("custom_provider_test_failed", "The response must contain a data array of models");
   }
   const seen = /* @__PURE__ */ new Set();
   const models = [];
   for (const entry of payload.data) {
-    if (!isObject7(entry)) continue;
-    const id = text(entry.id).trim();
+    if (!isObject8(entry)) continue;
+    const id = text2(entry.id).trim();
     if (!MODEL_ID.test(id) || seen.has(id)) continue;
     seen.add(id);
     const rawContext = Number(entry.max_model_len ?? entry.context_window ?? 0);
     models.push({
       id,
-      name: text(entry.name).trim().slice(0, 64) || id,
+      name: text2(entry.name).trim().slice(0, 64) || id,
       contextWindow: Number.isFinite(rawContext) && rawContext > 0 ? Math.min(Math.floor(rawContext), 1e7) : 128e3
     });
-    if (models.length >= MAX_MODELS) break;
+    if (models.length >= MAX_MODELS2) break;
   }
   if (models.length === 0) {
     throw new CustomProviderError("custom_provider_test_failed", "The /models endpoint returned no usable model ids");
@@ -296453,11 +296858,11 @@ async function probeCustomProvider(input2, fetcher = fetch) {
 }
 function readModelsJson(path16) {
   try {
-    if (statSync13(path16).size > MAX_FILE_BYTES) {
+    if (statSync14(path16).size > MAX_FILE_BYTES) {
       throw new CustomProviderError("models_file_too_large", "models.json is unexpectedly large; not modifying it");
     }
-    const value2 = JSON.parse(readFileSync22(path16, "utf8"));
-    if (!isObject7(value2)) {
+    const value2 = JSON.parse(readFileSync23(path16, "utf8"));
+    if (!isObject8(value2)) {
       throw new CustomProviderError(
         "models_file_invalid",
         "models.json must contain a JSON object; fix it before adding a server"
@@ -296466,7 +296871,7 @@ function readModelsJson(path16) {
     return value2;
   } catch (error48) {
     if (error48 instanceof CustomProviderError) throw error48;
-    if (isObject7(error48) && error48.code === "ENOENT") return {};
+    if (isObject8(error48) && error48.code === "ENOENT") return {};
     throw new CustomProviderError(
       "models_file_invalid",
       "models.json could not be read or parsed; fix it before adding a server"
@@ -296474,36 +296879,36 @@ function readModelsJson(path16) {
   }
 }
 function writeModelsJson(path16, value2) {
-  mkdirSync14(join46(path16, ".."), { recursive: true, mode: 448 });
+  mkdirSync15(join47(path16, ".."), { recursive: true, mode: 448 });
   const temporary = `${path16}.${process.pid}.tmp`;
-  writeFileSync13(temporary, `${JSON.stringify(value2, null, 2)}
+  writeFileSync14(temporary, `${JSON.stringify(value2, null, 2)}
 `, { encoding: "utf8", mode: 384 });
-  renameSync5(temporary, path16);
+  renameSync6(temporary, path16);
 }
 function modelsPath(env2) {
-  return join46(configDirectory(env2), "models.json");
+  return join47(configDirectory(env2), "models.json");
 }
 function managed(provider) {
   return provider.omapilotManaged === true;
 }
 function listCustomProviders(env2 = process.env) {
   const file2 = readModelsJson(modelsPath(env2));
-  const providers = isObject7(file2.providers) ? file2.providers : {};
+  const providers = isObject8(file2.providers) ? file2.providers : {};
   const out = [];
   for (const [id, value2] of Object.entries(providers)) {
-    if (!isObject7(value2) || !managed(value2)) continue;
+    if (!isObject8(value2) || !managed(value2)) continue;
     const models = Array.isArray(value2.models) ? value2.models : [];
     out.push({
       id,
-      name: text(value2.name) || id,
-      baseUrl: text(value2.baseUrl),
-      api: text(value2.api),
+      name: text2(value2.name) || id,
+      baseUrl: text2(value2.baseUrl),
+      api: text2(value2.api),
       models: models.flatMap((entry) => {
-        if (!isObject7(entry) || typeof entry.id !== "string") return [];
+        if (!isObject8(entry) || typeof entry.id !== "string") return [];
         const contextWindow = Number(entry.contextWindow ?? 0);
         return [{
           id: entry.id,
-          name: text(entry.name).trim().slice(0, 64) || entry.id,
+          name: text2(entry.name).trim().slice(0, 64) || entry.id,
           contextWindow: Number.isFinite(contextWindow) && contextWindow > 0 ? Math.min(Math.floor(contextWindow), 1e7) : 128e3
         }];
       }),
@@ -296518,9 +296923,9 @@ function addCustomProvider(input2, env2 = process.env) {
   const spec = validateCustomProvider(input2);
   const path16 = modelsPath(env2);
   const file2 = readModelsJson(path16);
-  const providers = isObject7(file2.providers) ? { ...file2.providers } : {};
+  const providers = isObject8(file2.providers) ? { ...file2.providers } : {};
   const existing = providers[spec.id];
-  if (existing !== void 0 && (!isObject7(existing) || !managed(existing))) {
+  if (existing !== void 0 && (!isObject8(existing) || !managed(existing))) {
     throw new CustomProviderError(
       "custom_provider_conflict",
       `models.json already defines "${spec.id}"; rename the server or edit that entry by hand`
@@ -296557,10 +296962,10 @@ function removeCustomProvider(id, env2 = process.env) {
   if (!PROVIDER_ID.test(key)) throw new CustomProviderError("invalid_custom_provider", "Unknown server");
   const path16 = modelsPath(env2);
   const file2 = readModelsJson(path16);
-  const providers = isObject7(file2.providers) ? { ...file2.providers } : {};
+  const providers = isObject8(file2.providers) ? { ...file2.providers } : {};
   const existing = providers[key];
   if (existing === void 0) return;
-  if (!isObject7(existing) || !managed(existing)) {
+  if (!isObject8(existing) || !managed(existing)) {
     throw new CustomProviderError(
       "custom_provider_conflict",
       `"${key}" was not added by OmaPilot; remove it from models.json by hand`
@@ -296574,79 +296979,79 @@ function removeCustomProvider(id, env2 = process.env) {
 
 // runtime/src/voxtype-osd.ts
 init_process();
-import { copyFileSync as copyFileSync3, existsSync as existsSync27, readFileSync as readFileSync23, renameSync as renameSync6, statSync as statSync14, writeFileSync as writeFileSync14 } from "node:fs";
+import { copyFileSync as copyFileSync3, existsSync as existsSync27, readFileSync as readFileSync24, renameSync as renameSync7, statSync as statSync15, writeFileSync as writeFileSync15 } from "node:fs";
 import { homedir as homedir15 } from "node:os";
-import { join as join47 } from "node:path";
+import { join as join48 } from "node:path";
 var MAX_CONFIG_BYTES = 512 * 1024;
 var OSD_SECTION = /^[ \t]*\[osd\][ \t]*$/mu;
 var ENABLED_LINE = /^[ \t]*enabled[ \t]*=[ \t]*(true|false)[ \t]*$/mu;
 function voxtypeConfigPath(env2 = process.env) {
-  const base = env2.XDG_CONFIG_HOME?.startsWith("/") === true ? env2.XDG_CONFIG_HOME : join47(env2.HOME ?? homedir15(), ".config");
-  return join47(base, "voxtype", "config.toml");
+  const base = env2.XDG_CONFIG_HOME?.startsWith("/") === true ? env2.XDG_CONFIG_HOME : join48(env2.HOME ?? homedir15(), ".config");
+  return join48(base, "voxtype", "config.toml");
 }
 function readConfig(path16) {
   try {
-    if (statSync14(path16).size > MAX_CONFIG_BYTES) return void 0;
-    return readFileSync23(path16, "utf8");
+    if (statSync15(path16).size > MAX_CONFIG_BYTES) return void 0;
+    return readFileSync24(path16, "utf8");
   } catch {
     return void 0;
   }
 }
-function osdSectionBounds(text3) {
-  const header = OSD_SECTION.exec(text3);
+function osdSectionBounds(text4) {
+  const header = OSD_SECTION.exec(text4);
   if (header === null) return void 0;
   const start = header.index + header[0].length;
-  const rest = text3.slice(start);
+  const rest = text4.slice(start);
   const next = /^[ \t]*\[[^\]]+\][ \t]*$/mu.exec(rest);
-  return { start, end: next === null ? text3.length : start + next.index };
+  return { start, end: next === null ? text4.length : start + next.index };
 }
-function readOsdEnabled(text3) {
-  const bounds = osdSectionBounds(text3);
+function readOsdEnabled(text4) {
+  const bounds = osdSectionBounds(text4);
   if (bounds === void 0) return true;
-  const match2 = ENABLED_LINE.exec(text3.slice(bounds.start, bounds.end));
+  const match2 = ENABLED_LINE.exec(text4.slice(bounds.start, bounds.end));
   return match2 === null ? true : match2[1] === "true";
 }
-function withOsdEnabled(text3, enabled) {
+function withOsdEnabled(text4, enabled) {
   const value2 = enabled ? "true" : "false";
-  const bounds = osdSectionBounds(text3);
+  const bounds = osdSectionBounds(text4);
   if (bounds === void 0) {
-    const separator = text3.length === 0 || text3.endsWith("\n") ? "" : "\n";
-    return `${text3}${separator}
+    const separator = text4.length === 0 || text4.endsWith("\n") ? "" : "\n";
+    return `${text4}${separator}
 # Added by OmaPilot: its voice node already indicates recording.
 [osd]
 enabled = ${value2}
 `;
   }
-  const body = text3.slice(bounds.start, bounds.end);
+  const body = text4.slice(bounds.start, bounds.end);
   const match2 = ENABLED_LINE.exec(body);
   if (match2 !== null) {
     const replaced = `${body.slice(0, match2.index)}enabled = ${value2}${body.slice(match2.index + match2[0].length)}`;
-    return text3.slice(0, bounds.start) + replaced + text3.slice(bounds.end);
+    return text4.slice(0, bounds.start) + replaced + text4.slice(bounds.end);
   }
-  return `${text3.slice(0, bounds.start)}
-enabled = ${value2}${body}${text3.slice(bounds.end)}`;
+  return `${text4.slice(0, bounds.start)}
+enabled = ${value2}${body}${text4.slice(bounds.end)}`;
 }
 function voxtypeOsdStatus(env2 = process.env) {
   const configPath = voxtypeConfigPath(env2);
-  const text3 = readConfig(configPath);
-  if (text3 === void 0) {
+  const text4 = readConfig(configPath);
+  if (text4 === void 0) {
     return { available: false, enabled: true, configPath, message: "Voxtype configuration was not found" };
   }
-  return { available: true, enabled: readOsdEnabled(text3), configPath };
+  return { available: true, enabled: readOsdEnabled(text4), configPath };
 }
 async function setVoxtypeOsdEnabled(enabled, env2 = process.env) {
   const configPath = voxtypeConfigPath(env2);
-  const text3 = readConfig(configPath);
-  if (text3 === void 0) {
+  const text4 = readConfig(configPath);
+  if (text4 === void 0) {
     return { available: false, enabled: true, configPath, message: "Voxtype configuration was not found" };
   }
-  const next = withOsdEnabled(text3, enabled);
-  if (next !== text3) {
+  const next = withOsdEnabled(text4, enabled);
+  if (next !== text4) {
     const backup = `${configPath}.omapilot.bak`;
     if (!existsSync27(backup)) copyFileSync3(configPath, backup);
     const temporary = `${configPath}.${process.pid}.tmp`;
-    writeFileSync14(temporary, next, { encoding: "utf8", mode: 384 });
-    renameSync6(temporary, configPath);
+    writeFileSync15(temporary, next, { encoding: "utf8", mode: 384 });
+    renameSync7(temporary, configPath);
   }
   const restart = await runCommand(
     "systemctl",
@@ -296693,7 +297098,7 @@ function promptWithContextAttachments(question, context, attachmentBlocks) {
 
 // runtime/src/context-attachments.ts
 import { readFile as readFile8 } from "node:fs/promises";
-import { join as join48 } from "node:path";
+import { join as join49 } from "node:path";
 init_paths();
 init_process();
 var ContextAttachmentError = class extends Error {
@@ -296745,7 +297150,7 @@ var ContextAttachmentStore = class {
       });
       if (result.code !== 0) return void 0;
       const value2 = JSON.parse(result.stdout);
-      if (!isObject8(value2)) return void 0;
+      if (!isObject9(value2)) return void 0;
       const x4 = integer2(value2.x);
       const y2 = integer2(value2.y);
       return x4 === void 0 || y2 === void 0 ? void 0 : { x: x4, y: y2 };
@@ -296813,14 +297218,14 @@ var ContextAttachmentStore = class {
       x: target.monitor.x + localAnchor.x,
       y: target.monitor.y + localAnchor.y
     };
-    const text3 = await this.#ocrText(image, bounds, mode === "window" ? anchor : void 0);
+    const text4 = await this.#ocrText(image, bounds, mode === "window" ? anchor : void 0);
     const title = [target.title, target.appId].map((value2) => value2?.trim() ?? "").find((value2) => value2 !== "") ?? (mode === "window" ? "Window capture" : "Region capture");
     const representations = [];
-    if (text3 !== void 0) representations.push({
+    if (text4 !== void 0) representations.push({
       id: "text",
       kind: "text",
       label: "Text",
-      preview: text3.slice(0, 320),
+      preview: text4.slice(0, 320),
       confidence: 0.72
     });
     representations.push({ id: "image", kind: "image", label: "Screenshot", confidence: 1 });
@@ -296834,9 +297239,9 @@ var ContextAttachmentStore = class {
       },
       previewImage: presentImage(image, this.#paths),
       representations,
-      selectedRepresentationIds: text3 === void 0 ? ["image"] : ["text"]
+      selectedRepresentationIds: text4 === void 0 ? ["image"] : ["text"]
     };
-    this.#attachments.set(view.id, { view, image, ...text3 === void 0 ? {} : { text: text3 } });
+    this.#attachments.set(view.id, { view, image, ...text4 === void 0 ? {} : { text: text4 } });
     while (this.#attachments.size > 8) {
       const oldest = this.#attachments.keys().next().value;
       if (oldest === void 0) break;
@@ -296857,21 +297262,21 @@ var ContextAttachmentStore = class {
     }
     const image = await this.#captureImage(target.window);
     this.#targets.delete(requestId);
-    const text3 = boundedBrowserText(capture.selection ?? capture.element.context?.text ?? capture.element.text);
+    const text4 = boundedBrowserText(capture.selection ?? capture.element.context?.text ?? capture.element.text);
     const element = semanticElementText(capture);
     const title = (capture.element.text ?? capture.element.name ?? capture.element.context?.name ?? capture.title ?? target.title ?? "Browser element").slice(0, 160);
     const representations = [
       { id: "element", kind: "element", label: "Element", preview: elementPreview(capture), confidence: elementConfidence(capture) }
     ];
-    if (text3 !== void 0) representations.push({
+    if (text4 !== void 0) representations.push({
       id: "text",
       kind: "text",
       label: "Text",
-      preview: text3.slice(0, 320),
+      preview: text4.slice(0, 320),
       confidence: capture.selection === void 0 ? 0.86 : 1
     });
     representations.push({ id: "image", kind: "image", label: "Screenshot", confidence: imageConfidence(capture) });
-    const selectedRepresentationIds = capture.selection !== void 0 ? ["text"] : visualElement(capture) ? ["image"] : elementConfidence(capture) >= 0.9 ? ["element"] : text3 === void 0 ? ["image"] : ["text"];
+    const selectedRepresentationIds = capture.selection !== void 0 ? ["text"] : visualElement(capture) ? ["image"] : elementConfidence(capture) >= 0.9 ? ["element"] : text4 === void 0 ? ["image"] : ["text"];
     const view = {
       version: 1,
       id: image.id,
@@ -296888,7 +297293,7 @@ var ContextAttachmentStore = class {
       view,
       image,
       element,
-      ...text3 === void 0 ? {} : { text: text3 }
+      ...text4 === void 0 ? {} : { text: text4 }
     });
     while (this.#attachments.size > 8) {
       const oldest = this.#attachments.keys().next().value;
@@ -296932,7 +297337,7 @@ var ContextAttachmentStore = class {
         });
       }
       if (selection.representationIds.includes("image")) {
-        const data = (await readFile8(join48(this.#paths.images, attachment.image.path))).toString("base64");
+        const data = (await readFile8(join49(this.#paths.images, attachment.image.path))).toString("base64");
         blocks.push({ type: "image", data, mimeType: attachment.image.mimeType });
       }
     }
@@ -296959,7 +297364,7 @@ var ContextAttachmentStore = class {
     }
     if (!Array.isArray(parsed)) throw new ContextAttachmentError("context_monitor", "The monitor layout was invalid");
     return parsed.flatMap((value2) => {
-      if (!isObject8(value2)) return [];
+      if (!isObject9(value2)) return [];
       const x4 = integer2(value2.x);
       const y2 = integer2(value2.y);
       const width = integer2(value2.width);
@@ -296980,7 +297385,7 @@ var ContextAttachmentStore = class {
     try {
       const tesseract = await resolveExecutable("tesseract", this.#env);
       if (tesseract === void 0) return void 0;
-      const result = await runCommand(tesseract, [join48(this.#paths.images, image.path), "stdout", "tsv"], {
+      const result = await runCommand(tesseract, [join49(this.#paths.images, image.path), "stdout", "tsv"], {
         env: this.#env,
         timeoutMs: 15e3,
         maxOutput: 2e6
@@ -297010,8 +297415,8 @@ var ContextAttachmentStore = class {
   }
 };
 function boundedBrowserText(value2) {
-  const text3 = value2?.replaceAll(/\s+/gu, " ").trim().slice(0, 12e3);
-  return text3 === void 0 || text3 === "" ? void 0 : text3;
+  const text4 = value2?.replaceAll(/\s+/gu, " ").trim().slice(0, 12e3);
+  return text4 === void 0 || text4 === "" ? void 0 : text4;
 }
 function semanticElementText(capture) {
   const nodes = { count: 0 };
@@ -297091,9 +297496,9 @@ function textAtPointFromTsv(tsv, point) {
     const width = Number(fields[8]);
     const height = Number(fields[9]);
     const confidence = Number(fields[10]);
-    const text3 = fields.slice(11).join("	").trim();
-    if (![left, top, width, height, confidence].every(Number.isFinite) || confidence < 35 || text3 === "") return [];
-    return [{ page: fields[1], block: fields[2], paragraph: fields[3], line: fields[4], left, top, width, height, confidence, text: text3 }];
+    const text4 = fields.slice(11).join("	").trim();
+    if (![left, top, width, height, confidence].every(Number.isFinite) || confidence < 35 || text4 === "") return [];
+    return [{ page: fields[1], block: fields[2], paragraph: fields[3], line: fields[4], left, top, width, height, confidence, text: text4 }];
   });
   if (rows.length === 0) return void 0;
   if (point === void 0) return textFromRows(rows);
@@ -297117,8 +297522,8 @@ function textFromRows(rows) {
     lines.set(lineKey, words2);
     paragraphs.set(paragraphKey, lines);
   }
-  const text3 = [...paragraphs.values()].map((lines) => [...lines.values()].map((words2) => words2.join(" ")).join("\n")).join("\n\n").trim().slice(0, 12e3);
-  return text3 === "" ? void 0 : text3;
+  const text4 = [...paragraphs.values()].map((lines) => [...lines.values()].map((words2) => words2.join(" ")).join("\n")).join("\n\n").trim().slice(0, 12e3);
+  return text4 === "" ? void 0 : text4;
 }
 function monitorFor(rectangle, monitors) {
   if (rectangle === void 0) return void 0;
@@ -297143,7 +297548,7 @@ function sensitiveTarget(target) {
   return /(?:password|passphrase|credential|1password|bitwarden|keepass)/iu.test(`${target.appId ?? ""} ${target.title ?? ""}`);
 }
 function windowBoundsFromHyprland(value2, expectedAppId) {
-  if (!isObject8(value2)) return void 0;
+  if (!isObject9(value2)) return void 0;
   const appId = typeof value2.class === "string" ? value2.class : typeof value2.initialClass === "string" ? value2.initialClass : "";
   if (expectedAppId !== void 0 && appId.trim().toLowerCase() !== expectedAppId.trim().toLowerCase()) return void 0;
   const at2 = Array.isArray(value2.at) ? value2.at : [];
@@ -297160,7 +297565,7 @@ function windowAtPointFromHyprland(value2, point) {
   if (!Array.isArray(value2)) return void 0;
   return value2.flatMap((client2, index3) => {
     const bounds = windowBoundsFromHyprland(client2);
-    if (bounds === void 0 || !isObject8(client2) || client2.mapped === false || client2.hidden === true || point.x < bounds.x || point.x >= bounds.x + bounds.width || point.y < bounds.y || point.y >= bounds.y + bounds.height) return [];
+    if (bounds === void 0 || !isObject9(client2) || client2.mapped === false || client2.hidden === true || point.x < bounds.x || point.x >= bounds.x + bounds.width || point.y < bounds.y || point.y >= bounds.y + bounds.height) return [];
     const appId = typeof client2.class === "string" && client2.class.trim() !== "" ? client2.class.trim() : typeof client2.initialClass === "string" && client2.initialClass.trim() !== "" ? client2.initialClass.trim() : void 0;
     if (/^(?:org\.omarchy\.quickshell|quickshell)$/iu.test(appId ?? "")) return [];
     const title = typeof client2.title === "string" && client2.title.trim() !== "" ? client2.title.trim() : void 0;
@@ -297189,7 +297594,7 @@ function rectangleDistance(point, row) {
 function integer2(value2) {
   return typeof value2 === "number" && Number.isInteger(value2) ? value2 : void 0;
 }
-function isObject8(value2) {
+function isObject9(value2) {
   return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
 }
 
@@ -297592,13 +297997,13 @@ function normalizeToolPermission(requestId, permissionId, provider, request) {
   const reviewable = detail !== void 0;
   const optionIds = {};
   const options = [];
-  for (const [index3, option] of request.options.entries()) {
-    const decision = permissionDecision(option.kind, option.name, option.optionId);
+  for (const [index3, option2] of request.options.entries()) {
+    const decision = permissionDecision(option2.kind, option2.name, option2.optionId);
     if (decision === void 0 || !reviewable && decision.startsWith("allow_")) continue;
     if (provider === "opencode" && decision !== "allow_once" && decision.startsWith("allow_")) continue;
     const id = `option-${index3}`;
-    optionIds[id] = option.optionId;
-    options.push({ id, decision, label: boundedText(option.name, 48) || defaultLabel(decision) });
+    optionIds[id] = option2.optionId;
+    options.push({ id, decision, label: boundedText(option2.name, 48) || defaultLabel(decision) });
   }
   return {
     view: {
@@ -297668,11 +298073,11 @@ init_process();
 // runtime/src/browser-companion.ts
 import { chmod, mkdir as mkdir5, rm as rm5 } from "node:fs/promises";
 import { createServer as createServer2 } from "node:net";
-import { dirname as dirname27, join as join49 } from "node:path";
-var text2 = (max) => external_exports.string().trim().min(1).max(max);
+import { dirname as dirname27, join as join50 } from "node:path";
+var text3 = (max) => external_exports.string().trim().min(1).max(max);
 var optionalText = (max) => external_exports.string().trim().max(max).optional();
 var semanticNodeSchema = external_exports.lazy(() => external_exports.object({
-  tag: text2(40),
+  tag: text3(40),
   role: optionalText(80),
   name: optionalText(500),
   text: optionalText(4e3),
@@ -297680,7 +298085,7 @@ var semanticNodeSchema = external_exports.lazy(() => external_exports.object({
   children: external_exports.array(semanticNodeSchema).max(40).optional()
 }).strict());
 var contextElementSchema = external_exports.object({
-  tag: text2(40),
+  tag: text3(40),
   role: optionalText(80),
   name: optionalText(500),
   text: optionalText(12e3),
@@ -297697,13 +298102,13 @@ var browserMessageSchema = external_exports.discriminatedUnion("type", [
     version: external_exports.literal(1),
     type: external_exports.literal("hello"),
     family: external_exports.enum(["chromium", "firefox"]),
-    browser: text2(80),
-    extensionVersion: text2(40)
+    browser: text3(80),
+    extensionVersion: text3(40)
   }).strict(),
   external_exports.object({
     version: external_exports.literal(1),
     type: external_exports.literal("probe.result"),
-    requestId: text2(120),
+    requestId: text3(120),
     available: external_exports.boolean(),
     title: optionalText(500),
     url: optionalText(8192),
@@ -297712,17 +298117,17 @@ var browserMessageSchema = external_exports.discriminatedUnion("type", [
   external_exports.object({
     version: external_exports.literal(1),
     type: external_exports.literal("capture.result"),
-    requestId: text2(120),
-    title: text2(500),
-    url: text2(8192),
+    requestId: text3(120),
+    title: text3(500),
+    url: text3(8192),
     selection: optionalText(12e3),
     element: external_exports.object({
-      tag: text2(40),
+      tag: text3(40),
       role: optionalText(80),
       name: optionalText(500),
       text: optionalText(12e3),
       attributes: external_exports.record(external_exports.string().max(80), external_exports.string().max(2e3)).optional(),
-      ancestors: external_exports.array(external_exports.object({ tag: text2(40), role: optionalText(80), name: optionalText(300) }).strict()).max(8),
+      ancestors: external_exports.array(external_exports.object({ tag: text3(40), role: optionalText(80), name: optionalText(300) }).strict()).max(8),
       tree: semanticNodeSchema,
       context: contextElementSchema.optional(),
       rect: external_exports.object({
@@ -297736,13 +298141,13 @@ var browserMessageSchema = external_exports.discriminatedUnion("type", [
   external_exports.object({
     version: external_exports.literal(1),
     type: external_exports.literal("capture.cancelled"),
-    requestId: text2(120)
+    requestId: text3(120)
   }).strict(),
   external_exports.object({
     version: external_exports.literal(1),
     type: external_exports.literal("capture.error"),
-    requestId: text2(120),
-    reason: text2(240)
+    requestId: text3(120),
+    reason: text3(240)
   }).strict()
 ]);
 var BrowserCompanionServer = class {
@@ -297757,8 +298162,8 @@ var BrowserCompanionServer = class {
   #closing = false;
   constructor(env2, callbacks) {
     const configuredRuntimeRoot = env2.XDG_RUNTIME_DIR?.trim();
-    const runtimeRoot = configuredRuntimeRoot === void 0 || configuredRuntimeRoot === "" ? join49(env2.HOME ?? "/tmp", ".cache") : configuredRuntimeRoot;
-    this.socketPath = join49(runtimeRoot, "quickchat", "browser-companion.sock");
+    const runtimeRoot = configuredRuntimeRoot === void 0 || configuredRuntimeRoot === "" ? join50(env2.HOME ?? "/tmp", ".cache") : configuredRuntimeRoot;
+    this.socketPath = join50(runtimeRoot, "quickchat", "browser-companion.sock");
     this.#callbacks = callbacks;
   }
   start() {
@@ -297974,7 +298379,7 @@ init_process();
 import { access as access6 } from "node:fs/promises";
 import { constants as constants9 } from "node:fs";
 import { spawn as spawn15 } from "node:child_process";
-import { dirname as dirname28, join as join50, resolve as resolve16 } from "node:path";
+import { dirname as dirname28, join as join51, resolve as resolve16 } from "node:path";
 import { fileURLToPath as fileURLToPath8 } from "node:url";
 function repositoryRoot() {
   return resolve16(dirname28(fileURLToPath8(import.meta.url)), "../..");
@@ -297988,8 +298393,8 @@ async function executable(path16) {
   }
 }
 function relayPath(env2) {
-  const dataRoot = env2.XDG_DATA_HOME?.startsWith("/") ? env2.XDG_DATA_HOME : join50(env2.HOME ?? "/tmp", ".local/share");
-  return join50(dataRoot, "omapilot/browser-companion/omapilot-browser-companion-host");
+  const dataRoot = env2.XDG_DATA_HOME?.startsWith("/") ? env2.XDG_DATA_HOME : join51(env2.HOME ?? "/tmp", ".local/share");
+  return join51(dataRoot, "omapilot/browser-companion/omapilot-browser-companion-host");
 }
 async function browserCompanionSetupStatus(env2, root = repositoryRoot()) {
   const installer = resolve16(root, "scripts/install-browser-companion.sh");
@@ -298051,6 +298456,7 @@ var QuickchatBroker = class {
   #history;
   #images;
   #dictation;
+  #voice;
   #sessionCleaner;
   #herdrContinue;
   #env;
@@ -298084,6 +298490,7 @@ var QuickchatBroker = class {
       }
     });
     this.#dictation = options.dictation ?? new DictationService();
+    this.#voice = options.voice ?? new VoiceService(options.env ?? process.env);
     this.#sessionCleaner = options.sessionCleaner ?? ((provider, sessionId) => isPiProvider(provider) ? Promise.resolve(true) : deleteAcpSession(provider, sessionId));
     this.#herdrContinue = options.herdrContinue ?? continueInHerdr;
     this.#env = options.env ?? process.env;
@@ -298170,6 +298577,18 @@ var QuickchatBroker = class {
       case "voxtype_osd_set":
         this.#emitVoxtypeOsd(await setVoxtypeOsdEnabled(command.enabled, this.#env));
         break;
+      case "voice_status":
+        await this.#emitVoiceStatus();
+        break;
+      case "tts_key_set":
+        await this.#ttsKeySet(command.provider, command.apiKey);
+        break;
+      case "tts_key_clear":
+        await this.#ttsKeyClear(command.provider);
+        break;
+      case "tts_key_test":
+        await this.#ttsKeyTest(command.provider, command.apiKey);
+        break;
       case "dictation_start":
         await this.#dictationStart();
         break;
@@ -298220,7 +298639,7 @@ var QuickchatBroker = class {
     }));
     this.#providers = new Map(discovered.map((provider) => [provider.id, provider]));
     const history = (await this.#history.list()).map((chat) => presentChat(chat));
-    this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context", "context-attachments"], providers: discovered.map(publicProvider), history });
+    this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context", "context-attachments", "voice"], providers: discovered.map(publicProvider), history });
     if (command.harness === "builtin") this.#emit({ type: "auth_methods", methods: authMethods });
   }
   #beginAuth(methodId) {
@@ -298293,7 +298712,7 @@ var QuickchatBroker = class {
           kind: prompt.type,
           message: prompt.message,
           ..."placeholder" in prompt && prompt.placeholder !== void 0 ? { placeholder: prompt.placeholder } : {},
-          ...prompt.type === "select" ? { options: prompt.options.map((option) => ({ ...option })) } : {}
+          ...prompt.type === "select" ? { options: prompt.options.map((option2) => ({ ...option2 })) } : {}
         }
       });
     });
@@ -298574,7 +298993,7 @@ var QuickchatBroker = class {
     const pending = normalizeToolPermission(requestId, permissionId, provider, request);
     if (pending === void 0) return { invalid: true };
     if (dangerousAutoApprove) {
-      const choice = pending.view.options.find((option) => option.decision === "allow_once");
+      const choice = pending.view.options.find((option2) => option2.decision === "allow_once");
       const optionId2 = choice === void 0 ? void 0 : pending.optionIds[choice.id];
       return optionId2 === void 0 ? { invalid: true } : { optionId: optionId2 };
     }
@@ -298595,7 +299014,7 @@ var QuickchatBroker = class {
     this.#permissions.delete(command.permissionId);
     clearTimeout(pending.timeout);
     this.#emit({ type: "permission_closed", id: command.id, permissionId: command.permissionId, reason: "decided" });
-    const choice = pending.view.options.find((option) => option.id === command.choiceId && option.decision === command.decision);
+    const choice = pending.view.options.find((option2) => option2.id === command.choiceId && option2.decision === command.decision);
     const optionId2 = choice === void 0 ? void 0 : pending.optionIds[choice.id];
     pending.resolve(optionId2 === void 0 ? {} : { optionId: optionId2 });
   }
@@ -298638,6 +299057,61 @@ var QuickchatBroker = class {
       enabled: status.enabled,
       ...status.message === void 0 ? {} : { message: status.message }
     });
+  }
+  async #emitVoiceStatus() {
+    try {
+      const status = await this.#voice.status();
+      this.#emit({ type: "voice", dictation: status.dictation, tts: status.tts });
+    } catch {
+      this.#emit({
+        type: "voice",
+        dictation: { available: false, message: "Voice status could not be loaded." },
+        tts: []
+      });
+    }
+  }
+  async #ttsKeySet(provider, apiKey) {
+    if (!isCloudTtsProviderId(provider)) return;
+    try {
+      const status = await this.#voice.setKey(provider, apiKey);
+      this.#emit({ type: "voice", dictation: status.dictation, tts: status.tts });
+    } catch (error48) {
+      this.#emit({
+        type: "tts_test_failed",
+        provider,
+        message: error48 instanceof VoiceError ? error48.message : "The API key could not be saved"
+      });
+    }
+  }
+  async #ttsKeyClear(provider) {
+    if (!isCloudTtsProviderId(provider)) return;
+    try {
+      const status = await this.#voice.clearKey(provider);
+      this.#emit({ type: "voice", dictation: status.dictation, tts: status.tts });
+    } catch (error48) {
+      this.#emit({
+        type: "tts_test_failed",
+        provider,
+        message: error48 instanceof VoiceError ? error48.message : "The API key could not be removed"
+      });
+    }
+  }
+  async #ttsKeyTest(provider, apiKey) {
+    if (!isCloudTtsProviderId(provider)) return;
+    try {
+      const result = await this.#voice.testKey(provider, apiKey);
+      if (!result.available) {
+        this.#emit({ type: "tts_test_failed", provider, message: result.message });
+        return;
+      }
+      this.#emit({ type: "tts_tested", provider, result });
+    } catch (error48) {
+      this.#emit({
+        type: "tts_test_failed",
+        provider,
+        message: error48 instanceof VoiceError ? error48.message : "The API key could not be tested"
+      });
+    }
   }
   #emitCustomProviders() {
     this.#emit({ type: "custom_providers", providers: listCustomProviders(this.#env) });
@@ -298765,8 +299239,8 @@ var QuickchatBroker = class {
     const generation = this.#dictationGeneration;
     this.#emit({ type: "dictation", state: "transcribing" });
     try {
-      const text3 = await this.#dictation.stop();
-      if (generation === this.#dictationGeneration) this.#emit({ type: "dictation", state: "idle", text: text3 });
+      const text4 = await this.#dictation.stop();
+      if (generation === this.#dictationGeneration) this.#emit({ type: "dictation", state: "idle", text: text4 });
     } catch {
       if (generation === this.#dictationGeneration) this.#emit({ type: "dictation", state: "unavailable", message: "Voxtype could not finish transcription" });
     }
@@ -298825,7 +299299,7 @@ var QuickchatBroker = class {
     }
     this.#emit({ type: "link", url: url2, opened: await launchDetached(opener, [url2], { env: this.#env }) });
   }
-  async #copy(text3) {
+  async #copy(text4) {
     const copy = await resolveExecutable("wl-copy", this.#env);
     if (copy === void 0) {
       this.#emit({ type: "copied", copied: false });
@@ -298833,7 +299307,7 @@ var QuickchatBroker = class {
     }
     const copied = await new Promise((resolveCopy) => {
       const child = spawn16(copy, [], { env: this.#env, stdio: ["pipe", "ignore", "ignore"] });
-      child.stdin.end(text3);
+      child.stdin.end(text4);
       child.once("error", () => resolveCopy(false));
       child.once("close", (code) => resolveCopy(code === 0));
     });
@@ -299005,6 +299479,21 @@ var customProviderRemoveCommand = external_exports.object({
   type: external_exports.literal("custom_provider_remove"),
   id: external_exports.string().min(1).max(64)
 });
+var cloudTtsProviderSchema = external_exports.enum(["elevenlabs", "openai"]);
+var ttsKeySetCommand = external_exports.object({
+  type: external_exports.literal("tts_key_set"),
+  provider: cloudTtsProviderSchema,
+  apiKey: external_exports.string().min(1).max(512)
+}).strict();
+var ttsKeyClearCommand = external_exports.object({
+  type: external_exports.literal("tts_key_clear"),
+  provider: cloudTtsProviderSchema
+}).strict();
+var ttsKeyTestCommand = external_exports.object({
+  type: external_exports.literal("tts_key_test"),
+  provider: cloudTtsProviderSchema,
+  apiKey: external_exports.string().min(1).max(512)
+}).strict();
 var commandSchema = external_exports.discriminatedUnion("type", [
   initializeCommand,
   submitCommand,
@@ -299027,7 +299516,10 @@ var commandSchema = external_exports.discriminatedUnion("type", [
   customProviderAddCommand,
   external_exports.object({ type: external_exports.literal("voxtype_osd_set"), enabled: external_exports.boolean() }),
   customProviderRemoveCommand,
-  external_exports.object({ type: external_exports.enum(["dictation_start", "dictation_stop", "dictation_cancel", "history_list", "history_clear", "custom_provider_list", "voxtype_osd_status", "shutdown"]) })
+  ttsKeySetCommand,
+  ttsKeyClearCommand,
+  ttsKeyTestCommand,
+  external_exports.object({ type: external_exports.enum(["dictation_start", "dictation_stop", "dictation_cancel", "history_list", "history_clear", "custom_provider_list", "voxtype_osd_status", "voice_status", "shutdown"]) })
 ]);
 
 // runtime/src/index.ts

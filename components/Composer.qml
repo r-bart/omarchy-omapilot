@@ -145,7 +145,8 @@ Item {
     PanelActionButton {
       Layout.alignment: Qt.AlignVCenter
       iconText: root.backend && root.backend.state === "dictating" ? "󰓛" : "󰍬"
-      tooltipText: root.backend && root.backend.state === "dictating" ? "Stop dictation" : "Dictate"
+      tooltipText: root.backend && root.backend.state === "dictating" ? "Stop dictation"
+        : (root.backend && root.backend.voiceEnabled === false ? "Enable voice in Settings" : "Dictate")
       foreground: root.foreground
       focusable: true
       enabled: root.backend && root.backend.providerReady && !root.backend.continuationBlocked

@@ -34,6 +34,11 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property bool dangerousAutoApprove: settings
     && settings.dangerousAutoApprove === true
+  readonly property bool voiceEnabled: settings && settings.voiceEnabled === true
+  readonly property string ttsProvider: settings && Protocol.normalizedTtsProvider(settings.ttsProvider)
+    ? Protocol.normalizedTtsProvider(settings.ttsProvider) : "kokoro"
+  readonly property string ttsModel: settings && typeof settings.ttsModel === "string" ? settings.ttsModel : ""
+  readonly property string ttsVoice: settings && typeof settings.ttsVoice === "string" ? settings.ttsVoice : ""
   readonly property string quickActionsJson: settings
     && typeof settings.quickActionsJson === "string" ? settings.quickActionsJson : ""
   readonly property var quickActionItems: ActionCatalog.actionsFromSettings(
@@ -139,6 +144,7 @@ Panel {
     viewMode = "settings"
     Quickchat.QuickchatStore.requestCustomProviders()
     Quickchat.QuickchatStore.requestVoxtypeOsd()
+    Quickchat.QuickchatStore.requestVoiceStatus()
     Quickchat.QuickchatStore.requestBrowserCompanionStatus()
     Qt.callLater(function() { settingsView.forceInitialFocus() })
   }
@@ -878,6 +884,10 @@ Panel {
         dangerousAutoApprove: root.dangerousAutoApprove
         desktopContextEnabled: settings
           && String(settings.desktopContext || "On") !== "Off"
+        voiceEnabled: root.voiceEnabled
+        ttsProvider: root.ttsProvider
+        ttsModel: root.ttsModel
+        ttsVoice: root.ttsVoice
         quickActions: root.quickActionItems
         motionEnabled: root.motionEnabled
         foreground: root.foreground
@@ -908,6 +918,36 @@ Panel {
         }
         onVoxtypeOsdRequested: function(enabled) {
           Quickchat.QuickchatStore.setVoxtypeOsd(enabled)
+        }
+        onVoiceEnabledRequested: function(enabled) {
+          root.persistSettings({ voiceEnabled: enabled === true })
+        }
+        onTtsProviderRequested: function(provider) {
+          var selected = Protocol.normalizedTtsProvider(provider) || "kokoro"
+          var catalog = Protocol.ttsProviderStatus(Quickchat.QuickchatStore.voiceStatus, selected)
+          var model = Protocol.ttsDefaultModel(catalog)
+          var voice = Protocol.ttsDefaultVoice(catalog, model)
+          root.persistSettings({ ttsProvider: selected, ttsModel: model, ttsVoice: voice })
+        }
+        onTtsModelRequested: function(model) {
+          var catalog = Protocol.ttsProviderStatus(Quickchat.QuickchatStore.voiceStatus, root.ttsProvider)
+          var selected = String(model || "")
+          var voice = root.ttsVoice
+          if (!Protocol.ttsVoiceAvailable(catalog, selected, voice))
+            voice = Protocol.ttsDefaultVoice(catalog, selected)
+          root.persistSettings({ ttsModel: selected, ttsVoice: voice })
+        }
+        onTtsVoiceRequested: function(voice) {
+          root.persistSettings({ ttsVoice: String(voice || "") })
+        }
+        onTtsKeySetRequested: function(provider, apiKey) {
+          Quickchat.QuickchatStore.setTtsKey(provider, apiKey)
+        }
+        onTtsKeyClearRequested: function(provider) {
+          Quickchat.QuickchatStore.clearTtsKey(provider)
+        }
+        onTtsKeyTestRequested: function(provider, apiKey) {
+          Quickchat.QuickchatStore.testTtsKey(provider, apiKey)
         }
         onCustomProviderRemoveRequested: function(id) {
           Quickchat.QuickchatStore.removeCustomProvider(id)

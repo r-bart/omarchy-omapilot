@@ -57,6 +57,11 @@ describe("NDJSON protocol", () => {
     expect(commandSchema.safeParse({ type: "browser_companion_open_settings", family: "firefox" }).success).toBe(true);
     expect(commandSchema.safeParse({ type: "browser_companion_open_settings", family: "other" }).success).toBe(false);
     expect(commandSchema.safeParse({ type: "browser_companion_install", command: "anything" }).success).toBe(false);
+    expect(commandSchema.safeParse({ type: "voice_status" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "tts_key_set", provider: "elevenlabs", apiKey: "sk-test-key" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "tts_key_set", provider: "kokoro", apiKey: "sk-test-key" }).success).toBe(false);
+    expect(commandSchema.safeParse({ type: "tts_key_clear", provider: "openai" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "tts_key_test", provider: "openai", apiKey: "sk-test-key" }).success).toBe(true);
     expect(commandSchema.safeParse({ type: "auth_begin", methodId: "openai-codex::oauth" }).success).toBe(true);
     expect(commandSchema.safeParse({ type: "auth_begin", methodId: "openai-codex::shell" }).success).toBe(false);
     expect(commandSchema.safeParse({
@@ -113,7 +118,7 @@ describe("NDJSON protocol", () => {
     await until(() => events.some((event) => event.type === "ready"));
     const ready = readySchema.parse(events.find((event) => event.type === "ready"));
     expect(ready.protocolVersion).toBe(2);
-    expect(ready.features).toEqual(["desktop-context", "context-attachments"]);
+    expect(ready.features).toEqual(["desktop-context", "context-attachments", "voice"]);
     expect(ready.providers.find((provider) => provider.id === "codex")?.models).toContainEqual({ id: "test/default", name: "Default" });
     expect(ready.providers.map(({ id, policy }) => ({ id, policy }))).toEqual([
       { id: "codex", policy: { tools: "device-approval", web: "approved-command", hostReads: true } }
@@ -455,7 +460,7 @@ describe("NDJSON protocol", () => {
 const readySchema = z.object({
   type: z.literal("ready"),
   protocolVersion: z.literal(2),
-  features: z.tuple([z.literal("desktop-context"), z.literal("context-attachments")]),
+  features: z.tuple([z.literal("desktop-context"), z.literal("context-attachments"), z.literal("voice")]),
   providers: z.array(z.object({
     id: z.string(),
     models: z.array(z.object({ id: z.string(), name: z.string() })),
