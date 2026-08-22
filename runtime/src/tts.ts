@@ -97,7 +97,9 @@ const ELEVENLABS_MODELS: TtsModelOption[] = [
 export const ELEVENLABS_DEFAULT_VOICE_ID = "wyWA56cQNU2KqUW4eCsI";
 export const ELEVENLABS_DEFAULT_VOICE: VoiceOption = { id: ELEVENLABS_DEFAULT_VOICE_ID, name: "Clyde" };
 const ELEVENLABS_VOICES: VoiceOption[] = [ELEVENLABS_DEFAULT_VOICE];
-const ELEVENLABS_VOICES_URL = "https://api.elevenlabs.io/v2/voices?page_size=100";
+const ELEVENLABS_VOICES_URL = "https://api.elevenlabs.io/v2/voices";
+const ELEVENLABS_VOICE_PAGE_SIZE = 20;
+const MAX_ELEVENLABS_VOICE_PAGES = 5;
 
 const MAX_AUTH_BYTES = 64 * 1024;
 const MAX_PROBE_BYTES = 256 * 1024;
@@ -461,13 +463,43 @@ async function probeOpenAi(apiKey: string, fetcher: typeof fetch): Promise<{ mod
 async function probeElevenLabs(apiKey: string, fetcher: typeof fetch): Promise<{ models: TtsModelOption[]; voices: VoiceOption[] }> {
   const [modelsResult, voicesResult] = await Promise.allSettled([
     elevenLabsJson("https://api.elevenlabs.io/v1/models", apiKey, fetcher),
-    elevenLabsJson(ELEVENLABS_VOICES_URL, apiKey, fetcher)
+    listElevenLabsVoices(apiKey, fetcher)
   ]);
   if (voicesResult.status === "rejected") throw voicesResult.reason;
   return {
     models: modelsResult.status === "fulfilled" ? parseElevenLabsModels(modelsResult.value) : [],
-    voices: withElevenLabsDefaultVoice(parseElevenLabsVoices(voicesResult.value))
+    voices: withElevenLabsDefaultVoice(voicesResult.value)
   };
+}
+
+async function listElevenLabsVoices(apiKey: string, fetcher: typeof fetch): Promise<VoiceOption[]> {
+  const voices: VoiceOption[] = [];
+  const voiceIds = new Set<string>();
+  const pageTokens = new Set<string>();
+  let nextPageToken = "";
+
+  for (let page = 0; page < MAX_ELEVENLABS_VOICE_PAGES && voices.length < MAX_VOICES; page += 1) {
+    const url = new URL(ELEVENLABS_VOICES_URL);
+    url.searchParams.set("page_size", String(ELEVENLABS_VOICE_PAGE_SIZE));
+    url.searchParams.set("include_total_count", "false");
+    if (nextPageToken !== "") url.searchParams.set("next_page_token", nextPageToken);
+
+    const payload = await elevenLabsJson(url.href, apiKey, fetcher);
+    for (const voice of parseElevenLabsVoices(payload)) {
+      if (voiceIds.has(voice.id)) continue;
+      voiceIds.add(voice.id);
+      voices.push(voice);
+      if (voices.length >= MAX_VOICES) break;
+    }
+
+    if (!isObject(payload) || payload.has_more !== true) break;
+    const token = text(payload.next_page_token).trim();
+    if (token === "" || token.length > 2_048 || pageTokens.has(token)) break;
+    pageTokens.add(token);
+    nextPageToken = token;
+  }
+
+  return voices;
 }
 
 async function elevenLabsJson(url: string, apiKey: string, fetcher: typeof fetch): Promise<unknown> {
