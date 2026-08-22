@@ -38,6 +38,14 @@ Scope {
   property bool customProviderTestPending: false
   property string customProviderTestError: ""
   property var voxtypeOsd: ({ available: false, enabled: true, message: "" })
+  property var voiceStatus: Protocol.emptyVoiceStatus()
+  property var ttsTest: null
+  property bool ttsTestPending: false
+  property string ttsTestError: ""
+  property bool voiceEnabled: false
+  property string ttsProvider: "kokoro"
+  property string ttsModel: ""
+  property string ttsVoice: ""
   // Last server-registration failure, surfaced in settings rather than the chat
   // lane — a rejection shown where the user is not looking is a silent failure.
   property string customProviderError: ""
@@ -120,6 +128,10 @@ Scope {
     var desiredOpencodeModel = String(source.opencodeModel || "")
     var desiredDangerousAutoApprove = source.dangerousAutoApprove === true
     var desiredDesktopContext = String(source.desktopContext || "On") !== "Off"
+    var desiredVoiceEnabled = source.voiceEnabled === true
+    var desiredTtsProvider = Protocol.normalizedTtsProvider(source.ttsProvider) || "kokoro"
+    var desiredTtsModel = String(source.ttsModel || "")
+    var desiredTtsVoice = String(source.ttsVoice || "")
     var harnessChanged = desiredProvider !== configuredProvider
     var changed = harnessChanged
       || desiredBuiltinModel !== configuredBuiltinModel
@@ -127,6 +139,10 @@ Scope {
       || desiredOpencodeModel !== configuredOpencodeModel
       || desiredDangerousAutoApprove !== configuredDangerousAutoApprove
       || desiredDesktopContext !== desktopContextEnabled
+      || desiredVoiceEnabled !== voiceEnabled
+      || desiredTtsProvider !== ttsProvider
+      || desiredTtsModel !== ttsModel
+      || desiredTtsVoice !== ttsVoice
     if (!changed) return
     configuredProvider = desiredProvider
     configuredBuiltinModel = desiredBuiltinModel
@@ -134,6 +150,10 @@ Scope {
     configuredOpencodeModel = desiredOpencodeModel
     configuredDangerousAutoApprove = desiredDangerousAutoApprove
     desktopContextEnabled = desiredDesktopContext
+    voiceEnabled = desiredVoiceEnabled
+    ttsProvider = desiredTtsProvider
+    ttsModel = desiredTtsModel
+    ttsVoice = desiredTtsVoice
     if (!desktopContextEnabled) latchedActiveWindow = null
     provider = desiredProvider
     var desiredModel = desiredProvider === "opencode" ? desiredOpencodeModel : desiredCodexModel
@@ -398,6 +418,10 @@ Scope {
   }
 
   function startDictation() {
+    if (!voiceEnabled) {
+      statusMessage = "Enable voice in OmaPilot Settings"
+      return false
+    }
     if (!providerReady || continuationBlocked || busy) return false
     transcript = ""
     sendCommand(Protocol.command("dictation_start"))
@@ -411,6 +435,24 @@ Scope {
   function requestVoxtypeOsd() { sendCommand(Protocol.command("voxtype_osd_status")) }
   function setVoxtypeOsd(enabled) {
     sendCommand(Protocol.command("voxtype_osd_set", { enabled: enabled === true }))
+  }
+  function requestVoiceStatus() { sendCommand(Protocol.command("voice_status")) }
+  function setTtsKey(provider, apiKey) {
+    ttsTest = null
+    ttsTestError = ""
+    ttsTestPending = true
+    sendCommand(Protocol.ttsKeySetCommand(provider, apiKey))
+  }
+  function clearTtsKey(provider) {
+    ttsTest = null
+    ttsTestError = ""
+    sendCommand(Protocol.ttsKeyClearCommand(provider))
+  }
+  function testTtsKey(provider, apiKey) {
+    ttsTest = null
+    ttsTestError = ""
+    ttsTestPending = true
+    sendCommand(Protocol.ttsKeyTestCommand(provider, apiKey))
   }
 
   function requestCustomProviders() { sendCommand(Protocol.command("custom_provider_list")) }
@@ -586,6 +628,7 @@ Scope {
       brokerContextAttachmentsSupported = Protocol.hasFeature(event.features, "context-attachments")
       applyProviders(event.providers || [])
       history = Protocol.normalizedHistory(event.history || [])
+      if (Protocol.hasFeature(event.features, "voice")) requestVoiceStatus()
       return
     }
     if (type === "providers") {
@@ -594,6 +637,24 @@ Scope {
     }
     if (type === "voxtype_osd") {
       voxtypeOsd = Protocol.normalizedVoxtypeOsd(event)
+      return
+    }
+    if (type === "voice") {
+      ttsTestPending = false
+      ttsTestError = ""
+      voiceStatus = Protocol.normalizedVoiceStatus(event)
+      return
+    }
+    if (type === "tts_tested") {
+      ttsTestPending = false
+      ttsTestError = ""
+      ttsTest = event.result || null
+      return
+    }
+    if (type === "tts_test_failed") {
+      ttsTestPending = false
+      ttsTest = null
+      ttsTestError = String(event.message || "The API key could not be verified")
       return
     }
     if (type === "custom_providers") {
@@ -769,6 +830,11 @@ Scope {
         if (String(event.code || "").indexOf("test") >= 0)
           customProviderTestError = String(event.message || "The server test failed")
         else customProviderError = String(event.message || "That server could not be saved")
+        return
+      }
+      if (!event.id && (ttsTestPending || String(event.code || "").indexOf("tts_") === 0)) {
+        ttsTestPending = false
+        ttsTestError = String(event.message || "The API key could not be saved")
         return
       }
       if (pendingContextRequestId !== "" && String(event.id || "") === pendingContextRequestId) {

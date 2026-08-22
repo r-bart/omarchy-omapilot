@@ -27,6 +27,20 @@ Item {
     })
   readonly property var voxtypeOsd: backend && backend.voxtypeOsd
     ? backend.voxtypeOsd : ({ available: false, enabled: true, message: "" })
+  readonly property var voiceStatus: backend && backend.voiceStatus
+    ? backend.voiceStatus : Protocol.emptyVoiceStatus()
+  property bool voiceEnabled: false
+  property string ttsProvider: "kokoro"
+  property string ttsModel: ""
+  property string ttsVoice: ""
+  property string ttsDraftKey: ""
+  property bool ttsKeyBusy: false
+  property string ttsFormError: ""
+  property string ttsFormNotice: ""
+  readonly property var ttsCatalog: Protocol.ttsProviderStatus(voiceStatus, ttsProvider)
+  readonly property bool ttsCloud: ttsProvider === "elevenlabs" || ttsProvider === "openai"
+  readonly property bool dictationReady: voiceStatus.dictation && voiceStatus.dictation.available === true
+  readonly property bool ttsReady: ttsCatalog && ttsCatalog.available === true
   // Guarded like browserCompanion: the offscreen contract harness injects a stub
   // backend with neither property.
   readonly property var savedServers: backend && backend.customProviders
@@ -70,6 +84,7 @@ Item {
   property string authPromptSelection: ""
   readonly property bool popupOpen: providerPicker.popupOpen || modelPicker.popupOpen
     || authMethodPicker.popupOpen || authPromptPicker.popupOpen
+    || ttsProviderPicker.popupOpen || ttsModelPicker.popupOpen || ttsVoicePicker.popupOpen
   readonly property bool modalInteractionActive: popupOpen
     || browserCompanionBusy
     || (selectedTab === "desktop" && browserRemoveConfirmation)
@@ -93,6 +108,13 @@ Item {
   signal customProviderTestRequested(string baseUrl, string apiKey)
   signal customProviderRemoveRequested(string id)
   signal voxtypeOsdRequested(bool enabled)
+  signal voiceEnabledRequested(bool enabled)
+  signal ttsProviderRequested(string provider)
+  signal ttsModelRequested(string model)
+  signal ttsVoiceRequested(string voice)
+  signal ttsKeySetRequested(string provider, string apiKey)
+  signal ttsKeyClearRequested(string provider)
+  signal ttsKeyTestRequested(string provider, string apiKey)
   signal dismissed()
 
   function resetServerForm() {
@@ -180,6 +202,45 @@ Item {
       root.serverTestPending = false
       root.serverFormError = message
     }
+
+    function onVoiceStatusChanged() {
+      if (root.ttsKeyBusy) {
+        root.ttsKeyBusy = false
+        root.ttsFormError = ""
+        root.ttsDraftKey = ""
+        root.ttsFormNotice = root.ttsCloud
+          ? (root.ttsCatalog.available ? "API key saved." : String(root.ttsCatalog.message || "The API key was saved."))
+          : ""
+      }
+      root.syncTtsSelection()
+    }
+
+    function onTtsTestChanged() {
+      if (!root.ttsKeyBusy || !root.backend || !root.backend.ttsTest) return
+      root.ttsKeyBusy = false
+      root.ttsFormError = ""
+      root.ttsFormNotice = "The API key works. Save it to use this provider."
+    }
+
+    function onTtsTestErrorChanged() {
+      var message = root.backend ? String(root.backend.ttsTestError || "") : ""
+      if (!root.ttsKeyBusy || message === "") return
+      root.ttsKeyBusy = false
+      root.ttsFormError = message
+    }
+  }
+
+  function syncTtsSelection() {
+    var catalog = Protocol.ttsProviderStatus(root.voiceStatus, root.ttsProvider)
+    var model = root.ttsModel
+    if (!Protocol.ttsModelAvailable(catalog, model)) {
+      model = Protocol.ttsDefaultModel(catalog)
+      if (model !== root.ttsModel) root.ttsModelRequested(model)
+    }
+    if (!Protocol.ttsVoiceAvailable(catalog, model, root.ttsVoice)) {
+      var voice = Protocol.ttsDefaultVoice(catalog, model)
+      if (voice !== root.ttsVoice) root.ttsVoiceRequested(voice)
+    }
   }
 
   function editServer(server) {
@@ -222,6 +283,9 @@ Item {
     modelPicker.close()
     authMethodPicker.close()
     authPromptPicker.close()
+    ttsProviderPicker.close()
+    ttsModelPicker.close()
+    ttsVoicePicker.close()
     if (restoreFocus !== false)
       Qt.callLater(function() { tabBar.forceActiveFocus() })
   }
@@ -526,6 +590,301 @@ Item {
 
               Item { Layout.fillWidth: true }
             }
+          }
+        }
+      }
+
+      Flickable {
+        id: voiceScroll
+        anchors.fill: parent
+        visible: root.selectedTab === "voice"
+        contentWidth: width
+        contentHeight: voiceContent.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
+
+        ColumnLayout {
+          id: voiceContent
+          width: voiceScroll.width
+          spacing: Style.spacing.lg
+
+          Text {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            text: "Voice stays off after install until you enable it here. Listening uses Voxtype; spoken answers use the TTS provider you choose."
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          Toggle {
+            Layout.fillWidth: true
+            label: "Enable voice"
+            description: root.voiceEnabled
+              ? (root.dictationReady
+                ? (root.ttsReady
+                  ? "Listening and speaking are ready."
+                  : "Listening is ready. Finish TTS setup below to hear answers.")
+                : "Voice is on, but dictation still needs Voxtype.")
+              : "Turn this on to talk to OmaPilot and, once a TTS provider is ready, hear answers."
+            checked: root.voiceEnabled
+            foreground: root.foreground
+            accent: root.accent
+            fontFamily: root.fontFamily
+            Accessible.name: label
+            onClicked: root.voiceEnabledRequested(!root.voiceEnabled)
+          }
+
+          Text {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            visible: root.voiceEnabled && (!root.dictationReady || !root.ttsReady)
+            text: !root.dictationReady && !root.ttsReady
+              ? "Set up listening and speaking below. The talk gesture stays quiet until Voxtype is ready."
+              : (!root.dictationReady
+                ? "Install Voxtype to listen. The talk gesture cannot start until dictation is ready."
+                : "Choose a TTS provider and finish setup to hear answers. Listening already works.")
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Listening"
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+          }
+
+          Text {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            text: root.dictationReady
+              ? "Voxtype is ready. It is the speech-to-text provider for OmaPilot."
+              : String(root.voiceStatus.dictation.message || "Voxtype is not installed. Install it, then reopen settings.")
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          Toggle {
+            Layout.fillWidth: true
+            visible: root.voxtypeOsd.available
+            label: "Voxtype on-screen display"
+            description: "Off leaves OmaPilot's glow as the only recording indicator. Restarts the Voxtype daemon."
+            checked: root.voxtypeOsd.enabled
+            foreground: root.foreground
+            accent: root.accent
+            fontFamily: root.fontFamily
+            Accessible.name: label
+            onClicked: root.voxtypeOsdRequested(!root.voxtypeOsd.enabled)
+          }
+
+          Text {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            visible: !root.voxtypeOsd.available
+            text: "Voxtype's configuration was not found, so its on-screen display cannot be switched from here."
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          Text {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            visible: String(root.voxtypeOsd.message || "") !== ""
+            text: String(root.voxtypeOsd.message || "")
+            color: Color.urgent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Speaking"
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+          }
+
+          Text {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            text: "Kokoro runs locally. ElevenLabs and OpenAI need an API key, stored in voice-auth.json — never in widget settings."
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          Dropdown {
+            id: ttsProviderPicker
+            Layout.fillWidth: true
+            showLabel: false
+            options: Protocol.ttsProviderOptions()
+            value: root.ttsProvider
+            foreground: root.foreground
+            background: root.background
+            Accessible.name: "TTS provider"
+            onChanged: function(value) {
+              root.ttsDraftKey = ""
+              root.ttsFormError = ""
+              root.ttsFormNotice = ""
+              root.ttsProviderRequested(value)
+            }
+          }
+
+          Text {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            visible: String(root.ttsCatalog.message || "") !== ""
+            text: String(root.ttsCatalog.message || "")
+            color: root.ttsReady ? root.mutedForeground : Color.urgent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          TextField {
+            id: ttsKeyInput
+            Layout.fillWidth: true
+            visible: root.ttsCloud
+            password: true
+            placeholderText: root.ttsCatalog.configured
+              ? "New API key (leave blank to keep the saved key)"
+              : (root.ttsProvider === "elevenlabs" ? "ElevenLabs API key" : "OpenAI API key")
+            maximumLength: 512
+            text: root.ttsDraftKey
+            foreground: root.foreground
+            accent: root.accent
+            Accessible.name: "TTS API key"
+            onTextChanged: {
+              root.ttsDraftKey = text
+              root.ttsFormNotice = ""
+            }
+          }
+
+          RowLayout {
+            Layout.fillWidth: true
+            visible: root.ttsCloud
+            spacing: Style.spacing.md
+
+            Button {
+              text: "Test key"
+              foreground: root.foreground
+              background: root.background
+              bordered: true
+              focusable: true
+              enabled: !root.ttsKeyBusy && root.ttsDraftKey.trim() !== ""
+              onClicked: {
+                root.ttsFormError = ""
+                root.ttsFormNotice = ""
+                root.ttsKeyBusy = true
+                root.ttsKeyTestRequested(root.ttsProvider, root.ttsDraftKey)
+              }
+            }
+
+            Button {
+              text: root.ttsCatalog.configured ? "Replace key" : "Save key"
+              foreground: root.foreground
+              background: root.background
+              accent: root.accent
+              active: true
+              bordered: true
+              focusable: true
+              enabled: !root.ttsKeyBusy && root.ttsDraftKey.trim() !== ""
+              onClicked: {
+                root.ttsFormError = ""
+                root.ttsFormNotice = ""
+                root.ttsKeyBusy = true
+                root.ttsKeySetRequested(root.ttsProvider, root.ttsDraftKey)
+              }
+            }
+
+            Button {
+              visible: root.ttsCatalog.configured
+              text: "Remove key"
+              foreground: root.foreground
+              background: root.background
+              bordered: true
+              focusable: true
+              enabled: !root.ttsKeyBusy
+              onClicked: {
+                root.ttsFormError = ""
+                root.ttsFormNotice = ""
+                root.ttsDraftKey = ""
+                root.ttsKeyClearRequested(root.ttsProvider)
+              }
+            }
+
+            Item { Layout.fillWidth: true }
+          }
+
+          Text {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            visible: root.ttsFormError !== ""
+            text: root.ttsFormError
+            color: Color.urgent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          Text {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            visible: root.ttsFormNotice !== ""
+            text: root.ttsFormNotice
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "TTS model"
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+          }
+
+          Dropdown {
+            id: ttsModelPicker
+            Layout.fillWidth: true
+            showLabel: false
+            options: Protocol.ttsModelOptions(root.ttsCatalog)
+            value: root.ttsModel
+            enabled: Protocol.ttsDefaultModel(root.ttsCatalog) !== ""
+            foreground: root.foreground
+            background: root.background
+            Accessible.name: "TTS model"
+            onChanged: function(value) { root.ttsModelRequested(value) }
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "TTS voice"
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+          }
+
+          Dropdown {
+            id: ttsVoicePicker
+            Layout.fillWidth: true
+            showLabel: false
+            options: Protocol.ttsVoiceOptions(root.ttsCatalog, root.ttsModel)
+            value: root.ttsVoice
+            enabled: Protocol.ttsDefaultVoice(root.ttsCatalog, root.ttsModel) !== ""
+            foreground: root.foreground
+            background: root.background
+            Accessible.name: "TTS voice"
+            onChanged: function(value) { root.ttsVoiceRequested(value) }
           }
         }
       }
@@ -878,39 +1237,6 @@ Item {
             fontFamily: root.fontFamily
             Accessible.name: label
             onClicked: root.desktopContextRequested(!root.desktopContextEnabled)
-          }
-
-          Toggle {
-            Layout.fillWidth: true
-            visible: root.voxtypeOsd.available
-            label: "Voxtype on-screen display"
-            description: "Off leaves OmaPilot's glow as the only recording indicator. Restarts the Voxtype daemon."
-            checked: root.voxtypeOsd.enabled
-            foreground: root.foreground
-            accent: root.accent
-            fontFamily: root.fontFamily
-            Accessible.name: label
-            onClicked: root.voxtypeOsdRequested(!root.voxtypeOsd.enabled)
-          }
-
-          Text {
-            Layout.fillWidth: true
-            wrapMode: Text.Wrap
-            visible: !root.voxtypeOsd.available
-            text: "Voxtype's configuration was not found, so its on-screen display cannot be switched from here."
-            color: root.mutedForeground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-
-          Text {
-            Layout.fillWidth: true
-            wrapMode: Text.Wrap
-            visible: String(root.voxtypeOsd.message || "") !== ""
-            text: String(root.voxtypeOsd.message || "")
-            color: Color.urgent
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
           }
 
           Text {

@@ -27,7 +27,11 @@
       "opencodeModel": "",
       "quickActionsJson": "",
       "desktopContext": "On",
-      "dangerousAutoApprove": false
+      "dangerousAutoApprove": false,
+      "voiceEnabled": false,
+      "ttsProvider": "kokoro",
+      "ttsModel": "",
+      "ttsVoice": ""
     },
     "schema": [
       {
@@ -73,6 +77,35 @@
         "label": "Dangerous auto-approve",
         "defaultValue": false,
         "description": "Automatically select each exact tool request's Allow once option instead of prompting."
+      },
+      {
+        "key": "voiceEnabled",
+        "type": "boolean",
+        "label": "Enable voice",
+        "defaultValue": false,
+        "description": "Allow talking to OmaPilot and speaking answers after a TTS provider is ready."
+      },
+      {
+        "key": "ttsProvider",
+        "type": "enum",
+        "label": "TTS provider",
+        "options": ["kokoro", "elevenlabs", "openai"],
+        "defaultValue": "kokoro",
+        "description": "Kokoro is local. ElevenLabs and OpenAI need an API key stored in voice-auth.json."
+      },
+      {
+        "key": "ttsModel",
+        "type": "string",
+        "label": "TTS model",
+        "defaultValue": "",
+        "description": "Empty uses the selected provider's default model."
+      },
+      {
+        "key": "ttsVoice",
+        "type": "string",
+        "label": "TTS voice",
+        "defaultValue": "",
+        "description": "Empty uses the selected provider's default voice."
       }
     ]
   }

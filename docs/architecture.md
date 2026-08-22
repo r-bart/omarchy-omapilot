@@ -18,6 +18,14 @@ The widget follows the current Quattro host contract:
 
 Quickchat does not edit `shell.json`, Omarchy sources, Hyprland configuration, or Herdr configuration directly.
 
+Voice is opt-in from Settings after install. Widget settings store only
+`voiceEnabled`, `ttsProvider`, `ttsModel`, and `ttsVoice`. Cloud TTS keys live
+in `~/.config/omapilot/voice-auth.json` and are never inlined into `shell.json`.
+Kokoro is discovered as an optional local Python import; ElevenLabs and OpenAI
+are probed with the supplied key before that key is saved. Spoken playback is
+not wired yet — Settings is the enablement and provider-selection surface.
+Dictation still uses Voxtype.
+
 One narrowly scoped exception exists for Voxtype. Its floating OSD renders its
 own waveform at the bottom centre of the focused output — the same place the
 voice node occupies — and two indicators for one state is worse than either.
@@ -41,9 +49,9 @@ The reviewed plugin revision contains self-contained broker and adapter bundles 
 
 One compact JSON object is sent per line; embedded newlines remain JSON escapes. Each command has an `id`. Every correlated event repeats that `id`; asynchronous readiness events may omit it.
 
-The UI sends commands whose `type` is one of `initialize`, `submit`, `context_begin`, `context_capture`, `context_cancel`, `context_discard`, `cancel`, `permission_response`, `dictation_start`, `dictation_stop`, `dictation_cancel`, `copy`, `open_link`, `load_image`, `continue_in_herdr`, `history_list`, `history_delete`, `history_clear`, or `shutdown`.
+The UI sends commands whose `type` is one of `initialize`, `submit`, `context_begin`, `context_capture`, `context_cancel`, `context_discard`, `cancel`, `permission_response`, `dictation_start`, `dictation_stop`, `dictation_cancel`, `voice_status`, `tts_key_set`, `tts_key_clear`, `tts_key_test`, `copy`, `open_link`, `load_image`, `continue_in_herdr`, `history_list`, `history_delete`, `history_clear`, or `shutdown`.
 
-The broker emits events whose `type` is one of `ready`, `providers`, `state`, `content`, `context_ready`, `context_attachment`, `permission`, `permission_closed`, `image`, `complete`, `error`, `dictation`, `history`, `herdr`, `link`, or `copied`. The broker's protocol tests are authoritative for exact fields and version negotiation.
+The broker emits events whose `type` is one of `ready`, `providers`, `state`, `content`, `context_ready`, `context_attachment`, `permission`, `permission_closed`, `image`, `complete`, `error`, `dictation`, `voice`, `tts_tested`, `tts_test_failed`, `history`, `herdr`, `link`, or `copied`. The broker's protocol tests are authoritative for exact fields and version negotiation.
 
 The broker's internal run contract is the normalization boundary, not the policy
 boundary. Initialization selects exactly one harness: the embedded Pi runtime

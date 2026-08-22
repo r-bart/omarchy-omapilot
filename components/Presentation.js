@@ -70,6 +70,7 @@ function escapeAction(viewMode, composerPopupOpen, settingsPopupOpen,
 function settingsTabs() {
   return [
     { id: "agent", label: "Agent" },
+    { id: "voice", label: "Voice" },
     { id: "servers", label: "Servers" },
     { id: "desktop", label: "Desktop" },
     { id: "actions", label: "Actions" }

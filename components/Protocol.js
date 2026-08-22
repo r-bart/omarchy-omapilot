@@ -512,6 +512,173 @@ function customProviderTestCommand(baseUrl, apiKey) {
   return command("custom_provider_test", payload)
 }
 
+function normalizedTtsProvider(value) {
+  var provider = String(value || "").toLowerCase()
+  return ["kokoro", "elevenlabs", "openai"].indexOf(provider) >= 0 ? provider : ""
+}
+
+function ttsProviderOptions() {
+  return [
+    { value: "kokoro", label: "Kokoro (local)" },
+    { value: "elevenlabs", label: "ElevenLabs" },
+    { value: "openai", label: "OpenAI" }
+  ]
+}
+
+function emptyVoiceStatus() {
+  return {
+    dictation: { available: false, message: "" },
+    tts: [
+      { id: "kokoro", name: "Kokoro", kind: "local", available: false, configured: false, message: "", models: [], voices: [] },
+      { id: "elevenlabs", name: "ElevenLabs", kind: "cloud", available: false, configured: false, message: "", models: [], voices: [] },
+      { id: "openai", name: "OpenAI", kind: "cloud", available: false, configured: false, message: "", models: [], voices: [] }
+    ]
+  }
+}
+
+function normalizedVoiceOption(raw, kind) {
+  var source = raw && typeof raw === "object" ? raw : { id: raw }
+  var id = String(source.id || "").trim()
+  if (id === "" || id.length > 128) return null
+  var name = String(source.name || id).trim().slice(0, 64) || id
+  var result = { id: id, name: name, value: id, label: name }
+  if (kind === "voice" && Array.isArray(source.models)) {
+    var models = []
+    for (var i = 0; i < source.models.length && models.length < 8; i++) {
+      var model = String(source.models[i] || "").trim()
+      if (model !== "") models.push(model)
+    }
+    if (models.length > 0) result.models = models
+  }
+  return result
+}
+
+function normalizedVoiceStatus(event) {
+  var source = event && typeof event === "object" ? event : {}
+  var fallback = emptyVoiceStatus()
+  var dictation = source.dictation && typeof source.dictation === "object" ? source.dictation : {}
+  var result = {
+    dictation: {
+      available: dictation.available === true,
+      message: String(dictation.message || "")
+    },
+    tts: []
+  }
+  var rows = Array.isArray(source.tts) ? source.tts : []
+  for (var i = 0; i < rows.length && result.tts.length < 8; i++) {
+    var entry = rows[i]
+    if (!entry || typeof entry !== "object") continue
+    var id = normalizedTtsProvider(entry.id)
+    if (id === "") continue
+    var models = []
+    var voices = []
+    var rawModels = Array.isArray(entry.models) ? entry.models : []
+    for (var m = 0; m < rawModels.length && models.length < 32; m++) {
+      var model = normalizedVoiceOption(rawModels[m], "model")
+      if (model) models.push(model)
+    }
+    var rawVoices = Array.isArray(entry.voices) ? entry.voices : []
+    for (var v = 0; v < rawVoices.length && voices.length < 100; v++) {
+      var voice = normalizedVoiceOption(rawVoices[v], "voice")
+      if (voice) voices.push(voice)
+    }
+    result.tts.push({
+      id: id,
+      name: String(entry.name || id),
+      kind: entry.kind === "local" ? "local" : "cloud",
+      available: entry.available === true,
+      configured: entry.configured === true,
+      message: String(entry.message || ""),
+      models: models,
+      voices: voices
+    })
+  }
+  if (result.tts.length === 0) result.tts = fallback.tts
+  return result
+}
+
+function ttsProviderStatus(status, provider) {
+  var id = normalizedTtsProvider(provider) || "kokoro"
+  var rows = status && Array.isArray(status.tts) ? status.tts : []
+  for (var i = 0; i < rows.length; i++)
+    if (String(rows[i] && rows[i].id || "") === id) return rows[i]
+  return { id: id, name: id, kind: id === "kokoro" ? "local" : "cloud", available: false, configured: false, message: "", models: [], voices: [] }
+}
+
+function ttsModelOptions(catalog) {
+  var models = catalog && Array.isArray(catalog.models) ? catalog.models : []
+  var options = []
+  for (var i = 0; i < models.length; i++) {
+    options.push({
+      value: String(models[i].value || models[i].id || ""),
+      label: String(models[i].label || models[i].name || models[i].id || "")
+    })
+  }
+  return options.length > 0 ? options : [{ value: "", label: "No models yet" }]
+}
+
+function ttsVoiceOptions(catalog, model) {
+  var voices = catalog && Array.isArray(catalog.voices) ? catalog.voices : []
+  var selected = String(model || "")
+  var options = []
+  for (var i = 0; i < voices.length; i++) {
+    var voice = voices[i]
+    var models = Array.isArray(voice.models) ? voice.models : []
+    if (selected !== "" && models.length > 0 && models.indexOf(selected) < 0) continue
+    options.push({
+      value: String(voice.value || voice.id || ""),
+      label: String(voice.label || voice.name || voice.id || "")
+    })
+  }
+  return options.length > 0 ? options : [{ value: "", label: "No voices yet" }]
+}
+
+function ttsDefaultModel(catalog) {
+  var options = ttsModelOptions(catalog)
+  return options[0] && options[0].value ? options[0].value : ""
+}
+
+function ttsDefaultVoice(catalog, model) {
+  var options = ttsVoiceOptions(catalog, model)
+  return options[0] && options[0].value ? options[0].value : ""
+}
+
+function ttsModelAvailable(catalog, model) {
+  var selected = String(model || "")
+  if (selected === "") return false
+  var options = ttsModelOptions(catalog)
+  for (var i = 0; i < options.length; i++)
+    if (options[i].value === selected) return true
+  return false
+}
+
+function ttsVoiceAvailable(catalog, model, voice) {
+  var selected = String(voice || "")
+  if (selected === "") return false
+  var options = ttsVoiceOptions(catalog, model)
+  for (var i = 0; i < options.length; i++)
+    if (options[i].value === selected) return true
+  return false
+}
+
+function ttsKeySetCommand(provider, apiKey) {
+  return command("tts_key_set", {
+    provider: normalizedTtsProvider(provider) || "openai",
+    apiKey: String(apiKey || "").trim()
+  })
+}
+
+function ttsKeyClearCommand(provider) {
+  return command("tts_key_clear", { provider: normalizedTtsProvider(provider) || "openai" })
+}
+
+function ttsKeyTestCommand(provider, apiKey) {
+  return command("tts_key_test", {
+    provider: normalizedTtsProvider(provider) || "openai",
+    apiKey: String(apiKey || "").trim()
+  })
+}
+
 function normalizedProvider(value) {
   var provider = String(value || "").toLowerCase()
   return ["builtin", "codex", "opencode"].indexOf(provider) >= 0 ? provider : ""

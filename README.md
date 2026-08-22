@@ -34,6 +34,11 @@ compact error notice opens an inspectable details pane.
 - Node.js 22 or newer for the broker and pinned ACP adapters.
 - Credentials for the built-in harness, or an installed and authenticated ACP harness.
 - Optional: Voxtype for dictation and Herdr for durable continuation.
+- Optional: a TTS provider to speak answers. Kokoro is local
+  (`pip install kokoro soundfile` on Python 3.10–3.12, plus `espeak-ng`).
+  ElevenLabs and OpenAI need an API key entered in Settings; keys are stored
+  in `~/.config/omapilot/voice-auth.json`, not widget settings. Voice stays
+  off until enabled there.
 - `grim` for contextual screenshots. ImageMagick, already used by OmaPilot's
   image policy, validates and normalizes every captured image.
 - Optional: Tesseract adds text-under-the-pointer extraction and the **Text**

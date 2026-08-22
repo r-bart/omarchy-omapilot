@@ -51,6 +51,7 @@ TestCase {
 
   function test_desktopContextRequiresBrokerFeatureAdvertisement() {
     verify(Protocol.hasFeature(["desktop-context"], "desktop-context"))
+    verify(Protocol.hasFeature(["desktop-context", "context-attachments", "voice"], "voice"))
     verify(!Protocol.hasFeature([], "desktop-context"))
     verify(!Protocol.hasFeature(undefined, "desktop-context"))
   }
@@ -366,6 +367,38 @@ TestCase {
     verify(Protocol.isSafeExternalUrl("mailto:hello@example.com"))
     verify(!Protocol.isSafeExternalUrl("javascript:alert(1)"))
     verify(!Protocol.isSafeExternalUrl("file:///etc/passwd"))
+  }
+
+  function test_voiceCatalogNormalizesProvidersAndCloudKeys() {
+    var status = Protocol.normalizedVoiceStatus({
+      dictation: { available: true, message: "Voxtype is ready for dictation." },
+      tts: [
+        { id: "kokoro", kind: "local", available: true, configured: true, message: "ready",
+          models: [{ id: "kokoro-82m", name: "Kokoro 82M" }],
+          voices: [{ id: "af_heart", name: "Heart" }] },
+        { id: "openai", kind: "cloud", available: true, configured: true,
+          models: [{ id: "gpt-4o-mini-tts" }, { id: "tts-1" }],
+          voices: [
+            { id: "coral", name: "Coral", models: ["gpt-4o-mini-tts"] },
+            { id: "alloy", name: "Alloy", models: ["gpt-4o-mini-tts", "tts-1"] }
+          ] },
+        { id: "bad", models: [{ id: "nope" }] }
+      ]
+    })
+    compare(status.dictation.available, true)
+    compare(status.tts.length, 2)
+    compare(Protocol.normalizedTtsProvider("ElevenLabs"), "elevenlabs")
+    compare(Protocol.ttsProviderOptions()[0].value, "kokoro")
+    var openai = Protocol.ttsProviderStatus(status, "openai")
+    compare(Protocol.ttsDefaultModel(openai), "gpt-4o-mini-tts")
+    compare(Protocol.ttsVoiceOptions(openai, "tts-1").length, 1)
+    compare(Protocol.ttsVoiceOptions(openai, "tts-1")[0].value, "alloy")
+    var save = Protocol.ttsKeySetCommand(" OpenAI ", " sk-test ")
+    compare(save.type, "tts_key_set")
+    compare(save.provider, "openai")
+    compare(save.apiKey, "sk-test")
+    compare(Protocol.ttsKeyClearCommand("elevenlabs").type, "tts_key_clear")
+    compare(Protocol.ttsKeyTestCommand("openai", " sk-test ").apiKey, "sk-test")
   }
 
   function test_customProviderProbeAndSaveKeepDiscoveredModelMetadata() {

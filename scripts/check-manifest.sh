@@ -34,15 +34,34 @@ jq -e '
     "opencodeModel":"",
     "quickActionsJson":"",
     "desktopContext":"On",
-    "dangerousAutoApprove":false
+    "dangerousAutoApprove":false,
+    "voiceEnabled":false,
+    "ttsProvider":"kokoro",
+    "ttsModel":"",
+    "ttsVoice":""
   }
-  and ([.barWidget.schema[].key] | sort) == (["builtinModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "provider"] | sort)
+  and ([.barWidget.schema[].key] | sort) == (["builtinModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "provider", "ttsModel", "ttsProvider", "ttsVoice", "voiceEnabled"] | sort)
   and (.barWidget.schema[] | select(.key == "dangerousAutoApprove")) == {
     "key":"dangerousAutoApprove",
     "type":"boolean",
     "label":"Dangerous auto-approve",
     "defaultValue":false,
     "description":"Automatically select each exact tool request\u0027s Allow once option instead of prompting."
+  }
+  and (.barWidget.schema[] | select(.key == "voiceEnabled")) == {
+    "key":"voiceEnabled",
+    "type":"boolean",
+    "label":"Enable voice",
+    "defaultValue":false,
+    "description":"Allow talking to OmaPilot and speaking answers after a TTS provider is ready."
+  }
+  and (.barWidget.schema[] | select(.key == "ttsProvider")) == {
+    "key":"ttsProvider",
+    "type":"enum",
+    "label":"TTS provider",
+    "options":["kokoro", "elevenlabs", "openai"],
+    "defaultValue":"kokoro",
+    "description":"Kokoro is local. ElevenLabs and OpenAI need an API key stored in voice-auth.json."
   }
 ' "$manifest" >/dev/null || fail "manifest contract drifted from the Quickchat v0.1 schema"
 

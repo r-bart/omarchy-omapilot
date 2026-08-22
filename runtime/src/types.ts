@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { TtsProviderStatus, VoiceStatus } from "./tts.js";
 
 export const providerIdSchema = z.enum(["builtin", "codex", "opencode"]);
 export type ProviderId = z.infer<typeof providerIdSchema>;
@@ -153,6 +154,21 @@ const customProviderRemoveCommand = z.object({
   type: z.literal("custom_provider_remove"),
   id: z.string().min(1).max(64)
 });
+const cloudTtsProviderSchema = z.enum(["elevenlabs", "openai"]);
+const ttsKeySetCommand = z.object({
+  type: z.literal("tts_key_set"),
+  provider: cloudTtsProviderSchema,
+  apiKey: z.string().min(1).max(512)
+}).strict();
+const ttsKeyClearCommand = z.object({
+  type: z.literal("tts_key_clear"),
+  provider: cloudTtsProviderSchema
+}).strict();
+const ttsKeyTestCommand = z.object({
+  type: z.literal("tts_key_test"),
+  provider: cloudTtsProviderSchema,
+  apiKey: z.string().min(1).max(512)
+}).strict();
 
 export const commandSchema = z.discriminatedUnion("type", [
   initializeCommand,
@@ -176,7 +192,10 @@ export const commandSchema = z.discriminatedUnion("type", [
   customProviderAddCommand,
   z.object({ type: z.literal("voxtype_osd_set"), enabled: z.boolean() }),
   customProviderRemoveCommand,
-  z.object({ type: z.enum(["dictation_start", "dictation_stop", "dictation_cancel", "history_list", "history_clear", "custom_provider_list", "voxtype_osd_status", "shutdown"]) })
+  ttsKeySetCommand,
+  ttsKeyClearCommand,
+  ttsKeyTestCommand,
+  z.object({ type: z.enum(["dictation_start", "dictation_stop", "dictation_cancel", "history_list", "history_clear", "custom_provider_list", "voxtype_osd_status", "voice_status", "shutdown"]) })
 ]);
 export type BrokerCommand = z.infer<typeof commandSchema>;
 
@@ -298,13 +317,16 @@ export type ChatRecord = {
 export type ChatView = Omit<ChatRecord, "images"> & { images: RenderableImage[] };
 
 export type BrokerEvent =
-  | { type: "ready"; protocolVersion: 2; features: Array<"desktop-context" | "context-attachments">; providers: ProviderInfo[]; history: ChatView[] }
+  | { type: "ready"; protocolVersion: 2; features: Array<"desktop-context" | "context-attachments" | "voice">; providers: ProviderInfo[]; history: ChatView[] }
   | { type: "providers"; providers: ProviderInfo[] }
   | { type: "custom_provider_saved"; provider: CustomProviderView }
   | { type: "custom_provider_tested"; result: CustomProviderProbeResult }
   | { type: "custom_provider_test_failed"; baseUrl: string; message: string }
   | { type: "custom_providers"; providers: CustomProviderView[] }
   | { type: "voxtype_osd"; available: boolean; enabled: boolean; message?: string }
+  | { type: "voice"; dictation: VoiceStatus["dictation"]; tts: TtsProviderStatus[] }
+  | { type: "tts_tested"; provider: "elevenlabs" | "openai"; result: TtsProviderStatus }
+  | { type: "tts_test_failed"; provider: "elevenlabs" | "openai"; message: string }
   | { type: "auth_methods"; methods: BuiltinAuthMethod[] }
   | { type: "auth"; phase: "starting"; flowId: string; methodId: string; message: string }
   | { type: "auth"; phase: "prompt"; flowId: string; methodId: string; prompt: BuiltinAuthPrompt }

@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import type { AcpRun, PermissionDecision } from "./acp.js";
 import { BrokerAcpError, deleteAcpSession, probeAcpModels, runAcpQuestion } from "./acp.js";
 import { DictationService } from "./dictation.js";
+import { isCloudTtsProviderId, VoiceError, VoiceService } from "./tts.js";
 import { addCustomProvider, CustomProviderError, listCustomProviders, normalizeBaseUrl, probeCustomProvider, removeCustomProvider } from "./custom-providers.js";
 import { setVoxtypeOsdEnabled, voxtypeOsdStatus } from "./voxtype-osd.js";
 import { promptWithContextAttachments } from "./context.js";
@@ -52,6 +53,7 @@ export class QuickchatBroker {
   readonly #history: HistoryStore;
   readonly #images: ImageStore;
   readonly #dictation: DictationClient;
+  readonly #voice: VoiceService;
   readonly #sessionCleaner: SessionCleaner;
   readonly #herdrContinue: HerdrContinue;
   readonly #env: NodeJS.ProcessEnv;
@@ -71,7 +73,7 @@ export class QuickchatBroker {
 
   constructor(
     emit: (event: BrokerEvent) => void,
-    options: { history?: HistoryStore; images?: ImageStore; contextAttachments?: ContextAttachmentStore; dictation?: DictationClient; sessionCleaner?: SessionCleaner; herdrContinue?: HerdrContinue; env?: NodeJS.ProcessEnv; permissionTimeoutMs?: number } = {}
+    options: { history?: HistoryStore; images?: ImageStore; contextAttachments?: ContextAttachmentStore; dictation?: DictationClient; voice?: VoiceService; sessionCleaner?: SessionCleaner; herdrContinue?: HerdrContinue; env?: NodeJS.ProcessEnv; permissionTimeoutMs?: number } = {}
   ) {
     this.#emit = emit;
     this.#history = options.history ?? new HistoryStore();
@@ -87,6 +89,7 @@ export class QuickchatBroker {
       statusChanged: () => { void this.#emitBrowserCompanionStatus(); }
     });
     this.#dictation = options.dictation ?? new DictationService();
+    this.#voice = options.voice ?? new VoiceService(options.env ?? process.env);
     this.#sessionCleaner = options.sessionCleaner ?? ((provider, sessionId) => isPiProvider(provider)
       ? Promise.resolve(true)
       : deleteAcpSession(provider, sessionId));
@@ -131,6 +134,10 @@ export class QuickchatBroker {
       case "custom_provider_list": this.#emitCustomProviders(); break;
       case "voxtype_osd_status": this.#emitVoxtypeOsd(voxtypeOsdStatus(this.#env)); break;
       case "voxtype_osd_set": this.#emitVoxtypeOsd(await setVoxtypeOsdEnabled(command.enabled, this.#env)); break;
+      case "voice_status": await this.#emitVoiceStatus(); break;
+      case "tts_key_set": await this.#ttsKeySet(command.provider, command.apiKey); break;
+      case "tts_key_clear": await this.#ttsKeyClear(command.provider); break;
+      case "tts_key_test": await this.#ttsKeyTest(command.provider, command.apiKey); break;
       case "dictation_start": await this.#dictationStart(); break;
       case "dictation_stop": await this.#dictationStop(); break;
       case "dictation_cancel": await this.#dictationCancel(); break;
@@ -170,7 +177,7 @@ export class QuickchatBroker {
     }));
     this.#providers = new Map(discovered.map((provider) => [provider.id, provider]));
     const history = (await this.#history.list()).map((chat) => presentChat(chat));
-    this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context", "context-attachments"], providers: discovered.map(publicProvider), history });
+    this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context", "context-attachments", "voice"], providers: discovered.map(publicProvider), history });
     if (command.harness === "builtin") this.#emit({ type: "auth_methods", methods: authMethods });
   }
 
@@ -571,6 +578,65 @@ export class QuickchatBroker {
       enabled: status.enabled,
       ...(status.message === undefined ? {} : { message: status.message })
     });
+  }
+
+  async #emitVoiceStatus(): Promise<void> {
+    try {
+      const status = await this.#voice.status();
+      this.#emit({ type: "voice", dictation: status.dictation, tts: status.tts });
+    } catch {
+      this.#emit({
+        type: "voice",
+        dictation: { available: false, message: "Voice status could not be loaded." },
+        tts: []
+      });
+    }
+  }
+
+  async #ttsKeySet(provider: string, apiKey: string): Promise<void> {
+    if (!isCloudTtsProviderId(provider)) return;
+    try {
+      const status = await this.#voice.setKey(provider, apiKey);
+      this.#emit({ type: "voice", dictation: status.dictation, tts: status.tts });
+    } catch (error) {
+      this.#emit({
+        type: "tts_test_failed",
+        provider,
+        message: error instanceof VoiceError ? error.message : "The API key could not be saved"
+      });
+    }
+  }
+
+  async #ttsKeyClear(provider: string): Promise<void> {
+    if (!isCloudTtsProviderId(provider)) return;
+    try {
+      const status = await this.#voice.clearKey(provider);
+      this.#emit({ type: "voice", dictation: status.dictation, tts: status.tts });
+    } catch (error) {
+      this.#emit({
+        type: "tts_test_failed",
+        provider,
+        message: error instanceof VoiceError ? error.message : "The API key could not be removed"
+      });
+    }
+  }
+
+  async #ttsKeyTest(provider: string, apiKey: string): Promise<void> {
+    if (!isCloudTtsProviderId(provider)) return;
+    try {
+      const result = await this.#voice.testKey(provider, apiKey);
+      if (!result.available) {
+        this.#emit({ type: "tts_test_failed", provider, message: result.message });
+        return;
+      }
+      this.#emit({ type: "tts_tested", provider, result });
+    } catch (error) {
+      this.#emit({
+        type: "tts_test_failed",
+        provider,
+        message: error instanceof VoiceError ? error.message : "The API key could not be tested"
+      });
+    }
   }
 
   #emitCustomProviders(): void {

@@ -54,12 +54,13 @@ TestCase {
   }
 
   function test_settingsTabsAreAClosedLaneSet() {
-    compare(Presentation.settingsTabIds().join(","), "agent,servers,desktop,actions")
+    compare(Presentation.settingsTabIds().join(","), "agent,voice,servers,desktop,actions")
     compare(Presentation.normalizedSettingsTab("desktop"), "desktop")
+    compare(Presentation.normalizedSettingsTab("voice"), "voice")
     compare(Presentation.normalizedSettingsTab("missing"), "agent")
     compare(Presentation.adjacentSettingsTab("agent", -1), "agent")
-    compare(Presentation.adjacentSettingsTab("agent", 1), "servers")
+    compare(Presentation.adjacentSettingsTab("agent", 1), "voice")
     compare(Presentation.adjacentSettingsTab("actions", 1), "actions")
-    compare(Presentation.adjacentSettingsTab("", 2), "desktop")
+    compare(Presentation.adjacentSettingsTab("", 2), "servers")
   }
 }
