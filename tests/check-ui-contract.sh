@@ -248,7 +248,13 @@ grep -Fq 'Protocol.ttsKeySetCommand(provider, apiKey)' "$repo_dir/components/Qui
 grep -Fq 'onVoiceEnabledRequested:' "$repo_dir/Panel.qml"
 grep -Fq 'if (!OmaPilot.QuickchatStore.voiceEnabled)' "$repo_dir/Ambient.qml"
 grep -Fq 'function newVoiceChat(): string {' "$repo_dir/Ambient.qml"
-grep -Fq 'freshVoiceStartPending = freshChat' "$repo_dir/Ambient.qml"
+grep -Fq 'property bool voiceSessionActive: false' "$repo_dir/Ambient.qml"
+grep -Fq 'SessionLifecycle.voiceActivationMode(' "$repo_dir/Ambient.qml"
+grep -Fq 'voiceSessionActive = false' "$repo_dir/Ambient.qml"
+grep -Fq 'session=" + (root.voiceSessionActive ? "active" : "closed")' \
+  "$repo_dir/Ambient.qml"
+grep -Fq 'freshVoiceStartPending = freshVoiceStartPending || freshChat' \
+  "$repo_dir/Ambient.qml"
 grep -Fq 'if (freshChat && !freshChatReset) OmaPilot.QuickchatStore.newChat()' \
   "$repo_dir/Ambient.qml"
 grep -Fq 'function continueInHerdr() { root.continueInHerdr() }' \
@@ -257,6 +263,9 @@ grep -Fq '|| (pendingHerdrChatId === "" && currentId !== "" && busy)' \
   "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'if (root.newChatPending && !root.busy) root.resetChat()' \
   "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'submittedResumeChatId = resumeChatId' "$repo_dir/components/QuickchatStore.qml"
+test "$(grep -Fc 'restoreSubmittedContinuation()' \
+  "$repo_dir/components/QuickchatStore.qml")" -ge 3
 grep -Fq 'pendingHerdrChatId = currentChatId' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'String(event.chatId || "") !== pendingHerdrChatId' \
   "$repo_dir/components/QuickchatStore.qml"
@@ -545,6 +554,10 @@ QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -input "$repo_dir/tests/tst_state_phrases.qml" \
   -import "$repo_dir" || fail "state phrase tests failed"
+
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
+  -input "$repo_dir/tests/tst_session_lifecycle.qml" \
+  -import "$repo_dir" || fail "session lifecycle tests failed"
 
 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -input "$repo_dir/tests/tst_quick_actions.qml" \

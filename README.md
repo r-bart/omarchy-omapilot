@@ -82,16 +82,16 @@ omarchy plugin remove io.github.spencerbull.quickchat
 
 ## Global hotkeys
 
-OmaPilot exposes compositor-safe IPC actions for continuing the current typed
-or voice conversation, starting a fresh one, and handing the current chat to
+OmaPilot exposes compositor-safe IPC actions for a contextual voice session,
+forced-fresh typed or voice conversations, and handing the current chat to
 Herdr. Add the bindings you want to `~/.config/hypr/bindings.lua`:
 
 ```lua
--- Continue the current voice chat, or start one when no chat exists.
+-- Start fresh when the ambient flow is closed; continue while it is visible.
 o.bind("SUPER + A", "Talk to OmaPilot",
   "omarchy-shell -q io.github.spencerbull.omapilot voiceToggle")
 
--- Start a fresh voice chat. Omarchy uses this chord for ChatGPT by default.
+-- Force a fresh voice chat, even while the ambient flow is still active.
 hl.unbind("SUPER + SHIFT + A")
 o.bind("SUPER + SHIFT + A", "New OmaPilot voice chat",
   "omarchy-shell -q io.github.spencerbull.omapilot newVoiceChat")
@@ -102,11 +102,14 @@ o.bind("SUPER + ALT + H", "Continue OmaPilot chat in Herdr",
   "omarchy-shell -q io.github.spencerbull.quickchat continueInHerdr")
 ```
 
-`Super+A` resumes the current durable conversation; `Super+Shift+A` clears that
-continuation before recording. New typed chat opens the panel with an empty
-composer. Continue in Herdr does nothing until the current conversation has a
-saved chat ID. These are user-owned bindings: installing or updating the plugin
-does not rewrite Hyprland configuration.
+`Super+A` starts a new durable conversation whenever the ambient node and answer
+curtain have closed. While that flow remains active, pressing it again finishes
+live dictation or begins a follow-up in the same conversation. The answer timer,
+explicit dismissal, and cancellation close the voice session; they do not erase
+its saved history. `Super+Shift+A` remains the force-new escape hatch. New typed
+chat opens the panel with an empty composer. Continue in Herdr does nothing until
+the current conversation has a saved chat ID. These are user-owned bindings:
+installing or updating the plugin does not rewrite Hyprland configuration.
 
 Removal deletes the cloned plugin. OmaPilot deliberately leaves user-owned history and cached runtime files in place. Use **Clear all** before removal to erase history and cached chat images. If the plugin is already gone, inspect and remove the compatibility-path `quickchat` directories under your effective `XDG_STATE_HOME` and `XDG_CACHE_HOME` with a file manager; the default locations are `~/.local/state/quickchat` and `~/.cache/quickchat`.
 

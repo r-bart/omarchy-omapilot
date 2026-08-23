@@ -4,6 +4,7 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import qs.Commons
 import "components" as OmaPilot
+import "components/SessionLifecycle.js" as SessionLifecycle
 
 // OmaPilot's ambient overlay root.
 //
@@ -107,10 +108,13 @@ Item {
     }
   }
 
-  // True from the moment a voice turn is armed until its answer is dismissed.
-  // Without this the node would light up for panel-initiated turns too, which
-  // would make the ambient layer noisy rather than intentional.
+  // Presentation and conversation lifetime are deliberately separate. A failed
+  // launch still engages the node long enough to explain itself, but it has not
+  // opened a voice conversation. Once a launch succeeds, that conversation stays
+  // active until the ambient flow is dismissed; the next closed-to-open gesture
+  // then starts fresh instead of reviving an invisible prior chat.
   property bool voiceEngaged: false
+  property bool voiceSessionActive: false
 
   readonly property bool curtainShown:
     voiceEngaged && (failed || hasAnswer)
@@ -192,6 +196,8 @@ Item {
       return "busy"
     }
 
+    voiceSessionActive = true
+
     // A fresh voice gesture supersedes presentation of an in-flight Herdr
     // handoff. The external handoff may still finish, but its tagged outcome is
     // ignored once newChat clears pendingHerdrChatId.
@@ -207,7 +213,9 @@ Item {
       // clears busy asynchronously, so arm the start and let the state change
       // below run it once the previous turn has unwound.
       voiceStartPending = true
-      freshVoiceStartPending = freshChat
+      // Once any gesture has requested a fresh session, later taps during the
+      // same cancellation window must not downgrade it back to continuation.
+      freshVoiceStartPending = freshVoiceStartPending || freshChat
       OmaPilot.QuickchatStore.cancel()
       return "preempting"
     }
@@ -222,7 +230,7 @@ Item {
     return "listening"
   }
 
-  function voiceStart() { return beginVoiceChat(false) }
+  function voiceStart() { return beginVoiceChat(!voiceSessionActive) }
 
   function newVoiceChat() { return beginVoiceChat(true) }
 
@@ -238,11 +246,13 @@ Item {
   // twice. `voiceStart`/`voiceStop` remain separately bindable for anyone who
   // prefers true push-to-talk.
   function voiceToggle() {
-    if (OmaPilot.QuickchatStore.state === "dictating") {
+    var activation = SessionLifecycle.voiceActivationMode(
+      voiceSessionActive, OmaPilot.QuickchatStore.state)
+    if (activation === "finish") {
       OmaPilot.QuickchatStore.stopDictation()
       return "finishing"
     }
-    return voiceStart()
+    return beginVoiceChat(activation === "fresh")
   }
 
   function voiceCancel() {
@@ -261,6 +271,7 @@ Item {
     // which is the one failure mode an invisible ambient layer must never have.
     if (OmaPilot.QuickchatStore.state === "dictating")
       OmaPilot.QuickchatStore.cancel()
+    voiceSessionActive = false
     voiceEngaged = false
     OmaPilot.QuickchatStore.clearDesktopContextLatch()
   }
@@ -337,8 +348,9 @@ Item {
   // ------------------------------------------------------------------- IPC
   // The voice gesture cannot be a surface keybinding, because the ambient
   // surfaces never take keyboard focus by design. It has to arrive over IPC from
-  // a compositor binding. Keep current-chat and fresh-chat gestures as separate
-  // methods so their continuation behavior is explicit at that boundary.
+  // a compositor binding. The default gesture derives fresh-versus-continue
+  // from the ambient session lease; `newVoiceChat` remains an explicit force-new
+  // escape hatch while that lease is still active.
   IpcHandler {
     target: "io.github.spencerbull.omapilot"
     function voiceStart(): string {
@@ -359,6 +371,7 @@ Item {
     function status(): string {
       return "phase=" + root.phase
         + " store=" + root.storeState
+        + " session=" + (root.voiceSessionActive ? "active" : "closed")
         + " screen=" + (root.activeScreen ? root.activeScreen.name : "none")
         + " dismissMs=" + root.dismissDelay
     }
