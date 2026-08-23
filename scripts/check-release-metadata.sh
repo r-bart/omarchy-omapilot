@@ -36,11 +36,20 @@ for launcher in runtime/dist/quickchat-broker runtime/dist/adapters/codex-acp; d
   readelf -W -h "$repo_root/$launcher" | grep -Fq 'Machine:                           Advanced Micro Devices X86-64' || {
     fail "$launcher has an unexpected ELF machine"
   }
-  readelf -W -d "$repo_root/$launcher" | grep -Fq 'BIND_NOW' || {
-    fail "$launcher is missing immediate relocation binding"
+  if readelf -W -l "$repo_root/$launcher" | grep -Eq '^[[:space:]]*INTERP'; then
+    fail "$launcher unexpectedly uses a dynamic interpreter"
+  fi
+  if readelf -W -d "$repo_root/$launcher" | grep -Fq '(NEEDED)'; then
+    fail "$launcher unexpectedly uses a dynamic dependency"
+  fi
+  readelf -W -l "$repo_root/$launcher" | grep -Fq 'GNU_STACK' || {
+    fail "$launcher does not declare its stack policy"
   }
-  if readelf -W -l "$repo_root/$launcher" | awk '$1 == "GNU_STACK" && $NF ~ /E/ { found=1 } END { exit !found }'; then
+  if readelf -W -l "$repo_root/$launcher" | grep 'GNU_STACK' | grep -Eq '[[:space:]]E[[:space:]]'; then
     fail "$launcher requests an executable stack"
+  fi
+  if readelf -W -l "$repo_root/$launcher" | grep -E '^[[:space:]]*LOAD' | grep -Eq '[[:space:]]W[[:space:]]'; then
+    fail "$launcher contains a writable load segment"
   fi
 done
 for stale in runtime/dist/quickchat-broker.js runtime/dist/quickchat-broker.js.map \

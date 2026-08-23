@@ -36,10 +36,11 @@
   artifacts created by this stream. Existing user files and other worktrees are
   out of scope.
 - Evidence so far: `npm audit` reports zero vulnerabilities; `npm run check`
-  passes 239 tests with 8 intentional skips; `bash tests/check-ui-contract.sh`
+  passes 242 tests with 8 intentional skips; `bash tests/check-ui-contract.sh`
   passes the QML, motion, and visual fixtures against pinned Quattro commit
   `ef6d9e6605b121df15bf310e630e04f0c1119fc8`; generated runtimes reproduce
-  byte-for-byte; and two release archives have identical SHA-256 hashes.
+  byte-for-byte across Arch and Debian build environments; and two release
+  archives have identical SHA-256 hashes.
 
 ## Goal
 

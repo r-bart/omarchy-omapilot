@@ -32,7 +32,7 @@ _No response_
 
 ### Maintainer notes
 
-OmaPilot ships reproducible Linux x86-64 launchers containing its reviewed broker and Codex ACP JavaScript payloads. The source, exact lockfile, build generator, license inventory, and generated files are in the same commit. Normal installation performs no build or download.
+OmaPilot ships reproducible Linux x86-64 launchers containing its reviewed broker and Codex ACP JavaScript payloads. A source-controlled deterministic generator emits the minimal static ELF wrapper and embedded payload; the exact lockfile, license inventory, and generated files are in the same commit. Normal installation performs no build or download.
 
 ### Submission checklist
 

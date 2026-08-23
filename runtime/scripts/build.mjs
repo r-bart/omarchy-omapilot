@@ -1,20 +1,15 @@
-import { chmod, copyFile, mkdir, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
-import { execFile } from "node:child_process";
+import { chmod, copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 import { build } from "esbuild";
 import { generateThirdPartyLicenses } from "./generate-third-party-licenses.mjs";
+import { embeddedNodeExecutable } from "../launcher/embedded-node-launcher.mjs";
 
-const run = promisify(execFile);
 const runtimeRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const projectRoot = await realpath(resolve(runtimeRoot, ".."));
 const distRoot = resolve(runtimeRoot, "dist");
 const workRoot = await mkdtemp(resolve(tmpdir(), "omapilot-runtime-build-"));
-const launcherSource = resolve(runtimeRoot, "launcher/embedded-node-launcher.c");
-const compiler = process.env.CC || "cc";
-const linker = process.env.LD || "ld";
 const runtimeBanner = "var __omapilotImportMetaUrl=require('node:url').pathToFileURL(__filename).href;";
 
 if (process.platform !== "linux" || process.arch !== "x64") {
@@ -22,20 +17,9 @@ if (process.platform !== "linux" || process.arch !== "x64") {
 }
 
 async function embeddedExecutable(payloadPath, outputPath, rootLevels) {
-  const objectPath = resolve(workRoot, `launcher-${rootLevels}.o`);
-  const payloadObjectPath = resolve(workRoot, `payload-${rootLevels}.o`);
-  await copyFile(payloadPath, resolve(workRoot, "payload.cjs"));
-  await run(compiler, [
-    "-std=c11", "-Os", "-fno-ident", "-Wall", "-Wextra", "-Werror",
-    `-DOMAPILOT_ROOT_LEVELS=${rootLevels}`, "-c", launcherSource, "-o", objectPath
-  ]);
-  await run(linker, ["-r", "-b", "binary", "payload.cjs", "-o", payloadObjectPath], { cwd: workRoot });
   await mkdir(dirname(outputPath), { recursive: true });
-  await run(compiler, [
-    "-no-pie", "-Wl,--build-id=none", "-Wl,-z,relro,-z,now,-z,noexecstack",
-    objectPath, payloadObjectPath, "-o", outputPath
-  ]);
-  await run("strip", ["--strip-all", "--remove-section=.comment", outputPath]);
+  const payload = await readFile(payloadPath);
+  await writeFile(outputPath, embeddedNodeExecutable(payload, rootLevels));
   await chmod(outputPath, 0o755);
 }
 

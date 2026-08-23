@@ -69,8 +69,11 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
   Kokoro is local and has no credential.
 - Broker and adapter launchers are generated from exact package-lock versions
   and reviewed as tracked files in the same Git commit as their source. They
-  contain sealed JavaScript payloads and execute them with system Node 22 or
-  newer; they do not unpack executable code to a shared temporary path.
+  contain JavaScript payloads loaded directly from the read-only launcher file
+  and execute them with system Node 22 or newer; they do not unpack executable
+  code to a shared temporary path. The minimal static ELF wrapper is emitted by
+  a source-controlled deterministic generator and has no dynamic dependencies
+  or writable load segment.
   Published release archives add SHA-256 verification, provenance, and an SBOM;
   the runtime does not download or replace adapters.
 - Remote images require a user action and are subject to scheme, redirect, address, MIME, byte-size, complete decode, pixel-area, and cache-quota checks before Quickshell sees them.

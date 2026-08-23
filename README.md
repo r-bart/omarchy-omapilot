@@ -82,7 +82,8 @@ install hook, does not request administrator access, and does not invoke a
 package manager or mutate host configuration. The reviewed repository revision
 includes reproducible Linux x86-64 broker and Codex ACP launchers, so a normal
 install does not run `npm`, `npx`, or silently download executable code. The
-launchers execute their embedded, sealed JavaScript payloads with system Node;
+launchers execute their embedded JavaScript payloads directly from the
+read-only launcher file with system Node;
 Git history anchors those generated files to their TypeScript source and pinned
 lockfile. Release archives add an SBOM, provenance record, and SHA-256 checksum.
 
@@ -426,8 +427,8 @@ npm run build
 ./scripts/package-runtime.sh --output-dir dist/release
 ```
 
-Runtime builds require Linux x86-64, a C compiler, and GNU `ld`/`strip`. The
-package helper stages the self-contained checked-in runtime, emits a
+Runtime builds require Linux x86-64 and Node.js 22 or newer. The package helper
+stages the self-contained checked-in runtime, emits a
 lockfile-derived CycloneDX SBOM, normalizes timestamps and ownership, creates a
 deterministic archive, and writes `SHA256SUMS`. Release details and marketplace
 gates are in [`docs/release.md`](docs/release.md).

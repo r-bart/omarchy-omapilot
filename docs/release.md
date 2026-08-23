@@ -9,8 +9,8 @@ and compatibility; it is not a plugin security review.
 1. Update `manifest.json`, `package.json`, and `package-lock.json` together.
 2. Review exact runtime dependencies, licenses, upstream changes, and
    `THIRD_PARTY_NOTICES.md`.
-3. On Linux x86-64 with Node 22, a C compiler, and GNU binutils, run `npm ci`,
-   `npm run check`, `./scripts/validate.sh`, and `bash tests/check-ui-contract.sh`.
+3. On Linux x86-64 with Node 22, run `npm ci`, `npm run check`,
+   `./scripts/validate.sh`, and `bash tests/check-ui-contract.sh`.
 4. Rebuild twice and confirm that every tracked file under `runtime/dist/` and
    `browser-companion/dist/` is byte-identical.
 5. Run `./scripts/package-runtime.sh --output-dir dist/release` twice and compare
