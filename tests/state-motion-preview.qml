@@ -25,6 +25,7 @@ ShellRoot {
     property alias wavePhase: wave.phase
     property alias wavePace: wave.motionPace
     property alias waveLevel: wave.level
+    property alias wavePower: wave.speakingLevel
 
     Text {
       anchors.left: parent.left
@@ -157,11 +158,20 @@ ShellRoot {
         Qt.quit()
         return
       }
+      if ((root.speakingLevel <= 0.05 && speakingLane.wavePower >= 0.12)
+          || (root.speakingLevel >= 0.15 && root.speakingLevel <= 0.5
+            && speakingLane.wavePower <= root.speakingLevel * 1.45)
+          || (root.speakingLevel >= 0.9 && speakingLane.wavePower < 0.99)) {
+        console.error("omapilot state motion preview failed: speaking envelope gain is too weak or unbounded")
+        Qt.quit()
+        return
+      }
       var output = root.outputDirectory + "/state-" + String(root.frameIndex).padStart(2, "0") + ".png"
       console.log("OMAPILOT_STATE_FRAME=" + root.frameIndex
         + " listening=" + listeningLane.wavePhase.toFixed(3)
         + " thinking=" + thinkingLane.wavePhase.toFixed(3)
-        + " speaking=" + root.speakingLevel.toFixed(2))
+        + " speaking=" + root.speakingLevel.toFixed(2)
+        + " power=" + speakingLane.wavePower.toFixed(2))
       captureSurface.grabToImage(function(result) {
         if (!result || !result.saveToFile(output)) {
           console.error("omapilot state motion preview failed: could not save " + output)

@@ -33,6 +33,13 @@ Item {
   property string motionStyle: "listening"
   readonly property bool thinking: motionStyle === "thinking"
   readonly property bool speaking: motionStyle === "speaking"
+  readonly property real boundedLevel: Math.max(0, Math.min(1, level))
+  // Provider output is commonly mastered well below full scale, which made a
+  // truthful raw envelope read as barely moving. Keep the first 2.5% as a
+  // silence/noise gate, then apply perceptual gain so ordinary syllables use
+  // more of the available height while loud peaks remain bounded.
+  readonly property real speakingLevel: boundedLevel <= 0.025 ? 0
+    : Math.min(1, Math.pow((boundedLevel - 0.025) / 0.975, 0.62) * 1.18)
   // A calm standing wave while listening; a much faster travelling signal
   // while thinking. The larger ratio is intentional: the previous 28% pace
   // difference was technically present but visually indistinguishable.
@@ -69,8 +76,8 @@ Item {
     var h = root.height
     if (w <= 0 || h <= 0) return points
     var mid = h * 0.5
-    var boundedLevel = Math.max(0, Math.min(1, root.level))
-    var levelScale = root.speaking ? 0.04 + boundedLevel * 0.96 : 0.3 + boundedLevel * 0.7
+    var levelScale = root.speaking ? 0.025 + root.speakingLevel * 1.1
+      : 0.3 + root.boundedLevel * 0.7
     var peak = mid * 0.86 * layer.amplitude * levelScale
     for (var i = 0; i <= root.samples; i++) {
       var t = i / root.samples

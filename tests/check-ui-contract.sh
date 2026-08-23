@@ -353,7 +353,10 @@ grep -Fq 'motionStyle: root.speaking ? "speaking" : root.phase' "$repo_dir/compo
 grep -Fq 'readonly property real motionPace: thinking ? 0.084 : (speaking ? 0.056 : 0.022)' \
   "$repo_dir/components/VoiceWave.qml"
 grep -Fq 'var travel = (root.phase * 0.095) % 1' "$repo_dir/components/VoiceWave.qml"
-grep -Fq 'root.speaking ? 0.04 + boundedLevel * 0.96' "$repo_dir/components/VoiceWave.qml"
+grep -Fq 'readonly property real speakingLevel: boundedLevel <= 0.025 ? 0' \
+  "$repo_dir/components/VoiceWave.qml"
+grep -Fq 'Math.pow((boundedLevel - 0.025) / 0.975, 0.62) * 1.18' \
+  "$repo_dir/components/VoiceWave.qml"
 grep -Fq 'interval: 2800' "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'StatePhrases.thinkingStatus(thinkingPhraseIndex, status)' \
   "$repo_dir/components/VoiceNode.qml"
