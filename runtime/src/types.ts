@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { TtsProviderStatus, VoiceStatus } from "./tts.js";
+import type { CapabilityRisk, CapabilityView } from "./capabilities/types.js";
 
 export const providerIdSchema = z.enum(["builtin", "codex", "opencode"]);
 export type ProviderId = z.infer<typeof providerIdSchema>;
@@ -104,6 +105,16 @@ const browserCompanionOpenSettingsCommand = z.object({
   type: z.literal("browser_companion_open_settings"),
   family: z.enum(["chromium", "firefox"])
 }).strict();
+const capabilityIdSchema = z.enum(["email", "calendar", "files", "projects", "messages", "meetings"]);
+const capabilitySetEnabledCommand = z.object({
+  type: z.literal("capability_set_enabled"),
+  id: capabilityIdSchema,
+  enabled: z.boolean()
+}).strict();
+const capabilityFilesRootSetCommand = z.object({
+  type: z.literal("capability_files_root_set"),
+  path: z.string().max(4_096)
+}).strict();
 const authBeginCommand = z.object({
   type: z.literal("auth_begin"),
   methodId: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}::(?:api_key|oauth)$/u)
@@ -192,6 +203,8 @@ export const commandSchema = z.discriminatedUnion("type", [
   contextCancelCommand,
   browserCompanionCommand,
   browserCompanionOpenSettingsCommand,
+  capabilitySetEnabledCommand,
+  capabilityFilesRootSetCommand,
   authBeginCommand,
   authResponseCommand,
   authCancelCommand,
@@ -211,7 +224,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   ttsKeyTestCommand,
   ttsSpeakCommand,
   ttsStopCommand,
-  z.object({ type: z.enum(["dictation_start", "dictation_stop", "dictation_cancel", "history_list", "history_clear", "custom_provider_list", "voxtype_osd_status", "voice_status", "shutdown"]) })
+  z.object({ type: z.enum(["dictation_start", "dictation_stop", "dictation_cancel", "history_list", "history_clear", "custom_provider_list", "capabilities_list", "voxtype_osd_status", "voice_status", "shutdown"]) })
 ]);
 export type BrokerCommand = z.infer<typeof commandSchema>;
 
@@ -304,6 +317,7 @@ export type ToolPermission = {
   title: string;
   kind: "execute";
   authority: "device";
+  risk?: CapabilityRisk;
   detail: string;
   options: Array<{
     id: string;
@@ -333,7 +347,8 @@ export type ChatRecord = {
 export type ChatView = Omit<ChatRecord, "images"> & { images: RenderableImage[] };
 
 export type BrokerEvent =
-  | { type: "ready"; protocolVersion: 2; features: Array<"desktop-context" | "context-attachments" | "voice">; providers: ProviderInfo[]; history: ChatView[] }
+  | { type: "ready"; protocolVersion: 2; features: Array<"desktop-context" | "context-attachments" | "voice" | "capability-packs">; providers: ProviderInfo[]; history: ChatView[] }
+  | { type: "capabilities"; capabilities: CapabilityView[] }
   | { type: "providers"; providers: ProviderInfo[] }
   | { type: "custom_provider_saved"; provider: CustomProviderView }
   | { type: "custom_provider_tested"; result: CustomProviderProbeResult }

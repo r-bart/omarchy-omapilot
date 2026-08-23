@@ -56,6 +56,20 @@ TestCase {
     verify(!Protocol.hasFeature(undefined, "desktop-context"))
   }
 
+  function test_capabilityPacksNormalizeFailClosed() {
+    var capabilities = Protocol.normalizedCapabilities([
+      { id: "email", label: "Email", connector: "HEY", state: "ready", status: "Connected", enabled: true,
+        operations: [{ id: "search", label: "Search mail", risk: "inspect", available: true }] },
+      { id: "unknown", label: "Unknown", state: "ready" },
+      { id: "email", label: "Duplicate", state: "ready" }
+    ])
+    compare(capabilities.length, 1)
+    compare(capabilities[0].id, "email")
+    compare(capabilities[0].operations[0].risk, "inspect")
+    compare(Protocol.capabilityOperationsLabel(capabilities[0]), "Search mail")
+    compare(Protocol.capabilityFilesRoot([{ id: "files", filesRoot: "/home/test/Dropbox" }]), "/home/test/Dropbox")
+  }
+
   function test_contextAttachmentKeepsAlternativesLocalUntilSubmit() {
     var id = "11111111-1111-4111-8111-111111111111"
     var attachment = Protocol.normalizedContextAttachment({

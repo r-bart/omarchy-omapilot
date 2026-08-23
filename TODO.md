@@ -1164,3 +1164,43 @@ turn per provider.
   user-owned file. The prior component is recoverable from
   `/home/sbull/.local/state/omarchy/quickchat-backups/20260818T193946Z-before-blur-only/`.
   Installed owner verification remains open.
+
+## Personal capability packs checkpoint 13 (2026-08-22)
+
+- Goal: make OmaPilot's personal-assistant integrations discoverable and
+  pluggable, with useful built-in defaults for Email, Calendar, Files,
+  Projects, Messages, and Meetings.
+- Done criteria: one broker-owned capability registry reports truthful
+  operation-level readiness; HEY email/calendar and a configured local-files
+  root use typed, bounded tools; meetings can open a validated join URL;
+  Basecamp and Signal surface actionable missing/setup states without being
+  installed automatically; Settings has an accessible Skills surface; Pi uses
+  the registered tools and ACP has a reviewed bridge plan or implementation;
+  external writes cannot inherit dangerous auto-approve or durable grants;
+  focused tests, the complete repository check, and final diff review pass.
+- Branch/worktree: `capability-packs` at
+  `/home/sbull/worktrees/omarchy-omapilot-capability-packs`, based on `dev`
+  commit `5767300`.
+- Allowed: scoped repository source, QML, documentation, tests, generated
+  bundles, read-only local capability probes, and—following the owner's
+  2026-08-23 landing authorization—commit, rebase, and local merge. Forbidden:
+  package installs, OAuth/login, Signal pairing, container creation, plugin
+  installation, shell restart, user configuration edits, pushes, releases, and
+  reading personal email, calendar, files, projects, or messages during tests.
+- Verification gates:
+  - [x] Add the capability registry, schemas, probes, risk classes, and status protocol.
+  - [x] Add typed HEY Email/Calendar, scoped Files, and Meetings tools.
+  - [x] Add Basecamp and Signal readiness/setup reporting.
+  - [x] Add the Settings Skills surface and configuration flow.
+  - [x] Add Pi wiring and the safest practical ACP tool bridge.
+  - [x] Pass focused runtime and QML tests, full validation, and diff review.
+- No workers are assigned. The orchestrator owns implementation and review.
+- Current checkpoint: six default packs, their bundled skills, Pi tools, and a
+  read-only scoped ACP MCP bridge are implemented. External writes are one-shot
+  only; OpenCode receives no registry or Files tools under its no-host-reads
+  policy. Full repository validation passes 237 tests with 8 opt-in live ACP
+  tests skipped, the QML/UI contract and rendered Skills preview pass, release
+  packaging and checksums pass, and Git whitespace checks pass. Shellcheck is
+  unavailable and was skipped. No install, account setup, user configuration,
+  push, install, shell restart, or live personal-data read occurred. Commit,
+  rebase, and local merge are now authorized as the remaining landing steps.

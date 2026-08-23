@@ -34,13 +34,22 @@ jq -e '
     "opencodeModel":"",
     "quickActionsJson":"",
     "desktopContext":"On",
+    "webHandoffProvider":"duckduckgo",
     "dangerousAutoApprove":false,
     "voiceEnabled":false,
     "ttsProvider":"kokoro",
     "ttsModel":"",
     "ttsVoice":""
   }
-  and ([.barWidget.schema[].key] | sort) == (["builtinModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "provider", "ttsModel", "ttsProvider", "ttsVoice", "voiceEnabled"] | sort)
+  and ([.barWidget.schema[].key] | sort) == (["builtinModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "provider", "ttsModel", "ttsProvider", "ttsVoice", "voiceEnabled", "webHandoffProvider"] | sort)
+  and (.barWidget.schema[] | select(.key == "webHandoffProvider")) == {
+    "key":"webHandoffProvider",
+    "type":"enum",
+    "label":"Search provider",
+    "options":["duckduckgo", "google", "chatgpt", "claude", "grok"],
+    "defaultValue":"duckduckgo",
+    "description":"Choose where OmaPilot opens current-information questions. AI sites also receive a paste-ready copy; answers stay in the browser."
+  }
   and (.barWidget.schema[] | select(.key == "dangerousAutoApprove")) == {
     "key":"dangerousAutoApprove",
     "type":"boolean",

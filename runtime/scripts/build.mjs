@@ -41,6 +41,21 @@ await generateThirdPartyLicenses({
 });
 await chmod(output, 0o755);
 
+const capabilityMcpOutput = resolve(runtimeRoot, "dist/capability-mcp.js");
+await build({
+  entryPoints: ["runtime/src/capability-mcp.ts"],
+  outfile: capabilityMcpOutput,
+  bundle: true,
+  platform: "node",
+  target: "node22",
+  format: "esm",
+  sourcemap: true,
+  banner: { js: "#!/usr/bin/env node" },
+  legalComments: "external",
+  absWorkingDir: projectRoot
+});
+await chmod(capabilityMcpOutput, 0o755);
+
 for (const adapter of [
   { name: "codex-acp", entry: "@agentclientprotocol/codex-acp/dist/index.js" }
 ]) {

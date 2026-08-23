@@ -43,6 +43,7 @@ required=(
   runtime/dist/quickchat-broker.js
   runtime/dist/quickchat-broker.js.LEGAL.txt
   runtime/dist/quickchat-broker.THIRD_PARTY_LICENSES.txt
+  runtime/dist/capability-mcp.js
   runtime/dist/adapters/codex-acp.js
   runtime/dist/adapters/Apache-2.0.txt
   runtime/policies/automatic.md
@@ -109,6 +110,7 @@ cp "$repo_root/package.json" "$repo_root/package-lock.json" "$stage/"
 cp "$repo_root/runtime/dist/quickchat-broker.js" "$stage/runtime/dist/"
 cp "$repo_root/runtime/dist/quickchat-broker.js.LEGAL.txt" "$stage/runtime/dist/"
 cp "$repo_root/runtime/dist/quickchat-broker.THIRD_PARTY_LICENSES.txt" "$stage/runtime/dist/"
+cp "$repo_root/runtime/dist/capability-mcp.js" "$stage/runtime/dist/"
 cp "$repo_root/runtime/dist/adapters/codex-acp.js" "$stage/runtime/dist/adapters/"
 cp "$repo_root/runtime/dist/adapters/Apache-2.0.txt" "$stage/runtime/dist/adapters/"
 cp "$repo_root/runtime/policies/automatic.md" "$stage/runtime/policies/"
@@ -117,7 +119,8 @@ cp "$repo_root/runtime/bin/quickchat-broker" "$repo_root/runtime/bin/codex-acp" 
 cp "$repo_root/runtime/adapters.release.json" "$stage/runtime/"
 cp "$repo_root/runtime/policies/automatic.md" "$stage/runtime/policies/"
 cp "$repo_root/THIRD_PARTY_NOTICES.md" "$repo_root/LICENSE" "$stage/"
-chmod 0755 "$stage/runtime/bin/quickchat-broker" "$stage/runtime/bin/codex-acp"
+chmod 0755 "$stage/runtime/bin/quickchat-broker" "$stage/runtime/bin/codex-acp" \
+  "$stage/runtime/dist/capability-mcp.js"
 
 (
   cd "$stage"

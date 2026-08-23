@@ -16,6 +16,7 @@ for relative in manifest.json package.json package-lock.json runtime/adapters.re
   runtime/licenses/ignore-7.0.5-MIT.txt \
   runtime/licenses/ignore-7.0.6-MIT.txt \
   runtime/dist/quickchat-broker.THIRD_PARTY_LICENSES.txt \
+  runtime/dist/capability-mcp.js \
   runtime/dist/adapters/Apache-2.0.txt \
   THIRD_PARTY_NOTICES.md; do
   [[ -f "$repo_root/$relative" ]] || fail "missing $relative"

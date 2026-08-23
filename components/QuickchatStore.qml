@@ -71,6 +71,9 @@ Scope {
   property bool configuredDangerousAutoApprove: false
   property bool desktopContextEnabled: true
   property string webHandoffProvider: "duckduckgo"
+  property var capabilities: []
+  property string capabilityError: ""
+  property bool brokerCapabilityPacksSupported: false
   property bool brokerDesktopContextSupported: false
   property var latchedActiveWindow: null
   property var latchedCaptureTarget: null
@@ -287,6 +290,24 @@ Scope {
 
   function requestBrowserCompanionStatus() {
     sendCommand(Protocol.command("browser_companion_status"))
+  }
+
+  function requestCapabilities() {
+    if (brokerCapabilityPacksSupported) sendCommand(Protocol.command("capabilities_list"))
+  }
+
+  function setCapabilityEnabled(id, enabled) {
+    capabilityError = ""
+    sendCommand(Protocol.command("capability_set_enabled", {
+      id: String(id || ""), enabled: enabled === true
+    }))
+  }
+
+  function setCapabilityFilesRoot(path) {
+    capabilityError = ""
+    sendCommand(Protocol.command("capability_files_root_set", {
+      path: String(path || "").trim()
+    }))
   }
 
   function installBrowserCompanion() {
@@ -680,9 +701,15 @@ Scope {
       initialized = true
       brokerDesktopContextSupported = Protocol.hasFeature(event.features, "desktop-context")
       brokerContextAttachmentsSupported = Protocol.hasFeature(event.features, "context-attachments")
+      brokerCapabilityPacksSupported = Protocol.hasFeature(event.features, "capability-packs")
       applyProviders(event.providers || [])
       history = Protocol.normalizedHistory(event.history || [])
       if (Protocol.hasFeature(event.features, "voice")) requestVoiceStatus()
+      return
+    }
+    if (type === "capabilities") {
+      capabilities = Protocol.normalizedCapabilities(event.capabilities || [])
+      capabilityError = ""
       return
     }
     if (type === "providers") {
@@ -892,6 +919,13 @@ Scope {
       return
     }
     if (type === "error") {
+      var capabilityCode = String(event.code || "")
+      if (!event.id && (capabilityCode.indexOf("capability_") === 0
+          || capabilityCode.indexOf("files_root") >= 0
+          || capabilityCode === "invalid_files_root")) {
+        capabilityError = String(event.message || "The capability setting could not be updated")
+        return
+      }
       // A registration failure belongs to the open settings form, not the chat
       // error lane. The pending flag also catches wire-schema rejections whose
       // generic `invalid_command` code cannot name the originating command.

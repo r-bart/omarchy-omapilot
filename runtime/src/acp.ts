@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
 import * as acp from "@agentclientprotocol/sdk";
 import type { ContentBlock, NewSessionRequest, RequestPermissionRequest, SessionConfigOption } from "@agentclientprotocol/sdk";
@@ -63,7 +64,7 @@ export async function probeAcpModels(provider: DiscoveredProvider, timeoutMs = 1
           clientInfo: { name: "omarchy-quickchat", version: QUICKCHAT_CLIENT_VERSION }
         });
         if (!canRemoveSession(initialized.agentCapabilities)) return { models: [] };
-        const session = await ctx.buildSession(providerSessionRequest(provider, cwd)).start();
+        const session = await ctx.buildSession(providerSessionRequest(provider, cwd, false)).start();
         const config = modelConfiguration(session.newSessionResponse.configOptions ?? []);
         session.dispose();
         await removeSession(ctx, initialized.agentCapabilities, session.sessionId);
@@ -446,16 +447,31 @@ async function removeSession(
   return false;
 }
 
-// Every remaining harness uses the plain ACP session request. The Claude
-// harness was the only provider that needed a _meta payload (its tool
-// allowlist, skill plugin, and permission settings), so the parameterised
-// request collapsed to its base when Claude was removed.
 export function providerSessionRequest(
   provider: DiscoveredProvider,
-  cwd: string
+  cwd: string,
+  includeCapabilities = true
 ): NewSessionRequest {
-  void provider;
-  return { cwd, mcpServers: [] };
+  if (!includeCapabilities) return { cwd, mcpServers: [] };
+  const inherited = ["HOME", "PATH", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_RUNTIME_DIR",
+    ...(provider.id === "opencode" ? [] : ["OMAPILOT_SIGNAL_API_URL", "OMAPILOT_SIGNAL_NUMBER"])];
+  const env = inherited.flatMap((name) => {
+    const value = provider.agent.env[name];
+    return value === undefined ? [] : [{ name, value }];
+  });
+  env.push({
+    name: "OMAPILOT_CAPABILITY_ACP_SCOPE",
+    value: provider.id === "opencode" ? "connector-reads" : "host-reads"
+  });
+  return {
+    cwd,
+    mcpServers: [{
+      name: "OmaPilot personal capabilities (read only)",
+      command: fileURLToPath(new URL("../dist/capability-mcp.js", import.meta.url)),
+      args: [],
+      env
+    }]
+  };
 }
 
 export function modelConfiguration(options: SessionConfigOption[]): { configId?: string; current?: string; models: ModelOption[] } {

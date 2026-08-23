@@ -142,6 +142,11 @@ needed:
   exact installed apps and current Hyprland targets, then verify app focus or
   launch, window focus/move/resize/float/close, and workspace focus or monitor
   movement before reporting success.
+  The **Skills** settings tab also reports personal capability packs for Email,
+  Calendar, Files, Projects, Messages, and Meetings. Ready packs add typed tools
+  for HEY, one configured files root, the official Basecamp CLI, a private
+  loopback Signal bridge, and validated Zoom links. Bundled domain skills teach
+  the agent when to use those tools and how to treat app content as untrusted.
   Pi's read, grep, find, and list tools may read files available to the current
   user. Bash, edit, and write require review unless an exact session or durable
   grant already exists. Executable Pi extensions are not loaded.
@@ -151,6 +156,9 @@ needed:
   requesting network or broader device authority pauses behind a card showing
   the adapter-normalized command, working directory, and every provider-native
   once, session, durable, or rejection choice supplied by the adapter.
+  OmaPilot also attaches a fixed local MCP server containing only the capability
+  registry and the packs' bounded read operations. It does not expose sends,
+  file opens, or meeting launches to ACP.
 - **OpenCode ACP** may load installed skills and use its positively identified web
   search tool automatically. Its native `bash` permission is fixed to `ask`;
   the broker accepts execution only after the exact command receives a
@@ -158,7 +166,7 @@ needed:
 
 Every supported permission decision is bound to a provider option. Native Pi
 session and durable grants match only the exact reviewed request and working
-directory. Oversized or visually ambiguous requests, arbitrary MCP,
+directory. Oversized or visually ambiguous requests, arbitrary provider-supplied MCP,
 browser/computer control, unclassified tools, and uninspectable targets remain
 blocked. OmaPilot removes its per-turn working directory afterward. Raw tool
 requests, decisions, inputs, and outputs are not stored in chat history; a
@@ -184,6 +192,33 @@ prefer the system default browser for authorized navigation; and use available
 web search for current or otherwise unknown information. These instructions
 shape how a harness chooses among capabilities but cannot enable a capability
 or bypass the provider policy and approval boundary above.
+
+## Personal capability packs
+
+Open **Settings → Skills** to see connector readiness, enable or disable a pack,
+refresh status, and choose the one folder Files may inspect. Pack configuration
+is broker-owned and validated; missing applications, authentication, and pairing
+are reported as setup states rather than installed or changed automatically.
+
+The built-in defaults are:
+
+- Email and Calendar through authenticated `hey-cli`;
+- Files inside one canonical local or synced folder, without following symlinks
+  outside that root;
+- Projects through the authenticated official `basecamp` CLI;
+- Messages through `signal-cli-rest-api` only when
+  `OMAPILOT_SIGNAL_API_URL` is an HTTP loopback origin and
+  `OMAPILOT_SIGNAL_NUMBER` is a linked E.164 number; and
+- Meetings through an exact HTTPS `zoom.us` URL opened with Omarchy.
+
+Read operations return bounded data marked as external and untrusted. Visible
+device actions use the normal exact approval. Email, HEY to-do, Basecamp, and
+Signal writes are stricter: they always require a fresh one-time review and are
+never covered by a session grant, durable grant, or Dangerous auto-approve.
+Codex receives the registry and bounded read-only pack tools through OmaPilot's
+bundled MCP server. OpenCode receives connector reads but no Files tools, which
+preserves its fixed no-host-reads policy. Mutations remain exclusive to the
+built-in Pi harness until ACP can preserve the same one-shot contract.
 
 ## Browser search handoff
 
@@ -259,6 +294,7 @@ invalid entries, and caps it at five.
 | Path | Purpose |
 | --- | --- |
 | `${XDG_STATE_HOME:-~/.local/state}/quickchat/` | Atomic local history and durable Pi conversation sessions |
+| `${XDG_CONFIG_HOME:-~/.config}/omapilot/capabilities.json` | Enabled packs and the canonical Files root (mode 0600) |
 | `${XDG_CACHE_HOME:-~/.cache}/quickchat/` | Bounded, validated image cache |
 | `${XDG_RUNTIME_DIR}/quickchat/` | Per-login sockets, temporary dictation, and in-flight data |
 

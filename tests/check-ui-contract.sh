@@ -107,12 +107,17 @@ if grep -Fq 'ButtonGroup {' "$repo_dir/components/Composer.qml"; then
   printf 'Composer must not expose a capability mode selector\n' >&2
   exit 1
 fi
-if grep -Fqi 'capability' "$repo_dir/components/Protocol.js" "$repo_dir/components/QuickchatStore.qml"; then
-  printf 'QML protocol and store must not expose capability helpers or fields\n' >&2
-  exit 1
-fi
-if grep -Fqi 'local_action' "$repo_dir/Panel.qml" "$repo_dir/components/Protocol.js" "$repo_dir/components/QuickchatStore.qml"; then
-  printf 'QML must not expose hardcoded local-action routing\n' >&2
+grep -Fq 'Protocol.hasFeature(event.features, "capability-packs")' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'sendCommand(Protocol.command("capability_set_enabled"' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'sendCommand(Protocol.command("capability_files_root_set"' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'visible: root.selectedTab === "skills"' \
+  "$repo_dir/components/SettingsView.qml"
+if grep -Eqi 'if .*local_action|local_action.*sendCommand' \
+    "$repo_dir/Panel.qml" "$repo_dir/components/QuickchatStore.qml"; then
+  printf 'QML must not hardcode local-action execution routing\n' >&2
   exit 1
 fi
 grep -Fq 'visible: !root.backend || root.backend.pendingPermission === null' \
@@ -448,6 +453,7 @@ fi
 grep -Fq 'instructions: [automaticInstructionPath()]' \
   "$repo_dir/runtime/src/providers.ts"
 grep -Fq 'runtime/policies/automatic.md' "$repo_dir/scripts/package-runtime.sh"
+grep -Fq 'runtime/dist/capability-mcp.js' "$repo_dir/scripts/package-runtime.sh"
 if grep -Fq 'Animation.Infinite' "$repo_dir/Panel.qml"; then
   printf 'Panel-owned transitions must remain finite\n' >&2
   exit 1
@@ -621,7 +627,7 @@ if grep -Eq "visual preview failed|Failed to load|Type .* unavailable|Cannot ass
   exit 1
 fi
 
-for preview_state in settings actions-settings history waiting streaming error error-details context; do
+for preview_state in settings skills-settings actions-settings history waiting streaming error error-details context; do
   preview_output="$repo_dir/screenshots/implementation-omapilot-$preview_state.png"
   OMAPILOT_PREVIEW_STATE="$preview_state" OMAPILOT_PREVIEW_PATH="$preview_output" \
     QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \

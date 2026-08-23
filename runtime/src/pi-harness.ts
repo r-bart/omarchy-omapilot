@@ -35,6 +35,13 @@ import {
   reviewDesktopToolInput
 } from "./tools/desktop.js";
 import { createWebHandoffTool, webHandoffApproval, webHandoffTitle } from "./tools/web-handoff.js";
+import {
+  capabilityReviewableInput,
+  capabilityToolRisk,
+  capabilityToolTitle,
+  createCapabilityRegistry,
+  type CapabilityRisk
+} from "./capabilities/index.js";
 
 export {
   createPersonalAssistantTools,
@@ -366,6 +373,7 @@ export function runPiQuestion(
       sessionApprovals.set(approvalStateKey, approvals);
     }
     const permissionExtension = createPermissionExtension(requestId, requestPermission, approvals, webHandoffProvider);
+    const capabilities = await createCapabilityRegistry(provider.agent.env);
     const loader = new DefaultResourceLoader({
       cwd: provider.cwd,
       agentDir: provider.agentDir,
@@ -393,8 +401,14 @@ export function runPiQuestion(
       resourceLoader: loader,
       sessionManager,
       settingsManager: settings,
-      tools: PI_TOOLS,
-      customTools: [agentTool, ...createDesktopTools(), createWebHandoffTool(webHandoffProvider), ...createPersonalAssistantTools()]
+      tools: [...PI_TOOLS, ...capabilities.tools.map((tool) => tool.name)],
+      customTools: [
+        agentTool,
+        ...createDesktopTools(),
+        createWebHandoffTool(webHandoffProvider),
+        ...createPersonalAssistantTools(),
+        ...capabilities.tools
+      ]
     });
     activeSession = session;
     let streamedText = "";
@@ -657,9 +671,20 @@ function createPermissionExtension(
         if (!requiresPiPermission(event.toolName)) return undefined;
         if (handler === undefined) return { block: true, reason: "OmaPilot did not provide a permission handler" };
         const rawInput = reviewableToolInput(event.toolName, event.input, webHandoffProvider);
+        const risk = capabilityToolRisk(event.toolName);
+        const oneShotOnly = oneShotCapabilityRisk(risk);
         const approvalKey = approvals.key(event.toolName, rawInput);
         if (approvals.denied(approvalKey)) return { block: true, reason: "This exact tool request is always denied" };
-        if (approvals.allowed(approvalKey)) return undefined;
+        if (!oneShotOnly && approvals.allowed(approvalKey)) return undefined;
+        const options: RequestPermissionRequest["options"] = [
+          { optionId: `allow-${event.toolCallId}`, name: "Allow once", kind: "allow_once" },
+          ...(!oneShotOnly ? [
+            { optionId: `session-${event.toolCallId}`, name: "Allow exact request for this session", kind: "allow_always" as const },
+            { optionId: `always-${event.toolCallId}`, name: "Always allow exact request", kind: "allow_always" as const }
+          ] : []),
+          { optionId: `reject-${event.toolCallId}`, name: "Deny", kind: "reject_once" },
+          { optionId: `reject-always-${event.toolCallId}`, name: "Always deny exact request", kind: "reject_always" }
+        ];
         const request: RequestPermissionRequest = {
           sessionId: requestId,
           toolCall: {
@@ -668,18 +693,12 @@ function createPermissionExtension(
             title: toolTitle(event.toolName, event.input, webHandoffProvider),
             rawInput
           },
-          options: [
-            { optionId: `allow-${event.toolCallId}`, name: "Allow once", kind: "allow_once" },
-            { optionId: `session-${event.toolCallId}`, name: "Allow exact request for this session", kind: "allow_always" },
-            { optionId: `always-${event.toolCallId}`, name: "Always allow exact request", kind: "allow_always" },
-            { optionId: `reject-${event.toolCallId}`, name: "Deny", kind: "reject_once" },
-            { optionId: `reject-always-${event.toolCallId}`, name: "Always deny exact request", kind: "reject_always" }
-          ]
+          options
         };
         const decision = await handler(request);
         const option = typeof decision === "string" ? decision : decision?.optionId;
-        if (option === `session-${event.toolCallId}`) approvals.allowSession(approvalKey);
-        if (option === `always-${event.toolCallId}`) approvals.allowAlways(approvalKey);
+        if (!oneShotOnly && option === `session-${event.toolCallId}`) approvals.allowSession(approvalKey);
+        if (!oneShotOnly && option === `always-${event.toolCallId}`) approvals.allowAlways(approvalKey);
         if (option === `reject-always-${event.toolCallId}`) approvals.denyAlways(approvalKey);
         return option === `allow-${event.toolCallId}` || option === `session-${event.toolCallId}` || option === `always-${event.toolCallId}`
           ? undefined : { block: true, reason: "The user denied this tool call" };
@@ -689,7 +708,11 @@ function createPermissionExtension(
 }
 
 export function requiresPiPermission(toolName: string): boolean {
-  return MUTATING_TOOLS.has(toolName);
+  return MUTATING_TOOLS.has(toolName) || capabilityToolRisk(toolName) !== undefined;
+}
+
+function oneShotCapabilityRisk(risk: CapabilityRisk | undefined): boolean {
+  return risk === "external_write" || risk === "destructive" || risk === "setup";
 }
 
 function reviewableToolInput(
@@ -697,6 +720,8 @@ function reviewableToolInput(
   input: Record<string, unknown>,
   webHandoffProvider: WebHandoffProvider
 ): Record<string, unknown> {
+  const capabilityInput = capabilityReviewableInput(name, input);
+  if (capabilityInput !== undefined) return capabilityInput;
   if (name === "bash") return { ...input, command: typeof input.command === "string" ? input.command : "" };
   if (name === "web_handoff") return webHandoffApproval(webHandoffProvider, input.query);
   if (name === "open_url") {
@@ -716,6 +741,8 @@ function reviewableToolInput(
 }
 
 function toolTitle(name: string, input: Record<string, unknown>, webHandoffProvider: WebHandoffProvider): string {
+  const capabilityTitle = capabilityToolTitle(name, input);
+  if (capabilityTitle !== undefined) return capabilityTitle;
   if (name === "bash") return "Run a command";
   if (name === "web_handoff") return webHandoffTitle(webHandoffProvider);
   if (name === "open_url") return "Open URL in default browser";

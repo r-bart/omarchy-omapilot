@@ -46,6 +46,11 @@ Item {
   // backend with neither property.
   readonly property var savedServers: backend && backend.customProviders
     ? backend.customProviders : []
+  readonly property var capabilities: backend && backend.capabilities
+    ? backend.capabilities : []
+  readonly property string capabilityError: backend && backend.capabilityError
+    ? String(backend.capabilityError) : ""
+  property string filesRootDraft: ""
   readonly property string brokerServerError: backend && backend.customProviderError
     ? String(backend.customProviderError) : ""
   readonly property bool browserCompanionConnected: backend ? backend.browserCompanionConnected === true : false
@@ -99,6 +104,9 @@ Item {
   signal dangerousAutoApproveRequested(bool enabled)
   signal desktopContextRequested(bool enabled)
   signal webHandoffProviderRequested(string provider)
+  signal capabilityEnabledRequested(string capabilityId, bool enabled)
+  signal capabilityFilesRootRequested(string path)
+  signal capabilitiesRefreshRequested()
   signal providerChanged(string provider)
   signal modelChanged(string provider, string model)
   signal quickActionsEdited(var actions)
@@ -169,10 +177,16 @@ Item {
     if (next !== "desktop") browserRemoveConfirmation = false
     if (next !== "actions" && quickActionEditor.adding) quickActionEditor.cancelAdding()
     selectedTab = next
+    if (next === "skills") filesRootDraft = Protocol.capabilityFilesRoot(capabilities)
   }
 
   Connections {
     target: root.backend
+
+    function onCapabilitiesChanged() {
+      if (!filesRootField.activeFocus)
+        root.filesRootDraft = Protocol.capabilityFilesRoot(root.capabilities)
+    }
 
     function onCustomProviderSavedChanged() {
       var saved = root.backend ? root.backend.customProviderSaved : null
@@ -594,6 +608,199 @@ Item {
 
               Item { Layout.fillWidth: true }
             }
+          }
+        }
+      }
+
+      Flickable {
+        id: skillsScroll
+        anchors.fill: parent
+        visible: root.selectedTab === "skills"
+        contentWidth: width
+        contentHeight: skillsContent.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
+
+        ColumnLayout {
+          id: skillsContent
+          width: skillsScroll.width
+          spacing: Style.spacing.lg
+
+          Text {
+            Layout.fillWidth: true
+            text: "Personal capability packs give the agent typed, bounded ways to work with your apps. Reading is automatic; sends and device actions still require review."
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.Wrap
+          }
+
+          Text {
+            Layout.fillWidth: true
+            visible: !root.backend || root.backend.brokerCapabilityPacksSupported !== true
+            text: "Capability packs require an updated OmaPilot runtime."
+            color: Color.urgent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.Wrap
+          }
+
+          Repeater {
+            model: root.capabilities
+
+            ColumnLayout {
+              required property var modelData
+              Layout.fillWidth: true
+              spacing: Style.spacing.sm
+
+              RowLayout {
+                Layout.fillWidth: true
+                spacing: Style.spacing.md
+
+                Rectangle {
+                  Layout.preferredWidth: 2
+                  Layout.preferredHeight: Style.space(36)
+                  radius: 1
+                  color: modelData.state === "ready" ? root.accent
+                    : (modelData.state === "degraded" ? Color.urgent : Qt.darker(root.foreground, 1.8))
+                }
+
+                ColumnLayout {
+                  Layout.fillWidth: true
+                  spacing: 0
+
+                  Text {
+                    Layout.fillWidth: true
+                    text: modelData.label + "  ·  " + modelData.connector
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    font.bold: true
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    Layout.fillWidth: true
+                    text: modelData.status
+                    color: modelData.state === "ready" ? Qt.darker(root.foreground, 1.45)
+                      : (modelData.state === "degraded" ? Color.urgent : root.accent)
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    wrapMode: Text.Wrap
+                  }
+                }
+
+                Toggle {
+                  label: modelData.enabled ? "On" : "Off"
+                  description: ""
+                  checked: modelData.enabled
+                  enabled: root.backend && root.backend.brokerCapabilityPacksSupported === true
+                  foreground: root.foreground
+                  accent: root.accent
+                  fontFamily: root.fontFamily
+                  Accessible.name: modelData.label + " capability"
+                  onClicked: root.capabilityEnabledRequested(modelData.id, !modelData.enabled)
+                }
+              }
+
+              Text {
+                Layout.fillWidth: true
+                text: modelData.description
+                color: root.mutedForeground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                wrapMode: Text.Wrap
+              }
+
+              Text {
+                Layout.fillWidth: true
+                text: Protocol.capabilityOperationsLabel(modelData)
+                color: Qt.darker(root.foreground, 1.55)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                wrapMode: Text.Wrap
+              }
+
+              Text {
+                Layout.fillWidth: true
+                visible: modelData.setupHint !== "" && modelData.state !== "disabled"
+                text: modelData.setupHint
+                color: root.accent
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                wrapMode: Text.Wrap
+              }
+            }
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Files root"
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Choose one specific local or synced folder. OmaPilot will not follow links outside it. Leave blank to disconnect Files."
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.Wrap
+          }
+
+          RowLayout {
+            Layout.fillWidth: true
+            spacing: Style.spacing.md
+
+            TextField {
+              id: filesRootField
+              Layout.fillWidth: true
+              placeholderText: "/home/you/Dropbox"
+              maximumLength: 4096
+              text: root.filesRootDraft
+              enabled: root.backend && root.backend.brokerCapabilityPacksSupported === true
+              foreground: root.foreground
+              accent: root.accent
+              Accessible.name: "Files capability root"
+              onTextEdited: root.filesRootDraft = text
+              onAccepted: root.capabilityFilesRootRequested(root.filesRootDraft)
+            }
+
+            Button {
+              text: "Save"
+              foreground: root.foreground
+              background: root.background
+              accent: root.accent
+              active: true
+              bordered: true
+              focusable: true
+              enabled: root.backend && root.backend.brokerCapabilityPacksSupported === true
+              onClicked: root.capabilityFilesRootRequested(root.filesRootDraft)
+            }
+          }
+
+          Text {
+            Layout.fillWidth: true
+            visible: root.capabilityError !== ""
+            text: root.capabilityError
+            color: Color.urgent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.Wrap
+          }
+
+          Button {
+            text: "Refresh connector status"
+            foreground: root.foreground
+            background: root.background
+            bordered: true
+            focusable: true
+            enabled: root.backend && root.backend.brokerCapabilityPacksSupported === true
+            onClicked: root.capabilitiesRefreshRequested()
           }
         }
       }

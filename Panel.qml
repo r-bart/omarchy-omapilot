@@ -908,6 +908,13 @@ Panel {
         onWebHandoffProviderRequested: function(provider) {
           root.persistSettings({ webHandoffProvider: Protocol.normalizedWebHandoffProvider(provider) || "duckduckgo" })
         }
+        onCapabilityEnabledRequested: function(capabilityId, enabled) {
+          Quickchat.QuickchatStore.setCapabilityEnabled(capabilityId, enabled)
+        }
+        onCapabilityFilesRootRequested: function(path) {
+          Quickchat.QuickchatStore.setCapabilityFilesRoot(path)
+        }
+        onCapabilitiesRefreshRequested: Quickchat.QuickchatStore.requestCapabilities()
         onProviderChanged: function(provider) { root.selectProvider(provider) }
         onModelChanged: function(provider, model) {
           var values = {}; values[root.providerModelKey(provider)] = model; root.persistSettings(values)

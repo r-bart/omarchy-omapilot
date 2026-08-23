@@ -96,6 +96,40 @@ ShellRoot {
     })
     property bool browserCompanionConnected: false
     property bool browserCompanionBusy: false
+    property bool brokerCapabilityPacksSupported: true
+    property string capabilityError: ""
+    property var capabilities: [
+      { id: "email", label: "Email", connector: "HEY", state: "ready", status: "Authenticated with HEY",
+        enabled: true, description: "Read, search, and send email.", setupHint: "", operations: [
+          { id: "search", label: "Search mail", risk: "inspect", available: true },
+          { id: "send", label: "Send or reply", risk: "external_write", available: true }
+        ] },
+      { id: "calendar", label: "Calendar", connector: "HEY", state: "ready", status: "Authenticated with HEY",
+        enabled: true, description: "Review events and manage personal to-dos.", setupHint: "", operations: [
+          { id: "events", label: "Read events", risk: "inspect", available: true },
+          { id: "todo_list", label: "Read to-dos", risk: "inspect", available: true },
+          { id: "todo_create", label: "Create a to-do", risk: "external_write", available: true }
+        ] },
+      { id: "files", label: "Files", connector: "Local folder", state: "needs_configuration",
+        status: "Choose a specific local or synced folder", enabled: true,
+        description: "Work inside one explicitly selected folder.",
+        setupHint: "Select a Dropbox folder or another bounded files root.", filesRoot: "", operations: [
+          { id: "read", label: "Read text files", risk: "inspect", available: false },
+          { id: "open", label: "Open a file", risk: "local_action", available: false }
+        ] },
+      { id: "projects", label: "Projects", connector: "Basecamp", state: "missing_connector",
+        status: "Basecamp CLI is not installed", enabled: true, description: "Search and update Basecamp work.",
+        setupHint: "Install the official basecamp-cli package, then run basecamp auth login.", operations: [] },
+      { id: "messages", label: "Messages", connector: "Signal", state: "needs_setup",
+        status: "Signal Desktop is not an automation connector", enabled: true,
+        description: "Send Signal messages through a private bridge.",
+        setupHint: "Pair a private signal-cli-rest-api service as a linked device.", operations: [] },
+      { id: "meetings", label: "Meetings", connector: "Zoom", state: "ready",
+        status: "Zoom links use the configured Omarchy handler", enabled: true,
+        description: "Find and join Zoom meetings.", setupHint: "", operations: [
+          { id: "join", label: "Join a Zoom meeting", risk: "local_action", available: true }
+        ] }
+    ]
     property var builtinAuth: ({ phase: "idle", flowId: "", methodId: "", message: "",
       url: "", verificationUri: "", userCode: "", prompt: null })
     property bool builtinAuthBusy: false
@@ -129,12 +163,15 @@ ShellRoot {
       if (contextAttachments.length > 0) contextAttachments[0].selectedRepresentationIds = String(mode).split("+")
     }
     function removeContextAttachment(id) { contextAttachments = [] }
+    function setCapabilityEnabled(id, enabled) {}
+    function setCapabilityFilesRoot(path) {}
+    function requestCapabilities() {}
   }
 
   Window {
     id: previewWindow
     width: 860
-    height: root.previewState === "settings" || root.previewState === "dangerous-settings"
+    height: root.previewState === "settings" || root.previewState === "skills-settings" || root.previewState === "dangerous-settings"
       || root.previewState === "actions-settings" || root.previewState === "history" ? 760
       : (root.previewState === "error-details" ? 520 : (root.previewState === "context" ? 430 : 320))
     visible: true
@@ -193,6 +230,7 @@ ShellRoot {
       OmaPilot.SettingsView {
         id: settingsView
         visible: root.previewState === "settings"
+          || root.previewState === "skills-settings"
           || root.previewState === "dangerous-settings"
           || root.previewState === "actions-settings"
         anchors.fill: parent
@@ -202,7 +240,9 @@ ShellRoot {
         anchors.bottomMargin: previewSurface.contentBottomInset + Style.spacing.popupPadding
         backend: backend
         selectedTab: root.previewState === "dangerous-settings" ? "desktop"
+          : (root.previewState === "skills-settings" ? "skills"
           : (root.previewState === "actions-settings" ? "actions" : "agent")
+          )
         dangerousAutoApprove: root.previewState === "dangerous-settings"
         desktopContextEnabled: true
         voiceEnabled: false
@@ -357,6 +397,7 @@ ShellRoot {
         && (header.implicitHeight <= 0 || composer.implicitHeight <= 0
           || actions.implicitHeight <= 0)
       var invalidSettings = (root.previewState === "settings"
+          || root.previewState === "skills-settings"
           || root.previewState === "dangerous-settings"
           || root.previewState === "actions-settings")
         && settingsView.implicitHeight <= 0

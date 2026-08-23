@@ -379,6 +379,64 @@ function hasFeature(features, feature) {
   return values.indexOf(String(feature || "")) >= 0
 }
 
+function normalizedCapabilities(raw) {
+  var source = Array.isArray(raw) ? raw : []
+  var validIds = ["email", "calendar", "files", "projects", "messages", "meetings"]
+  var validStates = ["ready", "needs_configuration", "missing_connector", "needs_setup", "degraded", "disabled"]
+  var validRisks = ["inspect", "prepare", "local_action", "external_write", "destructive", "setup"]
+  var result = []
+  var seen = {}
+  for (var i = 0; i < source.length && result.length < validIds.length; i++) {
+    var item = source[i] && typeof source[i] === "object" ? source[i] : {}
+    var id = String(item.id || "")
+    if (validIds.indexOf(id) < 0 || seen[id]) continue
+    var state = String(item.state || "degraded")
+    if (validStates.indexOf(state) < 0) state = "degraded"
+    var rawOperations = Array.isArray(item.operations) ? item.operations : []
+    var operations = []
+    for (var j = 0; j < rawOperations.length && operations.length < 16; j++) {
+      var operation = rawOperations[j] && typeof rawOperations[j] === "object" ? rawOperations[j] : {}
+      var risk = String(operation.risk || "inspect")
+      if (validRisks.indexOf(risk) < 0) risk = "inspect"
+      var operationId = safeContextText(operation.id, 80)
+      if (operationId === "") continue
+      operations.push({ id: operationId,
+        label: safeContextText(operation.label, 120) || operationId,
+        risk: risk,
+        available: operation.available === true })
+    }
+    var configuration = item.configuration && typeof item.configuration === "object" ? item.configuration : {}
+    seen[id] = true
+    result.push({
+      id: id,
+      label: safeContextText(item.label, 80) || id,
+      description: safeContextText(item.description, 240),
+      connector: safeContextText(item.connector, 80),
+      state: state,
+      status: safeContextText(item.status, 240),
+      enabled: item.enabled !== false,
+      operations: operations,
+      filesRoot: safeContextText(configuration.filesRoot, 4096),
+      setupHint: safeContextText(item.setupHint, 300)
+    })
+  }
+  return result
+}
+
+function capabilityFilesRoot(capabilities) {
+  var rows = Array.isArray(capabilities) ? capabilities : []
+  for (var i = 0; i < rows.length; i++)
+    if (String(rows[i] && rows[i].id || "") === "files") return String(rows[i].filesRoot || "")
+  return ""
+}
+
+function capabilityOperationsLabel(capability) {
+  var operations = capability && Array.isArray(capability.operations) ? capability.operations : []
+  var labels = []
+  for (var i = 0; i < operations.length; i++) labels.push(String(operations[i].label || ""))
+  return labels.filter(function(value) { return value !== "" }).join("  ·  ")
+}
+
 function parseLine(line) {
   try {
     var value = JSON.parse(String(line || ""))

@@ -26,6 +26,12 @@ import {
   uninstallBrowserCompanion,
   type BrowserFamily
 } from "./browser-companion-setup.js";
+import {
+  CapabilityConfigError,
+  discoverCapabilitySnapshot,
+  setCapabilityEnabled,
+  setFilesRoot
+} from "./capabilities/index.js";
 
 type DictationClient = Pick<DictationService, "start" | "stop" | "cancel">;
 type SessionCleaner = (provider: DiscoveredProvider, sessionId: string) => Promise<boolean>;
@@ -111,6 +117,9 @@ export class QuickchatBroker {
       case "browser_companion_install": await this.#installBrowserCompanion(); break;
       case "browser_companion_uninstall": await this.#uninstallBrowserCompanion(); break;
       case "browser_companion_open_settings": await this.#openBrowserCompanionSettings(command.family); break;
+      case "capabilities_list": await this.#emitCapabilities(); break;
+      case "capability_set_enabled": await this.#setCapabilityEnabled(command.id, command.enabled); break;
+      case "capability_files_root_set": await this.#setCapabilityFilesRoot(command.path); break;
       case "auth_begin": this.#beginAuth(command.methodId); break;
       case "auth_response": this.#respondAuth(command); break;
       case "auth_cancel": this.#cancelAuth(command.flowId); break;
@@ -181,7 +190,8 @@ export class QuickchatBroker {
     }));
     this.#providers = new Map(discovered.map((provider) => [provider.id, provider]));
     const history = (await this.#history.list()).map((chat) => presentChat(chat));
-    this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context", "context-attachments", "voice"], providers: discovered.map(publicProvider), history });
+    this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context", "context-attachments", "voice", "capability-packs"], providers: discovered.map(publicProvider), history });
+    await this.#emitCapabilities();
     if (command.harness === "builtin") this.#emit({ type: "auth_methods", methods: authMethods });
   }
 
@@ -508,7 +518,8 @@ export class QuickchatBroker {
     const permissionId = randomUUID();
     const pending = normalizeToolPermission(requestId, permissionId, provider, request);
     if (pending === undefined) return { invalid: true };
-    if (dangerousAutoApprove) {
+    if (dangerousAutoApprove && pending.view.risk !== "external_write"
+      && pending.view.risk !== "destructive" && pending.view.risk !== "setup") {
       const choice = pending.view.options.find((option) => option.decision === "allow_once");
       const optionId = choice === undefined ? undefined : pending.optionIds[choice.id];
       return optionId === undefined ? { invalid: true } : { optionId };
@@ -523,6 +534,37 @@ export class QuickchatBroker {
       this.#permissions.set(permissionId, { ...pending, resolve: resolvePermission, timeout });
       this.#emit({ type: "permission", permission: pending.view });
     });
+  }
+
+  async #emitCapabilities(): Promise<void> {
+    const snapshot = await discoverCapabilitySnapshot(this.#env);
+    this.#emit({ type: "capabilities", capabilities: snapshot.views });
+  }
+
+  async #setCapabilityEnabled(id: Extract<BrokerCommand, { type: "capability_set_enabled" }>["id"], enabled: boolean): Promise<void> {
+    try {
+      setCapabilityEnabled(id, enabled, this.#env);
+      await this.#emitCapabilities();
+    } catch (error) {
+      this.#capabilityError(error);
+    }
+  }
+
+  async #setCapabilityFilesRoot(path: string): Promise<void> {
+    try {
+      setFilesRoot(path, this.#env);
+      await this.#emitCapabilities();
+    } catch (error) {
+      this.#capabilityError(error);
+    }
+  }
+
+  #capabilityError(error: unknown): void {
+    if (error instanceof CapabilityConfigError) {
+      this.#error(error.code, error.message, false);
+      return;
+    }
+    this.#error("capability_update_failed", "The capability setting could not be updated", true);
   }
 
   #respondPermission(command: Extract<BrokerCommand, { type: "permission_response" }>): void {
