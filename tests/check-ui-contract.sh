@@ -53,6 +53,12 @@ grep -Fq 'Qt.resolvedUrl("../runtime/bin/omapilot-broker")' \
   "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'Quickshell.env("OMAPILOT_BROKER_PATH") || bundledBrokerPath' \
   "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'Qt.resolvedUrl("../scripts/install-hotkeys.sh")' \
+  "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'command: [root.hotkeyInstallerPath, "--once", "--installed-plugin-only"]' \
+  "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq -- '-- BEGIN OmaPilot managed hotkeys' \
+  "$repo_dir/scripts/install-hotkeys.sh"
 grep -Fq 'property string configuredProvider: "builtin"' \
   "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'harness: provider' "$repo_dir/components/OmaPilotStore.qml"
@@ -497,11 +503,12 @@ grep -Fq 'continuationProvider = currentChatId !== "" ? historicalProvider : ""'
 grep -Fq 'Protocol.historyContinuationBlocked(' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'if (!providerReady || continuationBlocked || busy) return false' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'if (!OmaPilot.OmaPilotStore.submit(spoken))' "$repo_dir/Ambient.qml"
-# The Voxtype OSD switch is the one place OmaPilot writes another tool's config.
-# It must stay a single-key, comment-preserving, backed-up, user-initiated edit,
-# and the exception must stay documented.
+# The broker's Voxtype OSD switch is a separate config-write boundary from the
+# first-load hotkey helper. It must stay a single-key, comment-preserving,
+# backed-up, user-initiated edit, and the exception must stay documented.
 grep -Fq '.omapilot.bak' "$repo_dir/runtime/src/voxtype-osd.ts"
-grep -Fq 'One narrowly scoped exception exists for Voxtype' "$repo_dir/docs/architecture.md"
+grep -Fq 'One separate, narrowly scoped exception exists for Voxtype' \
+  "$repo_dir/docs/architecture.md"
 if grep -Eq 'writeFileSync\(configPath' "$repo_dir/runtime/src/voxtype-osd.ts"; then
   printf 'Voxtype config must be replaced atomically, not written in place\n' >&2
   exit 1

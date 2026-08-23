@@ -19,6 +19,8 @@ jobs:
           cache: npm
       - name: Check manifest contract
         run: ./scripts/check-manifest.sh
+      - name: Check first-run hotkey installation
+        run: ./tests/test-hotkey-installer.sh
       - name: Validate with pinned Omarchy Quattro
         env:
           OMARCHY_QUATTRO_COMMIT: ef6d9e6605b121df15bf310e630e04f0c1119fc8

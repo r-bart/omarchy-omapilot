@@ -16,7 +16,13 @@ The widget follows the current Quattro host contract:
   routes panel actions through Quattro's focused-monitor bar-widget resolver;
   ownership follows the host's reassigned module list across monitor changes.
 
-OmaPilot does not edit `shell.json`, Omarchy sources, Hyprland configuration, or Herdr configuration directly.
+OmaPilot does not edit `shell.json`, Omarchy sources, or Herdr configuration.
+Because Omarchy intentionally exposes no plugin install hook, the first loaded
+installed copy runs a repository-owned helper that appends one marked block to
+`~/.config/hypr/bindings.lua`. The helper runs only once, skips chords already
+defined in the user file, validates the generated Lua when `luac` is available,
+reloads Hyprland, and can remove only its own block. Preview and development
+paths fail closed without touching the desktop configuration.
 
 Voice is opt-in from Settings after install. Widget settings store only
 `voiceEnabled`, `ttsProvider`, `ttsModel`, and `ttsVoice`. Cloud TTS keys live
@@ -26,9 +32,9 @@ are probed with the supplied key before that key is saved. After a Super+A
 voice turn completes, the broker speaks the answer with the selected TTS
 provider and plays it locally. Dictation still uses Voxtype.
 
-One narrowly scoped exception exists for Voxtype. Its floating OSD renders its
-own waveform at the bottom centre of the focused output — the same place the
-voice node occupies — and two indicators for one state is worse than either.
+One separate, narrowly scoped exception exists for Voxtype. Its floating OSD
+renders its own waveform at the bottom centre of the focused output — the same
+place the voice node occupies — and two indicators for one state is worse than either.
 Voxtype documents a master switch for it, and its own `voxtype config set`
 supports only `engine`, so the value cannot be delegated. Settings therefore
 offers an explicit toggle that writes `[osd] enabled` in

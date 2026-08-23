@@ -8,6 +8,14 @@ Security fixes are provided for the current OmaPilot release.
 
 Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. Review OmaPilot before enabling it. OmaPilot minimizes that authority by delegating provider traffic to a separate broker process and starting each agent with one provider-specific, fail-closed automatic policy.
 
+- On the first load from Omarchy's installed plugin directory, a one-time
+  helper appends a visibly marked hotkey block to the user's Hyprland
+  `bindings.lua`. It refuses preview and development paths, serializes concurrent
+  attempts, preserves chords directly defined in the user file, validates
+  generated Lua when `luac` is available, and has a removal mode limited to its own markers.
+  A state marker prevents later shell starts from silently restoring shortcuts
+  the user changed or removed.
+
 - The embedded Pi harness loads declarative skills, context files, and named
   agent profiles from the standard `~/.agents` roots. It does not
   auto-load executable Pi extensions. Read, grep, find, and list tools use the

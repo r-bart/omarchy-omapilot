@@ -22,6 +22,14 @@ Scope {
     return url
   }
   readonly property string brokerPath: Quickshell.env("OMAPILOT_BROKER_PATH") || bundledBrokerPath
+  readonly property string hotkeyInstallerPath: {
+    var url = String(Qt.resolvedUrl("../scripts/install-hotkeys.sh"))
+    if (url.indexOf("file://") === 0) {
+      try { return decodeURIComponent(url.slice("file://".length)) }
+      catch (error) { return url.slice("file://".length) }
+    }
+    return url
+  }
   property string state: "preparing"
   property string statusMessage: "Starting OmaPilot…"
   property string currentId: ""
@@ -1097,6 +1105,27 @@ Scope {
     function continueInHerdr() { root.continueInHerdr() }
     function history() { root.routeIpc("history") }
     function settings() { root.routeIpc("settings") }
+  }
+
+  // Omarchy intentionally has no plugin install hooks. The first real plugin
+  // load is therefore the only reliable place to add compositor bindings. The
+  // helper refuses development/preview paths, records its one-time attempt,
+  // preserves user-defined collisions, and owns only its marked block.
+  Process {
+    id: hotkeyInstaller
+    command: [root.hotkeyInstallerPath, "--once", "--installed-plugin-only"]
+    running: true
+
+    onExited: function(exitCode, exitStatus) {
+      if (exitCode !== 0)
+        console.warn("omapilot: automatic hotkey installation failed with exit code " + exitCode)
+    }
+
+    stderr: SplitParser {
+      onRead: function(line) {
+        if (String(line || "").trim() !== "") console.warn("omapilot: " + line)
+      }
+    }
   }
 
   Process {
