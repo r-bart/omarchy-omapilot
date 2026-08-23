@@ -36,7 +36,7 @@ else
   printf 'validate: package.json unavailable; skipping broker checks\n' >&2
 fi
 
-stage_parent=$(mktemp -d "${TMPDIR:-/tmp}/quickchat-validate.XXXXXX")
+stage_parent=$(mktemp -d "${TMPDIR:-/tmp}/omapilot-validate.XXXXXX")
 trap 'rm -rf -- "$stage_parent"' EXIT
 stage="$stage_parent/plugin"
 mkdir -p "$stage"

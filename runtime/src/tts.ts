@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DictationService } from "./dictation.js";
-import { quickchatPaths } from "./paths.js";
+import { omapilotPaths } from "./paths.js";
 import { resolveExecutable, runBinaryCommand, runCommand, terminateProcessGroup } from "./process.js";
 
 export const ttsProviderIds = ["kokoro", "elevenlabs", "openai"] as const;
@@ -74,6 +74,11 @@ const KOKORO_VOICES: VoiceOption[] = [
   { id: "bf_isabella", name: "Isabella (British female)" },
   { id: "bm_george", name: "George (British male)" },
   { id: "bm_fable", name: "Fable (British male)" }
+];
+const KOKORO_RUNTIME_IMPORTS = [
+  "import numpy as np",
+  "import soundfile as sf",
+  "from kokoro import KPipeline"
 ];
 
 const OPENAI_MODELS: TtsModelOption[] = [
@@ -150,7 +155,7 @@ function text(value: unknown): string {
 function voiceConfigDirectory(env: NodeJS.ProcessEnv): string {
   const explicit = env.OMAPILOT_CONFIG_DIR?.trim();
   if (explicit !== undefined && explicit.startsWith("/")) return explicit;
-  return quickchatPaths(env).config;
+  return omapilotPaths(env).config;
 }
 
 function authPath(env: NodeJS.ProcessEnv): string {
@@ -262,7 +267,7 @@ export class VoiceService {
     this.#env = env;
     this.#fetch = options.fetch ?? fetch;
     this.#dictationAvailable = options.dictationAvailable
-      ?? (() => new DictationService(quickchatPaths(env), env).available());
+      ?? (() => new DictationService(omapilotPaths(env), env).available());
     this.#kokoroAvailable = options.kokoroAvailable ?? (() => probeKokoro(env));
     this.#analyzeAudio = options.analyzeAudio ?? ((path, signal) => analyzeAudioFile(path, env, signal));
     this.#playAudio = options.playAudio
@@ -455,7 +460,7 @@ export class VoiceService {
 async function probeKokoro(env: NodeJS.ProcessEnv): Promise<boolean> {
   const python = await resolveExecutable("python3", env);
   if (python === undefined) return false;
-  const result = await runCommand(python, ["-c", "import kokoro"], {
+  const result = await runCommand(python, ["-c", KOKORO_RUNTIME_IMPORTS.join("\n")], {
     env,
     timeoutMs: KOKORO_TIMEOUT_MS,
     maxOutput: 4_096
@@ -731,9 +736,7 @@ async function synthesizeOpenAi(
 const KOKORO_SPEAK_SCRIPT = [
   "import sys",
   "from pathlib import Path",
-  "import numpy as np",
-  "import soundfile as sf",
-  "from kokoro import KPipeline",
+  ...KOKORO_RUNTIME_IMPORTS,
   "voice, wav_path, text_path = sys.argv[1], sys.argv[2], sys.argv[3]",
   "text = Path(text_path).read_text(encoding='utf-8')",
   "pipeline = KPipeline(lang_code='a')",

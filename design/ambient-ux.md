@@ -143,9 +143,9 @@ o.bind("SUPER + SHIFT + A", "New OmaPilot voice chat",
   "omarchy-shell -q io.github.spencerbull.omapilot newVoiceChat")
 
 o.bind("SUPER + ALT + N", "New OmaPilot chat",
-  "omarchy-shell -q io.github.spencerbull.quickchat newChat")
+  "omarchy-shell -q io.github.spencerbull.omapilot newChat")
 o.bind("SUPER + ALT + H", "Continue OmaPilot chat in Herdr",
-  "omarchy-shell -q io.github.spencerbull.quickchat continueInHerdr")
+  "omarchy-shell -q io.github.spencerbull.omapilot continueInHerdr")
 ```
 
 The answer timer, explicit dismissal, and cancellation close the voice lease

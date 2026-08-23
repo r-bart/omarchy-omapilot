@@ -14,14 +14,14 @@ Scope {
 
   readonly property int protocolVersion: Protocol.protocolVersion
   readonly property string bundledBrokerPath: {
-    var url = String(Qt.resolvedUrl("../runtime/bin/quickchat-broker"))
+    var url = String(Qt.resolvedUrl("../runtime/bin/omapilot-broker"))
     if (url.indexOf("file://") === 0) {
       try { return decodeURIComponent(url.slice("file://".length)) }
       catch (error) { return url.slice("file://".length) }
     }
     return url
   }
-  readonly property string brokerPath: Quickshell.env("QUICKCHAT_BROKER_PATH") || bundledBrokerPath
+  readonly property string brokerPath: Quickshell.env("OMAPILOT_BROKER_PATH") || bundledBrokerPath
   property string state: "preparing"
   property string statusMessage: "Starting OmaPilot…"
   property string currentId: ""
@@ -128,6 +128,7 @@ Scope {
   signal ipcSettingsRequested()
   signal contextOverlayRequested(string payload)
   signal contextBrowserPickerRequested()
+  signal ttsSpoken()
   signal contextAttachmentAdded()
 
   function routeIpc(method) {
@@ -236,7 +237,7 @@ Scope {
     sendCommand(Protocol.command("initialize", {
       protocolVersion: protocolVersion,
       harness: provider,
-      client: "omarchy-quickchat"
+      client: "omarchy-omapilot"
     }))
   }
 
@@ -780,6 +781,11 @@ Scope {
     }
     if (type === "tts_spoken") {
       if (ttsSpeakId === "" || String(event.id || "") !== ttsSpeakId) return
+      // Emit the successful terminal outcome before lowering ttsSpeaking so
+      // ambient dismissal starts with the short spoken-answer delay. Explicit
+      // stops clear ttsSpeakId before their broker acknowledgement arrives and
+      // therefore cannot masquerade as completed playback here.
+      ttsSpoken()
       ttsSpeaking = false
       ttsPlaybackActive = false
       ttsPlaybackMetered = false
@@ -1058,7 +1064,7 @@ Scope {
     if (type === "herdr") {
       if (pendingHerdrChatId === "" || String(event.chatId || "") !== pendingHerdrChatId) return
       var outcome = Protocol.herdrOutcome(event)
-      if (!outcome) { console.warn("quickchat: unknown Herdr state " + String(event.state || "")); return }
+      if (!outcome) { console.warn("omapilot: unknown Herdr state " + String(event.state || "")); return }
       if (String(event.state || "") !== "opening") pendingHerdrChatId = ""
       state = outcome.state
       statusMessage = outcome.message
@@ -1081,7 +1087,7 @@ Scope {
   }
 
   IpcHandler {
-    target: "io.github.spencerbull.quickchat"
+    target: "io.github.spencerbull.omapilot"
     function open() { root.routeIpc("open") }
     function close() { root.routeIpc("close") }
     function show() { root.routeIpc("show") }
@@ -1132,7 +1138,7 @@ Scope {
       onRead: function(line) {
         var event = Protocol.parseLine(line)
         if (event) root.applyEvent(event)
-        else if (String(line || "").trim() !== "") console.warn("quickchat: invalid broker event")
+        else if (String(line || "").trim() !== "") console.warn("omapilot: invalid broker event")
       }
     }
 

@@ -344,7 +344,7 @@ describe("native Pi harness", () => {
       expect(JSON.stringify(requests[0])).toContain('"window_action"');
       expect(JSON.stringify(requests[0])).toContain('"workspace_action"');
       expect(authorizationHeaders).toEqual([undefined, undefined]);
-      const sessionDir = join(root, ".local/state/quickchat/pi-sessions");
+      const sessionDir = join(root, ".local/state/omapilot/pi-sessions");
       const sessionFiles = await readdir(sessionDir);
       expect(sessionFiles).toHaveLength(1);
       expect(await readFile(join(sessionDir, sessionFiles[0] ?? "missing"), "utf8")).toContain("What did I ask?");
@@ -398,7 +398,7 @@ describe("native Pi harness", () => {
       const [provider] = await discoverPiProviders({ HOME: root, OMAPILOT_CONFIG_DIR: agentDir });
       if (provider === undefined) throw new Error("compatible provider was not discovered");
       const first = await runPiQuestion(provider, "prior", "First", "local::coder", () => undefined, 5_000).result;
-      const sessionDir = join(root, ".local/state/quickchat/pi-sessions");
+      const sessionDir = join(root, ".local/state/omapilot/pi-sessions");
       const [sessionName] = await readdir(sessionDir);
       if (sessionName === undefined) throw new Error("Pi session was not persisted");
       const sessionPath = join(sessionDir, sessionName);
@@ -598,12 +598,12 @@ describe("native Pi harness", () => {
         baseUrl: `http://127.0.0.1:${String(address.port)}/v1`, api: "openai-completions", apiKey: "test",
         models: [{ id: "coder", name: "Coder" }]
       } } }));
-      const running = spawn(resolve("runtime/bin/quickchat-broker"), [], {
+      const running = spawn(resolve("runtime/bin/omapilot-broker"), [], {
         env: {
           ...process.env,
           HOME: root,
           OMAPILOT_CONFIG_DIR: agentDir,
-          QUICKCHAT_DEBUG_PI: "1",
+          OMAPILOT_DEBUG_PI: "1",
           XDG_STATE_HOME: join(root, "state"),
           XDG_CACHE_HOME: join(root, "cache"),
           XDG_RUNTIME_DIR: join(root, "run")

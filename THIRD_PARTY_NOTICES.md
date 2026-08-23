@@ -11,6 +11,6 @@ OmaPilot's source is MIT licensed. Release bundles include third-party software 
 The exact transitive dependency graph and declared licenses for each runtime
 archive are recorded in its generated CycloneDX `sbom.cdx.json`. The broker's
 complete embedded-payload license inventory is shipped as
-`runtime/dist/quickchat-broker.THIRD_PARTY_LICENSES.txt`; adapter notices are
+`runtime/dist/omapilot-broker.THIRD_PARTY_LICENSES.txt`; adapter notices are
 shipped beside the generated launcher. This notice is attribution, not a
 replacement for those license texts.

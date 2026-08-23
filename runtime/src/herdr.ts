@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import type { ChatRecord, ProviderId } from "./types.js";
-import { quickchatPaths } from "./paths.js";
+import { omapilotPaths } from "./paths.js";
 import { resolveExecutable, runCommand } from "./process.js";
 
 type HerdrCommand = { executable: string; args: string[] };
@@ -79,13 +79,13 @@ export function nativeResumeArgs(
   // Keep Codex interactive so any command outside its read-only sandbox still
   // requires the user's approval in Herdr.
   if (provider === "codex") return ["resume", sessionId, "-C", cwd, "-s", "read-only", "-a", "on-request"];
-  if (provider === "builtin") return ["--session", sessionId, "--session-dir", quickchatPaths(env).piSessions, "--approve"];
+  if (provider === "builtin") return ["--session", sessionId, "--session-dir", omapilotPaths(env).piSessions, "--approve"];
   return ["--pure", "--session", sessionId];
 }
 
 export function transcriptPrompt(chat: ChatRecord): string {
   return [
-    "Continue this Quickchat conversation. The prior session could not be attached natively, so this is a transcript handoff.",
+    "Continue this OmaPilot conversation. The prior session could not be attached natively, so this is a transcript handoff.",
     "",
     "## Question",
     chat.question,
@@ -128,7 +128,7 @@ export async function continueInHerdr(
   if (windowAddress === undefined)
     throw new HerdrHandoffError("launch", "window_not_mapped");
 
-  const agentName = `quickchat-${chat.id.slice(0, 8)}`;
+  const agentName = `omapilot-${chat.id.slice(0, 8)}`;
   const transcriptAgentName = `${agentName}-context`;
   const existingAgents = await run(commands.herdr, ["agent", "list"]);
   if (existingAgents.code !== 0)
@@ -291,9 +291,9 @@ async function createHandoffTarget(
   run: CommandRunner,
   createdTabs: string[]
 ): Promise<HerdrTarget> {
-  const existing = findQuickchatWorkspace(listResult);
+  const existing = findOmaPilotWorkspace(listResult);
   if (existing !== undefined) return createTabTarget(herdr, existing, cwd, title, run, createdTabs);
-  const created = await run(herdr, ["workspace", "create", "--cwd", cwd, "--label", "Quickchat", "--no-focus"]);
+  const created = await run(herdr, ["workspace", "create", "--cwd", cwd, "--label", "OmaPilot", "--no-focus"]);
   if (created.code !== 0)
     throw new HerdrHandoffError("workspace", herdrCliErrorCode(created) ?? "workspace_create_failed");
   const createdResult = parseResult(created.stdout);
@@ -361,7 +361,7 @@ async function prepareAgentPane(
   wait: Delay
 ): Promise<void> {
   if (provider !== "builtin") return;
-  const paths = quickchatPaths(env);
+  const paths = omapilotPaths(env);
   const configured = await run(herdr, [
     "pane", "run", paneId,
     `export PI_CODING_AGENT_DIR=${shellWord(paths.config)} PI_CODING_AGENT_SESSION_DIR=${shellWord(paths.piSessions)}`
@@ -427,11 +427,11 @@ function workspaceFromTab(tabId: string | undefined): string | undefined {
   return separator > 0 ? tabId.slice(0, separator) : undefined;
 }
 
-function findQuickchatWorkspace(result: unknown): string | undefined {
+function findOmaPilotWorkspace(result: unknown): string | undefined {
   const workspaces = nestedArray(result, "workspaces");
   if (workspaces === undefined) return undefined;
   for (const workspace of workspaces) {
-    if (objectString(workspace, "label")?.toLowerCase() === "quickchat") return objectString(workspace, "workspace_id");
+    if (objectString(workspace, "label")?.toLowerCase() === "omapilot") return objectString(workspace, "workspace_id");
   }
   return undefined;
 }
@@ -521,8 +521,8 @@ function herdrErrorMessage(stage: HerdrHandoffStage, errorCode: string): string 
   if (stage === "availability")
     return errorCode === "herdr_missing" ? "Herdr is not installed" : "Omarchy's Herdr launcher is unavailable";
   if (stage === "launch") return "Herdr could not be opened";
-  if (stage === "workspace") return "Herdr opened, but Quickchat could not prepare its workspace";
+  if (stage === "workspace") return "Herdr opened, but OmaPilot could not prepare its workspace";
   if (stage === "session") return "Herdr opened, but the selected harness session could not be continued";
   if (stage === "transcript") return "Herdr opened, but the transcript handoff could not be sent";
-  return "The session opened in Herdr, but Quickchat could not focus it";
+  return "The session opened in Herdr, but OmaPilot could not focus it";
 }

@@ -1,17 +1,17 @@
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { quickchatPaths, type QuickchatPaths } from "./paths.js";
+import { omapilotPaths, type OmaPilotPaths } from "./paths.js";
 import { resolveExecutable, runCommand } from "./process.js";
 
 export class DictationService {
-  readonly #paths: QuickchatPaths;
+  readonly #paths: OmaPilotPaths;
   readonly #env: NodeJS.ProcessEnv;
   #voxtype: string | undefined;
   #transcript: string;
   #generation = 0;
   #operation: Promise<void> = Promise.resolve();
 
-  constructor(paths: QuickchatPaths = quickchatPaths(), env: NodeJS.ProcessEnv = process.env) {
+  constructor(paths: OmaPilotPaths = omapilotPaths(), env: NodeJS.ProcessEnv = process.env) {
     this.#paths = paths;
     this.#env = env;
     this.#transcript = join(paths.runtime, "dictation.txt");

@@ -26,7 +26,8 @@ cp -a "$repo_root/assets" "$preview_root/assets"
 cp -a "$omarchy_shell/Commons" "$omarchy_shell/Ui" "$preview_root/"
 
 output="${1:-$repo_root/preview.png}"
-OMAPILOT_PREVIEW_STATE=context \
+preview_state="${OMAPILOT_PREVIEW_STATE:-empty}"
+OMAPILOT_PREVIEW_STATE="$preview_state" \
 OMAPILOT_PREVIEW_PATH="$output" \
 QT_QPA_PLATFORM=offscreen \
   timeout 5s quickshell --no-duplicate --path "$preview_root" --no-color \

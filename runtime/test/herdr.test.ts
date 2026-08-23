@@ -25,7 +25,7 @@ describe("Herdr handoff", () => {
     expect(nativeResumeArgs("codex", "abc", "/work")).toEqual(["resume", "abc", "-C", "/work", "-s", "read-only", "-a", "on-request"]);
     expect(nativeResumeArgs("opencode", "abc")).toEqual(["--pure", "--session", "abc"]);
     expect(nativeResumeArgs("builtin", "abc", "/work", env)).toEqual([
-      "--session", "abc", "--session-dir", "/home/test/.local/state/quickchat/pi-sessions", "--approve"
+      "--session", "abc", "--session-dir", "/home/test/.local/state/omapilot/pi-sessions", "--approve"
     ]);
   });
 
@@ -43,15 +43,15 @@ describe("Herdr handoff", () => {
   });
 
   it("focuses the session, raises the exact Herdr window last, then reapplies session focus", () => {
-    expect(herdrFocusCommands(paths.herdr, paths.hyprctl, "0xabc", "w11", "w11:t2", "quickchat-1234"))
+    expect(herdrFocusCommands(paths.herdr, paths.hyprctl, "0xabc", "w11", "w11:t2", "omapilot-1234"))
       .toEqual([
         { executable: paths.herdr, args: ["workspace", "focus", "w11"] },
         { executable: paths.herdr, args: ["tab", "focus", "w11:t2"] },
-        { executable: paths.herdr, args: ["agent", "focus", "quickchat-1234"] },
+        { executable: paths.herdr, args: ["agent", "focus", "omapilot-1234"] },
         { executable: paths.hyprctl, args: ["dispatch", "hl.dsp.focus({ window = \"address:0xabc\" })"] },
         { executable: paths.herdr, args: ["workspace", "focus", "w11"] },
         { executable: paths.herdr, args: ["tab", "focus", "w11:t2"] },
-        { executable: paths.herdr, args: ["agent", "focus", "quickchat-1234"] }
+        { executable: paths.herdr, args: ["agent", "focus", "omapilot-1234"] }
       ]);
   });
 
@@ -62,7 +62,7 @@ describe("Herdr handoff", () => {
       launch,
       activeWindowMisses: 1,
       clientWindowMisses: 1,
-      agents: [existingAgent("quickchat-11111111")]
+      agents: [existingAgent("omapilot-11111111")]
     }));
     await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
     expect(await Promise.race([promise.then(() => "finished"), Promise.resolve("running")])).toBe("running");
@@ -72,7 +72,7 @@ describe("Herdr handoff", () => {
   });
 
   it.each(["org.omarchy.herdr", "kitty"])("continues against a mapped %s Herdr window", async (windowClass) => {
-    const fixture = harness({ agents: [existingAgent("quickchat-11111111")], windowClass, activeWindowMisses: 1 });
+    const fixture = harness({ agents: [existingAgent("omapilot-11111111")], windowClass, activeWindowMisses: 1 });
     await expect(continueInHerdr(chat({ resumable: true }), env, fixture)).resolves.toEqual({ mode: "native", reused: true });
     expect(fixture.launch).not.toHaveBeenCalled();
   });
@@ -82,7 +82,7 @@ describe("Herdr handoff", () => {
       activeWindowMisses: 7,
       clientWindowMisses: 1,
       workspaceMisses: 3,
-      agents: [existingAgent("quickchat-11111111")]
+      agents: [existingAgent("omapilot-11111111")]
     });
     await expect(continueInHerdr(chat({ resumable: true }), env, fixture)).resolves.toEqual({ mode: "native", reused: true });
     expect(fixture.launch).toHaveBeenCalledTimes(1);
@@ -94,12 +94,12 @@ describe("Herdr handoff", () => {
   });
 
   it("reuses an existing same-chat agent without creating another tab", async () => {
-    const fixture = harness({ agents: [existingAgent("quickchat-11111111")] });
+    const fixture = harness({ agents: [existingAgent("omapilot-11111111")] });
     await expect(continueInHerdr(chat({ resumable: true }), env, fixture)).resolves.toEqual({ mode: "native", reused: true });
     expect(callsContaining(fixture.calls, ["tab", "create"])).toHaveLength(0);
     expect(callsContaining(fixture.calls, ["agent", "start"])).toHaveLength(0);
     expect(callArgs(fixture.calls)).toEqual(expect.arrayContaining([
-      ["workspace", "focus", "w11"], ["tab", "focus", "w11:t4"], ["agent", "focus", "quickchat-11111111"]
+      ["workspace", "focus", "w11"], ["tab", "focus", "w11:t4"], ["agent", "focus", "omapilot-11111111"]
     ]));
     expect(fixture.launch).not.toHaveBeenCalled();
   });
@@ -118,7 +118,7 @@ describe("Herdr handoff", () => {
     await expect(continueInHerdr(chat({ provider: "builtin", resumable: true }), env, fixture))
       .resolves.toEqual({ mode: "native", reused: false });
     expect(callsContaining(fixture.calls, ["pane", "run"])[0]?.args[3]).toBe(
-      "export PI_CODING_AGENT_DIR='/home/test/.config/omapilot' PI_CODING_AGENT_SESSION_DIR='/home/test/.local/state/quickchat/pi-sessions'"
+      "export PI_CODING_AGENT_DIR='/home/test/.config/omapilot' PI_CODING_AGENT_SESSION_DIR='/home/test/.local/state/omapilot/pi-sessions'"
     );
     const start = callsContaining(fixture.calls, ["agent", "start"])[0]?.args ?? [];
     expect(start).toEqual(expect.arrayContaining(["--kind", "pi"]));
@@ -131,8 +131,8 @@ describe("Herdr handoff", () => {
       .resolves.toEqual({ mode: "transcript", reused: false });
     const starts = callsContaining(fixture.calls, ["agent", "start"]);
     expect(starts).toHaveLength(2);
-    expect(starts[0]?.args[2]).toBe("quickchat-11111111");
-    expect(starts[1]?.args[2]).toBe("quickchat-11111111-context");
+    expect(starts[0]?.args[2]).toBe("omapilot-11111111");
+    expect(starts[1]?.args[2]).toBe("omapilot-11111111-context");
     expect(callsContaining(fixture.calls, ["agent", "prompt"])[0]?.args).toEqual(expect.arrayContaining(["--until", "blocked"]));
     expect(callsContaining(fixture.calls, ["tab", "close"])[0]?.args).toEqual(["tab", "close", "w11:t4"]);
   });
@@ -154,9 +154,9 @@ describe("Herdr handoff", () => {
   it("uses the transcript agent name consistently when no native session exists", async () => {
     const fixture = harness({ enforceNamedAgents: true });
     await expect(continueInHerdr(chat({ resumable: false }), env, fixture)).resolves.toEqual({ mode: "transcript", reused: false });
-    expect(callsContaining(fixture.calls, ["agent", "start"])[0]?.args[2]).toBe("quickchat-11111111-context");
-    expect(callsContaining(fixture.calls, ["agent", "prompt"])[0]?.args[2]).toBe("quickchat-11111111-context");
-    expect(callsContaining(fixture.calls, ["agent", "focus"]).at(-1)?.args[2]).toBe("quickchat-11111111-context");
+    expect(callsContaining(fixture.calls, ["agent", "start"])[0]?.args[2]).toBe("omapilot-11111111-context");
+    expect(callsContaining(fixture.calls, ["agent", "prompt"])[0]?.args[2]).toBe("omapilot-11111111-context");
+    expect(callsContaining(fixture.calls, ["agent", "focus"]).at(-1)?.args[2]).toBe("omapilot-11111111-context");
   });
 
   it("does not claim success when the failed-native tab cannot be cleaned up", async () => {
@@ -246,7 +246,7 @@ function harness(options: {
     }
     if (args[0] === "workspace" && args[1] === "list") {
       if (workspaceMisses > 0) { workspaceMisses -= 1; return error("api_unavailable"); }
-      return ok({ workspaces: [{ workspace_id: "w11", label: "Quickchat" }] });
+      return ok({ workspaces: [{ workspace_id: "w11", label: "OmaPilot" }] });
     }
     if (args[0] === "agent" && args[1] === "list") return ok({ agents: options.agents ?? [] });
     if (args[0] === "tab" && args[1] === "create") {

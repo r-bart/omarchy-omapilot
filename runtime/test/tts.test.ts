@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -51,6 +51,28 @@ function requestUrl(input: Parameters<typeof fetch>[0]): string {
 }
 
 describe("voice TTS providers", () => {
+  it("probes every import required by Kokoro synthesis", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-kokoro-probe-"));
+    roots.push(root);
+    const bin = join(root, "bin");
+    const python = join(bin, "python3");
+    await mkdir(bin);
+    await writeFile(python, [
+      `#!${process.execPath}`,
+      "const source = process.argv[3] ?? '';",
+      "const imports = ['import numpy as np', 'import soundfile as sf', 'from kokoro import KPipeline'];",
+      "process.exit(process.argv[2] === '-c' && imports.every((value) => source.includes(value)) ? 0 : 1);"
+    ].join("\n"));
+    await chmod(python, 0o700);
+
+    const voice = new VoiceService(
+      { HOME: root, OMAPILOT_CONFIG_DIR: join(root, "config"), PATH: bin },
+      { dictationAvailable: () => Promise.resolve(false) }
+    );
+    const status = await voice.status();
+    expect(status.tts[0]).toMatchObject({ id: "kokoro", available: true, configured: true });
+  });
+
   it("reports local Kokoro and Voxtype without storing secrets", async () => {
     const { voice, config } = await service({ dictation: true, kokoro: true });
     const status = await voice.status();

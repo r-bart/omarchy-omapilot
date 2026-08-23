@@ -27,7 +27,7 @@ import type { AcpPrompt } from "./context.js";
 import type { AcpResult, AcpRun, PermissionHandler } from "./acp.js";
 import { automaticInstructions, type PiDiscoveredProvider } from "./providers.js";
 import type { BrokerEvent, BuiltinAuthMethod, ModelOption, ProviderPolicyInfo, WebHandoffProvider } from "./types.js";
-import { quickchatPaths } from "./paths.js";
+import { omapilotPaths } from "./paths.js";
 import { pluginRoot } from "./runtime-root.js";
 import {
   createPersonalAssistantTools,
@@ -120,7 +120,7 @@ export class BrokerPiError extends Error {
 export function configDirectory(env: NodeJS.ProcessEnv): string {
   const explicit = env.OMAPILOT_CONFIG_DIR?.trim();
   if (explicit !== undefined && explicit.startsWith("/")) return explicit;
-  return quickchatPaths(env).config;
+  return omapilotPaths(env).config;
 }
 
 export function agentDirectory(env: NodeJS.ProcessEnv): string {
@@ -437,7 +437,7 @@ export function runPiQuestion(
       if (terminalError !== undefined) throw terminalError;
       const answer = assistantText(terminal);
       if (answer.trim() === "") {
-        if (provider.agent.env.QUICKCHAT_DEBUG_PI === "1") {
+        if (provider.agent.env.OMAPILOT_DEBUG_PI === "1") {
           process.stderr.write(`OmaPilot Pi empty response: streamed=${String(streamedText.length)} ${assistantDiagnostics(turnMessages)}\n`);
         }
         throw new BrokerPiError("empty_response", "The model returned no final answer", true);
@@ -467,7 +467,7 @@ export function runPiQuestion(
           else if (existsSync(sessionFile)) unlinkSync(sessionFile);
         }
         catch (error) {
-          if (provider.agent.env.QUICKCHAT_DEBUG_PI === "1") {
+          if (provider.agent.env.OMAPILOT_DEBUG_PI === "1") {
             const message = error instanceof Error ? error.message : String(error);
             process.stderr.write(`OmaPilot Pi could not roll back failed turn: ${boundedDiagnostic(message)}\n`);
           }
@@ -480,7 +480,7 @@ export function runPiQuestion(
 }
 
 function piSessionManager(provider: PiDiscoveredProvider, resumeSessionId: string | undefined): SessionManager {
-  const sessionDir = quickchatPaths(provider.agent.env).piSessions;
+  const sessionDir = omapilotPaths(provider.agent.env).piSessions;
   mkdirSync(sessionDir, { recursive: true, mode: 0o700 });
   if (resumeSessionId === undefined) return SessionManager.create(provider.cwd, sessionDir);
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(resumeSessionId))

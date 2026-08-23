@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { HistoryStore, presentChat } from "../src/history.js";
-import { quickchatPaths } from "../src/paths.js";
+import { omapilotPaths } from "../src/paths.js";
 import type { ChatRecord, StoredImage } from "../src/types.js";
 
 const roots: string[] = [];
@@ -11,8 +11,8 @@ afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recur
 
 describe("history store", () => {
   it("atomically retains only the newest 30 complete chats", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-history-")); roots.push(root);
-    const paths = quickchatPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
+    const root = await mkdtemp(join(tmpdir(), "omapilot-history-")); roots.push(root);
+    const paths = omapilotPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
     const store = new HistoryStore(paths);
     const evicted: ChatRecord[] = [];
     for (let index = 0; index < 35; index += 1) evicted.push(...await store.save(record(index)));
@@ -25,8 +25,8 @@ describe("history store", () => {
   });
 
   it("deletes one record and clears all state", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-history-")); roots.push(root);
-    const paths = quickchatPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
+    const root = await mkdtemp(join(tmpdir(), "omapilot-history-")); roots.push(root);
+    const paths = omapilotPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
     const store = new HistoryStore(paths);
     await store.save(record(1));
     expect((await store.delete(record(1).id))?.id).toBe(record(1).id);
@@ -36,8 +36,8 @@ describe("history store", () => {
   });
 
   it("keeps a shared Pi session until its final chat record is deleted", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-history-pi-")); roots.push(root);
-    const paths = quickchatPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
+    const root = await mkdtemp(join(tmpdir(), "omapilot-history-pi-")); roots.push(root);
+    const paths = omapilotPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
     const store = new HistoryStore(paths);
     const sessionId = "11111111-1111-4111-8111-111111111111";
     const sessionFile = `2026-08-18_${sessionId}.jsonl`;
@@ -53,8 +53,8 @@ describe("history store", () => {
   });
 
   it("loads a legacy capability field but strips it from presented history", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-history-legacy-")); roots.push(root);
-    const paths = quickchatPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
+    const root = await mkdtemp(join(tmpdir(), "omapilot-history-legacy-")); roots.push(root);
+    const paths = omapilotPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
     const store = new HistoryStore(paths);
     const legacy = { ...record(3), capability: "tools" };
     await mkdir(paths.records, { recursive: true });
@@ -67,8 +67,8 @@ describe("history store", () => {
   });
 
   it("removes evicted cache images from retained chat records", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-history-images-")); roots.push(root);
-    const paths = quickchatPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
+    const root = await mkdtemp(join(tmpdir(), "omapilot-history-images-")); roots.push(root);
+    const paths = omapilotPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
     const store = new HistoryStore(paths);
     await mkdir(paths.images, { recursive: true });
     const oldest = image("oldest.png");

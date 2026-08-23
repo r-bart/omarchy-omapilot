@@ -10,7 +10,7 @@ import type { AcpPrompt } from "./context.js";
 import type { BrokerEvent, ModelOption, StoredImage } from "./types.js";
 import { ImageStore } from "./images.js";
 import { presentImage } from "./history.js";
-import { quickchatPaths } from "./paths.js";
+import { omapilotPaths } from "./paths.js";
 import { runCommand, terminateProcessGroup } from "./process.js";
 import { pluginRoot } from "./runtime-root.js";
 
@@ -33,7 +33,7 @@ export type ToolObservation = {
   title?: string | null;
   status?: string | null;
 };
-const QUICKCHAT_CLIENT_VERSION = "0.2.0";
+const OMAPILOT_CLIENT_VERSION = "0.2.0";
 
 export function providerPolicyEnvironment(provider: DiscoveredProvider): NodeJS.ProcessEnv {
   return secureEnvironment(provider);
@@ -44,7 +44,7 @@ export async function probeAcpModels(provider: DiscoveredProvider, timeoutMs = 1
   const child = spawn(provider.agent.executable, provider.agent.args, {
     cwd: "/", env: secureEnvironment(provider), stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32"
   });
-  const paths = quickchatPaths(provider.agent.env);
+  const paths = omapilotPaths(provider.agent.env);
   await mkdir(paths.runtime, { recursive: true, mode: 0o700 });
   const cwd = await mkdtemp(join(paths.runtime, "probe-"));
   const timeout = setTimeout(() => terminateProcessGroup(child.pid), timeoutMs);
@@ -55,13 +55,13 @@ export async function probeAcpModels(provider: DiscoveredProvider, timeoutMs = 1
       webWritable(child),
       webReadable(child)
     );
-    return await acp.client({ name: "omarchy-quickchat-probe" })
+    return await acp.client({ name: "omarchy-omapilot-probe" })
       .onRequest(acp.methods.client.session.requestPermission, () => ({ outcome: { outcome: "cancelled" } }))
       .connectWith(stream, async (ctx) => {
         const initialized = await ctx.request(acp.methods.agent.initialize, {
           protocolVersion: acp.PROTOCOL_VERSION,
           clientCapabilities: { session: { configOptions: { boolean: {} } } },
-          clientInfo: { name: "omarchy-quickchat", version: QUICKCHAT_CLIENT_VERSION }
+          clientInfo: { name: "omarchy-omapilot", version: OMAPILOT_CLIENT_VERSION }
         });
         if (!canRemoveSession(initialized.agentCapabilities)) return { models: [] };
         const session = await ctx.buildSession(providerSessionRequest(provider, cwd, false)).start();
@@ -127,7 +127,7 @@ async function probeCodexModels(provider: DiscoveredProvider, timeoutMs: number)
       });
       child.stdin?.write(`${JSON.stringify({
         jsonrpc: "2.0", id: 1, method: "initialize",
-        params: { clientInfo: { name: "omarchy-quickchat", version: QUICKCHAT_CLIENT_VERSION }, capabilities: { experimentalApi: true, requestAttestation: false } }
+        params: { clientInfo: { name: "omarchy-omapilot", version: OMAPILOT_CLIENT_VERSION }, capabilities: { experimentalApi: true, requestAttestation: false } }
       })}\n`);
     });
     return parseCodexModelCatalog(catalog);
@@ -167,13 +167,13 @@ export async function deleteAcpSession(provider: DiscoveredProvider, sessionId: 
   timeout.unref();
   try {
     if (child.stdin === null || child.stdout === null) return false;
-    const deleted = await acp.client({ name: "omarchy-quickchat-cleanup" })
+    const deleted = await acp.client({ name: "omarchy-omapilot-cleanup" })
       .onRequest(acp.methods.client.session.requestPermission, () => ({ outcome: { outcome: "cancelled" } }))
       .connectWith(acp.ndJsonStream(webWritable(child), webReadable(child)), async (ctx) => {
         const initialized = await ctx.request(acp.methods.agent.initialize, {
           protocolVersion: acp.PROTOCOL_VERSION,
           clientCapabilities: {},
-          clientInfo: { name: "omarchy-quickchat", version: QUICKCHAT_CLIENT_VERSION }
+          clientInfo: { name: "omarchy-omapilot", version: OMAPILOT_CLIENT_VERSION }
         });
         return removeSession(ctx, initialized.agentCapabilities, sessionId);
       });
@@ -231,7 +231,7 @@ export function runAcpQuestion(
   };
 
   const result = (async (): Promise<AcpResult> => {
-    const paths = quickchatPaths(provider.agent.env);
+    const paths = omapilotPaths(provider.agent.env);
     await mkdir(paths.runtime, { recursive: true, mode: 0o700 });
     const cwd = await mkdtemp(join(paths.runtime, "chat-"));
     const turnDeadline = Date.now() + timeoutMs;
@@ -252,7 +252,7 @@ export function runAcpQuestion(
 
       const text = new GuardedTextEmitter(requestId, emit);
       activeText = text;
-      const app = acp.client({ name: "omarchy-quickchat" })
+      const app = acp.client({ name: "omarchy-omapilot" })
         .onRequest(acp.methods.client.session.requestPermission, async ({ params }) => {
           if (requestPermission === undefined) {
             forbiddenToolAttempt = true;
@@ -278,19 +278,19 @@ export function runAcpQuestion(
             ? { outcome: { outcome: "cancelled" } }
             : { outcome: { outcome: "selected", optionId } };
         })
-        .onRequest(acp.methods.client.fs.readTextFile, () => { throw new Error("Quickchat does not expose filesystem reads"); })
-        .onRequest(acp.methods.client.fs.writeTextFile, () => { throw new Error("Quickchat does not expose filesystem writes"); })
-        .onRequest(acp.methods.client.terminal.create, () => { throw new Error("Quickchat does not expose a terminal"); })
-        .onRequest(acp.methods.client.terminal.output, () => { throw new Error("Quickchat does not expose a terminal"); })
-        .onRequest(acp.methods.client.terminal.release, () => { throw new Error("Quickchat does not expose a terminal"); })
-        .onRequest(acp.methods.client.terminal.waitForExit, () => { throw new Error("Quickchat does not expose a terminal"); })
-        .onRequest(acp.methods.client.terminal.kill, () => { throw new Error("Quickchat does not expose a terminal"); });
+        .onRequest(acp.methods.client.fs.readTextFile, () => { throw new Error("OmaPilot does not expose filesystem reads"); })
+        .onRequest(acp.methods.client.fs.writeTextFile, () => { throw new Error("OmaPilot does not expose filesystem writes"); })
+        .onRequest(acp.methods.client.terminal.create, () => { throw new Error("OmaPilot does not expose a terminal"); })
+        .onRequest(acp.methods.client.terminal.output, () => { throw new Error("OmaPilot does not expose a terminal"); })
+        .onRequest(acp.methods.client.terminal.release, () => { throw new Error("OmaPilot does not expose a terminal"); })
+        .onRequest(acp.methods.client.terminal.waitForExit, () => { throw new Error("OmaPilot does not expose a terminal"); })
+        .onRequest(acp.methods.client.terminal.kill, () => { throw new Error("OmaPilot does not expose a terminal"); });
 
       await app.connectWith(stream, async (ctx) => {
         const initialized = await ctx.request(acp.methods.agent.initialize, {
           protocolVersion: acp.PROTOCOL_VERSION,
           clientCapabilities: { session: { configOptions: { boolean: {} } } },
-          clientInfo: { name: "omarchy-quickchat", version: QUICKCHAT_CLIENT_VERSION }
+          clientInfo: { name: "omarchy-omapilot", version: OMAPILOT_CLIENT_VERSION }
         });
         if (initialized.protocolVersion !== acp.PROTOCOL_VERSION) throw new Error("ACP protocol version is unsupported");
         resumable = initialized.agentCapabilities?.loadSession === true;
@@ -415,7 +415,7 @@ function secureEnvironment(provider: DiscoveredProvider): NodeJS.ProcessEnv {
       // Codex read-only still permits host reads. Keep native web search off so
       // those unapproved reads cannot be exfiltrated through a model-controlled
       // search query. On-request routes any network or broader command through
-      // Quickchat's exact allow-once handler.
+      // OmaPilot's exact allow-once handler.
       approval_policy: "on-request",
       sandbox_mode: "read-only",
       web_search: "disabled",
@@ -738,7 +738,7 @@ function openCodeCommand(value: unknown): string | undefined {
 }
 
 function forbiddenToolError(): BrokerAcpError {
-  return new BrokerAcpError("forbidden_tool_attempt", "The selected harness attempted a device tool that Quickchat cannot safely authorize", false);
+  return new BrokerAcpError("forbidden_tool_attempt", "The selected harness attempted a device tool that OmaPilot cannot safely authorize", false);
 }
 
 class ForbiddenToolMarkupError extends Error {
@@ -764,7 +764,7 @@ export function childIsRunning(child: ChildProcess): boolean {
 }
 
 export function defaultTemporaryRoot(): string {
-  return join(tmpdir(), "quickchat");
+  return join(tmpdir(), "omapilot");
 }
 
 function webWritable(child: ChildProcess): WritableStream<Uint8Array> {
@@ -791,7 +791,7 @@ function webReadable(child: ChildProcess): ReadableStream<Uint8Array> {
           currentFrameBytes = byte === 0x0a ? 0 : currentFrameBytes + 1;
           if (currentFrameBytes > maxFrameBytes) {
             settled = true;
-            controller.error(new Error("ACP frame exceeds the Quickchat limit"));
+            controller.error(new Error("ACP frame exceeds the OmaPilot limit"));
             child.stdout?.destroy();
             terminateProcessGroup(child.pid);
             return;

@@ -3,7 +3,7 @@ import QtTest
 import "../components/Protocol.js" as Protocol
 
 TestCase {
-  name: "QuickchatProtocol"
+  name: "OmaPilotProtocol"
 
   function test_parseLineRejectsInvalidInput() {
     compare(Protocol.parseLine("not json"), null)
@@ -140,7 +140,7 @@ TestCase {
   function test_desktopContextFiltersShellSurfaces() {
     verify(Protocol.isShellAppId("org.omarchy.quickshell"))
     var context = Protocol.normalizedDesktopContext({
-      activeWindow: { appId: "org.omarchy.quickshell", title: "Quickchat" },
+      activeWindow: { appId: "org.omarchy.quickshell", title: "OmaPilot" },
       windows: [{ appId: "org.omarchy.quickshell", workspace: 1 }, { appId: "kitty", workspace: 2 }],
       media: []
     })
@@ -318,9 +318,9 @@ TestCase {
 
   function test_markdownImagesRequireExplicitLoading() {
     var output = Protocol.sanitizeMarkdown("![chart](https://example.com/chart.png)")
-    verify(output.indexOf("quickchat-image:") >= 0)
+    verify(output.indexOf("omapilot-image:") >= 0)
     verify(output.indexOf("![") < 0)
-    compare(Protocol.imageUrl(output.match(/\((quickchat-image:[^)]+)\)/)[1]), "https://example.com/chart.png")
+    compare(Protocol.imageUrl(output.match(/\((omapilot-image:[^)]+)\)/)[1]), "https://example.com/chart.png")
   }
 
   function test_remoteImageCompletionReplacesPlaceholder() {
@@ -345,7 +345,7 @@ TestCase {
   function test_referenceAndHtmlImagesAreNeutralized() {
     var input = "![plot][chart]\n\n[chart]: https://example.com/plot.png\n<img src=\"https://tracker.example/pixel.png\">"
     var output = Protocol.sanitizeMarkdown(input)
-    verify(output.indexOf("quickchat-image:") >= 0)
+    verify(output.indexOf("omapilot-image:") >= 0)
     verify(output.indexOf("<img") < 0)
     verify(output.indexOf("tracker.example") < 0)
     verify(output.indexOf("https://example.com/plot.png") < 0)

@@ -7,7 +7,7 @@ import { providerPolicyEnvironment, runAcpQuestion, type ToolObservation } from 
 import { discoverProviders } from "../src/providers.js";
 import type { BrokerEvent } from "../src/types.js";
 
-const live = process.env.QUICKCHAT_LIVE_CODEX_BEHAVIOR === "1";
+const live = process.env.OMAPILOT_LIVE_CODEX_BEHAVIOR === "1";
 
 describe("live automatic Codex boundary", () => {
   it.runIf(live)("loads the installed Omarchy skill", async () => {
@@ -18,7 +18,7 @@ describe("live automatic Codex boundary", () => {
     const run = runAcpQuestion(
       provider,
       "live-codex-skill",
-      "You must load the installed skill named omarchy before answering. Then return exactly QUICKCHAT_SKILL_OK.",
+      "You must load the installed skill named omarchy before answering. Then return exactly OMAPILOT_SKILL_OK.",
       undefined,
       () => undefined,
       90_000,
@@ -29,7 +29,7 @@ describe("live automatic Codex boundary", () => {
     );
     const result = await run.result;
     expect(tools.some((update) => /skill|omarchy/iu.test(`${update.kind ?? ""} ${update.title ?? ""}`)), JSON.stringify(tools)).toBe(true);
-    expect(result.answer).toContain("QUICKCHAT_SKILL_OK");
+    expect(result.answer).toContain("OMAPILOT_SKILL_OK");
   }, 120_000);
 
   it.runIf(live)("uses the reviewed automatic read-only policy", async () => {
@@ -46,7 +46,7 @@ describe("live automatic Codex boundary", () => {
     const provider = (await discoverProviders(process.env, "codex")).find((candidate) => candidate.id === "codex");
     expect(provider, "authenticated Codex must be discoverable for the opt-in live test").toBeDefined();
     if (provider === undefined) return;
-    const root = await mkdtemp(join(tmpdir(), "quickchat-codex-tools-"));
+    const root = await mkdtemp(join(tmpdir(), "omapilot-codex-tools-"));
     const proof = join(root, "approved-command.txt");
     const events: BrokerEvent[] = [];
     let permissionCount = 0;
@@ -54,7 +54,7 @@ describe("live automatic Codex boundary", () => {
       const run = runAcpQuestion(
         provider,
         "live-codex-tools",
-        `Use the shell to run exactly: printf quickchat-codex-tools-live > ${proof}. Then confirm completion.`,
+        `Use the shell to run exactly: printf omapilot-codex-tools-live > ${proof}. Then confirm completion.`,
         undefined,
         events.push.bind(events),
         90_000,
@@ -69,7 +69,7 @@ describe("live automatic Codex boundary", () => {
       );
       const result = await run.result;
       expect(permissionCount, JSON.stringify({ answer: result.answer, events })).toBe(1);
-      await expect(readFile(proof, "utf8")).resolves.toBe("quickchat-codex-tools-live");
+      await expect(readFile(proof, "utf8")).resolves.toBe("omapilot-codex-tools-live");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

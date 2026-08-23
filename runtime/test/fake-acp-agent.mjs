@@ -6,7 +6,7 @@ import { appendFile } from "node:fs/promises";
 let sessionCounter = 0;
 let pending;
 const stream = acp.ndJsonStream(Writable.toWeb(process.stdout), Readable.toWeb(process.stdin));
-const server = acp.agent({ name: "quickchat-fake" })
+const server = acp.agent({ name: "omapilot-fake" })
   .onRequest(acp.methods.agent.initialize, () => ({
     protocolVersion: acp.PROTOCOL_VERSION,
     agentCapabilities: {

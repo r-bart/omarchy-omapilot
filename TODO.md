@@ -1,4 +1,7 @@
-# Quickchat implementation ledger
+# OmaPilot implementation ledger
+
+Historical branch, worktree, backup, and runtime labels in this ledger use the
+current OmaPilot namespace so the submission tree has one consistent identity.
 
 ## Marketplace submission preparation (2026-08-23)
 
@@ -47,7 +50,7 @@
 Ship a public Omarchy Quattro bar-widget that provides themed, one-turn AI
 answers through authenticated Codex, Claude, or OpenCode ACP agents; retains
 the latest 30 answers; supports Voxtype dictation; and hands saved sessions to
-a dedicated Herdr Quickchat workspace.
+a dedicated Herdr OmaPilot workspace.
 
 ## Done criteria
 
@@ -67,9 +70,9 @@ a dedicated Herdr Quickchat workspace.
 
 | Stream | Branch/worktree | Owns | Status |
 | --- | --- | --- | --- |
-| QML surface | `quattro-ui` / `/home/sbull/worktrees/omarchy-quickchat-ui` | Bar widget, panel, components, QML tests | Implemented and integrated on `main` |
-| ACP runtime | `broker-runtime` / `/home/sbull/worktrees/omarchy-quickchat-broker` | Broker, provider adapters, history, Herdr/Voxtype helpers, unit tests | Integrated and independently reviewed on `main` |
-| Plugin/release | `plugin-compliance` / `/home/sbull/worktrees/omarchy-quickchat-compliance` | Manifest, docs, validation, CI/release packaging | Implemented and integrated on `main` |
+| QML surface | `quattro-ui` / `/home/sbull/worktrees/omarchy-omapilot-ui` | Bar widget, panel, components, QML tests | Implemented and integrated on `main` |
+| ACP runtime | `broker-runtime` / `/home/sbull/worktrees/omarchy-omapilot-broker` | Broker, provider adapters, history, Herdr/Voxtype helpers, unit tests | Integrated and independently reviewed on `main` |
+| Plugin/release | `plugin-compliance` / `/home/sbull/worktrees/omarchy-omapilot-compliance` | Manifest, docs, validation, CI/release packaging | Implemented and integrated on `main` |
 
 ## Automatic interaction goal (2026-08-15)
 
@@ -91,10 +94,10 @@ a dedicated Herdr Quickchat workspace.
   the complete suite and deterministic bundle pass; independent review has no
   unresolved findings; a draft PR is open and its CI is green.
 - Branch/worktree: `automatic-capabilities` at
-  `/home/sbull/worktrees/omarchy-quickchat-automatic`, based on `main` commit
+  `/home/sbull/worktrees/omarchy-omapilot-automatic`, based on `main` commit
   `ff93db8`. The orchestrator owns implementation and integration.
 - Allowed: scoped repository edits, local dependencies/tests, commits, push of
-  this branch, and a draft PR to `spencerbull/omarchy-quickchat:main`.
+  this branch, and a draft PR to `spencerbull/omarchy-omapilot:main`.
 - Forbidden: merge, tag, release, marketplace submission, installed-plugin or
   desktop mutation, provider credential/configuration changes, CUA, secrets,
   billing, and user-data operations.
@@ -123,7 +126,7 @@ reclassification. Two consecutive broker builds are byte-identical and
 `npm audit --omit=dev` reports zero vulnerabilities. Independent Claude review
 found one Medium and one Low; both were fixed in `3ef737d`, and the exact-fix
 re-review returned `CLEAN`. Draft PR
-<https://github.com/spencerbull/omarchy-quickchat/pull/1> targets `main`; its
+<https://github.com/spencerbull/omarchy-omapilot/pull/1> targets `main`; its
 validate/package workflow is required green on the final PR head. No CUA,
 installed plugin, desktop configuration, release, or marketplace state was
 changed.
@@ -141,7 +144,7 @@ changed.
   Companion as future work. Focused/full suites, deterministic bundle checks,
   and independent review must pass.
 - Branch/worktree: `desktop-context` at
-  `/home/sbull/worktrees/omarchy-quickchat-context`, based on merged `main`
+  `/home/sbull/worktrees/omarchy-omapilot-context`, based on merged `main`
   commit `caa2439`. The orchestrator owns implementation and integration.
 - Allowed: scoped source/docs/tests/build-artifact edits and local validation.
   Forbidden: merge, tag, release, installed-plugin mutation, browser extension
@@ -185,7 +188,7 @@ turn per provider.
   clean; a PR targets `main` with green exact-head CI; the reviewed candidate is
   installed locally only after those gates.
 - Branch/worktree: `provider-tools` at
-  `/home/sbull/worktrees/omarchy-quickchat-context`, based on merged `main`
+  `/home/sbull/worktrees/omarchy-omapilot-context`, based on merged `main`
   `caa2439` with desktop context preserved as commit `271966f`. The orchestrator
   owns implementation, integration, publication, and local installation.
 - Allowed: scoped source/docs/tests/build edits; local authenticated
@@ -193,7 +196,7 @@ turn per provider.
   reviewed local plugin installation. Forbidden: merge, tag, release,
   marketplace submission, provider credential/configuration changes, CUA,
   secrets, billing, production/customer data, hardcoded app mappings, or edits
-  outside this repo and the installed Quickchat copy.
+  outside this repo and the installed OmaPilot copy.
 - Architecture/review worker: visible Claude Herdr agent `qc_tools_arch`, pane
   `wK:p2N`, same worktree/branch, read-only design and final-diff review. The
   orchestrator owns follow-up and cleanup.
@@ -237,11 +240,11 @@ turn per provider.
 - [x] Push, open the PR, pass exact-head CI, and install the reviewed candidate.
   PR #3 targets `main`; GitHub Actions run 34 passed validation and packaging at
   reviewed code SHA `a72436c`. That payload is installed at
-  `~/.config/omarchy/plugins/io.github.spencerbull.quickchat`; the installed
+  `~/.config/omarchy/plugins/io.github.spencerbull.omapilot`; the installed
   broker returned protocol 2, three providers, and `desktop-context` before a
   lock-guarded shell restart. `shell.json` remained byte-identical, preserving
   the center placement and provider/model settings. Rollback snapshot:
-  `~/.local/state/omarchy-quickchat-backups/20260816-1428-before-a72436c`.
+  `~/.local/state/omarchy-omapilot-backups/20260816-1428-before-a72436c`.
 
 ## Allowed actions
 
@@ -274,7 +277,7 @@ turn per provider.
   installed Quattro plugin. Do not accept command-construction tests or a
   single successful development probe as completion.
 - [ ] Prove the complete handoff matrix in the live desktop: launch Herdr when
-  closed; raise its existing window; create or reuse the Quickchat workspace;
+  closed; raise its existing window; create or reuse the OmaPilot workspace;
   create and focus the intended tab; focus the intended agent pane; resume a
   native Codex, Claude, and OpenCode session where supported; repeat a handoff
   from the same chat without losing focus; and complete the transcript fallback
@@ -333,7 +336,7 @@ turn per provider.
   that approved Codex commands may read or change device data. Claude's
   scratch-only proof and the existing exact application-launch action remain
   green.
-- IPC criterion: one Quickchat IPC owner is registered across all monitors;
+- IPC criterion: one OmaPilot IPC owner is registered across all monitors;
   `open`, `close`, `newChat`, and `history` remain callable after reload and
   shell restart without duplicate-handler warnings.
 - Source/install criterion: focused and full suites pass, deterministic builds
@@ -403,7 +406,7 @@ turn per provider.
   workspace, tab, and agent-pane focus. The final installed OpenCode check used
   the actual panel button and left Herdr foregrounded on the reused focused
   agent (`focused: true`).
-- Codex remains `on-request` while Quickchat rejects every ACP permission
+- Codex remains `on-request` while OmaPilot rejects every ACP permission
   request; the live exact `/etc/hostname` denial probe passed with no streamed
   or persisted content.
 - Release `v0.1.0` and its checksum, SBOM, and provenance assets are published.
@@ -415,7 +418,7 @@ turn per provider.
 
 ## Streaming latency loop (2026-08-15)
 
-- Goal: determine whether Quickchat's apparently stalled answer rendering on
+- Goal: determine whether OmaPilot's apparently stalled answer rendering on
   Gonk is caused by provider first-token latency, ACP event buffering, broker
   NDJSON emission, QML parsing/rendering, or a lifecycle race; implement only
   evidence-backed latency and progress-feedback improvements.
@@ -426,12 +429,12 @@ turn per provider.
   CI is green; and the reviewed commit is updated on Gonk with a protocol-2
   broker timing check. Installed-panel feel remains an owner-run gate.
 - Stream: branch `streaming-latency`, worktree
-  `/home/sbull/worktrees/omarchy-quickchat-streaming`; the orchestrator owns
+  `/home/sbull/worktrees/omarchy-omapilot-streaming`; the orchestrator owns
   reproduction, implementation, integration, review fixes, PR, and Gonk
   verification.
 - Claude worker: visible agent `qc_stream_trace` in tab `wK:t16`, pane
   `wK:p29`, Claude session `b4e2da30-1d92-4db5-988d-3ed8090ede66`, cwd
-  `/home/sbull/worktrees/omarchy-quickchat-streaming`; read-only; owns an
+  `/home/sbull/worktrees/omarchy-omapilot-streaming`; read-only; owns an
   independent trace of broker, ACP, NDJSON, and QML streaming semantics plus
   smallest-safe optimization recommendations. The orchestrator owns the tab
   and cleanup.
@@ -446,7 +449,7 @@ turn per provider.
   both were covered by a latching discard and late-chunk integration test. The
   orchestrator closed both loop-created review tabs.
 - Allowed: scoped repository edits, tests, branch commits, push, draft PR, and
-  updating the Quickchat plugin on Gonk after review and CI. Forbidden: tags,
+  updating the OmaPilot plugin on Gonk after review and CI. Forbidden: tags,
   releases, marketplace changes, credential/provider configuration changes,
   destructive resets, unrelated desktop changes, and CUA automation.
 - Current status: Gonk reproduced 3.1-3.5 s to first visible content for short
@@ -459,7 +462,7 @@ turn per provider.
   explicit live skips), QML contracts (20 passed), and three byte-identical
   runtime builds (`3544884e…ad20` broker, `3de0cc91…12eb` map) are green.
   Independent review is clean. Draft PR #2 is open at
-  `https://github.com/spencerbull/omarchy-quickchat/pull/2`; exact-head CI run
+  `https://github.com/spencerbull/omarchy-omapilot/pull/2`; exact-head CI run
   `31912409144` passed. A temporary, non-installed copy of commit `299d409`
   on Gonk produced seven content events per answer across three authenticated
   Codex trials: first content at 3.1-4.9 s and completion at 3.7-5.5 s. This
@@ -479,8 +482,8 @@ turn per provider.
   security contact, and marketplace repository metadata. Compatibility package
   names and release artifact names remain intentionally unchanged for now.
 - [ ] Choose the replacement reverse-DNS plugin ID and provide an explicit
-  migration for the existing Quickchat layout entry and per-provider settings.
-- [ ] Migrate or compatibly discover Quickchat history, image cache, runtime
+  migration for the existing OmaPilot layout entry and per-provider settings.
+- [ ] Migrate or compatibly discover OmaPilot history, image cache, runtime
   paths, Herdr workspace labels, IPC targets, environment overrides, and broker
   client/protocol identifiers without abandoning user data.
 - [ ] Validate update, rollback, clean install, removal, and marketplace
@@ -488,7 +491,7 @@ turn per provider.
 
 ## Style revamp checkpoint 1 (2026-08-16)
 
-- Goal: make the anchored Quickchat panel feel like a native Quattro surface
+- Goal: make the anchored OmaPilot panel feel like a native Quattro surface
   with a quieter conversation-first layout, content-driven bounded height,
   transcript-owned scrolling, and restrained response-state motion.
 - Done criteria: the primary panel keeps only conversation controls visible;
@@ -498,16 +501,16 @@ turn per provider.
   only when the reader is near the bottom and exposes a return-to-latest action;
   waiting, first-token, completion, cancellation, and error states remain clear;
   focused QML/UI/manifest checks and `git diff --check` pass.
-- Branch/worktree: `quickchat-style-revamp` at
-  `/home/sbull/worktrees/omarchy-quickchat-style-revamp`, based exactly on
+- Branch/worktree: `omapilot-style-revamp` at
+  `/home/sbull/worktrees/omarchy-omapilot-style-revamp`, based exactly on
   `origin/main` commit `caa2439` when this checkpoint began.
 - Allowed: scoped source and test edits in this worktree; read-only inspection
-  of `/home/sbull/omarchy/shell`, the installed Quickchat payload, and the stale
-  `omarchy-quickchat-ui` worktree; local static and headless test execution.
+  of `/home/sbull/omarchy/shell`, the installed OmaPilot payload, and the stale
+  `omarchy-omapilot-ui` worktree; local static and headless test execution.
 - Forbidden for the original source checkpoint: commit, push, merge,
   install/update the plugin, restart Quickshell, mutate shell/Hyprland/live
   desktop state, edit any other worktree, or absorb runtime/security work from
-  `omarchy-quickchat-context`. The owner subsequently authorized only a local
+  `omarchy-omapilot-context`. The owner subsequently authorized only a local
   install and safe plugin rescan for hands-on testing; restart and all other
   restrictions remain in force.
 - Verification gates:
@@ -526,16 +529,16 @@ turn per provider.
     the old bar-widget panel component visible; the owner's screenshot proved
     that provider/model selectors and the old `ANSWER` card were still loaded.
     A subsequent owner-authorized, lock-guarded shell restart loaded the new
-    Quickchat IPC target without Quickchat-specific errors. Rollback snapshot:
-    `/home/sbull/.local/state/omarchy/quickchat-backups/pre-style-revamp-20260816T204536`.
+    OmaPilot IPC target without OmaPilot-specific errors. Rollback snapshot:
+    `/home/sbull/.local/state/omarchy/omapilot-backups/pre-style-revamp-20260816T204536`.
   - [ ] Owner-run installed/live validation on representative small and large
     screens, including keyboard, pointer, reduced-motion environment if one is
     later exposed by Quattro, and real waiting/stream/cancel/error behavior.
 - Current checkpoint: code-and-static-test checkpoint complete and left
   uncommitted for review. The locally installed plugin now contains the
   validated style surface merged with its existing separate desktop-context
-  and provider-policy payload. Omarchy reports Quickchat enabled with its IPC
-  target loaded and no Quickchat-specific error after the guarded restart;
+  and provider-policy payload. Omarchy reports OmaPilot enabled with its IPC
+  target loaded and no OmaPilot-specific error after the guarded restart;
   owner confirmation of the newly instantiated panel remains open.
 
 ## OmaPilot interaction checkpoint 2 (2026-08-16)
@@ -545,7 +548,7 @@ turn per provider.
   broker-policy-backed Ask / Act lanes, an integrated composer, configurable
   quick actions, and no redundant close affordance.
 - Done criteria: OmaPilot is the visible shell/manifest name while stable
-  Quickchat IDs and data paths remain compatible; Ask automatically rejects
+  OmaPilot IDs and data paths remain compatible; Ask automatically rejects
   every broker-mediated device approval while retaining safe harness-native
   work; Act retains exact approval for broader actions;
   provider/model details remain discoverable in settings; quick actions prefill
@@ -553,8 +556,8 @@ turn per provider.
   completion, cancellation, error, history, and settings layouts remain bounded
   and keyboard accessible; focused QML/UI/manifest checks and
   `git diff --check` pass.
-- Branch/worktree: `quickchat-style-revamp` at
-  `/home/sbull/worktrees/omarchy-quickchat-style-revamp`, still based exactly on
+- Branch/worktree: `omapilot-style-revamp` at
+  `/home/sbull/worktrees/omarchy-omapilot-style-revamp`, still based exactly on
   `origin/main` commit `caa2439`; all checkpoint-1 changes remain uncommitted.
 - Allowed: scoped source, manifest, documentation, test, TODO, and design-QA
   edits in this worktree; read-only inspection of the active Quattro source and
@@ -562,7 +565,7 @@ turn per provider.
 - Forbidden: commit, push, merge, plugin install/update, shell restart, live
   desktop mutation, edits to another worktree, stable ID/path/IPC migration,
   persistent dangerous approval, or any runtime/security work owned by
-  `/home/sbull/worktrees/omarchy-quickchat-context`.
+  `/home/sbull/worktrees/omarchy-omapilot-context`.
 - Verification gates:
   - [x] Reconfirm branch, worktree, `origin/main` base, uncommitted checkpoint-1
     ownership, current Quattro 0.3.0 component APIs, and installed divergence.
@@ -583,7 +586,7 @@ turn per provider.
     22 protocol/context, three permission-focus, nine presentation, and six
     quick-action QML checks against the live packaged shell APIs; the full
     candidate passed 130 runtime tests with 12 live-provider skips. Rollback:
-    `/home/sbull/.local/state/omarchy/quickchat-backups/pre-omapilot-20260816T214754`.
+    `/home/sbull/.local/state/omarchy/omapilot-backups/pre-omapilot-20260816T214754`.
   - [x] Reconcile Ask / Act with the installed provider-tools contract. A live
     read-only broker initialization proved Codex, Claude, and OpenCode all
     advertise `device-approval`; provider-based lanes would therefore disable
@@ -591,7 +594,7 @@ turn per provider.
     `reject_once` for every pending device approval in Ask, and exposes the
     exact approval card only in Act. No broker, protocol, runtime, or desktop-
     context byte changed. Pre-correction rollback:
-    `/home/sbull/.local/state/omarchy/quickchat-backups/pre-omapilot-permission-posture-20260816T215939`.
+    `/home/sbull/.local/state/omarchy/omapilot-backups/pre-omapilot-permission-posture-20260816T215939`.
   - [ ] Owner-run pointer, keyboard, mode-switch, quick-action, context, and real
     waiting/stream/cancel/error validation from the installed panel.
 - Current checkpoint: code, static validation, headless visual comparison, and
@@ -600,8 +603,8 @@ turn per provider.
   one replacement Quickshell child crashed during teardown; the crash handler
   recovered it. The final correction was installed atomically and the guarded
   restart then completed normally. The settled shell responds to IPC, exposes
-  the stable Quickchat target, discovers the enabled plugin as OmaPilot, is
-  unlocked, and has no OmaPilot/Quickchat-specific load error in the final
+  the stable OmaPilot target, discovers the enabled plugin as OmaPilot, is
+  unlocked, and has no OmaPilot/OmaPilot-specific load error in the final
   startup log. Hands-on interaction remains the owner validation gate.
 
 ## OmaPilot identity and dangerous Act checkpoint 3 (2026-08-16)
@@ -617,8 +620,8 @@ turn per provider.
   non-execute, missing-allow-once, stale, and provider-blocked tool requests
   remain fail-closed; focused QML, manifest, protocol, policy, runtime-build,
   repository, and `git diff --check` gates pass.
-- Branch/worktree: `quickchat-style-revamp` at
-  `/home/sbull/worktrees/omarchy-quickchat-style-revamp`; all checkpoint-1 and
+- Branch/worktree: `omapilot-style-revamp` at
+  `/home/sbull/worktrees/omarchy-omapilot-style-revamp`; all checkpoint-1 and
   checkpoint-2 user work remains uncommitted and must be preserved.
 - Allowed: scoped QML, generated icon asset, manifest, broker protocol/policy,
   built runtime, documentation, test, TODO, and design-QA edits in this
@@ -655,7 +658,7 @@ turn per provider.
     missing/unreviewable allow-once requests. A read-only installed broker
     initialization advertises all three harnesses with their preserved
     `device-approval` policies. Rollback snapshot:
-    `/home/sbull/.local/state/omarchy/quickchat-backups/pre-omapilot-dangerous-20260816T230559`.
+    `/home/sbull/.local/state/omarchy/omapilot-backups/pre-omapilot-dangerous-20260816T230559`.
 - Current checkpoint: code, static verification, and the owner-authorized local
   install are complete. The selected no-tab mark is rendered from its real
   asset with the Quattro accent; the persisted setting is off by default and
@@ -664,7 +667,7 @@ turn per provider.
   shell restart hit Quickshell's known teardown crash once; its crash handler
   recovered automatically, the settled shell responds to IPC, a new
   shell-owned installed broker is running, and the fresh log contains no
-  OmaPilot/Quickchat-specific load error. Changes remain uncommitted. Owner-run
+  OmaPilot/OmaPilot-specific load error. Changes remain uncommitted. Owner-run
   visual interaction and a deliberately scoped real device action remain the
   live validation gates.
 
@@ -677,8 +680,8 @@ turn per provider.
   requests show exact approval cards; Dangerous auto-approve applies to every
   submission only when enabled; both enabled quick actions remain visible;
   focused QML/UI/manifest checks and `git diff --check` pass.
-- Branch/worktree: `quickchat-style-revamp` at
-  `/home/sbull/worktrees/omarchy-quickchat-style-revamp`; all earlier checkpoint
+- Branch/worktree: `omapilot-style-revamp` at
+  `/home/sbull/worktrees/omarchy-omapilot-style-revamp`; all earlier checkpoint
   work remains uncommitted and preserved.
 - Allowed: scoped presentation, persisted dangerous-setting plumbing,
   documentation, tests, local merged install, and guarded shell restart for the
@@ -699,7 +702,7 @@ turn per provider.
     eight presentation, and five quick-action checks. The complete staged
     runtime passed 135 tests with 12 live-provider skips. Context source,
     automatic policy, and built-broker hashes remained byte-identical. Rollback:
-    `/home/sbull/.local/state/omarchy/quickchat-backups/pre-omapilot-unified-20260816T232710`.
+    `/home/sbull/.local/state/omarchy/omapilot-backups/pre-omapilot-unified-20260816T232710`.
   - [ ] Owner-run visual and real permission-flow validation.
 - Adjacent prompt issue: the installed context envelope already says desktop
   metadata is optional and untrusted, but it does not explicitly tell a harness
@@ -710,7 +713,7 @@ turn per provider.
   silently absorbed into this style worktree.
 - Current checkpoint: unified presentation is implemented, statically verified,
   installed, and reloaded. The shell responds to IPC, the installed broker is
-  running, and the fresh shell log contains no OmaPilot/Quickchat-specific load
+  running, and the fresh shell log contains no OmaPilot/OmaPilot-specific load
   error or crash. Changes remain uncommitted. Owner-run visual and real
   permission-flow validation remains open.
 
@@ -728,8 +731,8 @@ turn per provider.
   a keyboard-accessible details affordance with message, code, and retryability;
   Escape returns from details to the conversation; focused QML/UI/manifest and
   repository checks pass.
-- Branch/worktree: `quickchat-style-revamp` at
-  `/home/sbull/worktrees/omarchy-quickchat-style-revamp`; preserve every earlier
+- Branch/worktree: `omapilot-style-revamp` at
+  `/home/sbull/worktrees/omarchy-omapilot-style-revamp`; preserve every earlier
   uncommitted checkpoint change.
 - Allowed: scoped QML, presentation helpers, manifest preferences,
   documentation, tests, static previews, an owner-authorized local merged
@@ -754,7 +757,7 @@ turn per provider.
     seven quick-action checks. The preserved merged runtime remains the earlier
     135-pass/12-live-skip candidate and its context source, automatic policy,
     and built broker hashes are unchanged. Rollback:
-    `/home/sbull/.local/state/omarchy/quickchat-backups/pre-omapilot-actions-20260816T235458`.
+    `/home/sbull/.local/state/omarchy/omapilot-backups/pre-omapilot-actions-20260816T235458`.
   - [ ] Owner-run pointer, keyboard, persisted-action, real streaming, and real
     error validation.
 - Context-stream handoff (not implemented in this presentation worktree):
@@ -794,8 +797,8 @@ turn per provider.
   local/Omarchy capabilities before declining, uses current-information web
   search when available, and reports action success only after tool evidence;
   no permission, approval, IPC, or desktop-context schema authority changes.
-- Branch/worktree: `quickchat-style-revamp` at
-  `/home/sbull/worktrees/omarchy-quickchat-style-revamp`; preserve all earlier
+- Branch/worktree: `omapilot-style-revamp` at
+  `/home/sbull/worktrees/omarchy-omapilot-style-revamp`; preserve all earlier
   uncommitted checkpoints and do not edit another worktree.
 - Allowed: the scoped WaitingIndicator/Panel layout, shared hidden instruction
   text and its provider-native injection points, focused tests, generated broker
@@ -836,12 +839,12 @@ turn per provider.
   without replacing its separate desktop-context/provider-tools payload.
 - Done criteria: the public repository is named `omarchy-omapilot`; README,
   security, and marketplace URLs use that name; stable plugin/runtime/data
-  identifiers remain compatible; `quickchat-style-revamp` is committed and
+  identifiers remain compatible; `omapilot-style-revamp` is committed and
   pushed; a backed-up merged install passes source, merged-QML, provider-policy,
   protocol, motion, manifest, and shell-startup gates; owner interaction remains
   explicitly separate from static and startup evidence.
-- Branch/worktree: `quickchat-style-revamp` at
-  `/home/sbull/worktrees/omarchy-quickchat-style-revamp`; published repository
+- Branch/worktree: `omapilot-style-revamp` at
+  `/home/sbull/worktrees/omarchy-omapilot-style-revamp`; published repository
   `spencerbull/omarchy-omapilot`. Commit `03c569b` contains the complete visual,
   interaction, permission-setting, quick-action, error, motion, prompt, test,
   and public-name checkpoint.
@@ -864,7 +867,7 @@ turn per provider.
     and `git diff --check`. Shellcheck remained unavailable and was reported.
   - [x] Rename the public repository to `spencerbull/omarchy-omapilot`, update
     its description, preserve open provider-tools PR 3, and push
-    `quickchat-style-revamp` at `03c569b`.
+    `omapilot-style-revamp` at `03c569b`.
   - [x] Build and validate an installed-payload merge that preserves desktop
     context and the provider bundle while applying only the new response-status
     layout, waiting indicator, shared prompt, and public documentation deltas.
@@ -874,19 +877,19 @@ turn per provider.
   - [x] Install the candidate without directly editing `shell.json`; the file
     remained byte-identical through the swap. During the subsequent restart,
     Quattro rewrote unrelated clock defaults and the bar transparency field.
-    The complete OmaPilot/Quickchat settings object remained identical, so the
+    The complete OmaPilot/OmaPilot settings object remained identical, so the
     unrelated live rewrite was preserved rather than rolled back. The installed
     `runtime/src/context.ts` hash remains
     `bc12983327fcdde9a3960c8f3d57fa543f56f270d5597ab097cd6e6de03dfa0d`
     and the installed provider broker hash remains
     `61212d41c515994f648fba6ddc756664aee83dd68fec747aa604ad7f4815f9ca`.
     Rollback snapshot:
-    `/home/sbull/.local/state/omarchy/quickchat-backups/pre-omapilot-motion-prompt-20260817T052319Z`.
+    `/home/sbull/.local/state/omarchy/omapilot-backups/pre-omapilot-motion-prompt-20260817T052319Z`.
   - [x] Complete the unlocked guarded restart and verify shell IPC `ping`,
     plugin discovery as enabled OmaPilot, and one new shell-owned installed
     broker. The restart wrapper briefly exited status 255 after looking for a
     default config, then its handler relaunched the correct Omarchy shell; the
-    settled log contains no OmaPilot/Quickchat load error.
+    settled log contains no OmaPilot/OmaPilot load error.
   - [ ] Owner-run visual, pointer, keyboard, settings persistence, real waiting/
     streaming/completion/error, web-search, local action, permission, and
     dangerous-auto-approve testing.
@@ -901,10 +904,10 @@ turn per provider.
 - Done criteria: `origin/provider-tools` is integrated without dropping either
   stream's behavior; overlapping UI, policy, documentation, and generated
   runtime files are resolved deliberately; combined static and packaging gates
-  pass; `quickchat-style-revamp` is pushed; one draft PR targets `main`; and the
+  pass; `omapilot-style-revamp` is pushed; one draft PR targets `main`; and the
   provider-only PR is closed as superseded after the consolidated PR exists.
-- Branch/worktree: `quickchat-style-revamp` at
-  `/home/sbull/worktrees/omarchy-quickchat-style-revamp`; the provider-tools
+- Branch/worktree: `omapilot-style-revamp` at
+  `/home/sbull/worktrees/omarchy-omapilot-style-revamp`; the provider-tools
   branch is consumed read-only from `origin/provider-tools` and its separate
   worktree remains untouched.
 - Allowed: merge the remote provider-tools branch here, resolve conflicts,
@@ -1105,8 +1108,8 @@ turn per provider.
   Wayland scene graph renders the crisp core and soft bloom in the active theme.
   It retains one unrelated preview-fixture `Composer.qml` undefined-bool warning.
   The separately authorized local install is now complete at
-  `~/.config/omarchy/plugins/io.github.spencerbull.quickchat`. A guarded
-  three-way payload merge changed only `Panel.qml`, `QuickchatStore.qml`, the
+  `~/.config/omarchy/plugins/io.github.spencerbull.omapilot`. A guarded
+  three-way payload merge changed only `Panel.qml`, `OmaPilotStore.qml`, the
   component registry, removal of `WaitingIndicator.qml`, and addition of
   `ResponseActivityBorder.qml`; the installed context-capture and browser-
   companion work remains intact. The installed manifest, merged Wayland smoke,
@@ -1122,7 +1125,7 @@ turn per provider.
   `shell.json` remains byte-identical at SHA-256
   `4ce875fdbddbaff26f3ea847a4fe9484fa7e4ee47ba9cd0f549f4fdfdb1bd92c`.
   Rollback is
-  `~/.config/omarchy/plugins/.io.github.spencerbull.quickchat.perimeter-backup.20260818T133740Z`.
+  `~/.config/omarchy/plugins/.io.github.spencerbull.omapilot.perimeter-backup.20260818T133740Z`.
   The owner exercised a real response after the fresh restart, accepted the
   result as looking good, and authorized commit, branch push, and a PR. Merge
   and release remain outside this checkpoint.
@@ -1204,7 +1207,7 @@ turn per provider.
   later rewrote `shell.json` from `ed0f6bcc…` to `b6b8d498…` during the live
   verification sequence; the orchestrator did not edit or restore that
   user-owned file. The prior component is recoverable from
-  `/home/sbull/.local/state/omarchy/quickchat-backups/20260818T193946Z-before-blur-only/`.
+  `/home/sbull/.local/state/omarchy/omapilot-backups/20260818T193946Z-before-blur-only/`.
   Installed owner verification remains open.
 
 ## Personal capability packs checkpoint 13 (2026-08-22)

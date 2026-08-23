@@ -5,8 +5,8 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
-import "components" as Quickchat
-import "components/internal" as QuickchatInternal
+import "components" as OmaPilot
+import "components/internal" as OmaPilotInternal
 import "components/Presentation.js" as Presentation
 import "components/Protocol.js" as Protocol
 import "components/QuickActions.js" as ActionCatalog
@@ -14,7 +14,7 @@ import "components/StatePhrases.js" as StatePhrases
 
 Panel {
   id: root
-  moduleName: "io.github.spencerbull.quickchat"
+  moduleName: "io.github.spencerbull.omapilot"
   ipcTarget: moduleName
   manageIpc: false
 
@@ -60,31 +60,31 @@ Panel {
     ? Math.max(minimumContentHeight, comfortableCardHeight - popup.verticalContentInset)
     : (viewMode === "error" ? errorView.implicitHeight : chatView.implicitHeight)
   readonly property var responsePhase: Presentation.responsePhase(
-    Quickchat.QuickchatStore.state,
-    Quickchat.QuickchatStore.answerMarkdown !== "" || Quickchat.QuickchatStore.images.length > 0)
+    OmaPilot.OmaPilotStore.state,
+    OmaPilot.OmaPilotStore.answerMarkdown !== "" || OmaPilot.OmaPilotStore.images.length > 0)
   // True whenever the response area is presenting a failure, which is the one
   // state that used to be announced three times over.
-  readonly property bool failureVisible: Quickchat.QuickchatStore.state === "error"
-    || Quickchat.QuickchatStore.state === "unavailable"
+  readonly property bool failureVisible: OmaPilot.OmaPilotStore.state === "error"
+    || OmaPilot.OmaPilotStore.state === "unavailable"
   // The panel speaks the same state language as the ambient surfaces: working
   // is one hue, a delivered answer another, failure the theme's urgent role.
   readonly property string statePhase: failureVisible ? "error"
     : (responseActivityActive ? "thinking"
-      : (Quickchat.QuickchatStore.answerMarkdown !== "" ? "answering" : "listening"))
+      : (OmaPilot.OmaPilotStore.answerMarkdown !== "" ? "answering" : "listening"))
   readonly property bool responseActivityActive:
-    Quickchat.QuickchatStore.state === "preparing"
-    || Quickchat.QuickchatStore.state === "streaming"
+    OmaPilot.OmaPilotStore.state === "preparing"
+    || OmaPilot.OmaPilotStore.state === "streaming"
   property int thinkingPhraseIndex: 0
   readonly property bool genericActivityStatus: responseActivityActive
-    && StatePhrases.isGenericStatus(Quickchat.QuickchatStore.statusMessage)
+    && StatePhrases.isGenericStatus(OmaPilot.OmaPilotStore.statusMessage)
   readonly property string activityStatusText: StatePhrases.thinkingStatus(
-    thinkingPhraseIndex, Quickchat.QuickchatStore.statusMessage)
+    thinkingPhraseIndex, OmaPilot.OmaPilotStore.statusMessage)
   readonly property bool rotatingActivityStatus: root.opened
     && root.genericActivityStatus && root.motionEnabled
   readonly property bool panelWindowActive: panelFocus.Window.window
     ? panelFocus.Window.window.active : false
   readonly property bool modalInteractionActive: composer.popupOpen
-    || Quickchat.QuickchatStore.pendingPermission !== null
+    || OmaPilot.OmaPilotStore.pendingPermission !== null
     || root.previewSource !== ""
     || (root.viewMode === "settings" && settingsView.modalInteractionActive)
     || (root.viewMode === "history" && historyView.modalInteractionActive)
@@ -155,7 +155,7 @@ Panel {
 
   function prepareWorkInAppDraft() {
     var prompt = ActionCatalog.promptFor(root.quickActionItems, "work-in-app")
-    if (prompt === "" || root.viewMode !== "chat" || Quickchat.QuickchatStore.busy) return
+    if (prompt === "" || root.viewMode !== "chat" || OmaPilot.OmaPilotStore.busy) return
     composer.setDraft(prompt)
   }
 
@@ -163,7 +163,7 @@ Panel {
     openedFromHotkey = false
     showChat(false)
     setCenterHoverRevealSuppressed(false)
-    Quickchat.QuickchatStore.latchDesktopContext()
+    OmaPilot.OmaPilotStore.latchDesktopContext()
     root.controller.show()
     Qt.callLater(function() { composer.forceInputFocus() })
   }
@@ -171,7 +171,7 @@ Panel {
   function openFromHotkey() {
     openedFromHotkey = true
     showChat(false)
-    Quickchat.QuickchatStore.latchDesktopContext()
+    OmaPilot.OmaPilotStore.latchDesktopContext()
     root.controller.show()
     Qt.callLater(function() {
       if (root.opened) root.setCenterHoverRevealSuppressed(true)
@@ -182,18 +182,18 @@ Panel {
   function openHistory() {
     settingsView.closePopups(false)
     viewMode = "history"
-    Quickchat.QuickchatStore.latchDesktopContext()
+    OmaPilot.OmaPilotStore.latchDesktopContext()
     root.controller.show()
-    Quickchat.QuickchatStore.requestHistory()
+    OmaPilot.OmaPilotStore.requestHistory()
     Qt.callLater(function() { historyView.forceInitialFocus() })
   }
 
   function openSettings() {
     viewMode = "settings"
-    Quickchat.QuickchatStore.requestCustomProviders()
-    Quickchat.QuickchatStore.requestVoxtypeOsd()
-    Quickchat.QuickchatStore.requestVoiceStatus()
-    Quickchat.QuickchatStore.requestBrowserCompanionStatus()
+    OmaPilot.OmaPilotStore.requestCustomProviders()
+    OmaPilot.OmaPilotStore.requestVoxtypeOsd()
+    OmaPilot.OmaPilotStore.requestVoiceStatus()
+    OmaPilot.OmaPilotStore.requestBrowserCompanionStatus()
     Qt.callLater(function() { settingsView.forceInitialFocus() })
   }
 
@@ -211,8 +211,8 @@ Panel {
   function close() {
     setCenterHoverRevealSuppressed(false)
     previewSource = ""
-    Quickchat.QuickchatStore.clearContextAttachments()
-    Quickchat.QuickchatStore.clearDesktopContextLatch()
+    OmaPilot.OmaPilotStore.clearContextAttachments()
+    OmaPilot.OmaPilotStore.clearDesktopContextLatch()
     root.controller.hide()
     if (hostWidget) Qt.callLater(function() {
       if (typeof hostWidget.restoreFocus === "function") hostWidget.restoreFocus()
@@ -223,7 +223,7 @@ Panel {
   function closeForExternalHandoff() {
     setCenterHoverRevealSuppressed(false)
     previewSource = ""
-    Quickchat.QuickchatStore.clearDesktopContextLatch()
+    OmaPilot.OmaPilotStore.clearDesktopContextLatch()
     root.controller.hide()
   }
 
@@ -242,13 +242,13 @@ Panel {
     return String(provider) + "Model"
   }
 
-  onSettingsChanged: Quickchat.QuickchatStore.configure(settings)
-  Component.onCompleted: Quickchat.QuickchatStore.configure(settings)
+  onSettingsChanged: OmaPilot.OmaPilotStore.configure(settings)
+  Component.onCompleted: OmaPilot.OmaPilotStore.configure(settings)
   onOpenedChanged: {
     if (opened) {
-      Quickchat.QuickchatStore.configure(settings)
+      OmaPilot.OmaPilotStore.configure(settings)
       if (viewMode === "history") {
-        Quickchat.QuickchatStore.requestHistory()
+        OmaPilot.OmaPilotStore.requestHistory()
         Qt.callLater(function() { historyView.forceInitialFocus() })
       } else if (viewMode === "settings") {
         Qt.callLater(function() { settingsView.forceInitialFocus() })
@@ -256,22 +256,22 @@ Panel {
         Qt.callLater(function() { errorView.forceInitialFocus() })
       } else Qt.callLater(function() { composer.forceInputFocus() })
     } else {
-      Quickchat.QuickchatStore.clearDesktopContextLatch()
+      OmaPilot.OmaPilotStore.clearDesktopContextLatch()
     }
   }
 
   Connections {
-    target: Quickchat.QuickchatStore
+    target: OmaPilot.OmaPilotStore
     function onHerdrContinued() { root.closeForExternalHandoff() }
     function onContextOverlayRequested(payload) {
       var hostShell = root.bar && root.bar.shell ? root.bar.shell : null
       if (!hostShell || typeof hostShell.summon !== "function") {
-        Quickchat.QuickchatStore.toastRequested("Context capture is unavailable in this shell")
+        OmaPilot.OmaPilotStore.toastRequested("Context capture is unavailable in this shell")
         return
       }
       root.closeForExternalHandoff()
       if (!hostShell.summon(root.moduleName, payload))
-        Quickchat.QuickchatStore.toastRequested("Context capture overlay could not be opened")
+        OmaPilot.OmaPilotStore.toastRequested("Context capture overlay could not be opened")
     }
     function onContextBrowserPickerRequested() { root.closeForExternalHandoff() }
   }
@@ -281,12 +281,12 @@ Panel {
     sequence: "Escape"
     onActivated: {
       var action = Presentation.escapeAction(root.viewMode, composer.popupOpen,
-        settingsView.popupOpen, root.previewSource !== "", Quickchat.QuickchatStore.busy)
+        settingsView.popupOpen, root.previewSource !== "", OmaPilot.OmaPilotStore.busy)
       if (action === "close-composer-popup") composer.closePopups()
       else if (action === "close-settings-popup") settingsView.closePopups()
       else if (action === "close-preview") root.previewSource = ""
       else if (action === "show-chat") root.showChat()
-      else if (action === "cancel") Quickchat.QuickchatStore.cancel()
+      else if (action === "cancel") OmaPilot.OmaPilotStore.cancel()
       else root.close()
     }
   }
@@ -324,7 +324,7 @@ Panel {
       focus: true
       Keys.onPressed: function(event) { panelKeyboardNavigation.handleKey(event) }
 
-      QuickchatInternal.PanelKeyboardNavigation {
+      OmaPilotInternal.PanelKeyboardNavigation {
         id: panelKeyboardNavigation
         focusRoot: panelFocus
         activeFocusItem: panelFocus.Window.window
@@ -333,7 +333,7 @@ Panel {
         modalInteractionActive: root.modalInteractionActive
         workInAppShortcutEnabled: root.viewMode === "chat"
           && root.workInAppActionAvailable
-          && !Quickchat.QuickchatStore.busy
+          && !OmaPilot.OmaPilotStore.busy
         onWorkInAppRequested: root.prepareWorkInAppDraft()
       }
 
@@ -355,10 +355,10 @@ Panel {
         // The request is the hero and sits at the top. The old panel opened with
         // a logo, a tagline, and a gear, then buried the input under the answer;
         // that is app chrome. What the user came to do goes first.
-        Quickchat.Composer {
+        OmaPilot.Composer {
           id: composer
           Layout.fillWidth: true
-          backend: Quickchat.QuickchatStore
+          backend: OmaPilot.OmaPilotStore
           foreground: root.foreground
           background: root.surface
           accent: root.accent
@@ -373,10 +373,10 @@ Panel {
         // curtain uses, so the typed and the spoken paths present identically.
         Item {
           id: answerCard
-          readonly property bool contentVisible: Quickchat.QuickchatStore.question !== ""
-            || Quickchat.QuickchatStore.answerMarkdown !== ""
-            || Quickchat.QuickchatStore.state === "error"
-            || Quickchat.QuickchatStore.state === "unavailable"
+          readonly property bool contentVisible: OmaPilot.OmaPilotStore.question !== ""
+            || OmaPilot.OmaPilotStore.answerMarkdown !== ""
+            || OmaPilot.OmaPilotStore.state === "error"
+            || OmaPilot.OmaPilotStore.state === "unavailable"
           Layout.fillWidth: true
           Layout.minimumHeight: contentVisible ? Style.space(120) : stateLightBar.implicitHeight
           Layout.preferredHeight: implicitHeight
@@ -387,7 +387,7 @@ Panel {
           // One persistent seam carries the entire panel's state. It remains a
           // quiet accent while composing, gathers pace while working, and
           // settles into the answer or error hue without becoming a progress bar.
-          Quickchat.StateLightBar {
+          OmaPilot.StateLightBar {
             id: stateLightBar
             anchors.left: parent.left
             anchors.right: parent.right
@@ -407,11 +407,11 @@ Panel {
 
             RowLayout {
               Layout.fillWidth: true
-              visible: Quickchat.QuickchatStore.question !== "" || root.responsePhase.label !== ""
+              visible: OmaPilot.OmaPilotStore.question !== "" || root.responsePhase.label !== ""
 
               Text {
                 Layout.fillWidth: true
-                text: Quickchat.QuickchatStore.question
+                text: OmaPilot.OmaPilotStore.question
                 color: Qt.darker(root.foreground, 1.35)
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall
@@ -484,14 +484,14 @@ Panel {
               id: permissionCard
               Layout.fillWidth: true
               implicitHeight: permissionContent.implicitHeight + contentTopInset + contentBottomInset + Style.spacing.xl * 2
-              visible: Quickchat.QuickchatStore.pendingPermission !== null
+              visible: OmaPilot.OmaPilotStore.pendingPermission !== null
               color: Style.normalFillFor(root.foreground, root.accent)
               borderSpec: Border.controlSpec("focus", root.foreground, root.accent)
               radius: Style.cornerRadius
 
-              QuickchatInternal.PermissionFocusGuard {
-                permissionId: Quickchat.QuickchatStore.pendingPermission
-                  ? String(Quickchat.QuickchatStore.pendingPermission.id || "") : ""
+              OmaPilotInternal.PermissionFocusGuard {
+                permissionId: OmaPilot.OmaPilotStore.pendingPermission
+                  ? String(OmaPilot.OmaPilotStore.pendingPermission.id || "") : ""
                 defaultTarget: denyPermission.visible ? denyPermission : permissionChoices.itemAt(0)
               }
 
@@ -505,8 +505,8 @@ Panel {
 
                 Text {
                   Layout.fillWidth: true
-                  text: Quickchat.QuickchatStore.pendingPermission
-                    ? "Approval required: " + Quickchat.QuickchatStore.pendingPermission.title : ""
+                  text: OmaPilot.OmaPilotStore.pendingPermission
+                    ? "Approval required: " + OmaPilot.OmaPilotStore.pendingPermission.title : ""
                   color: root.foreground
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.body
@@ -535,8 +535,8 @@ Panel {
                   TextEdit {
                     id: permissionDetail
                     width: parent.width
-                    text: Quickchat.QuickchatStore.pendingPermission
-                      ? Quickchat.QuickchatStore.pendingPermission.detail : ""
+                    text: OmaPilot.OmaPilotStore.pendingPermission
+                      ? OmaPilot.OmaPilotStore.pendingPermission.detail : ""
                     color: Qt.darker(root.foreground, 1.25)
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.bodySmall
@@ -559,14 +559,14 @@ Panel {
                     background: root.surface
                     bordered: true
                     focusable: true
-                    visible: Quickchat.QuickchatStore.hasPermissionDecision("reject_once")
-                    onClicked: Quickchat.QuickchatStore.respondPermission(
-                      "reject_once", Quickchat.QuickchatStore.permissionChoiceId("reject_once"))
+                    visible: OmaPilot.OmaPilotStore.hasPermissionDecision("reject_once")
+                    onClicked: OmaPilot.OmaPilotStore.respondPermission(
+                      "reject_once", OmaPilot.OmaPilotStore.permissionChoiceId("reject_once"))
                   }
 
                   Repeater {
                     id: permissionChoices
-                    model: Quickchat.QuickchatStore.permissionOptionsWithoutDenyOnce()
+                    model: OmaPilot.OmaPilotStore.permissionOptionsWithoutDenyOnce()
                     delegate: Button {
                       required property var modelData
                       id: permissionChoice
@@ -577,7 +577,7 @@ Panel {
                       active: modelData.decision === "allow_once"
                       bordered: true
                       focusable: true
-                      onClicked: Quickchat.QuickchatStore.respondPermission(modelData.decision, modelData.id)
+                      onClicked: OmaPilot.OmaPilotStore.respondPermission(modelData.decision, modelData.id)
                     }
                   }
                 }
@@ -656,11 +656,11 @@ Panel {
                   width: answerScroll.width
                   spacing: Style.spacing.xl
 
-                  Quickchat.ErrorNotice {
+                  OmaPilot.ErrorNotice {
                     width: parent.width
-                    visible: Quickchat.QuickchatStore.state === "error"
-                      || Quickchat.QuickchatStore.state === "unavailable"
-                    message: Quickchat.QuickchatStore.statusMessage
+                    visible: OmaPilot.OmaPilotStore.state === "error"
+                      || OmaPilot.OmaPilotStore.state === "unavailable"
+                    message: OmaPilot.OmaPilotStore.statusMessage
                     foreground: root.foreground
                     background: root.surface
                     accent: root.accent
@@ -671,7 +671,7 @@ Panel {
                   // Recovery sits with the explanation instead of orphaned under
                   // the composer.
                   Button {
-                    visible: Quickchat.QuickchatStore.canRetry
+                    visible: OmaPilot.OmaPilotStore.canRetry
                     text: "Retry"
                     tooltipText: "Restart the OmaPilot broker"
                     foreground: root.foreground
@@ -680,16 +680,16 @@ Panel {
                     bordered: true
                     focusable: true
                     Accessible.name: tooltipText
-                    onClicked: Quickchat.QuickchatStore.retryBroker()
+                    onClicked: OmaPilot.OmaPilotStore.retryBroker()
                   }
 
                   Text {
-                    visible: Quickchat.QuickchatStore.statusMessage !== ""
+                    visible: OmaPilot.OmaPilotStore.statusMessage !== ""
                       && !root.responseActivityActive
-                      && Quickchat.QuickchatStore.state !== "error"
-                      && Quickchat.QuickchatStore.state !== "unavailable"
+                      && OmaPilot.OmaPilotStore.state !== "error"
+                      && OmaPilot.OmaPilotStore.state !== "unavailable"
                     width: parent.width
-                    text: Quickchat.QuickchatStore.statusMessage
+                    text: OmaPilot.OmaPilotStore.statusMessage
                     color: root.responsePhase.tone === "urgent"
                       ? Color.urgent : Qt.darker(root.foreground, 1.35)
                     font.family: root.fontFamily
@@ -699,12 +699,12 @@ Panel {
                     Accessible.name: text
                   }
 
-                  Quickchat.MarkdownView {
+                  OmaPilot.MarkdownView {
                     id: markdownAnswer
                     width: parent.width
-                    visible: Quickchat.QuickchatStore.answerMarkdown !== "" || Quickchat.QuickchatStore.images.length > 0
-                    markdown: Quickchat.QuickchatStore.answerMarkdown
-                    images: Quickchat.QuickchatStore.images
+                    visible: OmaPilot.OmaPilotStore.answerMarkdown !== "" || OmaPilot.OmaPilotStore.images.length > 0
+                    markdown: OmaPilot.OmaPilotStore.answerMarkdown
+                    images: OmaPilot.OmaPilotStore.images
                     foreground: root.foreground
                     background: root.surface
                     accent: root.accent
@@ -714,13 +714,13 @@ Panel {
                       opacity = visible && root.motionEnabled ? 0 : 1
                       if (visible && root.motionEnabled) firstTokenReveal.restart()
                     }
-                    onLinkActivated: function(url) { Quickchat.QuickchatStore.activateLink(url) }
-                    onImageLoadRequested: function(image) { Quickchat.QuickchatStore.requestImage(image) }
+                    onLinkActivated: function(url) { OmaPilot.OmaPilotStore.activateLink(url) }
+                    onImageLoadRequested: function(image) { OmaPilot.OmaPilotStore.requestImage(image) }
                     onImagePreviewRequested: function(source, alt) {
                       root.previewSource = source
                       root.previewAlt = alt
                     }
-                    onCopyRequested: function(text) { Quickchat.QuickchatStore.copyText(text) }
+                    onCopyRequested: function(text) { OmaPilot.OmaPilotStore.copyText(text) }
 
                     NumberAnimation {
                       id: firstTokenReveal
@@ -757,8 +757,8 @@ Panel {
             // was the loudest thing in the old panel.
             RowLayout {
               Layout.fillWidth: true
-              visible: Quickchat.QuickchatStore.answerMarkdown !== ""
-                || Quickchat.QuickchatStore.currentChatId !== ""
+              visible: OmaPilot.OmaPilotStore.answerMarkdown !== ""
+                || OmaPilot.OmaPilotStore.currentChatId !== ""
               spacing: Style.spacing.md
 
               PanelActionButton {
@@ -766,9 +766,9 @@ Panel {
                 tooltipText: "Copy answer"
                 foreground: Qt.darker(root.foreground, 1.4)
                 focusable: true
-                enabled: Quickchat.QuickchatStore.answerMarkdown !== ""
+                enabled: OmaPilot.OmaPilotStore.answerMarkdown !== ""
                 Accessible.name: tooltipText
-                onClicked: Quickchat.QuickchatStore.copyText(Quickchat.QuickchatStore.answerMarkdown)
+                onClicked: OmaPilot.OmaPilotStore.copyText(OmaPilot.OmaPilotStore.answerMarkdown)
               }
 
               Item { Layout.fillWidth: true }
@@ -780,30 +780,30 @@ Panel {
                 background: root.surface
                 bordered: false
                 focusable: true
-                onClicked: Quickchat.QuickchatStore.newChat()
+                onClicked: OmaPilot.OmaPilotStore.newChat()
               }
 
               Button {
                 text: "Continue in Herdr"
                 tooltipText: "Continue with native harness permissions \u00b7 Super+Alt+H"
-                visible: Quickchat.QuickchatStore.currentChatId !== ""
+                visible: OmaPilot.OmaPilotStore.currentChatId !== ""
                 foreground: Qt.darker(root.foreground, 1.4)
                 background: root.surface
                 accent: root.accent
                 bordered: false
                 focusable: true
-                onClicked: Quickchat.QuickchatStore.continueInHerdr()
+                onClicked: OmaPilot.OmaPilotStore.continueInHerdr()
               }
             }
           }
         }
 
-        Quickchat.QuickActions {
+        OmaPilot.QuickActions {
           id: quickActions
           Layout.fillWidth: true
-          visible: Quickchat.QuickchatStore.question === ""
-            && Quickchat.QuickchatStore.answerMarkdown === ""
-            && !Quickchat.QuickchatStore.busy
+          visible: OmaPilot.OmaPilotStore.question === ""
+            && OmaPilot.OmaPilotStore.answerMarkdown === ""
+            && !OmaPilot.OmaPilotStore.busy
             && quickActions.actions.length > 0
           actions: root.quickActionItems
           foreground: root.foreground
@@ -829,7 +829,7 @@ Panel {
             Layout.fillWidth: true
             Layout.minimumWidth: 0
             elide: Text.ElideRight
-            text: Protocol.providerShortLabel(Quickchat.QuickchatStore.provider)
+            text: Protocol.providerShortLabel(OmaPilot.OmaPilotStore.provider)
             color: Qt.darker(root.foreground, 1.35)
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall
@@ -922,11 +922,11 @@ Panel {
         }
       }
 
-      Quickchat.SettingsView {
+      OmaPilot.SettingsView {
         id: settingsView
         anchors.fill: parent
         visible: root.viewMode === "settings"
-        backend: Quickchat.QuickchatStore
+        backend: OmaPilot.OmaPilotStore
         dangerousAutoApprove: root.dangerousAutoApprove
         webHandoffProvider: root.webHandoffProvider
         desktopContextEnabled: settings
@@ -951,43 +951,43 @@ Panel {
           root.persistSettings({ webHandoffProvider: Protocol.normalizedWebHandoffProvider(provider) || "duckduckgo" })
         }
         onCapabilityEnabledRequested: function(capabilityId, enabled) {
-          Quickchat.QuickchatStore.setCapabilityEnabled(capabilityId, enabled)
+          OmaPilot.OmaPilotStore.setCapabilityEnabled(capabilityId, enabled)
         }
         onCapabilityFilesRootRequested: function(path) {
-          Quickchat.QuickchatStore.setCapabilityFilesRoot(path)
+          OmaPilot.OmaPilotStore.setCapabilityFilesRoot(path)
         }
-        onCapabilitiesRefreshRequested: Quickchat.QuickchatStore.requestCapabilities()
+        onCapabilitiesRefreshRequested: OmaPilot.OmaPilotStore.requestCapabilities()
         onProviderChanged: function(provider) { root.selectProvider(provider) }
         onModelChanged: function(provider, model) {
           var values = {}; values[root.providerModelKey(provider)] = model; root.persistSettings(values)
         }
         onQuickActionsEdited: function(actions) { root.setQuickActions(actions) }
-        onBrowserCompanionInstallRequested: Quickchat.QuickchatStore.installBrowserCompanion()
-        onBrowserCompanionUninstallRequested: Quickchat.QuickchatStore.uninstallBrowserCompanion()
-        onBrowserCompanionRefreshRequested: Quickchat.QuickchatStore.requestBrowserCompanionStatus()
-        onBrowserCompanionOpenSettingsRequested: function(family) { Quickchat.QuickchatStore.openBrowserCompanionSettings(family) }
-        onBrowserCompanionCopyPathRequested: function(family) { Quickchat.QuickchatStore.copyBrowserCompanionPath(family) }
+        onBrowserCompanionInstallRequested: OmaPilot.OmaPilotStore.installBrowserCompanion()
+        onBrowserCompanionUninstallRequested: OmaPilot.OmaPilotStore.uninstallBrowserCompanion()
+        onBrowserCompanionRefreshRequested: OmaPilot.OmaPilotStore.requestBrowserCompanionStatus()
+        onBrowserCompanionOpenSettingsRequested: function(family) { OmaPilot.OmaPilotStore.openBrowserCompanionSettings(family) }
+        onBrowserCompanionCopyPathRequested: function(family) { OmaPilot.OmaPilotStore.copyBrowserCompanionPath(family) }
         onCustomProviderAddRequested: function(id, name, baseUrl, api, models, apiKey) {
-          Quickchat.QuickchatStore.addCustomProvider(id, name, baseUrl, api, models, apiKey)
+          OmaPilot.OmaPilotStore.addCustomProvider(id, name, baseUrl, api, models, apiKey)
         }
         onCustomProviderTestRequested: function(baseUrl, apiKey) {
-          Quickchat.QuickchatStore.testCustomProvider(baseUrl, apiKey)
+          OmaPilot.OmaPilotStore.testCustomProvider(baseUrl, apiKey)
         }
         onVoxtypeOsdRequested: function(enabled) {
-          Quickchat.QuickchatStore.setVoxtypeOsd(enabled)
+          OmaPilot.OmaPilotStore.setVoxtypeOsd(enabled)
         }
         onVoiceEnabledRequested: function(enabled) {
           root.persistSettings({ voiceEnabled: enabled === true })
         }
         onTtsProviderRequested: function(provider) {
           var selected = Protocol.normalizedTtsProvider(provider) || "kokoro"
-          var catalog = Protocol.ttsProviderStatus(Quickchat.QuickchatStore.voiceStatus, selected)
+          var catalog = Protocol.ttsProviderStatus(OmaPilot.OmaPilotStore.voiceStatus, selected)
           var model = Protocol.ttsDefaultModel(catalog)
           var voice = Protocol.ttsDefaultVoice(catalog, model)
           root.persistSettings({ ttsProvider: selected, ttsModel: model, ttsVoice: voice })
         }
         onTtsModelRequested: function(model) {
-          var catalog = Protocol.ttsProviderStatus(Quickchat.QuickchatStore.voiceStatus, root.ttsProvider)
+          var catalog = Protocol.ttsProviderStatus(OmaPilot.OmaPilotStore.voiceStatus, root.ttsProvider)
           var selected = String(model || "")
           var voice = root.ttsVoice
           if (!Protocol.ttsVoiceAvailable(catalog, selected, voice))
@@ -998,26 +998,26 @@ Panel {
           root.persistSettings({ ttsVoice: String(voice || "") })
         }
         onTtsKeySetRequested: function(provider, apiKey) {
-          Quickchat.QuickchatStore.setTtsKey(provider, apiKey)
+          OmaPilot.OmaPilotStore.setTtsKey(provider, apiKey)
         }
         onTtsKeyClearRequested: function(provider) {
-          Quickchat.QuickchatStore.clearTtsKey(provider)
+          OmaPilot.OmaPilotStore.clearTtsKey(provider)
         }
         onTtsKeyTestRequested: function(provider, apiKey) {
-          Quickchat.QuickchatStore.testTtsKey(provider, apiKey)
+          OmaPilot.OmaPilotStore.testTtsKey(provider, apiKey)
         }
         onCustomProviderRemoveRequested: function(id) {
-          Quickchat.QuickchatStore.removeCustomProvider(id)
+          OmaPilot.OmaPilotStore.removeCustomProvider(id)
         }
         onDismissed: root.showChat()
       }
 
-      Quickchat.ErrorDetailsView {
+      OmaPilot.ErrorDetailsView {
         id: errorView
         anchors.fill: parent
         visible: root.viewMode === "error"
-        backend: Quickchat.QuickchatStore
-        details: Quickchat.QuickchatStore.errorDetails
+        backend: OmaPilot.OmaPilotStore
+        details: OmaPilot.OmaPilotStore.errorDetails
         foreground: root.foreground
         background: root.surface
         accent: root.accent
@@ -1026,23 +1026,23 @@ Panel {
         onDismissed: root.showChat()
       }
 
-      Quickchat.HistoryView {
+      OmaPilot.HistoryView {
         id: historyView
         anchors.fill: parent
         visible: root.viewMode === "history"
-        history: Quickchat.QuickchatStore.history
+        history: OmaPilot.OmaPilotStore.history
         motionEnabled: root.motionEnabled
         foreground: root.foreground
         background: root.surface
         accent: root.accent
         fontFamily: root.fontFamily
         onChatSelected: function(chat) {
-          Quickchat.QuickchatStore.loadChat(chat)
+          OmaPilot.OmaPilotStore.loadChat(chat)
           answerScroll.showFromStart()
           root.showChat()
         }
-        onDeleteRequested: function(chatId) { Quickchat.QuickchatStore.deleteHistory(chatId) }
-        onClearRequested: Quickchat.QuickchatStore.clearHistory()
+        onDeleteRequested: function(chatId) { OmaPilot.OmaPilotStore.deleteHistory(chatId) }
+        onClearRequested: OmaPilot.OmaPilotStore.clearHistory()
         onCloseRequested: {
           root.showChat()
         }

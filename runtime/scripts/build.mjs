@@ -39,7 +39,7 @@ const common = {
 try {
   await mkdir(resolve(distRoot, "adapters"), { recursive: true });
 
-  const licenseBundle = resolve(workRoot, "quickchat-broker-license.js");
+  const licenseBundle = resolve(workRoot, "omapilot-broker-license.js");
   await build({
     entryPoints: ["runtime/src/index.ts"],
     outfile: licenseBundle,
@@ -62,13 +62,13 @@ try {
     projectRoot,
     sourceMap,
     lockPath: resolve(projectRoot, "package-lock.json"),
-    outputPath: resolve(distRoot, "quickchat-broker.THIRD_PARTY_LICENSES.txt")
+    outputPath: resolve(distRoot, "omapilot-broker.THIRD_PARTY_LICENSES.txt")
   });
 
-  const brokerPayload = resolve(workRoot, "quickchat-broker.cjs");
+  const brokerPayload = resolve(workRoot, "omapilot-broker.cjs");
   await build({ ...common, entryPoints: ["runtime/src/index.ts"], outfile: brokerPayload });
-  await embeddedExecutable(brokerPayload, resolve(distRoot, "quickchat-broker"), 3);
-  await copyFile(`${brokerPayload}.LEGAL.txt`, resolve(distRoot, "quickchat-broker.LEGAL.txt"));
+  await embeddedExecutable(brokerPayload, resolve(distRoot, "omapilot-broker"), 3);
+  await copyFile(`${brokerPayload}.LEGAL.txt`, resolve(distRoot, "omapilot-broker.LEGAL.txt"));
 
   const capabilityMcpOutput = resolve(distRoot, "capability-mcp.js");
   await build({
@@ -89,9 +89,9 @@ try {
   await embeddedExecutable(adapterPayload, resolve(distRoot, "adapters/codex-acp"), 4);
 
   await Promise.all([
-    resolve(distRoot, "quickchat-broker.js"),
-    resolve(distRoot, "quickchat-broker.js.map"),
-    resolve(distRoot, "quickchat-broker.js.LEGAL.txt"),
+    resolve(distRoot, "omapilot-broker.js"),
+    resolve(distRoot, "omapilot-broker.js.map"),
+    resolve(distRoot, "omapilot-broker.js.LEGAL.txt"),
     resolve(distRoot, "capability-mcp.js.map"),
     resolve(distRoot, "adapters/codex-acp.js")
   ].map((path) => rm(path, { force: true })));

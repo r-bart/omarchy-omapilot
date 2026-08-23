@@ -2,11 +2,11 @@ import QtQuick
 import Quickshell
 import qs.Commons
 import qs.Ui
-import "components" as Quickchat
+import "components" as OmaPilot
 
 BarWidget {
   id: root
-  moduleName: "io.github.spencerbull.quickchat"
+  moduleName: "io.github.spencerbull.omapilot"
 
   // Quattro does not currently expose free space for a bar section. Inline
   // composition is therefore opt-in-by-capability: a future host can expose
@@ -33,7 +33,7 @@ BarWidget {
     if ("settings" in target) target.settings = root.settings
     if ("anchorItem" in target) target.anchorItem = root.inlineActive ? inlineComposer : button
     if ("hostWidget" in target) target.hostWidget = root
-    Quickchat.QuickchatStore.configure(root.settings)
+    OmaPilot.OmaPilotStore.configure(root.settings)
   }
 
   function persist(values) {
@@ -104,7 +104,7 @@ BarWidget {
       root.close()
       return
     }
-    Quickchat.QuickchatStore.latchDesktopContext()
+    OmaPilot.OmaPilotStore.latchDesktopContext()
     if (root.canInline) {
       root.inlineExpanded = true
       Qt.callLater(function() { inlineComposer.forceInputFocus() })
@@ -120,7 +120,7 @@ BarWidget {
   onCanInlineChanged: if (!canInline) inlineExpanded = false
 
   Connections {
-    target: Quickchat.QuickchatStore
+    target: OmaPilot.OmaPilotStore
     function onIpcOpenRequested() {
       if (root.routedWidget() === root) root.open()
     }
@@ -159,16 +159,16 @@ BarWidget {
     bar: root.bar
     text: ""
     iconComponent: Component {
-      Quickchat.OmaPilotMark {
+      OmaPilot.OmaPilotMark {
         anchors.fill: parent
         size: Math.min(width, height)
         accent: button.active && button.useActiveColor
           ? button.activeColor : button.foreground
-        active: Quickchat.QuickchatStore.busy
+        active: OmaPilot.OmaPilotStore.busy
       }
     }
-    active: root.opened || Quickchat.QuickchatStore.busy
-    tooltipText: Quickchat.QuickchatStore.busy ? "OmaPilot is working" : "OmaPilot"
+    active: root.opened || OmaPilot.OmaPilotStore.busy
+    tooltipText: OmaPilot.OmaPilotStore.busy ? "OmaPilot is working" : "OmaPilot"
     Accessible.name: tooltipText
 
     onPressed: function(b) {
@@ -179,12 +179,12 @@ BarWidget {
     }
   }
 
-  Quickchat.Composer {
+  OmaPilot.Composer {
     id: inlineComposer
     anchors.fill: parent
     visible: root.inlineActive
     inlineMode: true
-    backend: Quickchat.QuickchatStore
+    backend: OmaPilot.OmaPilotStore
     foreground: root.bar ? root.bar.foreground : Color.bar.text
     background: Color.bar.background
     fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
@@ -199,7 +199,7 @@ BarWidget {
     }
     onEscapeRequested: {
       root.inlineExpanded = false
-      Quickchat.QuickchatStore.clearDesktopContextLatch()
+      OmaPilot.OmaPilotStore.clearDesktopContextLatch()
       button.forceActiveFocus()
     }
   }

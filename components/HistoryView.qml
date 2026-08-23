@@ -3,7 +3,7 @@ import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 import "Protocol.js" as Protocol
-import "internal" as QuickchatInternal
+import "internal" as OmaPilotInternal
 
 Item {
   id: root
@@ -133,7 +133,7 @@ Item {
 
         Keys.onPressed: function(event) { historyKeyboard.handleKey(event) }
 
-        QuickchatInternal.HistoryListKeyboardHandler {
+        OmaPilotInternal.HistoryListKeyboardHandler {
           id: historyKeyboard
           list: list
           history: root.history

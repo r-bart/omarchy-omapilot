@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtTest
-import "../components/internal" as QuickchatInternal
+import "../components/internal" as OmaPilotInternal
 import "../components/QuickActions.js" as ActionCatalog
 
 Item {
@@ -78,7 +78,7 @@ Item {
     text: "read\nonly"
   }
 
-  QuickchatInternal.PanelKeyboardNavigation {
+  OmaPilotInternal.PanelKeyboardNavigation {
     id: navigation
     focusRoot: root
     activeFocusItem: root.Window.window

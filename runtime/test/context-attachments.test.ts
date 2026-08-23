@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ContextAttachmentStore, textAtPointFromTsv, windowAtPointFromHyprland, windowBoundsFromHyprland } from "../src/context-attachments.js";
 import { promptWithContextAttachments } from "../src/context.js";
 import { ImageStore } from "../src/images.js";
-import { quickchatPaths } from "../src/paths.js";
+import { omapilotPaths } from "../src/paths.js";
 import { commandSchema } from "../src/types.js";
 
 const header = "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext";
@@ -104,7 +104,7 @@ describe("explicit context attachments", () => {
       XDG_RUNTIME_DIR: join(root, "run"),
       PATH: `${join(fixtureRoot, "context-bin")}:${join(fixtureRoot, "image-bin")}:${process.env.PATH ?? ""}`
     };
-    const paths = quickchatPaths(env);
+    const paths = omapilotPaths(env);
     const images = new ImageStore(paths, env);
     const store = new ContextAttachmentStore(images, paths, env);
     const target = await store.begin("capture-1", {
@@ -135,7 +135,7 @@ describe("explicit context attachments", () => {
       XDG_RUNTIME_DIR: join(root, "run"),
       PATH: `${join(fixtureRoot, "context-bin")}:${join(fixtureRoot, "image-bin")}:${process.env.PATH ?? ""}`
     };
-    const paths = quickchatPaths(env);
+    const paths = omapilotPaths(env);
     const images = new ImageStore(paths, env);
     const store = new ContextAttachmentStore(images, paths, env);
     await store.begin("browser-1", {

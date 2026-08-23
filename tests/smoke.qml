@@ -17,9 +17,9 @@ ShellRoot {
     running: true
     onTriggered: {
       if (pluginLoader.status === Loader.Error)
-        console.error("quickchat smoke loader failed")
+        console.error("omapilot smoke loader failed")
       if (overlayLoader.status === Loader.Error)
-        console.error("quickchat overlay smoke loader failed")
+        console.error("omapilot overlay smoke loader failed")
       Qt.quit()
     }
   }

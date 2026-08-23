@@ -10,7 +10,7 @@ usage() {
   cat <<'USAGE'
 Usage: scripts/package-runtime.sh [--dry-run] [--output-dir DIR]
 
-Assemble (but do not publish) the pinned Quickchat ACP runtime for Linux x86-64.
+Assemble (but do not publish) the pinned OmaPilot ACP runtime for Linux x86-64.
 USAGE
 }
 
@@ -40,14 +40,14 @@ done
 required=(
   package.json
   package-lock.json
-  runtime/dist/quickchat-broker
-  runtime/dist/quickchat-broker.LEGAL.txt
-  runtime/dist/quickchat-broker.THIRD_PARTY_LICENSES.txt
+  runtime/dist/omapilot-broker
+  runtime/dist/omapilot-broker.LEGAL.txt
+  runtime/dist/omapilot-broker.THIRD_PARTY_LICENSES.txt
   runtime/dist/capability-mcp.js
   runtime/dist/adapters/codex-acp
   runtime/dist/adapters/Apache-2.0.txt
   runtime/policies/automatic.md
-  runtime/bin/quickchat-broker
+  runtime/bin/omapilot-broker
   runtime/bin/codex-acp
   runtime/adapters.release.json
   runtime/policies/automatic.md
@@ -100,27 +100,27 @@ version=$(jq -r '.version' "$repo_root/manifest.json")
   exit 1
 }
 
-stage_parent=$(mktemp -d "${TMPDIR:-/tmp}/quickchat-package.XXXXXX")
+stage_parent=$(mktemp -d "${TMPDIR:-/tmp}/omapilot-package.XXXXXX")
 trap 'rm -rf -- "$stage_parent"' EXIT
-bundle_name="omarchy-quickchat-runtime-${version}-${platform}"
+bundle_name="omarchy-omapilot-runtime-${version}-${platform}"
 stage="$stage_parent/$bundle_name"
 mkdir -p "$stage/runtime/dist/adapters" "$stage/runtime/bin" "$stage/runtime/policies"
 
 cp "$repo_root/package.json" "$repo_root/package-lock.json" "$stage/"
-cp "$repo_root/runtime/dist/quickchat-broker" "$stage/runtime/dist/"
-cp "$repo_root/runtime/dist/quickchat-broker.LEGAL.txt" "$stage/runtime/dist/"
-cp "$repo_root/runtime/dist/quickchat-broker.THIRD_PARTY_LICENSES.txt" "$stage/runtime/dist/"
+cp "$repo_root/runtime/dist/omapilot-broker" "$stage/runtime/dist/"
+cp "$repo_root/runtime/dist/omapilot-broker.LEGAL.txt" "$stage/runtime/dist/"
+cp "$repo_root/runtime/dist/omapilot-broker.THIRD_PARTY_LICENSES.txt" "$stage/runtime/dist/"
 cp "$repo_root/runtime/dist/capability-mcp.js" "$stage/runtime/dist/"
 cp "$repo_root/runtime/dist/adapters/codex-acp" "$stage/runtime/dist/adapters/"
 cp "$repo_root/runtime/dist/adapters/Apache-2.0.txt" "$stage/runtime/dist/adapters/"
 cp "$repo_root/runtime/policies/automatic.md" "$stage/runtime/policies/"
-cp "$repo_root/runtime/bin/quickchat-broker" "$repo_root/runtime/bin/codex-acp" \
+cp "$repo_root/runtime/bin/omapilot-broker" "$repo_root/runtime/bin/codex-acp" \
   "$stage/runtime/bin/"
 cp "$repo_root/runtime/adapters.release.json" "$stage/runtime/"
 cp "$repo_root/runtime/policies/automatic.md" "$stage/runtime/policies/"
 cp "$repo_root/THIRD_PARTY_NOTICES.md" "$repo_root/LICENSE" "$stage/"
-chmod 0755 "$stage/runtime/bin/quickchat-broker" "$stage/runtime/bin/codex-acp" \
-  "$stage/runtime/dist/quickchat-broker" "$stage/runtime/dist/adapters/codex-acp" \
+chmod 0755 "$stage/runtime/bin/omapilot-broker" "$stage/runtime/bin/codex-acp" \
+  "$stage/runtime/dist/omapilot-broker" "$stage/runtime/dist/adapters/codex-acp" \
   "$stage/runtime/dist/capability-mcp.js"
 
 (

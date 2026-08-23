@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { presentChat } from "../src/history.js";
 import { ImagePolicyError, ImageStore, inspectImage, isAllowedExternalLink, isPublicAddress } from "../src/images.js";
-import { quickchatPaths } from "../src/paths.js";
+import { omapilotPaths } from "../src/paths.js";
 import { commandSchema, type ChatRecord } from "../src/types.js";
 
 const roots: string[] = [];
@@ -46,8 +46,8 @@ describe("network and image policy", () => {
   });
 
   it("prunes the shared image cache after every direct save", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-image-cache-")); roots.push(root);
-    const paths = quickchatPaths({ HOME: root, XDG_CACHE_HOME: join(root, "cache"), XDG_STATE_HOME: join(root, "state"), XDG_RUNTIME_DIR: join(root, "run") });
+    const root = await mkdtemp(join(tmpdir(), "omapilot-image-cache-")); roots.push(root);
+    const paths = omapilotPaths({ HOME: root, XDG_CACHE_HOME: join(root, "cache"), XDG_STATE_HOME: join(root, "state"), XDG_RUNTIME_DIR: join(root, "run") });
     await mkdir(paths.images, { recursive: true });
     for (let index = 0; index < 10; index += 1) {
       const file = join(paths.images, `old-${String(index)}.png`);
@@ -63,15 +63,15 @@ describe("network and image policy", () => {
   });
 
   it("fails closed when the full image decoder is unavailable", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-no-decoder-")); roots.push(root);
-    const paths = quickchatPaths({ HOME: root, XDG_CACHE_HOME: join(root, "cache"), XDG_STATE_HOME: join(root, "state"), XDG_RUNTIME_DIR: join(root, "run") });
+    const root = await mkdtemp(join(tmpdir(), "omapilot-no-decoder-")); roots.push(root);
+    const paths = omapilotPaths({ HOME: root, XDG_CACHE_HOME: join(root, "cache"), XDG_STATE_HOME: join(root, "state"), XDG_RUNTIME_DIR: join(root, "run") });
     await expect(new ImageStore(paths, { PATH: "/missing" }).save(onePixelPng(), "image/png"))
       .rejects.toMatchObject({ code: "image_decoder_unavailable" } satisfies Partial<ImagePolicyError>);
   });
 
   it("fully decodes, strips, and preserves PNG alpha and JPEG photo media", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-normalize-")); roots.push(root);
-    const paths = quickchatPaths({ HOME: root, XDG_CACHE_HOME: join(root, "cache"), XDG_STATE_HOME: join(root, "state"), XDG_RUNTIME_DIR: join(root, "run") });
+    const root = await mkdtemp(join(tmpdir(), "omapilot-normalize-")); roots.push(root);
+    const paths = omapilotPaths({ HOME: root, XDG_CACHE_HOME: join(root, "cache"), XDG_STATE_HOME: join(root, "state"), XDG_RUNTIME_DIR: join(root, "run") });
     const audit = join(root, "decoder-audit.txt");
     const store = new ImageStore(paths, decoderEnvironment({ FAKE_MAGICK_AUDIT: audit }));
     const alpha = await store.save(alphaPng(), "image/png");
@@ -84,8 +84,8 @@ describe("network and image policy", () => {
   });
 
   it("rejects structurally plausible but undecodable compressed image data", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-malformed-decode-")); roots.push(root);
-    const paths = quickchatPaths({ HOME: root, XDG_CACHE_HOME: join(root, "cache"), XDG_STATE_HOME: join(root, "state"), XDG_RUNTIME_DIR: join(root, "run") });
+    const root = await mkdtemp(join(tmpdir(), "omapilot-malformed-decode-")); roots.push(root);
+    const paths = omapilotPaths({ HOME: root, XDG_CACHE_HOME: join(root, "cache"), XDG_STATE_HOME: join(root, "state"), XDG_RUNTIME_DIR: join(root, "run") });
     const malformed = onePixelPng();
     malformed.fill(0, 41, 48);
     await expect(new ImageStore(paths, decoderEnvironment()).save(malformed, "image/png"))
@@ -93,8 +93,8 @@ describe("network and image policy", () => {
   });
 
   it("rejects oversized provider base64 before decoding", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-base64-limit-")); roots.push(root);
-    const paths = quickchatPaths({ HOME: root, XDG_CACHE_HOME: join(root, "cache"), XDG_STATE_HOME: join(root, "state"), XDG_RUNTIME_DIR: join(root, "run") });
+    const root = await mkdtemp(join(tmpdir(), "omapilot-base64-limit-")); roots.push(root);
+    const paths = omapilotPaths({ HOME: root, XDG_CACHE_HOME: join(root, "cache"), XDG_STATE_HOME: join(root, "state"), XDG_RUNTIME_DIR: join(root, "run") });
     await expect(new ImageStore(paths, decoderEnvironment()).saveBase64("A".repeat(7_000_000), "image/png"))
       .rejects.toMatchObject({ code: "image_size" } satisfies Partial<ImagePolicyError>);
   });
@@ -105,8 +105,8 @@ describe("network and image policy", () => {
   });
 
   it("derives file URLs but never persists them", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-present-")); roots.push(root);
-    const paths = quickchatPaths({ HOME: root, XDG_CACHE_HOME: join(root, "cache"), XDG_STATE_HOME: join(root, "state"), XDG_RUNTIME_DIR: join(root, "run") });
+    const root = await mkdtemp(join(tmpdir(), "omapilot-present-")); roots.push(root);
+    const paths = omapilotPaths({ HOME: root, XDG_CACHE_HOME: join(root, "cache"), XDG_STATE_HOME: join(root, "state"), XDG_RUNTIME_DIR: join(root, "run") });
     const chat = sampleChat();
     const view = presentChat(chat, paths);
     expect(view.images[0]?.localUrl).toMatch(/^file:\/\//u);

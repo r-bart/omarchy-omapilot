@@ -1,6 +1,6 @@
 .pragma library
 
-// UI-facing Quickchat protocol, version 1. The broker owns harness details,
+// UI-facing OmaPilot protocol, version 1. The broker owns harness details,
 // policy, persistence, URL opening, clipboard writes, and Herdr control. QML
 // only sends typed commands and renders normalized events.
 
@@ -932,12 +932,12 @@ function isSafeExternalUrl(url) {
 }
 
 function isImageLink(url) {
-  return String(url || "").indexOf("quickchat-image:") === 0
+  return String(url || "").indexOf("omapilot-image:") === 0
 }
 
 function imageUrl(url) {
   if (!isImageLink(url)) return ""
-  try { return decodeURIComponent(String(url).slice("quickchat-image:".length)) }
+  try { return decodeURIComponent(String(url).slice("omapilot-image:".length)) }
   catch (error) { return "" }
 }
 
@@ -959,13 +959,13 @@ function sanitizeMarkdown(markdown) {
     function(_, alt, url) {
       var target = String(url || "")
       if (!/^https:\/\//i.test(target)) return "Image blocked: " + (alt || "unnamed image")
-      return "[Image: " + (alt || "remote image") + " — click to load](quickchat-image:" + encodeURIComponent(target) + ")"
+      return "[Image: " + (alt || "remote image") + " — click to load](omapilot-image:" + encodeURIComponent(target) + ")"
     })
   value = value.replace(/!\[([^\]]*)\]\[([^\]]+)\]/g,
     function(_, alt, id) {
       var target = definitions[String(id || "").toLowerCase()] || ""
       if (!/^https:\/\//i.test(target)) return "Image blocked: " + (alt || "unnamed image")
-      return "[Image: " + (alt || "remote image") + " — click to load](quickchat-image:" + encodeURIComponent(target) + ")"
+      return "[Image: " + (alt || "remote image") + " — click to load](omapilot-image:" + encodeURIComponent(target) + ")"
     })
   value = value.replace(definitionMatcher, function(line, id) {
     return imageReferences[String(id || "").toLowerCase()] ? "" : line
@@ -978,7 +978,7 @@ function sanitizeMarkdown(markdown) {
   value = value.replace(/<\/?(?:script|iframe|object|embed|style|link|meta)[^>]*>/gi, "")
   // CommonMark has several image forms (inline, full/collapsed/shortcut
   // references, nested labels, and escaped label text). After converting the
-  // forms we understand into broker-owned quickchat-image links, remove the
+  // forms we understand into broker-owned omapilot-image links, remove the
   // image opener itself from every remaining form. Encoding the exclamation
   // mark is deliberately structural: Markdown parses the entity as display
   // text only, so Text.MarkdownText never receives an image token or URL to

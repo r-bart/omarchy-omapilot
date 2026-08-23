@@ -37,7 +37,7 @@ qml_files=(
   "$repo_dir/components/internal/PermissionFocusGuard.qml"
   "$repo_dir/components/internal/PanelKeyboardNavigation.qml"
   "$repo_dir/components/internal/HistoryListKeyboardHandler.qml"
-  "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
   "$repo_dir/components/DesktopContext.qml"
   "$repo_dir/components/Protocol.js"
   "$repo_dir/components/Presentation.js"
@@ -49,44 +49,44 @@ qml_files=(
 
 /usr/lib/qt6/bin/qmllint -I "$omarchy_shell" -I "$repo_dir" "${qml_files[@]}" >/dev/null 2>&1
 
-grep -Fq 'Qt.resolvedUrl("../runtime/bin/quickchat-broker")' \
-  "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'Quickshell.env("QUICKCHAT_BROKER_PATH") || bundledBrokerPath' \
-  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'Qt.resolvedUrl("../runtime/bin/omapilot-broker")' \
+  "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'Quickshell.env("OMAPILOT_BROKER_PATH") || bundledBrokerPath' \
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'property string configuredProvider: "builtin"' \
-  "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'harness: provider' "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'harness: provider' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'readonly property var modeProviders: Protocol.harnessOptions()' \
   "$repo_dir/components/SettingsView.qml"
 grep -Fq 'text: "Open sign-in page"' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'sendCommand(Protocol.command("auth_begin", { methodId: selected }))' \
-  "$repo_dir/components/QuickchatStore.qml"
-if grep -Fq 'PI_CODING_AGENT_DIR' "$repo_dir/components/QuickchatStore.qml"; then
+  "$repo_dir/components/OmaPilotStore.qml"
+if grep -Fq 'PI_CODING_AGENT_DIR' "$repo_dir/components/OmaPilotStore.qml"; then
   printf 'Built-in authentication must stay embedded instead of launching Pi\n' >&2
   exit 1
 fi
-if grep -Fq 'backendSelection' "$repo_dir/components/QuickchatStore.qml"; then
+if grep -Fq 'backendSelection' "$repo_dir/components/OmaPilotStore.qml"; then
   printf 'Harness selection must not be split into backend and provider settings\n' >&2
   exit 1
 fi
 grep -Fq 'property bool desktopContextEnabled: true' \
-  "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'property string webHandoffProvider: "duckduckgo"' \
-  "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'webHandoffProvider))' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'DesktopContext.snapshot()' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'Protocol.hasFeature(event.features, "desktop-context")' "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'webHandoffProvider))' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'DesktopContext.snapshot()' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'Protocol.hasFeature(event.features, "desktop-context")' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'import Quickshell.Hyprland' "$repo_dir/components/DesktopContext.qml"
 grep -Fq 'import Quickshell.Services.Mpris' "$repo_dir/components/DesktopContext.qml"
 awk '
   /^[[:space:]]*function / { latched = 0 }
-  /Quickchat\.QuickchatStore\.latchDesktopContext\(\)/ { latched = 1 }
+  /OmaPilot\.OmaPilotStore\.latchDesktopContext\(\)/ { latched = 1 }
   /root\.controller\.show\(\)/ { if (!latched) exit 1; shows += 1 }
   END { if (shows < 3) exit 1 }
 ' "$repo_dir/Panel.qml"
 awk '
   /^[[:space:]]*function / { cleared = 0 }
-  /Quickchat\.QuickchatStore\.clearDesktopContextLatch\(\)/ { cleared = 1 }
+  /OmaPilot\.OmaPilotStore\.clearDesktopContextLatch\(\)/ { cleared = 1 }
   /root\.controller\.hide\(\)/ { if (!cleared) exit 1; hides += 1 }
   END { if (hides < 2) exit 1 }
 ' "$repo_dir/Panel.qml"
@@ -95,15 +95,15 @@ awk '
   inside && /if \(!desktopContextActive\) return null/ { gated = 1 }
   inside && /DesktopContext\.snapshot\(\)/ { if (!gated) exit 1; found = 1; exit }
   END { if (!found) exit 1 }
-' "$repo_dir/components/QuickchatStore.qml"
+' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'if (context && context.activeWindow) latchedActiveWindow = context.activeWindow' \
-  "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'if (!changed) return' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'model = desiredModel' "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'if (!changed) return' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'model = desiredModel' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'if (providers.length > 0) selectProvider(provider)' \
-  "$repo_dir/components/QuickchatStore.qml"
-test "$(grep -Fc 'root.pendingPermission = null' "$repo_dir/components/QuickchatStore.qml")" -ge 2
-test "$(grep -Fc 'root.permissionQueue = []' "$repo_dir/components/QuickchatStore.qml")" -ge 2
+  "$repo_dir/components/OmaPilotStore.qml"
+test "$(grep -Fc 'root.pendingPermission = null' "$repo_dir/components/OmaPilotStore.qml")" -ge 2
+test "$(grep -Fc 'root.permissionQueue = []' "$repo_dir/components/OmaPilotStore.qml")" -ge 2
 grep -Fq 'signal escapeRequested()' "$repo_dir/components/Composer.qml"
 grep -Fq 'Protocol.providerPolicyDescription(root.backend.provider, root.backend.providerPolicy)' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'policy.web === "search"' "$repo_dir/components/Protocol.js"
@@ -113,15 +113,15 @@ if grep -Fq 'ButtonGroup {' "$repo_dir/components/Composer.qml"; then
   exit 1
 fi
 grep -Fq 'Protocol.hasFeature(event.features, "capability-packs")' \
-  "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'sendCommand(Protocol.command("capability_set_enabled"' \
-  "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'sendCommand(Protocol.command("capability_files_root_set"' \
-  "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'visible: root.selectedTab === "skills"' \
   "$repo_dir/components/SettingsView.qml"
 if grep -Eqi 'if .*local_action|local_action.*sendCommand' \
-    "$repo_dir/Panel.qml" "$repo_dir/components/QuickchatStore.qml"; then
+    "$repo_dir/Panel.qml" "$repo_dir/components/OmaPilotStore.qml"; then
   printf 'QML must not hardcode local-action execution routing\n' >&2
   exit 1
 fi
@@ -137,14 +137,14 @@ grep -Fq 'Review the exact request and choose how long this agent may retain the
 grep -Fq 'readonly property bool popupOpen:' "$repo_dir/components/Composer.qml"
 grep -Fq 'var action = Presentation.escapeAction(root.viewMode, composer.popupOpen,' "$repo_dir/Panel.qml"
 grep -Fq 'if (action === "close-composer-popup") composer.closePopups()' "$repo_dir/Panel.qml"
-grep -Fq 'Quickchat.SettingsView {' "$repo_dir/Panel.qml"
+grep -Fq 'OmaPilot.SettingsView {' "$repo_dir/Panel.qml"
 grep -Fq 'visible: root.viewMode === "settings"' "$repo_dir/Panel.qml"
 grep -Fq 'settingsView.popupOpen' "$repo_dir/Panel.qml"
 # The ambient redesign removed the panel header (logo, tagline, gear). The
 # chrome assertions below pin the replacement instead: a borderless hero prompt,
 # one answer seam, and a hint row carrying provider identity, permission posture,
 # the desktop-global settings binding, and focused-panel history navigation.
-if grep -Fq 'Quickchat.OmaPilotHeader {' "$repo_dir/Panel.qml"; then
+if grep -Fq 'OmaPilot.OmaPilotHeader {' "$repo_dir/Panel.qml"; then
   printf 'Panel must not reintroduce the OmaPilot header chrome\n' >&2
   exit 1
 fi
@@ -152,7 +152,7 @@ if grep -Fq 'ActivityFilament {' "$repo_dir/components/Composer.qml"; then
   printf 'The composer must not draw a second rule above the answer seam\n' >&2
   exit 1
 fi
-grep -Fq 'Quickchat.StateLightBar {' "$repo_dir/Panel.qml"
+grep -Fq 'OmaPilot.StateLightBar {' "$repo_dir/Panel.qml"
 grep -Fq 'Layout.minimumHeight: contentVisible ? Style.space(120) : stateLightBar.implicitHeight' \
   "$repo_dir/Panel.qml"
 grep -Fq 'visible: answerCard.contentVisible' "$repo_dir/Panel.qml"
@@ -173,7 +173,7 @@ if grep -Fq 'Active window, open apps, workspaces, and playing media' \
   printf 'Desktop context disclosure must be the hostname, not a capability list\n' >&2
   exit 1
 fi
-grep -Fq 'Protocol.providerShortLabel(Quickchat.QuickchatStore.provider)' "$repo_dir/Panel.qml"
+grep -Fq 'Protocol.providerShortLabel(OmaPilot.OmaPilotStore.provider)' "$repo_dir/Panel.qml"
 grep -Fq 'font.pixelSize: Style.font.heading' "$repo_dir/components/Composer.qml"
 grep -Fq 'sequences: ["Ctrl+H"]' "$repo_dir/Panel.qml"
 grep -Fq '{ label: "Super+Alt+P settings", lane: "settings" }' "$repo_dir/Panel.qml"
@@ -201,8 +201,8 @@ if [[ -e "$repo_dir/components/ModeSwitch.qml" ]]; then
   printf 'OmaPilot must not retain the Ask/Act mode switch\n' >&2
   exit 1
 fi
-grep -Fq 'visible: Quickchat.QuickchatStore.pendingPermission !== null' "$repo_dir/Panel.qml"
-grep -Fq 'Quickchat.QuickActions {' "$repo_dir/Panel.qml"
+grep -Fq 'visible: OmaPilot.OmaPilotStore.pendingPermission !== null' "$repo_dir/Panel.qml"
+grep -Fq 'OmaPilot.QuickActions {' "$repo_dir/Panel.qml"
 grep -Fq 'workInAppShortcutText: "Ctrl+Shift+A"' "$repo_dir/Panel.qml"
 grep -Fq 'sequence: "Ctrl+Shift+A"' \
   "$repo_dir/components/internal/PanelKeyboardNavigation.qml"
@@ -213,7 +213,7 @@ fi
 grep -Fq 'var prompt = ActionCatalog.promptFor(root.quickActionItems, "work-in-app")' \
   "$repo_dir/Panel.qml"
 grep -Fq 'composer.setDraft(prompt)' "$repo_dir/Panel.qml"
-test "$(grep -Fc '&& !Quickchat.QuickchatStore.busy' "$repo_dir/Panel.qml")" -ge 2
+test "$(grep -Fc '&& !OmaPilot.OmaPilotStore.busy' "$repo_dir/Panel.qml")" -ge 2
 grep -Fq 'modalInteractionActive: root.modalInteractionActive' \
   "$repo_dir/Panel.qml"
 grep -Fq 'Accessible.name: tooltipText' "$repo_dir/components/QuickActions.qml"
@@ -243,11 +243,11 @@ grep -Fq 'text: "Speaking"' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'Accessible.name: "TTS provider"' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'Accessible.name: "TTS model"' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'Accessible.name: "TTS voice"' "$repo_dir/components/SettingsView.qml"
-grep -Fq 'function requestVoiceStatus()' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'Protocol.command("voice_status")' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'Protocol.ttsKeySetCommand(provider, apiKey)' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'function requestVoiceStatus()' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'Protocol.command("voice_status")' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'Protocol.ttsKeySetCommand(provider, apiKey)' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'onVoiceEnabledRequested:' "$repo_dir/Panel.qml"
-grep -Fq 'if (!OmaPilot.QuickchatStore.voiceEnabled)' "$repo_dir/Ambient.qml"
+grep -Fq 'if (!OmaPilot.OmaPilotStore.voiceEnabled)' "$repo_dir/Ambient.qml"
 grep -Fq 'function newVoiceChat(): string {' "$repo_dir/Ambient.qml"
 grep -Fq 'property bool voiceSessionActive: false' "$repo_dir/Ambient.qml"
 grep -Fq 'SessionLifecycle.voiceActivationMode(' "$repo_dir/Ambient.qml"
@@ -261,21 +261,21 @@ grep -Fq 'if (freshChatResetInProgress) return' "$repo_dir/Ambient.qml"
 grep -Fq 'if (freshChat && !freshChatReset) resetFreshVoiceChat()' \
   "$repo_dir/Ambient.qml"
 grep -Fq 'function continueInHerdr() { root.continueInHerdr() }' \
-  "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq '|| (pendingHerdrChatId === "" && currentId !== "" && busy)' \
-  "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'if (root.newChatPending && !root.busy) root.resetChat()' \
-  "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'submittedResumeChatId = resumeChatId' "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'submittedResumeChatId = resumeChatId' "$repo_dir/components/OmaPilotStore.qml"
 test "$(grep -Fc 'restoreSubmittedContinuation()' \
-  "$repo_dir/components/QuickchatStore.qml")" -ge 3
-grep -Fq 'pendingHerdrChatId = currentChatId' "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml")" -ge 3
+grep -Fq 'pendingHerdrChatId = currentChatId' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'String(event.chatId || "") !== pendingHerdrChatId' \
-  "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'SUPER + SHIFT + A' "$repo_dir/README.md"
 grep -Fq 'io.github.spencerbull.omapilot newVoiceChat' "$repo_dir/README.md"
 grep -Fq 'SUPER + ALT + N' "$repo_dir/README.md"
-grep -Fq 'io.github.spencerbull.quickchat continueInHerdr' "$repo_dir/README.md"
+grep -Fq 'io.github.spencerbull.omapilot continueInHerdr' "$repo_dir/README.md"
 if grep -Fq 'text: "Voice indicator"' "$repo_dir/components/SettingsView.qml"; then
   printf 'Voice settings must own listening and speaking, not only the Voxtype OSD\n' >&2
   exit 1
@@ -290,12 +290,12 @@ grep -Fq 'url.searchParams.set("page_size", String(ELEVENLABS_VOICE_PAGE_SIZE))'
 grep -Fq 'wyWA56cQNU2KqUW4eCsI' "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'wyWA56cQNU2KqUW4eCsI' "$repo_dir/components/Protocol.js"
 grep -Fq 'function ttsSpeakCommand' "$repo_dir/components/Protocol.js"
-grep -Fq 'function speakAnswer' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'property bool ttsPlaybackMetered: false' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'if (type === "tts_level")' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'playbackLevel: OmaPilot.QuickchatStore.ttsLevel' "$repo_dir/Ambient.qml"
+grep -Fq 'function speakAnswer' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'property bool ttsPlaybackMetered: false' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'if (type === "tts_level")' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'playbackLevel: OmaPilot.OmaPilotStore.ttsLevel' "$repo_dir/Ambient.qml"
 grep -Fq 'function normalizedTtsLevel(event)' "$repo_dir/components/Protocol.js"
-grep -Fq 'OmaPilot.QuickchatStore.speakAnswer(answer)' "$repo_dir/Ambient.qml"
+grep -Fq 'OmaPilot.OmaPilotStore.speakAnswer(answer)' "$repo_dir/Ambient.qml"
 grep -Fq 'https://api.elevenlabs.io/v1/text-to-speech/' "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'https://api.openai.com/v1/audio/speech' "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'export function pcm16Envelope(' "$repo_dir/runtime/src/tts.ts"
@@ -308,10 +308,10 @@ grep -Fq 'ActivityFilament {' "$repo_dir/components/HistoryView.qml"
 grep -Fq 'text: root.browserCompanion.relayInstalled === true ? "Repair browser setup" : "Enable browser context"' \
   "$repo_dir/components/SettingsView.qml"
 grep -Fq 'onBrowserCompanionInstallRequested:' "$repo_dir/Panel.qml"
-grep -Fq 'Protocol.command("browser_companion_install")' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'Protocol.command("browser_companion_uninstall")' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'Protocol.command("browser_companion_install")' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'Protocol.command("browser_companion_uninstall")' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'Protocol.command("browser_companion_open_settings", { family: selected })' \
-  "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'text: "Open Firefox debugging"' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'Accessible.name: "Copy Firefox extension folder path"' \
   "$repo_dir/components/SettingsView.qml"
@@ -320,15 +320,15 @@ grep -Fq 'text: root.browserRemoveConfirmation ? "Confirm removal" : "Remove bro
 grep -Fq 'onDangerousAutoApproveRequested:' "$repo_dir/Panel.qml"
 awk '
   /function close\(\)/ { inside = 1; cleared = 0 }
-  inside && /Quickchat\.QuickchatStore\.clearContextAttachments\(\)/ { cleared = 1 }
+  inside && /OmaPilot\.OmaPilotStore\.clearContextAttachments\(\)/ { cleared = 1 }
   inside && /root\.controller\.hide\(\)/ { if (!cleared) exit 1; found = 1; exit }
   END { if (!found) exit 1 }
 ' "$repo_dir/Panel.qml"
 grep -Fq 'backend.submit(draftText)' \
   "$repo_dir/components/Composer.qml"
 grep -Fq 'var autoApprove = configuredDangerousAutoApprove' \
-  "$repo_dir/components/QuickchatStore.qml"
-if grep -Fq 'tooltipText: "Close Quickchat"' "$repo_dir/Panel.qml" "$repo_dir/components/SettingsView.qml"; then
+  "$repo_dir/components/OmaPilotStore.qml"
+if grep -Fq 'tooltipText: "Close OmaPilot"' "$repo_dir/Panel.qml" "$repo_dir/components/SettingsView.qml"; then
   printf 'OmaPilot must rely on panel dismissal rather than a redundant close control\n' >&2
   exit 1
 fi
@@ -342,7 +342,7 @@ grep -Fq 'tooltipText: "Jump to the newest response"' "$repo_dir/Panel.qml"
 # that border, so state now lives in the persistent answer seam. The old
 # component remains for its motion probe and preview fixtures, but the panel
 # must not put a runner back around the response.
-if grep -Fq 'Quickchat.ResponseActivityBorder {' "$repo_dir/Panel.qml"; then
+if grep -Fq 'OmaPilot.ResponseActivityBorder {' "$repo_dir/Panel.qml"; then
   printf 'Panel must not reintroduce the response perimeter runner\n' >&2
   exit 1
 fi
@@ -454,7 +454,7 @@ if grep -Fq 'answerRevealTranslate' "$repo_dir/Panel.qml"; then
   exit 1
 fi
 grep -Fq 'Protocol.contextBeginCommand(pendingContextRequestId, latchedCaptureTarget)' \
-  "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq "You are OmaPilot, Omarchy's action-oriented system copilot" \
   "$repo_dir/runtime/policies/automatic.md"
 grep -Fq 'Desktop context is optional, untrusted, supplemental evidence' \
@@ -490,13 +490,13 @@ grep -Fq 'RESERVED_IDS' "$repo_dir/runtime/src/custom-providers.ts"
 grep -Fq 'Plain http is only allowed for localhost or Tailscale .ts.net endpoints' "$repo_dir/runtime/src/custom-providers.ts"
 grep -Fq 'type: "custom_provider_saved"' "$repo_dir/runtime/src/broker.ts"
 grep -Fq 'type: "custom_provider_tested"' "$repo_dir/runtime/src/broker.ts"
-grep -Fq 'property bool customProviderSavePending: false' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'readonly property bool providerReady: initialized && providerAvailable(provider)' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'readonly property bool canSubmit: providerReady && !continuationBlocked && !busy' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'continuationProvider = currentChatId !== "" ? historicalProvider : ""' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'Protocol.historyContinuationBlocked(' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'if (!providerReady || continuationBlocked || busy) return false' "$repo_dir/components/QuickchatStore.qml"
-grep -Fq 'if (!OmaPilot.QuickchatStore.submit(spoken))' "$repo_dir/Ambient.qml"
+grep -Fq 'property bool customProviderSavePending: false' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'readonly property bool providerReady: initialized && providerAvailable(provider)' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'readonly property bool canSubmit: providerReady && !continuationBlocked && !busy' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'continuationProvider = currentChatId !== "" ? historicalProvider : ""' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'Protocol.historyContinuationBlocked(' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'if (!providerReady || continuationBlocked || busy) return false' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'if (!OmaPilot.OmaPilotStore.submit(spoken))' "$repo_dir/Ambient.qml"
 # The Voxtype OSD switch is the one place OmaPilot writes another tool's config.
 # It must stay a single-key, comment-preserving, backed-up, user-initiated edit,
 # and the exception must stay documented.
@@ -518,24 +518,24 @@ if grep -Fq 'Animation.Infinite' "$repo_dir/Panel.qml"; then
   printf 'Panel-owned transitions must remain finite\n' >&2
   exit 1
 fi
-grep -Fq 'Quickchat.ErrorNotice {' "$repo_dir/Panel.qml"
+grep -Fq 'OmaPilot.ErrorNotice {' "$repo_dir/Panel.qml"
 grep -Fq 'onDetailsRequested: root.openErrorDetails()' "$repo_dir/Panel.qml"
-grep -Fq 'Quickchat.ErrorDetailsView {' "$repo_dir/Panel.qml"
+grep -Fq 'OmaPilot.ErrorDetailsView {' "$repo_dir/Panel.qml"
 grep -Fq 'visible: root.viewMode === "error"' "$repo_dir/Panel.qml"
 grep -Fq 'errorDetails = Protocol.normalizedError(event, statusMessage)' \
-  "$repo_dir/components/QuickchatStore.qml"
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'readonly property bool opened:' "$repo_dir/BarWidget.qml"
 grep -Fq 'function closeForPopoutSwitch()' "$repo_dir/BarWidget.qml"
-test "$(grep -Fc 'IpcHandler {' "$repo_dir/components/QuickchatStore.qml")" -eq 1
+test "$(grep -Fc 'IpcHandler {' "$repo_dir/components/OmaPilotStore.qml")" -eq 1
 if grep -Fq 'IpcHandler {' "$repo_dir/BarWidget.qml"; then
   printf 'BarWidget must not register one IPC target per monitor\n' >&2
   exit 1
 fi
 grep -Fq 'function onIpcOpenRequested()' "$repo_dir/BarWidget.qml"
 grep -Fq 'if (root.routedWidget() === root) root.open()' "$repo_dir/BarWidget.qml"
-grep -Fq 'signal ipcOpenRequested()' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'signal ipcOpenRequested()' "$repo_dir/components/OmaPilotStore.qml"
 manifest_id="$(jq -r '.id' "$repo_dir/manifest.json")"
-grep -Fq "target: \"$manifest_id\"" "$repo_dir/components/QuickchatStore.qml"
+grep -Fq "target: \"$manifest_id\"" "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'bar.findPanelWidget(moduleName)' "$repo_dir/BarWidget.qml"
 if grep -Fq 'Accessible.name: plainText' "$repo_dir/components/MarkdownView.qml"; then
   printf 'MarkdownView uses TextEdit.plainText, which is unavailable in Qt Quick\n' >&2
@@ -592,7 +592,7 @@ cp -a "$repo_dir/components" "$smoke_root/components"
 cp -a "$repo_dir/assets" "$smoke_root/assets"
 cp -a "$omarchy_shell/Commons" "$omarchy_shell/Ui" "$smoke_root/"
 
-QUICKCHAT_BROKER_PATH=/usr/bin/false QT_QPA_PLATFORM=wayland \
+OMAPILOT_BROKER_PATH=/usr/bin/false QT_QPA_PLATFORM=wayland \
   timeout 5s quickshell --no-duplicate --path "$smoke_root" --no-color \
   >"$smoke_root/output.log" 2>&1
 if grep -Eq "smoke loader failed|overlay smoke loader failed|Failed to load|Type .* unavailable|Cannot assign" "$smoke_root/output.log"; then
@@ -601,7 +601,7 @@ if grep -Eq "smoke loader failed|overlay smoke loader failed|Failed to load|Type
 fi
 
 cp "$repo_dir/tests/ambient-session-lifecycle-probe.qml" "$smoke_root/shell.qml"
-if ! QUICKCHAT_BROKER_PATH=/usr/bin/false QT_QPA_PLATFORM=wayland \
+if ! OMAPILOT_BROKER_PATH=/usr/bin/false QT_QPA_PLATFORM=wayland \
     timeout 5s quickshell --no-duplicate --path "$smoke_root" --no-color \
     >"$smoke_root/ambient-session-lifecycle.log" 2>&1; then
   cat "$smoke_root/ambient-session-lifecycle.log"

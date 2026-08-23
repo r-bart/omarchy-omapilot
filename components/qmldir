@@ -1,4 +1,4 @@
-singleton QuickchatStore 1.0 QuickchatStore.qml
+singleton OmaPilotStore 1.0 OmaPilotStore.qml
 singleton DesktopContext 1.0 DesktopContext.qml
 Composer 1.0 Composer.qml
 ContextAttachmentPreview 1.0 ContextAttachmentPreview.qml
