@@ -153,8 +153,11 @@ without deleting its completed history. The next Super+A resets the presentation
 and continuation immediately before recording, after any in-flight cancellation
 has settled.
 
-These are **documented user bindings, not something OmaPilot writes**. The
-plugin does not edit Hyprland configuration; that constraint is unchanged.
+The installed plugin now writes these as a one-time managed block in the user's
+Hyprland bindings file. It leaves pre-existing user chords alone, replaces the
+stock `Super+Shift+A` ChatGPT binding only when the user has not already
+overridden it, and never reapplies the block after the user changes or removes
+it. Preview and development worktrees do not run the installer.
 
 Layer rules are likewise optional and user-owned. Real backdrop blur behind the
 ambient surfaces needs

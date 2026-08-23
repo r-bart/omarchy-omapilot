@@ -55,6 +55,8 @@ Item {
     ? String(backend.customProviderError) : ""
   readonly property bool browserCompanionConnected: backend ? backend.browserCompanionConnected === true : false
   readonly property bool browserCompanionBusy: backend ? backend.browserCompanionBusy === true : false
+  readonly property bool hotkeyBusy: backend ? backend.hotkeyBusy === true : false
+  readonly property string hotkeyMessage: backend ? String(backend.hotkeyMessage || "") : ""
   property bool browserRemoveConfirmation: false
   property bool browserSetupExpanded: false
   // Add-an-endpoint form state. Nothing here is persisted until the broker
@@ -115,6 +117,8 @@ Item {
   signal browserCompanionRefreshRequested()
   signal browserCompanionOpenSettingsRequested(string family)
   signal browserCompanionCopyPathRequested(string family)
+  signal hotkeyInstallRequested()
+  signal hotkeyRemoveRequested()
   signal customProviderAddRequested(string id, string name, string baseUrl, string api, var models, string apiKey)
   signal customProviderTestRequested(string baseUrl, string apiKey)
   signal customProviderRemoveRequested(string id)
@@ -1448,6 +1452,72 @@ Item {
             fontFamily: root.fontFamily
             Accessible.name: label
             onClicked: root.desktopContextRequested(!root.desktopContextEnabled)
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Global hotkeys"
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Install a clearly marked OmaPilot block in ~/.config/hypr/bindings.lua. Nothing is changed until you choose Install, and existing shortcut chords are preserved."
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.Wrap
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
+          }
+
+          RowLayout {
+            Layout.fillWidth: true
+            spacing: Style.spacing.md
+
+            Button {
+              Layout.fillWidth: true
+              text: root.hotkeyBusy ? "Updating hotkeys…" : "Install global hotkeys"
+              tooltipText: "Add OmaPilot shortcuts without replacing existing shortcut chords"
+              foreground: root.foreground
+              background: root.background
+              accent: root.accent
+              active: true
+              bordered: true
+              focusable: true
+              enabled: root.backend && !root.hotkeyBusy
+              Accessible.name: tooltipText
+              onClicked: root.hotkeyInstallRequested()
+            }
+
+            Button {
+              text: "Remove"
+              tooltipText: "Remove only the hotkey block managed by OmaPilot"
+              foreground: root.foreground
+              background: root.background
+              bordered: true
+              focusable: true
+              enabled: root.backend && !root.hotkeyBusy
+              Accessible.name: tooltipText
+              onClicked: root.hotkeyRemoveRequested()
+            }
+          }
+
+          Text {
+            Layout.fillWidth: true
+            visible: root.hotkeyMessage !== ""
+            text: root.hotkeyMessage
+            color: root.hotkeyMessage.toLowerCase().indexOf("fail") >= 0
+              || root.hotkeyMessage.toLowerCase().indexOf("refus") >= 0
+              ? Color.urgent : root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.Wrap
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
           }
 
           Text {

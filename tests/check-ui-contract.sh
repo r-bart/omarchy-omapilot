@@ -53,6 +53,23 @@ grep -Fq 'Qt.resolvedUrl("../runtime/bin/omapilot-broker")' \
   "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'Quickshell.env("OMAPILOT_BROKER_PATH") || bundledBrokerPath' \
   "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'Qt.resolvedUrl("../scripts/install-hotkeys.sh")' \
+  "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'command: [root.hotkeyInstallerPath, "--installed-plugin-only"]' \
+  "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'running: false' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'function installHotkeys()' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'onHotkeyInstallRequested: OmaPilot.OmaPilotStore.installHotkeys()' \
+  "$repo_dir/Panel.qml"
+grep -Fq 'text: root.hotkeyBusy ? "Updating hotkeys…" : "Install global hotkeys"' \
+  "$repo_dir/components/SettingsView.qml"
+if grep -Fq 'command: [root.hotkeyInstallerPath, "--once"' \
+  "$repo_dir/components/OmaPilotStore.qml"; then
+  printf 'Hotkey installation must require an explicit settings action\n' >&2
+  exit 1
+fi
+grep -Fq -- '-- BEGIN OmaPilot managed hotkeys' \
+  "$repo_dir/scripts/install-hotkeys.sh"
 grep -Fq 'property string configuredProvider: "builtin"' \
   "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'harness: provider' "$repo_dir/components/OmaPilotStore.qml"
@@ -248,12 +265,14 @@ grep -Fq 'Protocol.command("voice_status")' "$repo_dir/components/OmaPilotStore.
 grep -Fq 'Protocol.ttsKeySetCommand(provider, apiKey)' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'onVoiceEnabledRequested:' "$repo_dir/Panel.qml"
 grep -Fq 'if (!OmaPilot.OmaPilotStore.voiceEnabled)' "$repo_dir/Ambient.qml"
-grep -Fq 'function newVoiceChat(): string {' "$repo_dir/Ambient.qml"
+grep -Fq 'function newVoiceChat() {' "$repo_dir/Ambient.qml"
+grep -Fq 'function onIpcNewVoiceChatRequested() { root.newVoiceChat() }' \
+  "$repo_dir/Ambient.qml"
 grep -Fq 'property bool voiceSessionActive: false' "$repo_dir/Ambient.qml"
 grep -Fq 'SessionLifecycle.voiceActivationMode(' "$repo_dir/Ambient.qml"
 grep -Fq 'voiceSessionActive = false' "$repo_dir/Ambient.qml"
-grep -Fq 'session=" + (root.voiceSessionActive ? "active" : "closed")' \
-  "$repo_dir/Ambient.qml"
+grep -Fq 'function status(): string { return "store=" + root.state }' \
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'freshVoiceStartPending = freshVoiceStartPending || freshChat' \
   "$repo_dir/Ambient.qml"
 grep -Fq 'property bool freshChatResetInProgress: false' "$repo_dir/Ambient.qml"
@@ -497,11 +516,12 @@ grep -Fq 'continuationProvider = currentChatId !== "" ? historicalProvider : ""'
 grep -Fq 'Protocol.historyContinuationBlocked(' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'if (!providerReady || continuationBlocked || busy) return false' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'if (!OmaPilot.OmaPilotStore.submit(spoken))' "$repo_dir/Ambient.qml"
-# The Voxtype OSD switch is the one place OmaPilot writes another tool's config.
-# It must stay a single-key, comment-preserving, backed-up, user-initiated edit,
-# and the exception must stay documented.
+# The broker's Voxtype OSD switch is a separate config-write boundary from the
+# opt-in hotkey helper. It must stay a single-key, comment-preserving,
+# backed-up, user-initiated edit, and the exception must stay documented.
 grep -Fq '.omapilot.bak' "$repo_dir/runtime/src/voxtype-osd.ts"
-grep -Fq 'One narrowly scoped exception exists for Voxtype' "$repo_dir/docs/architecture.md"
+grep -Fq 'One separate, narrowly scoped exception exists for Voxtype' \
+  "$repo_dir/docs/architecture.md"
 if grep -Eq 'writeFileSync\(configPath' "$repo_dir/runtime/src/voxtype-osd.ts"; then
   printf 'Voxtype config must be replaced atomically, not written in place\n' >&2
   exit 1
@@ -527,10 +547,13 @@ grep -Fq 'errorDetails = Protocol.normalizedError(event, statusMessage)' \
 grep -Fq 'readonly property bool opened:' "$repo_dir/BarWidget.qml"
 grep -Fq 'function closeForPopoutSwitch()' "$repo_dir/BarWidget.qml"
 test "$(grep -Fc 'IpcHandler {' "$repo_dir/components/OmaPilotStore.qml")" -eq 1
-if grep -Fq 'IpcHandler {' "$repo_dir/BarWidget.qml"; then
-  printf 'BarWidget must not register one IPC target per monitor\n' >&2
+if grep -Fq 'IpcHandler {' "$repo_dir/BarWidget.qml" \
+    || grep -Fq 'IpcHandler {' "$repo_dir/Ambient.qml"; then
+  printf 'Only OmaPilotStore may register the plugin IPC target\n' >&2
   exit 1
 fi
+grep -Fq 'function voiceToggle(): string {' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'signal ipcVoiceToggleRequested()' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'function onIpcOpenRequested()' "$repo_dir/BarWidget.qml"
 grep -Fq 'if (root.routedWidget() === root) root.open()' "$repo_dir/BarWidget.qml"
 grep -Fq 'signal ipcOpenRequested()' "$repo_dir/components/OmaPilotStore.qml"
@@ -595,7 +618,7 @@ cp -a "$omarchy_shell/Commons" "$omarchy_shell/Ui" "$smoke_root/"
 OMAPILOT_BROKER_PATH=/usr/bin/false QT_QPA_PLATFORM=wayland \
   timeout 5s quickshell --no-duplicate --path "$smoke_root" --no-color \
   >"$smoke_root/output.log" 2>&1
-if grep -Eq "smoke loader failed|overlay smoke loader failed|Failed to load|Type .* unavailable|Cannot assign" "$smoke_root/output.log"; then
+if grep -Eq "smoke loader failed|overlay smoke loader failed|Failed to load|Type .* unavailable|Cannot assign|Handler was registered but will not be used" "$smoke_root/output.log"; then
   cat "$smoke_root/output.log"
   exit 1
 fi
