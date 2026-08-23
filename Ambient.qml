@@ -146,11 +146,21 @@ Item {
   // starts recording. A fresh-chat hotkey can arrive while a turn or dictation
   // is still unwinding, so the reset has to wait for the broker to settle.
   property bool freshVoiceStartPending: false
+  // QuickchatStore.newChat() synchronously publishes its composing state. Keep
+  // that intentional reset distinct from an empty completed dictation, which
+  // the normal state handler dismisses as a silence-only voice turn.
+  property bool freshChatResetInProgress: false
   // Why the node is lit in its error state, shown as the caption.
   property string voiceNotice: ""
   // True after this voice turn's answer has been spoken, so the curtain can
   // linger briefly instead of waiting out a reading-time guess.
   property bool answerSpoken: false
+
+  function resetFreshVoiceChat() {
+    freshChatResetInProgress = true
+    OmaPilot.QuickchatStore.newChat()
+    freshChatResetInProgress = false
+  }
 
   function beginVoiceChat(freshChat) {
     // A voice hotkey must always produce visible feedback. The first version
@@ -202,7 +212,7 @@ Item {
     // handoff. The external handoff may still finish, but its tagged outcome is
     // ignored once newChat clears pendingHerdrChatId.
     if (freshChat && OmaPilot.QuickchatStore.pendingHerdrChatId !== "") {
-      OmaPilot.QuickchatStore.newChat()
+      resetFreshVoiceChat()
       freshChatReset = true
     }
 
@@ -220,7 +230,7 @@ Item {
       return "preempting"
     }
 
-    if (freshChat && !freshChatReset) OmaPilot.QuickchatStore.newChat()
+    if (freshChat && !freshChatReset) resetFreshVoiceChat()
 
     if (!OmaPilot.QuickchatStore.startDictation()) {
       voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
@@ -280,6 +290,7 @@ Item {
   // flow that is the submit signal: the user already spoke their intent, so
   // making them confirm it in a text box would defeat the gesture.
   onStoreStateChanged: {
+    if (freshChatResetInProgress) return
     if (voiceStartPending && !OmaPilot.QuickchatStore.busy) {
       var freshChat = freshVoiceStartPending
       voiceStartPending = false
@@ -289,7 +300,7 @@ Item {
       // the fresh chat's status after this handler returns.
       Qt.callLater(function() {
         if (!root.voiceEngaged) return
-        if (freshChat) OmaPilot.QuickchatStore.newChat()
+        if (freshChat) root.resetFreshVoiceChat()
         if (!OmaPilot.QuickchatStore.startDictation()) {
           root.voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
             ? OmaPilot.QuickchatStore.statusMessage : "Voice input is not available right now"

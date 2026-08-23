@@ -1,0 +1,47 @@
+import QtQuick
+import Quickshell
+import "components" as OmaPilot
+
+ShellRoot {
+  id: root
+  property bool failed: false
+
+  function fail(message) {
+    failed = true
+    console.error("omapilot ambient session lifecycle probe failed: " + message)
+  }
+
+  Ambient {
+    id: ambient
+  }
+
+  Timer {
+    interval: 80
+    running: true
+    onTriggered: {
+      OmaPilot.QuickchatStore.initialized = true
+      OmaPilot.QuickchatStore.dictationPhase = ""
+      OmaPilot.QuickchatStore.currentId = ""
+      OmaPilot.QuickchatStore.currentChatId = "completed-chat"
+      OmaPilot.QuickchatStore.transcript = ""
+      OmaPilot.QuickchatStore.answerMarkdown = "A completed answer"
+      OmaPilot.QuickchatStore.state = "complete"
+      ambient.voiceEngaged = true
+      ambient.voiceSessionActive = true
+
+      ambient.resetFreshVoiceChat()
+
+      if (!ambient.voiceEngaged)
+        root.fail("fresh reset dismissed the ambient presentation")
+      if (!ambient.voiceSessionActive)
+        root.fail("fresh reset closed the voice-session lease")
+      if (OmaPilot.QuickchatStore.state !== "composing")
+        root.fail("fresh reset did not return the store to composing")
+      if (OmaPilot.QuickchatStore.currentChatId !== "")
+        root.fail("fresh reset retained the completed chat continuation")
+
+      if (!root.failed) console.log("OMAPILOT_AMBIENT_SESSION_LIFECYCLE_PROBE_OK")
+      Qt.quit()
+    }
+  }
+}
