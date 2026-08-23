@@ -40,8 +40,8 @@ Item {
   readonly property color lightColor: StateColor.forPhase(Color.accent, Color.urgent, phase)
 
   // One decorative driver for non-playback states. Listening is an honest
-  // breath on a fixed rhythm, not a microphone level; speaking switches the
-  // visual path to the measured TTS envelope below.
+  // breath on a fixed rhythm, not a microphone level; thinking uses the
+  // scanner below, and speaking switches to the measured TTS envelope.
   property real level: 0
   property real presence: lit ? 1 : 0
   // A second, much slower cycle keeps the active listening/thinking surface
@@ -61,8 +61,11 @@ Item {
     + (atmosphereActive ? 0.24 * Math.sin(livingPhase * 0.447 + 0.4) : 0)
   readonly property bool atmosphereActive: motionEnabled
     && (phase === "listening" || phase === "thinking" || speaking)
-  readonly property bool voiceWaveActive: phase === "listening"
-    || phase === "thinking" || speaking
+  readonly property bool voiceWaveActive: phase === "listening" || speaking
+  readonly property bool thinkingScannerActive: phase === "thinking"
+  readonly property bool scannerRunning: thinkingScanner.running
+  readonly property real scannerProgress: thinkingScanner.progress
+  readonly property bool thinkingPhraseRunning: thinkingPhraseTimer.running
   readonly property real visualLevel: !motionEnabled ? 0.5
     : (speaking
       ? (playbackMetered ? Math.max(0, Math.min(1, playbackLevel))
@@ -70,9 +73,10 @@ Item {
       : level)
   readonly property bool genericThinkingStatus: phase === "thinking"
     && StatePhrases.isGenericStatus(status)
+  readonly property string captionDetail: phase === "thinking"
+    && !genericThinkingStatus ? String(status || "") : hint
   readonly property string captionMessage: speaking ? "Speaking…"
-    : (phase === "thinking"
-      ? StatePhrases.thinkingStatus(thinkingPhraseIndex, status) : transcript)
+    : (phase === "thinking" ? StatePhrases.thinkingAt(thinkingPhraseIndex) : transcript)
 
   function settleAtmosphere() {
     if (!atmosphereActive) {
@@ -96,7 +100,7 @@ Item {
   Timer {
     id: thinkingPhraseTimer
     interval: 2800
-    running: root.genericThinkingStatus && root.motionEnabled
+    running: root.phase === "thinking" && root.motionEnabled
     repeat: true
     triggeredOnStart: false
     onTriggered: thinkingPhraseSwap.restart()
@@ -166,7 +170,10 @@ Item {
     duration: 300
     easing.type: Easing.OutCubic
   }
-  onPhaseChanged: settleAtmosphere()
+  onPhaseChanged: {
+    settleAtmosphere()
+    resetThinkingPhrase()
+  }
   onMotionEnabledChanged: {
     settleAtmosphere()
     resetThinkingPhrase()
@@ -179,8 +186,6 @@ Item {
     captionText.opacity = 1
     if (phase !== "thinking") thinkingPhraseIndex = 0
   }
-
-  onGenericThinkingStatusChanged: resetThinkingPhrase()
 
   PanelWindow {
     id: surface
@@ -295,30 +300,6 @@ Item {
         }
       }
 
-      // Thinking: one short bright runner sweeping the filament. Same
-      // vocabulary as the response perimeter runner, flattened to a line, so
-      // the surfaces read as one product.
-      Rectangle {
-        id: runner
-        visible: root.phase === "thinking" && root.motionEnabled
-        width: parent.width * 0.18
-        height: parent.height
-        radius: height / 2
-        color: root.lightColor
-        SequentialAnimation {
-          running: runner.visible
-          loops: Animation.Infinite
-          NumberAnimation {
-            target: runner; property: "x"; from: 0
-            to: filamentSource.width - runner.width
-            duration: 1150; easing.type: Easing.InOutSine
-          }
-          NumberAnimation {
-            target: runner; property: "x"
-            to: 0; duration: 1150; easing.type: Easing.InOutSine
-          }
-        }
-      }
     }
 
     MultiEffect {
@@ -332,7 +313,7 @@ Item {
       brightness: 0.5
       colorization: 0.9
       colorizationColor: root.lightColor
-      opacity: root.presence
+      opacity: root.presence * (root.thinkingScannerActive ? 0.18 : 1)
     }
 
     // The filament itself, unblurred, on top: one hairline of real light. It
@@ -350,12 +331,26 @@ Item {
         GradientStop { position: 0.7; color: root.lightColor }
         GradientStop { position: 1.0; color: "transparent" }
       }
-      opacity: root.presence * (root.phase === "thinking" ? 0.35 : 0.55 + root.visualLevel * 0.3)
+      opacity: root.presence * (root.thinkingScannerActive ? 0
+        : 0.55 + root.visualLevel * 0.3)
     }
 
-    // ---- the ribbon. Listening/thinking use authored motion signatures;
-    // speaking follows the decoded TTS envelope. See VoiceWave for the boundary
-    // between measured and decorative motion.
+    // Thinking is backend activity, not voice. A reversible luminous scanner
+    // makes that processing state unambiguous without inventing audio input.
+    ThinkingScanner {
+      id: thinkingScanner
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.bottom: parent.bottom
+      width: parent.width * 0.52
+      height: Style.space(32)
+      accent: root.lightColor
+      active: root.thinkingScannerActive
+      motionEnabled: root.motionEnabled
+      intensity: root.presence
+    }
+
+    // ---- the ribbon. Listening uses an authored breath; speaking follows the
+    // decoded TTS envelope. See VoiceWave for the telemetry boundary.
     VoiceWave {
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.bottom: parent.bottom
@@ -366,8 +361,8 @@ Item {
       level: root.visualLevel
       motionEnabled: root.motionEnabled
       visible: root.voiceWaveActive
-      intensity: root.presence * (root.phase === "thinking" ? 0.6
-        : (root.speaking ? 0.68 + root.visualLevel * 0.25 : 1))
+      intensity: root.presence * (root.speaking
+        ? 0.68 + root.visualLevel * 0.25 : 1)
       motionStyle: root.speaking ? "speaking" : root.phase
     }
 
@@ -460,7 +455,7 @@ Item {
           width: parent.width
           horizontalAlignment: Text.AlignHCenter
           elide: Text.ElideRight
-          text: root.hint
+          text: root.captionDetail
           color: Qt.darker(Color.foreground, 1.45)
           font.family: Style.font.family
           font.pixelSize: Style.font.caption

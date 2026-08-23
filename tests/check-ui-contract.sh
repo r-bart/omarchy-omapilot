@@ -29,6 +29,7 @@ qml_files=(
   "$repo_dir/components/SettingsView.qml"
   "$repo_dir/components/SettingsTabs.qml"
   "$repo_dir/components/StateLightBar.qml"
+  "$repo_dir/components/ThinkingScanner.qml"
   "$repo_dir/components/VoiceNode.qml"
   "$repo_dir/components/VoiceWave.qml"
   "$repo_dir/components/ActivityFilament.qml"
@@ -341,8 +342,14 @@ grep -Fq 'anchors { left: parent.left; right: parent.right }' "$repo_dir/compone
 grep -Fq 'property real tide: 0.35' "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'property real drift: 0' "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'readonly property bool atmosphereActive: motionEnabled' "$repo_dir/components/VoiceNode.qml"
-grep -Fq '|| phase === "thinking" || speaking' "$repo_dir/components/VoiceNode.qml"
-grep -Fq 'readonly property bool voiceWaveActive:' "$repo_dir/components/VoiceNode.qml"
+grep -Fq '&& (phase === "listening" || phase === "thinking" || speaking)' \
+  "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'readonly property bool voiceWaveActive: phase === "listening" || speaking' \
+  "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'readonly property bool thinkingScannerActive: phase === "thinking"' \
+  "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'id: thinkingScanner' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'active: root.thinkingScannerActive' "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'playbackMetered ? Math.max(0, Math.min(1, playbackLevel))' \
   "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'running: root.atmosphereActive' "$repo_dir/components/VoiceNode.qml"
@@ -358,8 +365,19 @@ grep -Fq 'readonly property real speakingLevel: boundedLevel <= 0.025 ? 0' \
 grep -Fq 'Math.pow((boundedLevel - 0.025) / 0.975, 0.62) * 1.18' \
   "$repo_dir/components/VoiceWave.qml"
 grep -Fq 'interval: 2800' "$repo_dir/components/VoiceNode.qml"
-grep -Fq 'StatePhrases.thinkingStatus(thinkingPhraseIndex, status)' \
+grep -Fq 'running: root.phase === "thinking" && root.motionEnabled' \
   "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'readonly property bool thinkingPhraseRunning: thinkingPhraseTimer.running' \
+  "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'StatePhrases.thinkingAt(thinkingPhraseIndex)' \
+  "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'readonly property string captionDetail:' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'id: scannerTravel' "$repo_dir/components/ThinkingScanner.qml"
+grep -Fq 'property: "progress"; from: 0; to: 1' \
+  "$repo_dir/components/ThinkingScanner.qml"
+grep -Fq 'property: "progress"; from: 1; to: 0' \
+  "$repo_dir/components/ThinkingScanner.qml"
+grep -Fq 'source: scannerGlowSource' "$repo_dir/components/ThinkingScanner.qml"
 grep -Fq 'onMotionEnabledChanged: {' "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'readonly property bool rotatingActivityStatus:' "$repo_dir/Panel.qml"
 grep -Fq 'onRotatingActivityStatusChanged:' "$repo_dir/Panel.qml"

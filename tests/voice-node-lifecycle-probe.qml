@@ -44,14 +44,21 @@ ShellRoot {
           root.fail("reduced motion changed atmosphere values across phases")
         if (node.captionMessage !== "Thinking it through…")
           root.fail("reduced motion did not hold the first thinking phrase")
+        if (node.voiceWaveActive || !node.thinkingScannerActive
+            || node.scannerRunning || node.scannerProgress !== 0.5
+            || node.thinkingPhraseRunning)
+          root.fail("reduced-motion thinking did not hold a centred scanner")
         node.motionEnabled = true
         node.phase = "thinking"
       } else if (root.stage === 3) {
-        if (!node.atmosphereActive || node.tide === 0.4)
-          root.fail("active thinking atmosphere did not start")
+        if (!node.atmosphereActive || node.tide === 0.4
+            || !node.scannerRunning || node.voiceWaveActive
+            || !node.thinkingPhraseRunning)
+          root.fail("active thinking scanner did not replace the voice waveform")
         node.status = "Waiting for tool approval…"
-        if (node.captionMessage !== node.status)
-          root.fail("actionable thinking status was replaced by decorative copy")
+        if (node.captionMessage !== "Thinking it through…"
+            || node.captionDetail !== node.status)
+          root.fail("rotating thinking copy did not preserve actionable detail")
         node.phase = "error"
       } else if (root.stage === 4) {
         if (node.atmosphereActive || node.tide !== 0.4 || node.drift !== 0)
@@ -61,7 +68,8 @@ ShellRoot {
         node.playbackMetered = true
         node.playbackLevel = 0.76
       } else if (root.stage === 5) {
-        if (!node.atmosphereActive || !node.voiceWaveActive)
+        if (!node.atmosphereActive || !node.voiceWaveActive
+            || node.thinkingScannerActive || node.scannerRunning)
           root.fail("speaking did not activate the measured playback atmosphere")
         if (Math.abs(node.visualLevel - 0.76) > 0.001)
           root.fail("speaking did not expose the measured playback level")

@@ -14,6 +14,9 @@ ShellRoot {
   readonly property string outputDirectory: Quickshell.env("OMAPILOT_STATE_FRAME_DIR")
   property int frameIndex: 0
   property int phraseIndex: 0
+  property real lastScannerProgress: -1
+  property bool sawScannerForward: false
+  property bool sawScannerReverse: false
   readonly property var speakingLevels: [0.04, 0.32, 0.74, 0.18, 0.92, 0.48, 0.10, 0.66]
   property real speakingLevel: speakingLevels[0]
 
@@ -26,6 +29,9 @@ ShellRoot {
     property alias wavePace: wave.motionPace
     property alias waveLevel: wave.level
     property alias wavePower: wave.speakingLevel
+    property alias waveVisible: wave.visible
+    property alias scannerProgress: scanner.progress
+    property alias scannerRunning: scanner.running
 
     Text {
       anchors.left: parent.left
@@ -48,7 +54,20 @@ ShellRoot {
       level: lane.level
       intensity: lane.phase === "thinking" ? 0.72 : 0.92
       motionEnabled: true
+      visible: lane.phase !== "thinking"
       motionStyle: lane.phase
+    }
+
+    OmaPilot.ThinkingScanner {
+      id: scanner
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      anchors.topMargin: 34
+      height: 92
+      accent: "#8caaee"
+      active: lane.phase === "thinking"
+      motionEnabled: true
     }
 
     OmaPilot.StateLightBar {
@@ -109,7 +128,7 @@ ShellRoot {
         height: 150
         phase: "thinking"
         level: 0.42
-        title: "THINKING  ·  directional flow"
+        title: "THINKING  ·  luminous processing scan"
       }
 
       MotionLane {
@@ -146,11 +165,17 @@ ShellRoot {
         Qt.quit()
         return
       }
-      if (thinkingLane.wavePhase <= listeningLane.wavePhase * 2.5) {
-        console.error("omapilot state motion preview failed: thinking did not outrun listening")
+      if (thinkingLane.waveVisible || !thinkingLane.scannerRunning) {
+        console.error("omapilot state motion preview failed: thinking did not replace the voice wave with a scanner")
         Qt.quit()
         return
       }
+      if (root.lastScannerProgress >= 0) {
+        var scannerStep = thinkingLane.scannerProgress - root.lastScannerProgress
+        if (scannerStep > 0.01) root.sawScannerForward = true
+        if (scannerStep < -0.01) root.sawScannerReverse = true
+      }
+      root.lastScannerProgress = thinkingLane.scannerProgress
       if (speakingLane.wavePace <= listeningLane.wavePace
           || speakingLane.wavePace >= thinkingLane.wavePace
           || Math.abs(speakingLane.waveLevel - root.speakingLevel) > 0.001) {
@@ -169,7 +194,7 @@ ShellRoot {
       var output = root.outputDirectory + "/state-" + String(root.frameIndex).padStart(2, "0") + ".png"
       console.log("OMAPILOT_STATE_FRAME=" + root.frameIndex
         + " listening=" + listeningLane.wavePhase.toFixed(3)
-        + " thinking=" + thinkingLane.wavePhase.toFixed(3)
+        + " scanner=" + thinkingLane.scannerProgress.toFixed(3)
         + " speaking=" + root.speakingLevel.toFixed(2)
         + " power=" + speakingLane.wavePower.toFixed(2))
       captureSurface.grabToImage(function(result) {
@@ -180,6 +205,11 @@ ShellRoot {
         }
         root.frameIndex += 1
         if (root.frameIndex >= 8) {
+          if (!root.sawScannerForward || !root.sawScannerReverse) {
+            console.error("omapilot state motion preview failed: scanner did not complete a readable reversal")
+            Qt.quit()
+            return
+          }
           console.log("OMAPILOT_STATE_MOTION_PREVIEW_OK")
           Qt.quit()
           return
