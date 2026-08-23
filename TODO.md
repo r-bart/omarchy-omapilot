@@ -1178,9 +1178,9 @@ turn per provider.
   the registered tools and ACP has a reviewed bridge plan or implementation;
   external writes cannot inherit dangerous auto-approve or durable grants;
   focused tests, the complete repository check, and final diff review pass.
-- Branch/worktree: `capability-packs` at
-  `/home/sbull/worktrees/omarchy-omapilot-capability-packs`, based on `dev`
-  commit `5767300`.
+- Branch/worktree: implemented as `capability-packs` at
+  `/home/sbull/worktrees/omarchy-omapilot-capability-packs`, rebased on `dev`
+  commit `5767300`, then fast-forwarded into local `dev`.
 - Allowed: scoped repository source, QML, documentation, tests, generated
   bundles, read-only local capability probes, and—following the owner's
   2026-08-23 landing authorization—commit, rebase, and local merge. Forbidden:
@@ -1201,6 +1201,8 @@ turn per provider.
   policy. Full repository validation passes 237 tests with 8 opt-in live ACP
   tests skipped, the QML/UI contract and rendered Skills preview pass, release
   packaging and checksums pass, and Git whitespace checks pass. Shellcheck is
-  unavailable and was skipped. No install, account setup, user configuration,
-  push, install, shell restart, or live personal-data read occurred. Commit,
-  rebase, and local merge are now authorized as the remaining landing steps.
+  unavailable and was skipped. The feature commit is `361c9a4`; local `dev`
+  also contains the canonical-checkout bundle normalization. The pre-existing
+  uncommitted policy-copy edits were restored byte-for-byte and remain owned by
+  their original author. No account setup, user configuration, push, install,
+  shell restart, or live personal-data read occurred.
