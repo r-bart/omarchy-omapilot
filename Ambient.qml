@@ -102,9 +102,9 @@ Item {
   Connections {
     target: OmaPilot.QuickchatStore
     function onStateChanged() { root.storeState = OmaPilot.QuickchatStore.state }
-    function onTtsSpeakingChanged() {
+    function onTtsSpoken() {
       if (!root.voiceEngaged || root.storeState !== "complete") return
-      if (!OmaPilot.QuickchatStore.ttsSpeaking) root.answerSpoken = true
+      root.answerSpoken = true
     }
   }
 

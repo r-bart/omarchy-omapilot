@@ -29,6 +29,27 @@ ShellRoot {
       ambient.voiceEngaged = true
       ambient.voiceSessionActive = true
 
+      OmaPilot.QuickchatStore.ttsSpeakId = "failed-speech"
+      OmaPilot.QuickchatStore.ttsSpeaking = true
+      OmaPilot.QuickchatStore.applyEvent({
+        type: "tts_speak_failed",
+        id: "failed-speech",
+        message: "Playback failed"
+      })
+      if (ambient.answerSpoken)
+        root.fail("failed speech selected the short spoken-answer dismissal")
+      if (ambient.dismissDelay < 6000)
+        root.fail("failed speech did not preserve the reading-time dismissal")
+
+      OmaPilot.QuickchatStore.ttsSpeakId = "completed-speech"
+      OmaPilot.QuickchatStore.ttsSpeaking = true
+      OmaPilot.QuickchatStore.applyEvent({ type: "tts_spoken", id: "completed-speech" })
+      if (!ambient.answerSpoken)
+        root.fail("completed speech did not select the spoken-answer dismissal")
+      if (ambient.dismissDelay !== 2000)
+        root.fail("completed speech did not select the two-second dismissal")
+      ambient.answerSpoken = false
+
       ambient.resetFreshVoiceChat()
 
       if (!ambient.voiceEngaged)

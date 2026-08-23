@@ -128,6 +128,7 @@ Scope {
   signal ipcSettingsRequested()
   signal contextOverlayRequested(string payload)
   signal contextBrowserPickerRequested()
+  signal ttsSpoken()
   signal contextAttachmentAdded()
 
   function routeIpc(method) {
@@ -780,6 +781,11 @@ Scope {
     }
     if (type === "tts_spoken") {
       if (ttsSpeakId === "" || String(event.id || "") !== ttsSpeakId) return
+      // Emit the successful terminal outcome before lowering ttsSpeaking so
+      // ambient dismissal starts with the short spoken-answer delay. Explicit
+      // stops clear ttsSpeakId before their broker acknowledgement arrives and
+      // therefore cannot masquerade as completed playback here.
+      ttsSpoken()
       ttsSpeaking = false
       ttsPlaybackActive = false
       ttsPlaybackMetered = false

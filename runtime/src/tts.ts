@@ -75,6 +75,11 @@ const KOKORO_VOICES: VoiceOption[] = [
   { id: "bm_george", name: "George (British male)" },
   { id: "bm_fable", name: "Fable (British male)" }
 ];
+const KOKORO_RUNTIME_IMPORTS = [
+  "import numpy as np",
+  "import soundfile as sf",
+  "from kokoro import KPipeline"
+];
 
 const OPENAI_MODELS: TtsModelOption[] = [
   { id: "gpt-4o-mini-tts", name: "GPT-4o mini TTS" },
@@ -455,7 +460,7 @@ export class VoiceService {
 async function probeKokoro(env: NodeJS.ProcessEnv): Promise<boolean> {
   const python = await resolveExecutable("python3", env);
   if (python === undefined) return false;
-  const result = await runCommand(python, ["-c", "import kokoro"], {
+  const result = await runCommand(python, ["-c", KOKORO_RUNTIME_IMPORTS.join("\n")], {
     env,
     timeoutMs: KOKORO_TIMEOUT_MS,
     maxOutput: 4_096
@@ -731,9 +736,7 @@ async function synthesizeOpenAi(
 const KOKORO_SPEAK_SCRIPT = [
   "import sys",
   "from pathlib import Path",
-  "import numpy as np",
-  "import soundfile as sf",
-  "from kokoro import KPipeline",
+  ...KOKORO_RUNTIME_IMPORTS,
   "voice, wav_path, text_path = sys.argv[1], sys.argv[2], sys.argv[3]",
   "text = Path(text_path).read_text(encoding='utf-8')",
   "pipeline = KPipeline(lang_code='a')",
