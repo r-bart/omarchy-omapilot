@@ -30,6 +30,9 @@ ShellRoot {
     property bool browserCompanionConnected: false
     property bool browserCompanionBusy: false
     property var voxtypeOsd: ({ available: false, enabled: true, message: "" })
+    property var voiceStatus: ({ dictation: { available: false, message: "" }, tts: [] })
+    property var ttsTest: null
+    property string ttsTestError: ""
     property var customProviders: []
     property var customProviderSaved: null
     property string customProviderError: ""

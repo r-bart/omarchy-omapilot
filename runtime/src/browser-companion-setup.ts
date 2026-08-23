@@ -1,9 +1,9 @@
 import { access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { spawn } from "node:child_process";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import { resolveExecutable, runCommand } from "./process.js";
+import { pluginRoot } from "./runtime-root.js";
 
 export type BrowserFamily = "chromium" | "firefox";
 
@@ -15,7 +15,7 @@ export type BrowserCompanionSetupStatus = {
 };
 
 function repositoryRoot(): string {
-  return resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+  return pluginRoot(import.meta.url);
 }
 
 async function executable(path: string): Promise<boolean> {

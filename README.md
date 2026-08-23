@@ -1,19 +1,24 @@
 # OmaPilot for Omarchy
 
-OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget and contextual-capture overlay for asking questions and working on your desktop through an authenticated AI harness. Device actions stay behind an exact, inspectable approval unless you explicitly enable **Dangerous auto-approve** in settings. OmaPilot can attach a bounded desktop snapshot, clip a window or exact region with a reviewed Text/Screenshot choice, render Markdown in a themed panel, remember the latest 30 completed chats, and hand an answer to Herdr when you want to keep working.
+OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget and contextual-capture overlay for asking questions and working on your desktop through an authenticated AI harness. It can summarize the active window, research current information, clip a window or exact region, work through bounded app connectors, remember the latest 30 completed chats, and hand a conversation to Herdr when you want to keep going.
 
 The public project and product name is now OmaPilot. The existing plugin ID, IPC target, package/runtime identifiers, and local `quickchat` data paths remain unchanged so current installations and user data continue to work.
 
-> [!IMPORTANT]
-> The compatibility-ID `0.1.1` build is the current published release. Protocol-2 version `0.2.0`
-> remains unreleased until its release and marketplace gates are complete in
-> [`TODO.md`](TODO.md).
+The repository carries the `0.2.0` marketplace candidate. The permanent plugin
+ID remains `io.github.spencerbull.quickchat`, preserving existing installs and
+the compatibility-path `quickchat` user data directories.
 
 ## Preview
 
-![OmaPilot answering from OpenCode in the active Omarchy Quattro theme](docs/assets/quickchat-live.png)
+![OmaPilot composing with a reviewed contextual desktop clip](preview.png)
 
-The compact composer expands from the right side of the bar. Its result panel
+This preview is rendered from the current QML components against the pinned
+Omarchy Quattro imports with `npm run preview`; the same panel and components
+are exercised by the UI contract suite and verified in the live shell.
+
+The compact composer expands from the right side of the bar. Device changes
+stay behind an exact, inspectable approval unless you explicitly enable
+**Dangerous auto-approve** in settings. Its result panel
 supports selectable Markdown, code blocks, tables, safe clickable links,
 bounded images, Copy, New chat, History, and Continue in Herdr. The in-panel
 settings pane can add, edit, remove, and reorder up to five quick actions.
@@ -31,9 +36,15 @@ compact error notice opens an inspectable details pane.
 
 - Omarchy Quattro with the native shell plugin architecture.
 - Linux x86-64 for the initial prebuilt runtime.
-- Node.js 22 or newer for the broker and pinned ACP adapters.
+- Node.js 22 or newer. The checked-in Linux launchers contain the reviewed
+  broker and Codex ACP payloads but execute them with the system Node runtime.
 - Credentials for the built-in harness, or an installed and authenticated ACP harness.
 - Optional: Voxtype for dictation and Herdr for durable continuation.
+- Optional: a TTS provider to speak answers. Kokoro is local
+  (`pip install kokoro soundfile` on Python 3.10–3.12, plus `espeak-ng`).
+  ElevenLabs and OpenAI need an API key entered in Settings; keys are stored
+  in `~/.config/omapilot/voice-auth.json`, not widget settings. Voice stays
+  off until enabled there.
 - `grim` for contextual screenshots. ImageMagick, already used by OmaPilot's
   image policy, validates and normalizes every captured image.
 - Optional: Tesseract adds text-under-the-pointer extraction and the **Text**
@@ -42,8 +53,10 @@ compact error notice opens an inspectable details pane.
 OmaPilot includes a native Pi-based harness for Codex subscription, OpenAI API,
 Grok, and configured OpenAI-compatible endpoints. It resolves credentials from
 environment variables or `${XDG_CONFIG_HOME:-$HOME/.config}/omapilot/auth.json`,
-discovers shared `~/.agents` skills and named agents, and exposes Pi's standard
-coding tools behind OmaPilot's approval broker. See [Native Pi harness configuration](docs/native-harness.md).
+discovers shared `~/.agents` skills, Omarchy's official `~/.pi/agent/skills`
+root, bundled OmaPilot skills, and named agents. It exposes Pi's standard coding
+tools plus verified app, window, workspace, and monitor controls behind
+OmaPilot's approval broker. See [Native Pi harness configuration](docs/native-harness.md).
 The Harness setting explicitly selects **Built-in (OmaPilot)**, **Codex**, or
 **OpenCode**. The latter two are ACP harnesses and must already
 be installed and signed in. OmaPilot never substitutes one harness for another.
@@ -64,7 +77,15 @@ omarchy plugin validate ~/.config/omarchy/plugins/io.github.spencerbull.quickcha
 omarchy plugin enable io.github.spencerbull.quickchat right
 ```
 
-The Omarchy installer only clones, validates, and enables the plugin. It runs no install hook, `sudo`, package manager, or host-configuration mutation. The reviewed repository revision includes self-contained broker and ACP adapter bundles, so a normal install does not run `npm`, `npx`, or silently download executable code. Git history anchors those checked-in bundles to their TypeScript source and pinned lockfile; release archives add an SBOM, provenance record, and SHA-256 checksum.
+The Omarchy installer only clones, validates, and enables the plugin. It runs no
+install hook, does not request administrator access, and does not invoke a
+package manager or mutate host configuration. The reviewed repository revision
+includes reproducible Linux x86-64 broker and Codex ACP launchers, so a normal
+install does not run `npm`, `npx`, or silently download executable code. The
+launchers execute their embedded JavaScript payloads directly from the
+read-only launcher file with system Node;
+Git history anchors those generated files to their TypeScript source and pinned
+lockfile. Release archives add an SBOM, provenance record, and SHA-256 checksum.
 
 Update or remove it with the standard plugin commands:
 
@@ -72,6 +93,37 @@ Update or remove it with the standard plugin commands:
 omarchy plugin update io.github.spencerbull.quickchat
 omarchy plugin remove io.github.spencerbull.quickchat
 ```
+
+## Global hotkeys
+
+OmaPilot exposes compositor-safe IPC actions for a contextual voice session,
+forced-fresh typed or voice conversations, and handing the current chat to
+Herdr. Add the bindings you want to `~/.config/hypr/bindings.lua`:
+
+```lua
+-- Start fresh when the ambient flow is closed; continue while it is visible.
+o.bind("SUPER + A", "Talk to OmaPilot",
+  "omarchy-shell -q io.github.spencerbull.omapilot voiceToggle")
+
+-- Force a fresh voice chat, even while the ambient flow is still active.
+hl.unbind("SUPER + SHIFT + A")
+o.bind("SUPER + SHIFT + A", "New OmaPilot voice chat",
+  "omarchy-shell -q io.github.spencerbull.omapilot newVoiceChat")
+
+o.bind("SUPER + ALT + N", "New OmaPilot chat",
+  "omarchy-shell -q io.github.spencerbull.quickchat newChat")
+o.bind("SUPER + ALT + H", "Continue OmaPilot chat in Herdr",
+  "omarchy-shell -q io.github.spencerbull.quickchat continueInHerdr")
+```
+
+`Super+A` starts a new durable conversation whenever the ambient node and answer
+curtain have closed. While that flow remains active, pressing it again finishes
+live dictation or begins a follow-up in the same conversation. The answer timer,
+explicit dismissal, and cancellation close the voice session; they do not erase
+its saved history. `Super+Shift+A` remains the force-new escape hatch. New typed
+chat opens the panel with an empty composer. Continue in Herdr does nothing until
+the current conversation has a saved chat ID. These are user-owned bindings:
+installing or updating the plugin does not rewrite Hyprland configuration.
 
 Removal deletes the cloned plugin. OmaPilot deliberately leaves user-owned history and cached runtime files in place. Use **Clear all** before removal to erase history and cached chat images. If the plugin is already gone, inspect and remove the compatibility-path `quickchat` directories under your effective `XDG_STATE_HOME` and `XDG_CACHE_HOME` with a file manager; the default locations are `~/.local/state/quickchat` and `~/.cache/quickchat`.
 
@@ -101,7 +153,17 @@ needed:
 
 - **Built-in (OmaPilot)** combines available Codex, OpenAI, Grok, and
   OpenAI-compatible models in one catalog and loads
-  declarative skills and named agents from the documented `~/.agents` roots.
+  declarative skills from `~/.agents/skills`, `~/.pi/agent/skills`, project
+  skill roots, and this plugin's bundled `skills/` directory, plus named agents
+  from the documented `~/.agents` roots. Its structured desktop tools discover
+  exact installed apps and current Hyprland targets, then verify app focus or
+  launch, window focus/move/resize/float/close, and workspace focus or monitor
+  movement before reporting success.
+  The **Skills** settings tab also reports personal capability packs for Email,
+  Calendar, Files, Projects, Messages, and Meetings. Ready packs add typed tools
+  for HEY, one configured files root, the official Basecamp CLI, a private
+  loopback Signal bridge, and validated Zoom links. Bundled domain skills teach
+  the agent when to use those tools and how to treat app content as untrusted.
   Pi's read, grep, find, and list tools may read files available to the current
   user. Bash, edit, and write require review unless an exact session or durable
   grant already exists. Executable Pi extensions are not loaded.
@@ -111,6 +173,9 @@ needed:
   requesting network or broader device authority pauses behind a card showing
   the adapter-normalized command, working directory, and every provider-native
   once, session, durable, or rejection choice supplied by the adapter.
+  OmaPilot also attaches a fixed local MCP server containing only the capability
+  registry and the packs' bounded read operations. It does not expose sends,
+  file opens, or meeting launches to ACP.
 - **OpenCode ACP** may load installed skills and use its positively identified web
   search tool automatically. Its native `bash` permission is fixed to `ask`;
   the broker accepts execution only after the exact command receives a
@@ -118,7 +183,7 @@ needed:
 
 Every supported permission decision is bound to a provider option. Native Pi
 session and durable grants match only the exact reviewed request and working
-directory. Oversized or visually ambiguous requests, arbitrary MCP,
+directory. Oversized or visually ambiguous requests, arbitrary provider-supplied MCP,
 browser/computer control, unclassified tools, and uninspectable targets remain
 blocked. OmaPilot removes its per-turn working directory afterward. Raw tool
 requests, decisions, inputs, and outputs are not stored in chat history; a
@@ -144,6 +209,48 @@ prefer the system default browser for authorized navigation; and use available
 web search for current or otherwise unknown information. These instructions
 shape how a harness chooses among capabilities but cannot enable a capability
 or bypass the provider policy and approval boundary above.
+
+## Personal capability packs
+
+Open **Settings → Skills** to see connector readiness, enable or disable a pack,
+refresh status, and choose the one folder Files may inspect. Pack configuration
+is broker-owned and validated; missing applications, authentication, and pairing
+are reported as setup states rather than installed or changed automatically.
+
+The built-in defaults are:
+
+- Email and Calendar through authenticated `hey-cli`;
+- Files inside one canonical local or synced folder, without following symlinks
+  outside that root;
+- Projects through the authenticated official `basecamp` CLI;
+- Messages through `signal-cli-rest-api` only when
+  `OMAPILOT_SIGNAL_API_URL` is an HTTP loopback origin and
+  `OMAPILOT_SIGNAL_NUMBER` is a linked E.164 number; and
+- Meetings through an exact HTTPS `zoom.us` URL opened with Omarchy.
+
+Read operations return bounded data marked as external and untrusted. Visible
+device actions use the normal exact approval. Email, HEY to-do, Basecamp, and
+Signal writes are stricter: they always require a fresh one-time review and are
+never covered by a session grant, durable grant, or Dangerous auto-approve.
+Codex receives the registry and bounded read-only pack tools through OmaPilot's
+bundled MCP server. OpenCode receives connector reads but no Files tools, which
+preserves its fixed no-host-reads policy. Mutations remain exclusive to the
+built-in Pi harness until ACP can preserve the same one-shot contract.
+
+## Browser search handoff
+
+Built-in OmaPilot can hand a current-information question to a browser without
+adding a paid search API. Choose **Settings → Desktop → Search provider** and
+select DuckDuckGo, Google, ChatGPT Search, Claude, or Grok. The `web_handoff`
+tool shows an approval card with the provider, exact question, and destination
+URL, then opens it through `omarchy launch browser`.
+
+DuckDuckGo and Google receive a normal search query. AI sites receive a
+search-oriented prompt in their URL and a paste-ready clipboard copy as a
+fallback because their web composers may not reliably prefill. This is an
+interactive handoff: OmaPilot reports that the browser opened, but it does not
+read, synthesize, or verify the answer shown there. OpenCode's native search,
+when available under its own policy, remains separate from this setting.
 
 ## Desktop context on submit
 
@@ -204,6 +311,7 @@ invalid entries, and caps it at five.
 | Path | Purpose |
 | --- | --- |
 | `${XDG_STATE_HOME:-~/.local/state}/quickchat/` | Atomic local history and durable Pi conversation sessions |
+| `${XDG_CONFIG_HOME:-~/.config}/omapilot/capabilities.json` | Enabled packs and the canonical Files root (mode 0600) |
 | `${XDG_CACHE_HOME:-~/.cache}/quickchat/` | Bounded, validated image cache |
 | `${XDG_RUNTIME_DIR}/quickchat/` | Per-login sockets, temporary dictation, and in-flight data |
 
@@ -308,6 +416,7 @@ out of scope; they would need their own inspectable per-action approval boundary
 ```bash
 ./scripts/validate.sh
 ./scripts/package-runtime.sh --dry-run
+npm run preview
 ```
 
 After the broker has been built, assemble a local release artifact without publishing it:
@@ -318,7 +427,11 @@ npm run build
 ./scripts/package-runtime.sh --output-dir dist/release
 ```
 
-The package helper stages the self-contained checked-in runtime, emits a lockfile-derived CycloneDX SBOM, normalizes timestamps and ownership, creates a deterministic archive, and writes `SHA256SUMS`. Release details and marketplace gates are in [`docs/release.md`](docs/release.md).
+Runtime builds require Linux x86-64 and Node.js 22 or newer. The package helper
+stages the self-contained checked-in runtime, emits a
+lockfile-derived CycloneDX SBOM, normalizes timestamps and ownership, creates a
+deterministic archive, and writes `SHA256SUMS`. Release details and marketplace
+gates are in [`docs/release.md`](docs/release.md).
 
 ## License and attribution
 

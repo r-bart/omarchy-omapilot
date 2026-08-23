@@ -17,4 +17,5 @@ VoiceNode 1.0 VoiceNode.qml
 AnswerCurtain 1.0 AnswerCurtain.qml
 ActivityFilament 1.0 ActivityFilament.qml
 StateLightBar 1.0 StateLightBar.qml
+ThinkingScanner 1.0 ThinkingScanner.qml
 VoiceWave 1.0 VoiceWave.qml

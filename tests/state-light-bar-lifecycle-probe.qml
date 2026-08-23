@@ -8,6 +8,7 @@ ShellRoot {
   property int stage: 0
   property real frozenTide: 0
   property real frozenDrift: 0
+  property real frozenTravel: 0
 
   function fail(message) {
     failed = true
@@ -31,9 +32,11 @@ ShellRoot {
         if (!bar.visible || !bar.atmosphereActive || !bar.motionRunning)
           root.fail("listening state was not visible and animated")
         root.frozenTide = bar.tide
+        root.frozenTravel = bar.travel
         bar.phase = "thinking"
       } else if (root.stage === 1) {
-        if (!bar.atmosphereActive || !bar.motionRunning || bar.tide === root.frozenTide)
+        if (!bar.atmosphereActive || !bar.motionRunning || bar.tide === root.frozenTide
+            || bar.travel === root.frozenTravel || !bar.thinking)
           root.fail("thinking state did not continue the atmosphere")
         bar.phase = "answering"
       } else if (root.stage === 2) {
@@ -47,9 +50,11 @@ ShellRoot {
         bar.phase = "thinking"
         root.frozenTide = bar.tide
         root.frozenDrift = bar.drift
+        root.frozenTravel = bar.travel
       } else if (root.stage === 4) {
         if (bar.atmosphereActive || bar.motionRunning
-            || bar.tide !== root.frozenTide || bar.drift !== root.frozenDrift)
+            || bar.tide !== root.frozenTide || bar.drift !== root.frozenDrift
+            || bar.travel !== root.frozenTravel)
           root.fail("reduced motion allowed atmosphere values to change")
         if (!root.failed) console.log("OMAPILOT_STATE_LIGHT_BAR_LIFECYCLE_PROBE_OK")
         probeTimer.stop()

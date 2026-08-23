@@ -7,6 +7,7 @@ import { QuickchatBroker } from "../src/broker.js";
 import * as piHarness from "../src/pi-harness.js";
 import { HerdrHandoffError } from "../src/herdr.js";
 import { HistoryStore } from "../src/history.js";
+import { VoiceService } from "../src/tts.js";
 import { ImageStore } from "../src/images.js";
 import { quickchatPaths } from "../src/paths.js";
 import type { DiscoveredProvider } from "../src/providers.js";
@@ -414,6 +415,73 @@ describe("Herdr handoff serialization", () => {
       errorCode: "window_not_focused",
       message: "The session opened in Herdr, but Quickchat could not focus it"
     }]);
+  });
+});
+
+describe("voice provider status", () => {
+  it("emits a voice catalog without secrets and acknowledges a tested key", async () => {
+    const root = await mkdtemp(join(tmpdir(), "quickchat-voice-")); roots.push(root);
+    const config = join(root, ".config/omapilot");
+    const events: BrokerEvent[] = [];
+    const voice = new VoiceService(
+      { HOME: root, OMAPILOT_CONFIG_DIR: config },
+      {
+        dictationAvailable: () => Promise.resolve(true),
+        kokoroAvailable: () => Promise.resolve(false),
+        fetch: () => Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+      }
+    );
+    const broker = new QuickchatBroker(events.push.bind(events), { voice, env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config } });
+    await broker.handle({ type: "voice_status" });
+    const status = events.find((event) => event.type === "voice");
+    expect(status?.type === "voice" ? status.dictation.available : false).toBe(true);
+    expect(status?.type === "voice" ? status.tts.map((provider) => provider.id) : []).toEqual(["kokoro", "elevenlabs", "openai"]);
+    expect(JSON.stringify(status)).not.toContain("apiKey");
+    await broker.handle({ type: "tts_key_test", provider: "openai", apiKey: "sk-openai-test-key" });
+    expect(events.some((event) => event.type === "tts_tested" && event.provider === "openai" && event.result.available)).toBe(true);
+  });
+
+  it("speaks a stored ElevenLabs answer without leaking the key", async () => {
+    const root = await mkdtemp(join(tmpdir(), "quickchat-voice-speak-")); roots.push(root);
+    const config = join(root, ".config/omapilot");
+    const events: BrokerEvent[] = [];
+    const fetcher: typeof fetch = (input, init) => {
+      if (String(init?.method ?? "GET").toUpperCase() === "POST") {
+        return Promise.resolve(new Response(Buffer.from("ID3fake-mp3"), { status: 200 }));
+      }
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes("/v1/models")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      return Promise.resolve(new Response(JSON.stringify({ voices: [] }), { status: 200 }));
+    };
+    const voice = new VoiceService(
+      { HOME: root, OMAPILOT_CONFIG_DIR: config },
+      {
+        dictationAvailable: () => Promise.resolve(true),
+        kokoroAvailable: () => Promise.resolve(false),
+        fetch: fetcher,
+        analyzeAudio: () => Promise.resolve([0.18, 0.72]),
+        playAudio: (_path, _signal, telemetry) => {
+          if (telemetry !== undefined) {
+            telemetry.onStarted();
+            for (const level of telemetry.levels) telemetry.onLevel(level);
+          }
+          return Promise.resolve();
+        }
+      }
+    );
+    const broker = new QuickchatBroker(events.push.bind(events), { voice, env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config } });
+    await voice.setKey("elevenlabs", "eleven-test-key");
+    await broker.handle({ type: "tts_speak", id: "speak-1", provider: "elevenlabs", text: "Hello **world**" });
+    const deadline = Date.now() + 2_000;
+    while (Date.now() < deadline && !events.some((event) => event.type === "tts_spoken" && event.id === "speak-1")) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(events.some((event) => event.type === "tts_speaking"
+      && event.id === "speak-1" && event.metered)).toBe(true);
+    expect(events.filter((event) => event.type === "tts_level").map((event) => event.level))
+      .toEqual([0.18, 0.72]);
+    expect(events.some((event) => event.type === "tts_spoken" && event.id === "speak-1")).toBe(true);
+    expect(JSON.stringify(events)).not.toContain("eleven-test-key");
   });
 });
 

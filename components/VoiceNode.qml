@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Wayland
 import qs.Commons
 import "StateColor.js" as StateColor
+import "StatePhrases.js" as StatePhrases
 
 // The voice node: light bleeding up from the bottom edge of the focused output.
 //
@@ -19,6 +20,14 @@ Item {
   // dormant | listening | thinking | answering | error
   property string phase: "dormant"
   property string transcript: ""
+  // Exact broker state wins over decorative rotating copy. Empty/generic
+  // working states use the same phrase cadence as first-party Omarchy panels.
+  property string status: ""
+  // TTS playback can expose a measured output envelope. `playbackMetered`
+  // distinguishes real telemetry from the calm fallback used without FFmpeg.
+  property bool speaking: false
+  property bool playbackMetered: false
+  property real playbackLevel: 0
   // How to finish. Rendered under the caption while listening.
   property string hint: ""
   property var targetScreen: null
@@ -30,9 +39,9 @@ Item {
   // than using absolute "success green" style colours.
   readonly property color lightColor: StateColor.forPhase(Color.accent, Color.urgent, phase)
 
-  // One driver for the whole node. This is an honest breath on a fixed rhythm,
-  // not an audio level: the broker reports recording/transcribing/idle with no
-  // amplitude, so a VU meter would be a lie in pixels.
+  // One decorative driver for non-playback states. Listening is an honest
+  // breath on a fixed rhythm, not a microphone level; thinking uses the
+  // scanner below, and speaking switches to the measured TTS envelope.
   property real level: 0
   property real presence: lit ? 1 : 0
   // A second, much slower cycle keeps the active listening/thinking surface
@@ -42,8 +51,32 @@ Item {
   // The brightest part of the full-width gradient wanders by only a few percent.
   // That slight asymmetry is what keeps the edge from feeling mechanically looped.
   property real drift: 0
+  property real livingPhase: 0
+  property int thinkingPhraseIndex: 0
+  readonly property real organicLift: atmosphereActive
+    ? 0.52 + 0.25 * Math.sin(livingPhase)
+      + 0.15 * Math.sin(livingPhase * 1.618 + 1.1)
+      + 0.08 * Math.sin(livingPhase * 2.414 + 2.7) : 0.5
+  readonly property real organicDrift: drift * 0.76
+    + (atmosphereActive ? 0.24 * Math.sin(livingPhase * 0.447 + 0.4) : 0)
   readonly property bool atmosphereActive: motionEnabled
-    && (phase === "listening" || phase === "thinking")
+    && (phase === "listening" || phase === "thinking" || speaking)
+  readonly property bool voiceWaveActive: phase === "listening" || speaking
+  readonly property bool thinkingScannerActive: phase === "thinking"
+  readonly property bool scannerRunning: thinkingScanner.running
+  readonly property real scannerProgress: thinkingScanner.progress
+  readonly property bool thinkingPhraseRunning: thinkingPhraseTimer.running
+  readonly property real visualLevel: !motionEnabled ? 0.5
+    : (speaking
+      ? (playbackMetered ? Math.max(0, Math.min(1, playbackLevel))
+        : 0.42 + organicLift * 0.16)
+      : level)
+  readonly property bool genericThinkingStatus: phase === "thinking"
+    && StatePhrases.isGenericStatus(status)
+  readonly property string captionDetail: phase === "thinking"
+    && !genericThinkingStatus ? String(status || "") : hint
+  readonly property string captionMessage: speaking ? "Speaking…"
+    : (phase === "thinking" ? StatePhrases.thinkingAt(thinkingPhraseIndex) : transcript)
 
   function settleAtmosphere() {
     if (!atmosphereActive) {
@@ -63,6 +96,38 @@ Item {
     loops: Animation.Infinite
     NumberAnimation { target: root; property: "level"; to: 1; duration: 820; easing.type: Easing.InOutSine }
     NumberAnimation { target: root; property: "level"; to: 0.34; duration: 980; easing.type: Easing.InOutSine }
+  }
+  Timer {
+    id: thinkingPhraseTimer
+    interval: 2800
+    running: root.phase === "thinking" && root.motionEnabled
+    repeat: true
+    triggeredOnStart: false
+    onTriggered: thinkingPhraseSwap.restart()
+  }
+  SequentialAnimation {
+    id: thinkingPhraseSwap
+    PropertyAnimation {
+      target: captionText; property: "opacity"
+      to: 0; duration: 180; easing.type: Easing.OutQuad
+    }
+    ScriptAction {
+      script: root.thinkingPhraseIndex = (root.thinkingPhraseIndex + 1)
+        % StatePhrases.thinkingCount()
+    }
+    PropertyAnimation {
+      target: captionText; property: "opacity"
+      to: 1; duration: 260; easing.type: Easing.InQuad
+    }
+  }
+  Timer {
+    interval: 40
+    repeat: true
+    running: root.atmosphereActive
+    onTriggered: {
+      var pace = root.phase === "thinking" ? 0.076 : 0.047
+      root.livingPhase = (root.livingPhase + pace) % (Math.PI * 200)
+    }
   }
   SequentialAnimation {
     id: tideAnimation
@@ -105,9 +170,22 @@ Item {
     duration: 300
     easing.type: Easing.OutCubic
   }
-  onPhaseChanged: settleAtmosphere()
-  onMotionEnabledChanged: settleAtmosphere()
+  onPhaseChanged: {
+    settleAtmosphere()
+    resetThinkingPhrase()
+  }
+  onMotionEnabledChanged: {
+    settleAtmosphere()
+    resetThinkingPhrase()
+  }
   onAtmosphereActiveChanged: settleAtmosphere()
+  onSpeakingChanged: settleAtmosphere()
+
+  function resetThinkingPhrase() {
+    thinkingPhraseSwap.stop()
+    captionText.opacity = 1
+    if (phase !== "thinking") thinkingPhraseIndex = 0
+  }
 
   PanelWindow {
     id: surface
@@ -147,15 +225,15 @@ Item {
       visible: false
       anchors { left: parent.left; right: parent.right }
       height: Style.space(64)
-      y: parent.height - Style.space(14) - root.tide * Style.space(2)
+      y: parent.height - Style.space(15) - (root.tide * 2 + root.organicLift * 2.4)
       Rectangle {
         anchors.fill: parent
         gradient: Gradient {
           orientation: Gradient.Horizontal
           GradientStop { position: 0.0; color: Qt.rgba(root.lightColor.r, root.lightColor.g, root.lightColor.b, 0.10) }
-          GradientStop { position: 0.18 + root.drift * 0.025; color: Qt.rgba(root.lightColor.r, root.lightColor.g, root.lightColor.b, 0.48) }
-          GradientStop { position: 0.50 + root.drift * 0.055; color: root.lightColor }
-          GradientStop { position: 0.82 + root.drift * 0.025; color: Qt.rgba(root.lightColor.r, root.lightColor.g, root.lightColor.b, 0.48) }
+          GradientStop { position: 0.18 + root.organicDrift * 0.035; color: Qt.rgba(root.lightColor.r, root.lightColor.g, root.lightColor.b, 0.52) }
+          GradientStop { position: 0.50 + root.organicDrift * 0.075; color: root.lightColor }
+          GradientStop { position: 0.82 + root.organicDrift * 0.035; color: Qt.rgba(root.lightColor.r, root.lightColor.g, root.lightColor.b, 0.52) }
           GradientStop { position: 1.0; color: Qt.rgba(root.lightColor.r, root.lightColor.g, root.lightColor.b, 0.10) }
         }
       }
@@ -174,8 +252,8 @@ Item {
       brightness: 0.26
       colorization: 1
       colorizationColor: root.lightColor
-      opacity: root.presence * (0.24 + root.level * 0.22 + root.tide * 0.06)
-      scale: 1 + root.level * 0.035 + root.tide * 0.018
+      opacity: root.presence * (0.27 + root.visualLevel * 0.24 + root.tide * 0.07 + root.organicLift * 0.06)
+      scale: 1 + root.visualLevel * 0.04 + root.tide * 0.02 + root.organicLift * 0.012
       transformOrigin: Item.Bottom
     }
 
@@ -190,8 +268,8 @@ Item {
       brightness: 0.42
       colorization: 1
       colorizationColor: root.lightColor
-      opacity: root.presence * (0.14 + root.level * 0.16 + root.tide * 0.04)
-      scale: 1 + root.level * 0.022 + root.tide * 0.012
+      opacity: root.presence * (0.17 + root.visualLevel * 0.18 + root.tide * 0.05)
+      scale: 1 + root.visualLevel * 0.022 + root.tide * 0.012
       transformOrigin: Item.Bottom
     }
 
@@ -222,30 +300,6 @@ Item {
         }
       }
 
-      // Thinking: one short bright runner sweeping the filament. Same
-      // vocabulary as the response perimeter runner, flattened to a line, so
-      // the surfaces read as one product.
-      Rectangle {
-        id: runner
-        visible: root.phase === "thinking" && root.motionEnabled
-        width: parent.width * 0.18
-        height: parent.height
-        radius: height / 2
-        color: root.lightColor
-        SequentialAnimation {
-          running: runner.visible
-          loops: Animation.Infinite
-          NumberAnimation {
-            target: runner; property: "x"; from: 0
-            to: filamentSource.width - runner.width
-            duration: 1150; easing.type: Easing.InOutSine
-          }
-          NumberAnimation {
-            target: runner; property: "x"
-            to: 0; duration: 1150; easing.type: Easing.InOutSine
-          }
-        }
-      }
     }
 
     MultiEffect {
@@ -259,7 +313,7 @@ Item {
       brightness: 0.5
       colorization: 0.9
       colorizationColor: root.lightColor
-      opacity: root.presence
+      opacity: root.presence * (root.thinkingScannerActive ? 0.18 : 1)
     }
 
     // The filament itself, unblurred, on top: one hairline of real light. It
@@ -277,12 +331,26 @@ Item {
         GradientStop { position: 0.7; color: root.lightColor }
         GradientStop { position: 1.0; color: "transparent" }
       }
-      opacity: root.presence * (root.phase === "thinking" ? 0.35 : 0.55 + root.level * 0.3)
+      opacity: root.presence * (root.thinkingScannerActive ? 0
+        : 0.55 + root.visualLevel * 0.3)
     }
 
-    // ---- the ribbon. Present while the node is listening or thinking, so the
-    // surface reads as alive rather than as a static gradient. It is abstract by
-    // design: see VoiceWave for why this is not a level meter.
+    // Thinking is backend activity, not voice. A reversible luminous scanner
+    // makes that processing state unambiguous without inventing audio input.
+    ThinkingScanner {
+      id: thinkingScanner
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.bottom: parent.bottom
+      width: parent.width * 0.52
+      height: Style.space(32)
+      accent: root.lightColor
+      active: root.thinkingScannerActive
+      motionEnabled: root.motionEnabled
+      intensity: root.presence
+    }
+
+    // ---- the ribbon. Listening uses an authored breath; speaking follows the
+    // decoded TTS envelope. See VoiceWave for the telemetry boundary.
     VoiceWave {
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.bottom: parent.bottom
@@ -290,10 +358,12 @@ Item {
       width: parent.width * 0.72
       height: Style.space(66)
       accent: root.lightColor
-      level: root.level
+      level: root.visualLevel
       motionEnabled: root.motionEnabled
-      visible: root.phase === "listening" || root.phase === "thinking"
-      intensity: root.presence * (root.phase === "thinking" ? 0.6 : 1)
+      visible: root.voiceWaveActive
+      intensity: root.presence * (root.speaking
+        ? 0.68 + root.visualLevel * 0.25 : 1)
+      motionStyle: root.speaking ? "speaking" : root.phase
     }
 
     // ---- caption. Voice mode's only text.
@@ -356,7 +426,8 @@ Item {
         opacity: 0.46
       }
 
-      // Transcript above, how-to-finish below, stacked so the plate backs both.
+      // Transcript/status above, how-to-finish below, stacked so the plate
+      // backs both. Thinking phrases fade in place instead of hard-cutting.
       Column {
         id: captionColumn
         anchors.centerIn: parent
@@ -373,7 +444,7 @@ Item {
           elide: Text.ElideRight
           maximumLineCount: 2
           wrapMode: Text.WordWrap
-          text: root.transcript
+          text: root.captionMessage
           color: Color.foreground
           font.family: Style.font.family
           font.pixelSize: Style.font.body
@@ -384,7 +455,7 @@ Item {
           width: parent.width
           horizontalAlignment: Text.AlignHCenter
           elide: Text.ElideRight
-          text: root.hint
+          text: root.captionDetail
           color: Qt.darker(Color.foreground, 1.45)
           font.family: Style.font.family
           font.pixelSize: Style.font.caption

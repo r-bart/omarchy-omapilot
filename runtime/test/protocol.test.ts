@@ -33,6 +33,14 @@ describe("NDJSON protocol", () => {
       type: "submit", id: "three", question: "act", provider: "codex",
       dangerousAutoApprove: "true"
     }).success).toBe(false);
+    expect(commandSchema.safeParse({
+      type: "submit", id: "four", question: "research", provider: "builtin",
+      webHandoffProvider: "claude"
+    }).success).toBe(true);
+    expect(commandSchema.safeParse({
+      type: "submit", id: "five", question: "research", provider: "builtin",
+      webHandoffProvider: "bing"
+    }).success).toBe(false);
   });
 
   it("accepts a bounded versioned desktop snapshot and rejects unknown context fields", () => {
@@ -57,6 +65,20 @@ describe("NDJSON protocol", () => {
     expect(commandSchema.safeParse({ type: "browser_companion_open_settings", family: "firefox" }).success).toBe(true);
     expect(commandSchema.safeParse({ type: "browser_companion_open_settings", family: "other" }).success).toBe(false);
     expect(commandSchema.safeParse({ type: "browser_companion_install", command: "anything" }).success).toBe(false);
+    expect(commandSchema.safeParse({ type: "capabilities_list" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "capability_set_enabled", id: "email", enabled: false }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "capability_set_enabled", id: "browser", enabled: false }).success).toBe(false);
+    expect(commandSchema.safeParse({ type: "capability_files_root_set", path: "/tmp/files" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "voice_status" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "tts_key_set", provider: "elevenlabs", apiKey: "sk-test-key" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "tts_key_set", provider: "kokoro", apiKey: "sk-test-key" }).success).toBe(false);
+    expect(commandSchema.safeParse({ type: "tts_key_clear", provider: "openai" }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "tts_key_test", provider: "openai", apiKey: "sk-test-key" }).success).toBe(true);
+    expect(commandSchema.safeParse({
+      type: "tts_speak", id: "speak-1", provider: "elevenlabs", voice: "wyWA56cQNU2KqUW4eCsI", text: "Hello"
+    }).success).toBe(true);
+    expect(commandSchema.safeParse({ type: "tts_speak", id: "speak-1", provider: "kokoro", text: "" }).success).toBe(false);
+    expect(commandSchema.safeParse({ type: "tts_stop" }).success).toBe(true);
     expect(commandSchema.safeParse({ type: "auth_begin", methodId: "openai-codex::oauth" }).success).toBe(true);
     expect(commandSchema.safeParse({ type: "auth_begin", methodId: "openai-codex::shell" }).success).toBe(false);
     expect(commandSchema.safeParse({
@@ -113,12 +135,17 @@ describe("NDJSON protocol", () => {
     await until(() => events.some((event) => event.type === "ready"));
     const ready = readySchema.parse(events.find((event) => event.type === "ready"));
     expect(ready.protocolVersion).toBe(2);
-    expect(ready.features).toEqual(["desktop-context", "context-attachments"]);
+    expect(ready.features).toEqual(["desktop-context", "context-attachments", "voice", "capability-packs"]);
     expect(ready.providers.find((provider) => provider.id === "codex")?.models).toContainEqual({ id: "test/default", name: "Default" });
     expect(ready.providers.map(({ id, policy }) => ({ id, policy }))).toEqual([
       { id: "codex", policy: { tools: "device-approval", web: "approved-command", hostReads: true } }
     ]);
     expect(JSON.stringify(events.find((event) => event.type === "ready"))).not.toContain('"capabilities"');
+    await until(() => events.some((event) => event.type === "capabilities"));
+    const capabilities = events.find((event) => event.type === "capabilities");
+    expect((capabilities?.capabilities as Array<{ id: string }>).map((pack) => pack.id)).toEqual([
+      "email", "calendar", "files", "projects", "messages", "meetings"
+    ]);
     child.stdin.write(`${JSON.stringify({
       type: "submit", id: "wire-1", question: "Say hello", provider: "codex",
       desktopContext: {
@@ -455,7 +482,7 @@ describe("NDJSON protocol", () => {
 const readySchema = z.object({
   type: z.literal("ready"),
   protocolVersion: z.literal(2),
-  features: z.tuple([z.literal("desktop-context"), z.literal("context-attachments")]),
+  features: z.tuple([z.literal("desktop-context"), z.literal("context-attachments"), z.literal("voice"), z.literal("capability-packs")]),
   providers: z.array(z.object({
     id: z.string(),
     models: z.array(z.object({ id: z.string(), name: z.string() })),

@@ -51,8 +51,23 @@ TestCase {
 
   function test_desktopContextRequiresBrokerFeatureAdvertisement() {
     verify(Protocol.hasFeature(["desktop-context"], "desktop-context"))
+    verify(Protocol.hasFeature(["desktop-context", "context-attachments", "voice"], "voice"))
     verify(!Protocol.hasFeature([], "desktop-context"))
     verify(!Protocol.hasFeature(undefined, "desktop-context"))
+  }
+
+  function test_capabilityPacksNormalizeFailClosed() {
+    var capabilities = Protocol.normalizedCapabilities([
+      { id: "email", label: "Email", connector: "HEY", state: "ready", status: "Connected", enabled: true,
+        operations: [{ id: "search", label: "Search mail", risk: "inspect", available: true }] },
+      { id: "unknown", label: "Unknown", state: "ready" },
+      { id: "email", label: "Duplicate", state: "ready" }
+    ])
+    compare(capabilities.length, 1)
+    compare(capabilities[0].id, "email")
+    compare(capabilities[0].operations[0].risk, "inspect")
+    compare(Protocol.capabilityOperationsLabel(capabilities[0]), "Search mail")
+    compare(Protocol.capabilityFilesRoot([{ id: "files", filesRoot: "/home/test/Dropbox" }]), "/home/test/Dropbox")
   }
 
   function test_contextAttachmentKeepsAlternativesLocalUntilSubmit() {
@@ -236,6 +251,19 @@ TestCase {
     verify(payload.dangerousAutoApprove)
   }
 
+  function test_webHandoffProviderIsNormalizedAndSubmitted() {
+    compare(Protocol.normalizedWebHandoffProvider("CLAUDE"), "claude")
+    compare(Protocol.normalizedWebHandoffProvider("bing"), "")
+    compare(Protocol.webHandoffProviderLabel("chatgpt"), "ChatGPT Search")
+    compare(Protocol.webHandoffProviderOptions().length, 5)
+    var payload = Protocol.submitCommand(
+      "research", "Find current information", "builtin", "", null, false, [], "", "grok")
+    compare(payload.webHandoffProvider, "grok")
+    verify(Protocol.submitCommand(
+      "research", "Find current information", "builtin", "", null, false, [], "", "bing")
+      .webHandoffProvider === undefined)
+  }
+
   function test_followUpSubmitCarriesOnlyAValidSavedChatId() {
     var saved = "11111111-1111-4111-8111-111111111111"
     compare(Protocol.submitCommand("turn", "Follow up", "builtin", "", null, false, [], saved).resumeChatId, saved)
@@ -366,6 +394,60 @@ TestCase {
     verify(Protocol.isSafeExternalUrl("mailto:hello@example.com"))
     verify(!Protocol.isSafeExternalUrl("javascript:alert(1)"))
     verify(!Protocol.isSafeExternalUrl("file:///etc/passwd"))
+  }
+
+  function test_voiceCatalogNormalizesProvidersAndCloudKeys() {
+    var status = Protocol.normalizedVoiceStatus({
+      dictation: { available: true, message: "Voxtype is ready for dictation." },
+      tts: [
+        { id: "kokoro", kind: "local", available: true, configured: true, message: "ready",
+          models: [{ id: "kokoro-82m", name: "Kokoro 82M" }],
+          voices: [{ id: "af_heart", name: "Heart" }] },
+        { id: "openai", kind: "cloud", available: true, configured: true,
+          models: [{ id: "gpt-4o-mini-tts" }, { id: "tts-1" }],
+          voices: [
+            { id: "coral", name: "Coral", models: ["gpt-4o-mini-tts"] },
+            { id: "alloy", name: "Alloy", models: ["gpt-4o-mini-tts", "tts-1"] }
+          ] },
+        { id: "bad", models: [{ id: "nope" }] }
+      ]
+    })
+    compare(status.dictation.available, true)
+    compare(status.tts.length, 2)
+    compare(Protocol.normalizedTtsProvider("ElevenLabs"), "elevenlabs")
+    compare(Protocol.ttsProviderOptions()[0].value, "kokoro")
+    var openai = Protocol.ttsProviderStatus(status, "openai")
+    compare(Protocol.ttsDefaultModel(openai), "gpt-4o-mini-tts")
+    compare(Protocol.ttsVoiceOptions(openai, "tts-1").length, 1)
+    compare(Protocol.ttsVoiceOptions(openai, "tts-1")[0].value, "alloy")
+    var save = Protocol.ttsKeySetCommand(" OpenAI ", " sk-test ")
+    compare(save.type, "tts_key_set")
+    compare(save.provider, "openai")
+    compare(save.apiKey, "sk-test")
+    compare(Protocol.ttsKeyClearCommand("elevenlabs").type, "tts_key_clear")
+    compare(Protocol.ttsKeyTestCommand("openai", " sk-test ").apiKey, "sk-test")
+    compare(Protocol.elevenLabsDefaultVoiceId(), "wyWA56cQNU2KqUW4eCsI")
+    var elevenlabs = Protocol.ttsProviderStatus({
+      tts: [{
+        id: "elevenlabs",
+        voices: [
+          { id: "voice-one", name: "Rachel" },
+          { id: "wyWA56cQNU2KqUW4eCsI", name: "Clyde" }
+        ]
+      }]
+    }, "elevenlabs")
+    compare(Protocol.ttsDefaultVoice(elevenlabs, "eleven_multilingual_v2"), "wyWA56cQNU2KqUW4eCsI")
+    compare(Protocol.ttsDefaultVoice({ id: "elevenlabs", voices: [] }, ""), "wyWA56cQNU2KqUW4eCsI")
+    compare(Protocol.emptyVoiceStatus().tts[1].voices[0].id, "wyWA56cQNU2KqUW4eCsI")
+    var speak = Protocol.ttsSpeakCommand("speak-1", "elevenlabs", "eleven_multilingual_v2", "wyWA56cQNU2KqUW4eCsI", "Hello")
+    compare(speak.type, "tts_speak")
+    compare(speak.provider, "elevenlabs")
+    compare(speak.voice, "wyWA56cQNU2KqUW4eCsI")
+    compare(Protocol.ttsStopCommand().type, "tts_stop")
+    compare(Protocol.normalizedTtsLevel({ type: "tts_level", level: 0.72 }), 0.72)
+    compare(Protocol.normalizedTtsLevel({ type: "tts_level", level: 4 }), 1)
+    compare(Protocol.normalizedTtsLevel({ type: "tts_level", level: -2 }), 0)
+    compare(Protocol.normalizedTtsLevel({ type: "tts_level", level: "bad" }), null)
   }
 
   function test_customProviderProbeAndSaveKeepDiscoveredModelMetadata() {

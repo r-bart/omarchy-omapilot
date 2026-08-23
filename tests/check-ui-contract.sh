@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-omarchy_shell="${OMARCHY_PATH:-/home/sbull/omarchy}/shell"
+omarchy_shell="${OMARCHY_PATH:-/usr/share/omarchy}/shell"
 smoke_root=""
 preview_root=""
 
@@ -29,6 +29,9 @@ qml_files=(
   "$repo_dir/components/SettingsView.qml"
   "$repo_dir/components/SettingsTabs.qml"
   "$repo_dir/components/StateLightBar.qml"
+  "$repo_dir/components/ThinkingScanner.qml"
+  "$repo_dir/components/VoiceNode.qml"
+  "$repo_dir/components/VoiceWave.qml"
   "$repo_dir/components/ActivityFilament.qml"
   "$repo_dir/components/ResponseActivityBorder.qml"
   "$repo_dir/components/internal/PermissionFocusGuard.qml"
@@ -40,6 +43,8 @@ qml_files=(
   "$repo_dir/components/Presentation.js"
   "$repo_dir/components/QuickActions.js"
   "$repo_dir/tests/motion-preview.qml"
+  "$repo_dir/tests/state-motion-preview.qml"
+  "$repo_dir/tests/voice-node-preview.qml"
 )
 
 /usr/lib/qt6/bin/qmllint -I "$omarchy_shell" -I "$repo_dir" "${qml_files[@]}" >/dev/null 2>&1
@@ -66,6 +71,9 @@ if grep -Fq 'backendSelection' "$repo_dir/components/QuickchatStore.qml"; then
 fi
 grep -Fq 'property bool desktopContextEnabled: true' \
   "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'property string webHandoffProvider: "duckduckgo"' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'webHandoffProvider))' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'DesktopContext.snapshot()' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'Protocol.hasFeature(event.features, "desktop-context")' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'import Quickshell.Hyprland' "$repo_dir/components/DesktopContext.qml"
@@ -104,12 +112,17 @@ if grep -Fq 'ButtonGroup {' "$repo_dir/components/Composer.qml"; then
   printf 'Composer must not expose a capability mode selector\n' >&2
   exit 1
 fi
-if grep -Fqi 'capability' "$repo_dir/components/Protocol.js" "$repo_dir/components/QuickchatStore.qml"; then
-  printf 'QML protocol and store must not expose capability helpers or fields\n' >&2
-  exit 1
-fi
-if grep -Fqi 'local_action' "$repo_dir/Panel.qml" "$repo_dir/components/Protocol.js" "$repo_dir/components/QuickchatStore.qml"; then
-  printf 'QML must not expose hardcoded local-action routing\n' >&2
+grep -Fq 'Protocol.hasFeature(event.features, "capability-packs")' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'sendCommand(Protocol.command("capability_set_enabled"' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'sendCommand(Protocol.command("capability_files_root_set"' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'visible: root.selectedTab === "skills"' \
+  "$repo_dir/components/SettingsView.qml"
+if grep -Eqi 'if .*local_action|local_action.*sendCommand' \
+    "$repo_dir/Panel.qml" "$repo_dir/components/QuickchatStore.qml"; then
+  printf 'QML must not hardcode local-action execution routing\n' >&2
   exit 1
 fi
 grep -Fq 'visible: !root.backend || root.backend.pendingPermission === null' \
@@ -150,6 +163,8 @@ grep -Fq '&& (phase === "listening" || phase === "thinking")' \
 grep -Fq 'running: root.atmosphereActive' "$repo_dir/components/StateLightBar.qml"
 grep -Fq 'StateColor.forPhase' "$repo_dir/components/StateLightBar.qml"
 grep -Fq 'colorizationColor: root.displayedColor' "$repo_dir/components/StateLightBar.qml"
+grep -Fq 'readonly property real glowCenter: thinking' "$repo_dir/components/StateLightBar.qml"
+grep -Fq 'root.travel = (root.travel + 0.0095) % 1' "$repo_dir/components/StateLightBar.qml"
 grep -Fq 'id: promptRow' "$repo_dir/components/Composer.qml"
 grep -Fq 'iconText: "󰹑"' "$repo_dir/components/Composer.qml"
 grep -Fq '󰍬' "$repo_dir/components/Composer.qml"
@@ -216,6 +231,76 @@ grep -Fq 'ActionCatalog.addAction(' "$repo_dir/components/QuickActionEditor.qml"
 grep -Fq 'ActionCatalog.updateAction(' "$repo_dir/components/QuickActionEditor.qml"
 grep -Fq 'label: "Dangerous auto-approve"' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'label: "Desktop context"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'text: "Search provider"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'Accessible.name: "Search provider"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'onWebHandoffProviderRequested:' "$repo_dir/Panel.qml"
+grep -Fq '"webHandoffProvider": "duckduckgo"' "$repo_dir/manifest.json"
+grep -Fq '{ id: "voice", label: "Voice" }' "$repo_dir/components/Presentation.js"
+grep -Fq 'visible: root.selectedTab === "voice"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'label: "Enable voice"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'text: "Listening"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'text: "Speaking"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'Accessible.name: "TTS provider"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'Accessible.name: "TTS model"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'Accessible.name: "TTS voice"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'function requestVoiceStatus()' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'Protocol.command("voice_status")' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'Protocol.ttsKeySetCommand(provider, apiKey)' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'onVoiceEnabledRequested:' "$repo_dir/Panel.qml"
+grep -Fq 'if (!OmaPilot.QuickchatStore.voiceEnabled)' "$repo_dir/Ambient.qml"
+grep -Fq 'function newVoiceChat(): string {' "$repo_dir/Ambient.qml"
+grep -Fq 'property bool voiceSessionActive: false' "$repo_dir/Ambient.qml"
+grep -Fq 'SessionLifecycle.voiceActivationMode(' "$repo_dir/Ambient.qml"
+grep -Fq 'voiceSessionActive = false' "$repo_dir/Ambient.qml"
+grep -Fq 'session=" + (root.voiceSessionActive ? "active" : "closed")' \
+  "$repo_dir/Ambient.qml"
+grep -Fq 'freshVoiceStartPending = freshVoiceStartPending || freshChat' \
+  "$repo_dir/Ambient.qml"
+grep -Fq 'property bool freshChatResetInProgress: false' "$repo_dir/Ambient.qml"
+grep -Fq 'if (freshChatResetInProgress) return' "$repo_dir/Ambient.qml"
+grep -Fq 'if (freshChat && !freshChatReset) resetFreshVoiceChat()' \
+  "$repo_dir/Ambient.qml"
+grep -Fq 'function continueInHerdr() { root.continueInHerdr() }' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq '|| (pendingHerdrChatId === "" && currentId !== "" && busy)' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'if (root.newChatPending && !root.busy) root.resetChat()' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'submittedResumeChatId = resumeChatId' "$repo_dir/components/QuickchatStore.qml"
+test "$(grep -Fc 'restoreSubmittedContinuation()' \
+  "$repo_dir/components/QuickchatStore.qml")" -ge 3
+grep -Fq 'pendingHerdrChatId = currentChatId' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'String(event.chatId || "") !== pendingHerdrChatId' \
+  "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'SUPER + SHIFT + A' "$repo_dir/README.md"
+grep -Fq 'io.github.spencerbull.omapilot newVoiceChat' "$repo_dir/README.md"
+grep -Fq 'SUPER + ALT + N' "$repo_dir/README.md"
+grep -Fq 'io.github.spencerbull.quickchat continueInHerdr' "$repo_dir/README.md"
+if grep -Fq 'text: "Voice indicator"' "$repo_dir/components/SettingsView.qml"; then
+  printf 'Voice settings must own listening and speaking, not only the Voxtype OSD\n' >&2
+  exit 1
+fi
+grep -Fq 'voice-auth.json' "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'id: "kokoro"' "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'elevenlabs: "ElevenLabs"' "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'const ELEVENLABS_VOICES_URL = "https://api.elevenlabs.io/v2/voices"' \
+  "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'url.searchParams.set("page_size", String(ELEVENLABS_VOICE_PAGE_SIZE))' \
+  "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'wyWA56cQNU2KqUW4eCsI' "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'wyWA56cQNU2KqUW4eCsI' "$repo_dir/components/Protocol.js"
+grep -Fq 'function ttsSpeakCommand' "$repo_dir/components/Protocol.js"
+grep -Fq 'function speakAnswer' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'property bool ttsPlaybackMetered: false' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'if (type === "tts_level")' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'playbackLevel: OmaPilot.QuickchatStore.ttsLevel' "$repo_dir/Ambient.qml"
+grep -Fq 'function normalizedTtsLevel(event)' "$repo_dir/components/Protocol.js"
+grep -Fq 'OmaPilot.QuickchatStore.speakAnswer(answer)' "$repo_dir/Ambient.qml"
+grep -Fq 'https://api.elevenlabs.io/v1/text-to-speech/' "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'https://api.openai.com/v1/audio/speech' "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'export function pcm16Envelope(' "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'type: "tts_level"' "$repo_dir/runtime/src/types.ts"
+grep -Fq 'https://api.openai.com/v1/models' "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'text: "Browser context"' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'onDesktopContextRequested:' "$repo_dir/Panel.qml"
 grep -Fq 'text: "History"' "$repo_dir/components/HistoryView.qml"
@@ -268,9 +353,47 @@ grep -Fq 'anchors { left: parent.left; right: parent.right }' "$repo_dir/compone
 grep -Fq 'property real tide: 0.35' "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'property real drift: 0' "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'readonly property bool atmosphereActive: motionEnabled' "$repo_dir/components/VoiceNode.qml"
+grep -Fq '&& (phase === "listening" || phase === "thinking" || speaking)' \
+  "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'readonly property bool voiceWaveActive: phase === "listening" || speaking' \
+  "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'readonly property bool thinkingScannerActive: phase === "thinking"' \
+  "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'id: thinkingScanner' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'active: root.thinkingScannerActive' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'playbackMetered ? Math.max(0, Math.min(1, playbackLevel))' \
+  "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'running: root.atmosphereActive' "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'running: root.motionEnabled && root.lit && root.phase !== "listening"' "$repo_dir/components/VoiceNode.qml"
-grep -Fq '0.50 + root.drift * 0.055' "$repo_dir/components/VoiceNode.qml"
+grep -Fq '0.50 + root.organicDrift * 0.075' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'Math.sin(livingPhase * 1.618 + 1.1)' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'motionStyle: root.speaking ? "speaking" : root.phase' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'readonly property real motionPace: thinking ? 0.084 : (speaking ? 0.056 : 0.022)' \
+  "$repo_dir/components/VoiceWave.qml"
+grep -Fq 'var travel = (root.phase * 0.095) % 1' "$repo_dir/components/VoiceWave.qml"
+grep -Fq 'readonly property real speakingLevel: boundedLevel <= 0.025 ? 0' \
+  "$repo_dir/components/VoiceWave.qml"
+grep -Fq 'Math.pow((boundedLevel - 0.025) / 0.975, 0.62) * 1.18' \
+  "$repo_dir/components/VoiceWave.qml"
+grep -Fq 'interval: 2800' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'running: root.phase === "thinking" && root.motionEnabled' \
+  "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'readonly property bool thinkingPhraseRunning: thinkingPhraseTimer.running' \
+  "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'StatePhrases.thinkingAt(thinkingPhraseIndex)' \
+  "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'readonly property string captionDetail:' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'id: scannerTravel' "$repo_dir/components/ThinkingScanner.qml"
+grep -Fq 'property: "progress"; from: 0; to: 1' \
+  "$repo_dir/components/ThinkingScanner.qml"
+grep -Fq 'property: "progress"; from: 1; to: 0' \
+  "$repo_dir/components/ThinkingScanner.qml"
+grep -Fq 'source: scannerGlowSource' "$repo_dir/components/ThinkingScanner.qml"
+grep -Fq 'onMotionEnabledChanged: {' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'readonly property bool rotatingActivityStatus:' "$repo_dir/Panel.qml"
+grep -Fq 'onRotatingActivityStatusChanged:' "$repo_dir/Panel.qml"
+grep -Fq 'text: root.activityStatusText' "$repo_dir/Panel.qml"
+grep -Fq 'StatePhrases.thinkingAt(0)' "$repo_dir/tests/visual-preview.qml"
 grep -Fq 'StateColor.forPhase' "$repo_dir/components/AnswerCurtain.qml"
 grep -Fq 'colorizationColor: root.accent' "$repo_dir/components/ActivityFilament.qml"
 grep -Fq 'id: responseStatusSlot' "$repo_dir/Panel.qml"
@@ -308,8 +431,9 @@ fi
 # the panel closes instead of animating off screen.
 grep -Fq 'motionEnabled: root.motionEnabled && root.opened' "$repo_dir/Panel.qml"
 grep -Fq 'id: activityStatus' "$repo_dir/Panel.qml"
-if grep -Eq 'WaitingIndicator|signalClock|FrameAnimation|onTriggered:' \
-    "$repo_dir/Panel.qml" "$repo_dir/components/ResponseActivityBorder.qml"; then
+if grep -Eq 'WaitingIndicator|signalClock|FrameAnimation' \
+    "$repo_dir/Panel.qml" "$repo_dir/components/ResponseActivityBorder.qml" \
+    || grep -Eq 'onTriggered:' "$repo_dir/components/ResponseActivityBorder.qml"; then
   printf 'OmaPilot perimeter motion must not retain the per-frame route implementation\n' >&2
   exit 1
 fi
@@ -346,8 +470,14 @@ if grep -Fq 'claudeCode' "$repo_dir/runtime/src/acp.ts"; then
   printf 'ACP must not retain Claude-specific session shaping\n' >&2
   exit 1
 fi
-# Claude is no longer a selectable harness anywhere in the product.
-if grep -Fq '"claude"' "$repo_dir/runtime/src/types.ts" "$repo_dir/components/Protocol.js"; then
+# Claude is no longer a selectable harness. It may still be an external browser
+# handoff target, so keep this guard scoped to the actual harness contracts.
+grep -Fq 'providerIdSchema = z.enum(["builtin", "codex", "opencode"])' \
+  "$repo_dir/runtime/src/types.ts"
+grep -Fq 'verify(Protocol.normalizedProvider("claude") === "")' \
+  "$repo_dir/tests/tst_protocol.qml"
+if jq -e '.barWidget.schema[] | select(.key == "provider") | .options | index("claude")' \
+    "$repo_dir/manifest.json" >/dev/null; then
   printf 'Claude must not be reintroduced as a provider id\n' >&2
   exit 1
 fi
@@ -383,6 +513,7 @@ fi
 grep -Fq 'instructions: [automaticInstructionPath()]' \
   "$repo_dir/runtime/src/providers.ts"
 grep -Fq 'runtime/policies/automatic.md' "$repo_dir/scripts/package-runtime.sh"
+grep -Fq 'runtime/dist/capability-mcp.js' "$repo_dir/scripts/package-runtime.sh"
 if grep -Fq 'Animation.Infinite' "$repo_dir/Panel.qml"; then
   printf 'Panel-owned transitions must remain finite\n' >&2
   exit 1
@@ -441,13 +572,22 @@ QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -import "$repo_dir" || fail "state colour tests failed"
 
 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
+  -input "$repo_dir/tests/tst_state_phrases.qml" \
+  -import "$repo_dir" || fail "state phrase tests failed"
+
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
+  -input "$repo_dir/tests/tst_session_lifecycle.qml" \
+  -import "$repo_dir" || fail "session lifecycle tests failed"
+
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -input "$repo_dir/tests/tst_quick_actions.qml" \
   -import "$repo_dir" \
   -import "$omarchy_shell"
 
 smoke_root="$(mktemp -d)"
 cp "$repo_dir/tests/smoke.qml" "$smoke_root/shell.qml"
-cp "$repo_dir/BarWidget.qml" "$repo_dir/ContextCaptureOverlay.qml" "$repo_dir/Panel.qml" "$smoke_root/"
+cp "$repo_dir/Ambient.qml" "$repo_dir/BarWidget.qml" \
+  "$repo_dir/ContextCaptureOverlay.qml" "$repo_dir/Panel.qml" "$smoke_root/"
 cp -a "$repo_dir/components" "$smoke_root/components"
 cp -a "$repo_dir/assets" "$smoke_root/assets"
 cp -a "$omarchy_shell/Commons" "$omarchy_shell/Ui" "$smoke_root/"
@@ -457,6 +597,21 @@ QUICKCHAT_BROKER_PATH=/usr/bin/false QT_QPA_PLATFORM=wayland \
   >"$smoke_root/output.log" 2>&1
 if grep -Eq "smoke loader failed|overlay smoke loader failed|Failed to load|Type .* unavailable|Cannot assign" "$smoke_root/output.log"; then
   cat "$smoke_root/output.log"
+  exit 1
+fi
+
+cp "$repo_dir/tests/ambient-session-lifecycle-probe.qml" "$smoke_root/shell.qml"
+if ! QUICKCHAT_BROKER_PATH=/usr/bin/false QT_QPA_PLATFORM=wayland \
+    timeout 5s quickshell --no-duplicate --path "$smoke_root" --no-color \
+    >"$smoke_root/ambient-session-lifecycle.log" 2>&1; then
+  cat "$smoke_root/ambient-session-lifecycle.log"
+  exit 1
+fi
+if grep -Eq "omapilot ambient session lifecycle probe failed|Failed to load|Type .* unavailable|Cannot assign|TypeError|ReferenceError" \
+    "$smoke_root/ambient-session-lifecycle.log" \
+    || ! grep -Fq 'OMAPILOT_AMBIENT_SESSION_LIFECYCLE_PROBE_OK' \
+      "$smoke_root/ambient-session-lifecycle.log"; then
+  cat "$smoke_root/ambient-session-lifecycle.log"
   exit 1
 fi
 
@@ -529,6 +684,23 @@ if grep -Eq "omapilot motion preview failed|Failed to load|Type .* unavailable|C
   exit 1
 fi
 
+state_frame_root="$smoke_root/state-frames"
+mkdir -p "$state_frame_root"
+cp "$repo_dir/tests/state-motion-preview.qml" "$smoke_root/shell.qml"
+if ! OMAPILOT_STATE_FRAME_DIR="$state_frame_root" QT_QPA_PLATFORM=offscreen \
+    timeout 7s quickshell --no-duplicate --path "$smoke_root" --no-color \
+    >"$smoke_root/state-motion-preview.log" 2>&1; then
+  cat "$smoke_root/state-motion-preview.log"
+  exit 1
+fi
+if grep -Eq "omapilot state motion preview failed|Failed to load|Type .* unavailable|Cannot assign|TypeError" \
+    "$smoke_root/state-motion-preview.log" \
+    || ! grep -Fq 'OMAPILOT_STATE_MOTION_PREVIEW_OK' "$smoke_root/state-motion-preview.log" \
+    || [[ $(find "$state_frame_root" -maxdepth 1 -type f -name 'state-*.png' | wc -l) -ne 8 ]]; then
+  cat "$smoke_root/state-motion-preview.log"
+  exit 1
+fi
+
 preview_root="$(mktemp -d)"
 preview_output="$repo_dir/screenshots/implementation-omapilot-empty.png"
 mkdir -p "$repo_dir/screenshots"
@@ -556,7 +728,7 @@ if grep -Eq "visual preview failed|Failed to load|Type .* unavailable|Cannot ass
   exit 1
 fi
 
-for preview_state in settings actions-settings history waiting streaming error error-details context; do
+for preview_state in settings skills-settings actions-settings history waiting streaming error error-details context; do
   preview_output="$repo_dir/screenshots/implementation-omapilot-$preview_state.png"
   OMAPILOT_PREVIEW_STATE="$preview_state" OMAPILOT_PREVIEW_PATH="$preview_output" \
     QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \

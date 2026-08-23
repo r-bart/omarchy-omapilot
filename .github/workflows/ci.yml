@@ -21,7 +21,7 @@ jobs:
         run: ./scripts/check-manifest.sh
       - name: Validate with pinned Omarchy Quattro
         env:
-          OMARCHY_QUATTRO_COMMIT: 4727bad5ebd37cf2344416ae937b02a931113ec3
+          OMARCHY_QUATTRO_COMMIT: ef6d9e6605b121df15bf310e630e04f0c1119fc8
         run: |
           git clone --filter=blob:none https://github.com/basecamp/omarchy.git /tmp/omarchy
           git -C /tmp/omarchy checkout "$OMARCHY_QUATTRO_COMMIT"
@@ -51,6 +51,8 @@ jobs:
           scandir: scripts
       - name: Install development dependencies
         run: npm ci --ignore-scripts
+      - name: Confirm binary inspection tools
+        run: command -v file readelf
       - name: Check release metadata locks
         run: ./scripts/check-release-metadata.sh
       - name: Run broker checks

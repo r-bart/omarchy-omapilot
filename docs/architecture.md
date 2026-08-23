@@ -18,6 +18,14 @@ The widget follows the current Quattro host contract:
 
 Quickchat does not edit `shell.json`, Omarchy sources, Hyprland configuration, or Herdr configuration directly.
 
+Voice is opt-in from Settings after install. Widget settings store only
+`voiceEnabled`, `ttsProvider`, `ttsModel`, and `ttsVoice`. Cloud TTS keys live
+in `~/.config/omapilot/voice-auth.json` and are never inlined into `shell.json`.
+Kokoro is discovered as an optional local Python import; ElevenLabs and OpenAI
+are probed with the supplied key before that key is saved. After a Super+A
+voice turn completes, the broker speaks the answer with the selected TTS
+provider and plays it locally. Dictation still uses Voxtype.
+
 One narrowly scoped exception exists for Voxtype. Its floating OSD renders its
 own waveform at the bottom centre of the focused output — the same place the
 voice node occupies — and two indicators for one state is worse than either.
@@ -35,15 +43,51 @@ rather than creating a file.
 
 The UI starts a separate Quickchat broker and communicates using newline-delimited JSON on stdin/stdout. The broker owns selected-harness discovery and authentication readiness, the embedded Pi lifecycle, ACP lifecycle, permission handling, streaming, cancellation, validation, history, and optional integration commands. Provider stderr is diagnostic input and must never be forwarded to persisted history without redaction.
 
-The reviewed plugin revision contains self-contained broker and adapter bundles usable immediately after a plain clone. Release builds package those tracked bundles into a deterministic, checksum-addressed `linux-x86_64` archive with lockfile-derived SBOM and provenance. Omarchy itself still performs no install hook. Contributors use `npm ci && npm run build` to reproduce checked-in bundles; missing or incompatible runtimes fail closed.
+The reviewed plugin revision contains self-contained, generated Linux x86-64
+launchers usable immediately after a plain clone. A source-controlled Node
+generator writes the minimal static ELF header and x86-64 `execve` stub
+deterministically, then appends the minified JavaScript payload at a fixed
+offset. The launcher invokes system Node 22 or newer, which reads that payload
+directly from the launcher file; it creates no temporary executable. The source
+tree, exact lockfile, generator, legal inventory, and generated launchers live
+in the same commit. Release builds package those tracked files into a deterministic,
+checksum-addressed archive with a lockfile-derived SBOM and provenance. Omarchy
+itself performs no install hook. Contributors use `npm ci && npm run build` on
+Linux x86-64 to reproduce the checked-in runtime; missing or incompatible
+prerequisites fail closed.
 
 ## Runtime command/event contract
 
 One compact JSON object is sent per line; embedded newlines remain JSON escapes. Each command has an `id`. Every correlated event repeats that `id`; asynchronous readiness events may omit it.
 
-The UI sends commands whose `type` is one of `initialize`, `submit`, `context_begin`, `context_capture`, `context_cancel`, `context_discard`, `cancel`, `permission_response`, `dictation_start`, `dictation_stop`, `dictation_cancel`, `copy`, `open_link`, `load_image`, `continue_in_herdr`, `history_list`, `history_delete`, `history_clear`, or `shutdown`.
+The UI sends commands whose `type` is one of `initialize`, `submit`, `context_begin`, `context_capture`, `context_cancel`, `context_discard`, `cancel`, `permission_response`, `capabilities_list`, `capability_set_enabled`, `capability_files_root_set`, `dictation_start`, `dictation_stop`, `dictation_cancel`, `voice_status`, `tts_key_set`, `tts_key_clear`, `tts_key_test`, `tts_speak`, `tts_stop`, `copy`, `open_link`, `load_image`, `continue_in_herdr`, `history_list`, `history_delete`, `history_clear`, or `shutdown`.
 
-The broker emits events whose `type` is one of `ready`, `providers`, `state`, `content`, `context_ready`, `context_attachment`, `permission`, `permission_closed`, `image`, `complete`, `error`, `dictation`, `history`, `herdr`, `link`, or `copied`. The broker's protocol tests are authoritative for exact fields and version negotiation.
+The broker emits events whose `type` is one of `ready`, `providers`, `capabilities`, `state`, `content`, `context_ready`, `context_attachment`, `permission`, `permission_closed`, `image`, `complete`, `error`, `dictation`, `voice`, `tts_tested`, `tts_test_failed`, `tts_speaking`, `tts_spoken`, `tts_speak_failed`, `history`, `herdr`, `link`, or `copied`. The broker's protocol tests are authoritative for exact fields and version negotiation.
+
+## Personal capability registry
+
+The broker owns one versioned capability registry for Email, Calendar, Files,
+Projects, Messages, and Meetings. Connector probes report operation-level
+readiness without reading domain records. Configuration is stored atomically at
+`${XDG_CONFIG_HOME:-$HOME/.config}/omapilot/capabilities.json`; it contains only
+enabled flags and one canonical Files root. Installation, OAuth, Signal pairing,
+containers, and application configuration remain explicit human setup gates.
+
+Each tool is typed and bounded. HEY and Basecamp execute fixed argument arrays;
+Files resolves both lexical and canonical containment and skips symlink traversal;
+Signal accepts only a healthy loopback bridge; Zoom accepts only credential-free
+HTTPS `zoom.us` URLs. Returned email, calendar, file, and project data is marked
+external and untrusted. External writes are never eligible for session/durable
+approval or Dangerous auto-approve.
+
+Built-in Pi receives all ready tools plus bundled domain skills. ACP answer
+sessions receive a fixed, self-contained local MCP server with an explicit
+read-only allowlist. Codex can use the registry and bounded Files reads under
+its existing host-read policy; OpenCode receives connector reads but no registry
+or Files tools under its no-host-reads policy. Model-discovery sessions do not
+start the server. The MCP bridge cannot call external writes, file opens,
+meeting launches, or Signal sends; this preserves the stricter mutation boundary
+until ACP supplies an equivalent end-to-end risk contract.
 
 The broker's internal run contract is the normalization boundary, not the policy
 boundary. Initialization selects exactly one harness: the embedded Pi runtime
@@ -171,4 +215,4 @@ claim an action completed without a successful performing tool result.
 
 ## Compatibility rule
 
-The protocol and release metadata are versioned independently of the manifest schema. Protocol 2 removes user-selected capability fields and makes the broker's automatic provider policy authoritative; legacy stored protocol-1 chats remain readable and are projected into the protocol-2 public shape. The plugin must show an actionable incompatibility error when the cached runtime cannot negotiate its supported protocol; it must not guess at provider output or silently broaden permissions.
+The protocol and release metadata are versioned independently of the manifest schema. Protocol 2 removes the legacy per-submit capability mode fields and makes the broker's automatic provider policy authoritative; legacy stored protocol-1 chats remain readable and are projected into the protocol-2 public shape. The plugin must show an actionable incompatibility error when the cached runtime cannot negotiate its supported protocol; it must not guess at provider output or silently broaden permissions.

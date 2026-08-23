@@ -10,6 +10,7 @@ import "components/internal" as QuickchatInternal
 import "components/Presentation.js" as Presentation
 import "components/Protocol.js" as Protocol
 import "components/QuickActions.js" as ActionCatalog
+import "components/StatePhrases.js" as StatePhrases
 
 Panel {
   id: root
@@ -34,6 +35,14 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property bool dangerousAutoApprove: settings
     && settings.dangerousAutoApprove === true
+  readonly property string webHandoffProvider: settings
+    && Protocol.normalizedWebHandoffProvider(settings.webHandoffProvider)
+    ? Protocol.normalizedWebHandoffProvider(settings.webHandoffProvider) : "duckduckgo"
+  readonly property bool voiceEnabled: settings && settings.voiceEnabled === true
+  readonly property string ttsProvider: settings && Protocol.normalizedTtsProvider(settings.ttsProvider)
+    ? Protocol.normalizedTtsProvider(settings.ttsProvider) : "kokoro"
+  readonly property string ttsModel: settings && typeof settings.ttsModel === "string" ? settings.ttsModel : ""
+  readonly property string ttsVoice: settings && typeof settings.ttsVoice === "string" ? settings.ttsVoice : ""
   readonly property string quickActionsJson: settings
     && typeof settings.quickActionsJson === "string" ? settings.quickActionsJson : ""
   readonly property var quickActionItems: ActionCatalog.actionsFromSettings(
@@ -65,6 +74,13 @@ Panel {
   readonly property bool responseActivityActive:
     Quickchat.QuickchatStore.state === "preparing"
     || Quickchat.QuickchatStore.state === "streaming"
+  property int thinkingPhraseIndex: 0
+  readonly property bool genericActivityStatus: responseActivityActive
+    && StatePhrases.isGenericStatus(Quickchat.QuickchatStore.statusMessage)
+  readonly property string activityStatusText: StatePhrases.thinkingStatus(
+    thinkingPhraseIndex, Quickchat.QuickchatStore.statusMessage)
+  readonly property bool rotatingActivityStatus: root.opened
+    && root.genericActivityStatus && root.motionEnabled
   readonly property bool panelWindowActive: panelFocus.Window.window
     ? panelFocus.Window.window.active : false
   readonly property bool modalInteractionActive: composer.popupOpen
@@ -74,6 +90,43 @@ Panel {
     || (root.viewMode === "history" && historyView.modalInteractionActive)
   readonly property bool workInAppActionAvailable:
     ActionCatalog.promptFor(root.quickActionItems, "work-in-app") !== ""
+
+  Timer {
+    id: thinkingPhraseTimer
+    interval: 2800
+    running: root.rotatingActivityStatus
+    repeat: true
+    triggeredOnStart: false
+    onTriggered: thinkingPhraseSwap.restart()
+  }
+
+  SequentialAnimation {
+    id: thinkingPhraseSwap
+    PropertyAnimation {
+      target: activityStatus; property: "opacity"
+      to: 0; duration: 180; easing.type: Easing.OutQuad
+    }
+    ScriptAction {
+      script: root.thinkingPhraseIndex = (root.thinkingPhraseIndex + 1)
+        % StatePhrases.thinkingCount()
+    }
+    PropertyAnimation {
+      target: activityStatus; property: "opacity"
+      to: 1; duration: 260; easing.type: Easing.InQuad
+    }
+  }
+
+  function resetThinkingPhrase() {
+    thinkingPhraseSwap.stop()
+    activityStatus.opacity = 1
+    if (!responseActivityActive) thinkingPhraseIndex = 0
+  }
+
+  onGenericActivityStatusChanged: resetThinkingPhrase()
+  onResponseActivityActiveChanged: resetThinkingPhrase()
+  onRotatingActivityStatusChanged: {
+    if (!rotatingActivityStatus) resetThinkingPhrase()
+  }
 
   function persistSettings(values) {
     var entry = { id: root.moduleName }
@@ -139,6 +192,7 @@ Panel {
     viewMode = "settings"
     Quickchat.QuickchatStore.requestCustomProviders()
     Quickchat.QuickchatStore.requestVoxtypeOsd()
+    Quickchat.QuickchatStore.requestVoiceStatus()
     Quickchat.QuickchatStore.requestBrowserCompanionStatus()
     Qt.callLater(function() { settingsView.forceInitialFocus() })
   }
@@ -384,10 +438,7 @@ Panel {
                   anchors.right: parent.right
                   anchors.verticalCenter: parent.verticalCenter
                   width: parent.width
-                  text: Quickchat.QuickchatStore.statusMessage !== ""
-                    ? Quickchat.QuickchatStore.statusMessage
-                    : (Quickchat.QuickchatStore.state === "streaming" ? "Receiving response…"
-                      : "Waiting for " + Protocol.providerLabel(Quickchat.QuickchatStore.provider) + "…")
+                  text: root.activityStatusText
                   visible: root.responseActivityActive
                   color: Qt.darker(root.foreground, 1.25)
                   font.family: root.fontFamily
@@ -724,6 +775,7 @@ Panel {
 
               Button {
                 text: "New chat"
+                tooltipText: "New chat \u00b7 Super+Alt+N"
                 foreground: Qt.darker(root.foreground, 1.4)
                 background: root.surface
                 bordered: false
@@ -733,7 +785,7 @@ Panel {
 
               Button {
                 text: "Continue in Herdr"
-                tooltipText: "Continue in Herdr with the native harness permissions"
+                tooltipText: "Continue with native harness permissions \u00b7 Super+Alt+H"
                 visible: Quickchat.QuickchatStore.currentChatId !== ""
                 foreground: Qt.darker(root.foreground, 1.4)
                 background: root.surface
@@ -876,8 +928,13 @@ Panel {
         visible: root.viewMode === "settings"
         backend: Quickchat.QuickchatStore
         dangerousAutoApprove: root.dangerousAutoApprove
+        webHandoffProvider: root.webHandoffProvider
         desktopContextEnabled: settings
           && String(settings.desktopContext || "On") !== "Off"
+        voiceEnabled: root.voiceEnabled
+        ttsProvider: root.ttsProvider
+        ttsModel: root.ttsModel
+        ttsVoice: root.ttsVoice
         quickActions: root.quickActionItems
         motionEnabled: root.motionEnabled
         foreground: root.foreground
@@ -890,6 +947,16 @@ Panel {
         onDesktopContextRequested: function(enabled) {
           root.persistSettings({ desktopContext: enabled === true ? "On" : "Off" })
         }
+        onWebHandoffProviderRequested: function(provider) {
+          root.persistSettings({ webHandoffProvider: Protocol.normalizedWebHandoffProvider(provider) || "duckduckgo" })
+        }
+        onCapabilityEnabledRequested: function(capabilityId, enabled) {
+          Quickchat.QuickchatStore.setCapabilityEnabled(capabilityId, enabled)
+        }
+        onCapabilityFilesRootRequested: function(path) {
+          Quickchat.QuickchatStore.setCapabilityFilesRoot(path)
+        }
+        onCapabilitiesRefreshRequested: Quickchat.QuickchatStore.requestCapabilities()
         onProviderChanged: function(provider) { root.selectProvider(provider) }
         onModelChanged: function(provider, model) {
           var values = {}; values[root.providerModelKey(provider)] = model; root.persistSettings(values)
@@ -908,6 +975,36 @@ Panel {
         }
         onVoxtypeOsdRequested: function(enabled) {
           Quickchat.QuickchatStore.setVoxtypeOsd(enabled)
+        }
+        onVoiceEnabledRequested: function(enabled) {
+          root.persistSettings({ voiceEnabled: enabled === true })
+        }
+        onTtsProviderRequested: function(provider) {
+          var selected = Protocol.normalizedTtsProvider(provider) || "kokoro"
+          var catalog = Protocol.ttsProviderStatus(Quickchat.QuickchatStore.voiceStatus, selected)
+          var model = Protocol.ttsDefaultModel(catalog)
+          var voice = Protocol.ttsDefaultVoice(catalog, model)
+          root.persistSettings({ ttsProvider: selected, ttsModel: model, ttsVoice: voice })
+        }
+        onTtsModelRequested: function(model) {
+          var catalog = Protocol.ttsProviderStatus(Quickchat.QuickchatStore.voiceStatus, root.ttsProvider)
+          var selected = String(model || "")
+          var voice = root.ttsVoice
+          if (!Protocol.ttsVoiceAvailable(catalog, selected, voice))
+            voice = Protocol.ttsDefaultVoice(catalog, selected)
+          root.persistSettings({ ttsModel: selected, ttsVoice: voice })
+        }
+        onTtsVoiceRequested: function(voice) {
+          root.persistSettings({ ttsVoice: String(voice || "") })
+        }
+        onTtsKeySetRequested: function(provider, apiKey) {
+          Quickchat.QuickchatStore.setTtsKey(provider, apiKey)
+        }
+        onTtsKeyClearRequested: function(provider) {
+          Quickchat.QuickchatStore.clearTtsKey(provider)
+        }
+        onTtsKeyTestRequested: function(provider, apiKey) {
+          Quickchat.QuickchatStore.testTtsKey(provider, apiKey)
         }
         onCustomProviderRemoveRequested: function(id) {
           Quickchat.QuickchatStore.removeCustomProvider(id)

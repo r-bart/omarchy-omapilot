@@ -1,5 +1,6 @@
 import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import type { ProviderId, ToolPermission } from "./types.js";
+import type { CapabilityRisk } from "./capabilities/types.js";
 
 export type PendingToolPermission = {
   view: ToolPermission;
@@ -17,6 +18,7 @@ export function normalizeToolPermission(
 
   const title = boundedText(request.toolCall.title ?? request.toolCall.name ?? `${kind} tool`, 120);
   const detail = permissionDetail(kind, request.toolCall.rawInput);
+  const risk = permissionRisk(request.toolCall.rawInput);
   const reviewable = detail !== undefined;
   const optionIds: PendingToolPermission["optionIds"] = {};
   const options: ToolPermission["options"] = [];
@@ -27,6 +29,7 @@ export function normalizeToolPermission(
     // only. Do not advertise session/durable choices that the completion guard
     // would correctly refuse to honor.
     if (provider === "opencode" && decision !== "allow_once" && decision.startsWith("allow_")) continue;
+    if (oneShotRisk(risk) && decision !== "allow_once" && decision.startsWith("allow_")) continue;
     const id = `option-${index}`;
     optionIds[id] = option.optionId;
     options.push({ id, decision, label: boundedText(option.name, 48) || defaultLabel(decision) });
@@ -39,11 +42,23 @@ export function normalizeToolPermission(
       title: reviewable ? (title === "" ? `${kind} tool` : title) : "Command blocked",
       kind,
       authority: "device",
+      ...(risk === undefined ? {} : { risk }),
       detail: detail ?? "OmaPilot blocked this command because its complete contents cannot be displayed safely.",
       options
     },
     optionIds
   };
+}
+
+function permissionRisk(rawInput: unknown): CapabilityRisk | undefined {
+  if (rawInput === null || typeof rawInput !== "object" || Array.isArray(rawInput)) return undefined;
+  const risk = (rawInput as Record<string, unknown>).risk;
+  return risk === "inspect" || risk === "prepare" || risk === "local_action" || risk === "external_write"
+    || risk === "destructive" || risk === "setup" ? risk : undefined;
+}
+
+function oneShotRisk(risk: CapabilityRisk | undefined): boolean {
+  return risk === "external_write" || risk === "destructive" || risk === "setup";
 }
 
 function permissionDecision(kind: string, name: string, optionId: string): ToolPermission["options"][number]["decision"] | undefined {
@@ -78,7 +93,8 @@ function exactInput(kind: "execute", value: unknown): string | undefined {
   if (hasUnsafeText(remaining)) return undefined;
   let rendered: string;
   try { rendered = JSON.stringify(value, null, 2); } catch { return undefined; }
-  if (rendered.length > 3_000) return undefined;
+  const maximum = oneShotRisk(permissionRisk(value)) ? 32_000 : 3_000;
+  if (rendered.length > maximum) return undefined;
   return rendered;
 }
 

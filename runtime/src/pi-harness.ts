@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync,
 import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { homedir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { createAgentSession } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/sdk.js";
 import { DefaultResourceLoader } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js";
 import { AuthStorage, readStoredCredential } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/auth-storage.js";
@@ -26,8 +26,31 @@ import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import type { AcpPrompt } from "./context.js";
 import type { AcpResult, AcpRun, PermissionHandler } from "./acp.js";
 import { automaticInstructions, type PiDiscoveredProvider } from "./providers.js";
-import type { BrokerEvent, BuiltinAuthMethod, ModelOption, ProviderPolicyInfo } from "./types.js";
+import type { BrokerEvent, BuiltinAuthMethod, ModelOption, ProviderPolicyInfo, WebHandoffProvider } from "./types.js";
 import { quickchatPaths } from "./paths.js";
+import { pluginRoot } from "./runtime-root.js";
+import {
+  createPersonalAssistantTools,
+  desktopToolTitle,
+  reviewDesktopToolInput
+} from "./tools/desktop.js";
+import { createWebHandoffTool, webHandoffApproval, webHandoffTitle } from "./tools/web-handoff.js";
+import {
+  capabilityReviewableInput,
+  capabilityToolRisk,
+  capabilityToolTitle,
+  createCapabilityRegistry,
+  type CapabilityRisk
+} from "./capabilities/index.js";
+
+export {
+  createPersonalAssistantTools,
+  discoverInstalledApps,
+  normalizeWindowAddress,
+  readDesktopState,
+  windowActionCommand,
+  workspaceActionCommand
+} from "./tools/desktop.js";
 
 const PROVIDER_GROUPS = [
   { id: "codex", name: "Codex", piProviderIds: ["openai-codex"] },
@@ -35,9 +58,14 @@ const PROVIDER_GROUPS = [
   { id: "grok", name: "Grok", piProviderIds: ["xai"] }
 ] as const;
 const BUILTIN_PROVIDER_IDS = new Set(["openai-codex", "openai", "xai"]);
-const MUTATING_TOOLS = new Set(["bash", "edit", "write", "open_url", "media_control"]);
+const MUTATING_TOOLS = new Set([
+  "bash", "edit", "write", "open_url", "web_handoff", "media_control", "app_open", "window_action", "workspace_action"
+]);
 const AGENT_PROFILE_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
-const PI_TOOLS = [...AGENT_PROFILE_TOOLS, "agent", "open_url", "media_control"];
+const PI_TOOLS = [
+  ...AGENT_PROFILE_TOOLS, "agent", "open_url", "web_handoff", "media_control", "app_catalog", "app_open", "desktop_state",
+  "window_action", "workspace_action"
+];
 const SAFE_AGENT_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const MAX_AGENT_FILE_BYTES = 128 * 1024;
 const sessionApprovals = new Map<string, PiApprovalState>();
@@ -321,7 +349,8 @@ export function runPiQuestion(
   timeoutMs = 180_000,
   requestPermission?: PermissionHandler,
   cancelPermissions?: () => void,
-  resumeSessionId?: string
+  resumeSessionId?: string,
+  webHandoffProvider: WebHandoffProvider = "duckduckgo"
 ): AcpRun {
   const controller = new AbortController();
   let activeSession: { abort: () => Promise<void>; dispose: () => void } | undefined;
@@ -343,13 +372,14 @@ export function runPiQuestion(
       approvals = new PiApprovalState(join(provider.agentDir, "approvals.json"), provider.cwd);
       sessionApprovals.set(approvalStateKey, approvals);
     }
-    const permissionExtension = createPermissionExtension(requestId, requestPermission, approvals);
+    const permissionExtension = createPermissionExtension(requestId, requestPermission, approvals, webHandoffProvider);
+    const capabilities = await createCapabilityRegistry(provider.agent.env);
     const loader = new DefaultResourceLoader({
       cwd: provider.cwd,
       agentDir: provider.agentDir,
       noExtensions: true,
       noSkills: true,
-      additionalSkillPaths: existingSkillPaths(provider.sharedAgentsDir, provider.cwd),
+      additionalSkillPaths: allSkillPaths(provider),
       extensionFactories: [permissionExtension],
       appendSystemPrompt: [automaticInstructions(), formatAgentProfiles(profiles)]
     });
@@ -371,8 +401,14 @@ export function runPiQuestion(
       resourceLoader: loader,
       sessionManager,
       settingsManager: settings,
-      tools: PI_TOOLS,
-      customTools: [agentTool, ...createDesktopTools()]
+      tools: [...PI_TOOLS, ...capabilities.tools.map((tool) => tool.name)],
+      customTools: [
+        agentTool,
+        ...createDesktopTools(),
+        createWebHandoffTool(webHandoffProvider),
+        ...createPersonalAssistantTools(),
+        ...capabilities.tools
+      ]
     });
     activeSession = session;
     let streamedText = "";
@@ -621,38 +657,48 @@ function stableValue(value: unknown): unknown {
   return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableValue(value[key])]));
 }
 
-function createPermissionExtension(requestId: string, handler: PermissionHandler | undefined, approvals: PiApprovalState): InlineExtension {
+function createPermissionExtension(
+  requestId: string,
+  handler: PermissionHandler | undefined,
+  approvals: PiApprovalState,
+  webHandoffProvider: WebHandoffProvider = "duckduckgo"
+): InlineExtension {
   return {
     name: "omapilot-permissions",
     hidden: true,
     factory: (pi) => {
       pi.on("tool_call", async (event) => {
-        if (!MUTATING_TOOLS.has(event.toolName)) return undefined;
+        if (!requiresPiPermission(event.toolName)) return undefined;
         if (handler === undefined) return { block: true, reason: "OmaPilot did not provide a permission handler" };
-        const rawInput = reviewableToolInput(event.toolName, event.input);
+        const rawInput = reviewableToolInput(event.toolName, event.input, webHandoffProvider);
+        const risk = capabilityToolRisk(event.toolName);
+        const oneShotOnly = oneShotCapabilityRisk(risk);
         const approvalKey = approvals.key(event.toolName, rawInput);
         if (approvals.denied(approvalKey)) return { block: true, reason: "This exact tool request is always denied" };
-        if (approvals.allowed(approvalKey)) return undefined;
+        if (!oneShotOnly && approvals.allowed(approvalKey)) return undefined;
+        const options: RequestPermissionRequest["options"] = [
+          { optionId: `allow-${event.toolCallId}`, name: "Allow once", kind: "allow_once" },
+          ...(!oneShotOnly ? [
+            { optionId: `session-${event.toolCallId}`, name: "Allow exact request for this session", kind: "allow_always" as const },
+            { optionId: `always-${event.toolCallId}`, name: "Always allow exact request", kind: "allow_always" as const }
+          ] : []),
+          { optionId: `reject-${event.toolCallId}`, name: "Deny", kind: "reject_once" },
+          { optionId: `reject-always-${event.toolCallId}`, name: "Always deny exact request", kind: "reject_always" }
+        ];
         const request: RequestPermissionRequest = {
           sessionId: requestId,
           toolCall: {
             toolCallId: event.toolCallId,
             kind: "execute",
-            title: toolTitle(event.toolName, event.input),
+            title: toolTitle(event.toolName, event.input, webHandoffProvider),
             rawInput
           },
-          options: [
-            { optionId: `allow-${event.toolCallId}`, name: "Allow once", kind: "allow_once" },
-            { optionId: `session-${event.toolCallId}`, name: "Allow exact request for this session", kind: "allow_always" },
-            { optionId: `always-${event.toolCallId}`, name: "Always allow exact request", kind: "allow_always" },
-            { optionId: `reject-${event.toolCallId}`, name: "Deny", kind: "reject_once" },
-            { optionId: `reject-always-${event.toolCallId}`, name: "Always deny exact request", kind: "reject_always" }
-          ]
+          options
         };
         const decision = await handler(request);
         const option = typeof decision === "string" ? decision : decision?.optionId;
-        if (option === `session-${event.toolCallId}`) approvals.allowSession(approvalKey);
-        if (option === `always-${event.toolCallId}`) approvals.allowAlways(approvalKey);
+        if (!oneShotOnly && option === `session-${event.toolCallId}`) approvals.allowSession(approvalKey);
+        if (!oneShotOnly && option === `always-${event.toolCallId}`) approvals.allowAlways(approvalKey);
         if (option === `reject-always-${event.toolCallId}`) approvals.denyAlways(approvalKey);
         return option === `allow-${event.toolCallId}` || option === `session-${event.toolCallId}` || option === `always-${event.toolCallId}`
           ? undefined : { block: true, reason: "The user denied this tool call" };
@@ -661,8 +707,23 @@ function createPermissionExtension(requestId: string, handler: PermissionHandler
   };
 }
 
-function reviewableToolInput(name: string, input: Record<string, unknown>): Record<string, unknown> {
+export function requiresPiPermission(toolName: string): boolean {
+  return MUTATING_TOOLS.has(toolName) || capabilityToolRisk(toolName) !== undefined;
+}
+
+function oneShotCapabilityRisk(risk: CapabilityRisk | undefined): boolean {
+  return risk === "external_write" || risk === "destructive" || risk === "setup";
+}
+
+function reviewableToolInput(
+  name: string,
+  input: Record<string, unknown>,
+  webHandoffProvider: WebHandoffProvider
+): Record<string, unknown> {
+  const capabilityInput = capabilityReviewableInput(name, input);
+  if (capabilityInput !== undefined) return capabilityInput;
   if (name === "bash") return { ...input, command: typeof input.command === "string" ? input.command : "" };
+  if (name === "web_handoff") return webHandoffApproval(webHandoffProvider, input.query);
   if (name === "open_url") {
     const url = typeof input.url === "string" ? input.url : "";
     return { command: `omarchy launch browser ${url}`, url };
@@ -673,25 +734,45 @@ function reviewableToolInput(name: string, input: Record<string, unknown>): Reco
     try { method = omarchyMediaMethod(action); } catch { /* Keep malformed input reviewable. */ }
     return { command: `omarchy-shell media ${method}`, action };
   }
+  const desktopInput = reviewDesktopToolInput(name, input);
+  if (desktopInput !== undefined) return desktopInput;
   const path = typeof input.path === "string" ? input.path : "unknown";
   return { command: `${name} ${path}`, ...input };
 }
 
-function toolTitle(name: string, input: Record<string, unknown>): string {
+function toolTitle(name: string, input: Record<string, unknown>, webHandoffProvider: WebHandoffProvider): string {
+  const capabilityTitle = capabilityToolTitle(name, input);
+  if (capabilityTitle !== undefined) return capabilityTitle;
   if (name === "bash") return "Run a command";
+  if (name === "web_handoff") return webHandoffTitle(webHandoffProvider);
   if (name === "open_url") return "Open URL in default browser";
   if (name === "media_control") return `Control media: ${typeof input.action === "string" ? input.action : "action"}`;
+  const desktopTitle = desktopToolTitle(name, input);
+  if (desktopTitle !== undefined) return desktopTitle;
   const path = typeof input.path === "string" ? basename(input.path) : "file";
   return `${name === "write" ? "Write" : "Edit"} ${path}`;
 }
 
-export function existingSkillPaths(directory: string, cwd: string): string[] {
+export function existingSkillPaths(directory: string, cwd: string, home = homedir()): string[] {
   const candidates = [
     join(directory, "skills"),
+    join(home, ".pi/agent/skills"),
     join(cwd, ".agents/skills"),
     join(cwd, ".pi/skills")
   ];
   return [...new Set(candidates.filter((path) => existsSync(path)))];
+}
+
+export function bundledSkillPaths(): string[] {
+  const path = resolve(pluginRoot(import.meta.url), "skills");
+  return existsSync(path) ? [path] : [];
+}
+
+function allSkillPaths(provider: PiDiscoveredProvider): string[] {
+  return [
+    ...existingSkillPaths(provider.sharedAgentsDir, provider.cwd, provider.agent.env.HOME ?? homedir()),
+    ...bundledSkillPaths()
+  ];
 }
 
 export function discoverAgentProfiles(directory: string, cwd: string): AgentProfile[] {
@@ -769,7 +850,7 @@ function createAgentTool(
         agentDir: provider.agentDir,
         noExtensions: true,
         noSkills: true,
-        additionalSkillPaths: existingSkillPaths(provider.sharedAgentsDir, provider.cwd),
+        additionalSkillPaths: allSkillPaths(provider),
         extensionFactories: [createPermissionExtension(requestId, requestPermission, approvals)],
         systemPrompt: [automaticInstructions(), profile.systemPrompt].join("\n\n")
       });

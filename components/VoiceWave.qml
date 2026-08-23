@@ -5,10 +5,10 @@ import qs.Commons
 
 // A living ribbon of light along the bottom edge.
 //
-// Deliberately NOT a level meter. The broker reports recording/transcribing/idle
-// with no amplitude, so a bar-graph VU would be inventing data — it would read as
-// "this is your voice" while being pure decoration. This says "listening", not
-// "73% loud".
+// Listening is deliberately NOT a microphone level meter: the broker reports
+// recording/transcribing/idle with no input amplitude. Speaking is different —
+// its `level` comes from the decoded TTS output, so that state can truthfully
+// follow the audio while the other active states stay deterministic.
 //
 // Two earlier shapes were rejected for concrete reasons:
 //
@@ -29,6 +29,22 @@ Item {
   property real level: 0.5          // 0..1, swells the ribbon
   property real intensity: 1        // overall opacity multiplier
   property bool motionEnabled: true
+  // listening | thinking | speaking. This changes character, not just speed.
+  property string motionStyle: "listening"
+  readonly property bool thinking: motionStyle === "thinking"
+  readonly property bool speaking: motionStyle === "speaking"
+  readonly property real boundedLevel: Math.max(0, Math.min(1, level))
+  // Provider output is commonly mastered well below full scale, which made a
+  // truthful raw envelope read as barely moving. Keep the first 2.5% as a
+  // silence/noise gate, then apply perceptual gain so ordinary syllables use
+  // more of the available height while loud peaks remain bounded.
+  readonly property real speakingLevel: boundedLevel <= 0.025 ? 0
+    : Math.min(1, Math.pow((boundedLevel - 0.025) / 0.975, 0.62) * 1.18)
+  // A calm standing wave while listening; a much faster travelling signal
+  // while thinking. The larger ratio is intentional: the previous 28% pace
+  // difference was technically present but visually indistinguishable.
+  readonly property real motionPace: thinking ? 0.084 : (speaking ? 0.056 : 0.022)
+  readonly property real frequencyScale: thinking ? 1.48 : (speaking ? 1.16 : 0.92)
 
   readonly property var layers: [
     { frequency: 1.3, drift:  1.00, weight: 1.00, thickness: 3.0, amplitude: 1.00 },
@@ -38,6 +54,7 @@ Item {
   readonly property int samples: 44
 
   property real phase: 0
+  property real livingPhase: 0
 
   // 30fps rather than a 60fps binding. The ribbon drifts slowly, so half the
   // updates are indistinguishable and cost half the CPU.
@@ -45,7 +62,12 @@ Item {
     interval: 33
     repeat: true
     running: root.motionEnabled && root.visible
-    onTriggered: root.phase = (root.phase + 0.028) % (Math.PI * 2)
+    onTriggered: {
+      var variation = 1 + 0.18 * Math.sin(root.livingPhase * 0.73)
+        + 0.08 * Math.sin(root.livingPhase * 1.91 + 0.7)
+      root.phase = (root.phase + root.motionPace * variation) % (Math.PI * 200)
+      root.livingPhase = (root.livingPhase + (root.thinking ? 0.029 : 0.013)) % (Math.PI * 200)
+    }
   }
 
   function wavePoints(layer) {
@@ -54,16 +76,48 @@ Item {
     var h = root.height
     if (w <= 0 || h <= 0) return points
     var mid = h * 0.5
-    var peak = mid * 0.86 * layer.amplitude * (0.3 + root.level * 0.7)
+    var levelScale = root.speaking ? 0.025 + root.speakingLevel * 1.1
+      : 0.3 + root.boundedLevel * 0.7
+    var peak = mid * 0.86 * layer.amplitude * levelScale
     for (var i = 0; i <= root.samples; i++) {
       var t = i / root.samples
       // Raised-cosine envelope: zero at both ends, full in the middle. Baked in,
       // so the ribbon disperses instead of terminating — and because it lives in
       // the geometry there is no mask to fall out of alignment.
       var envelope = 0.5 - 0.5 * Math.cos(2 * Math.PI * t)
-      // Two summed harmonics per layer so no single sine is recognisable.
-      var wave = Math.sin(t * Math.PI * 2 * layer.frequency + root.phase * layer.drift)
-        + 0.35 * Math.sin(t * Math.PI * 2 * layer.frequency * 2.3 - root.phase * layer.drift * 1.7)
+      var frequency = layer.frequency * root.frequencyScale
+      var wave
+      if (root.thinking) {
+        // Directional phase makes the whole ribbon flow left-to-right. A tight
+        // travelling knot and softer wake make the work state readable at a
+        // glance without implying measurable completion.
+        wave = Math.sin(t * Math.PI * 2 * frequency - root.phase * layer.drift * 1.55)
+          + 0.34 * Math.sin(t * Math.PI * 2 * frequency * 1.9 - root.phase * layer.drift * 2.15)
+          + 0.14 * Math.sin(t * Math.PI * 2 * frequency * 0.72
+            - root.phase * layer.drift * 0.82 + root.livingPhase)
+        var travel = (root.phase * 0.095) % 1
+        var knot = Math.exp(-Math.pow((t - (0.10 + travel * 0.80)) / 0.095, 2))
+        var wake = Math.exp(-Math.pow((t - (0.04 + travel * 0.72)) / 0.18, 2))
+        wave += knot * 0.78 * Math.sin(root.phase * 2.15 + t * 12)
+          + wake * 0.18 * Math.sin(root.phase * 1.2 + t * 7)
+      } else if (root.speaking) {
+        // Playback keeps a readable travelling carrier, but the height is the
+        // measured TTS envelope. Silence falls almost flat; syllables lift it.
+        wave = Math.sin(t * Math.PI * 2 * frequency - root.phase * layer.drift * 0.92)
+          + 0.28 * Math.sin(t * Math.PI * 2 * frequency * 2.05
+            - root.phase * layer.drift * 1.34 + root.livingPhase * 0.4)
+          + 0.10 * Math.sin(t * Math.PI * 2 * frequency * 0.72
+            + root.phase * layer.drift * 0.36)
+      } else {
+        // Listening stays centred: phase bends a standing set of harmonics
+        // instead of pushing them laterally, while VoiceNode supplies the slow
+        // inhale/exhale in amplitude.
+        var bend = Math.sin(root.phase * 0.62)
+        wave = Math.sin(t * Math.PI * 2 * frequency + bend * layer.drift * 0.62)
+          + 0.32 * Math.sin(t * Math.PI * 2 * frequency * 2.15 - bend * layer.drift * 0.48)
+          + 0.12 * Math.sin(t * Math.PI * 2 * frequency * 0.618
+            + bend * layer.drift * 0.27 + root.livingPhase)
+      }
       points.push(Qt.point(t * w, mid + wave * peak * envelope * 0.74))
     }
     return points

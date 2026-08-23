@@ -1,9 +1,13 @@
 import { z } from "zod";
+import type { TtsProviderStatus, VoiceStatus } from "./tts.js";
+import type { CapabilityRisk, CapabilityView } from "./capabilities/types.js";
 
 export const providerIdSchema = z.enum(["builtin", "codex", "opencode"]);
 export type ProviderId = z.infer<typeof providerIdSchema>;
 export const harnessIdSchema = providerIdSchema;
 export type HarnessId = z.infer<typeof harnessIdSchema>;
+export const webHandoffProviderSchema = z.enum(["duckduckgo", "google", "chatgpt", "claude", "grok"]);
+export type WebHandoffProvider = z.infer<typeof webHandoffProviderSchema>;
 
 const contextText = (max: number) => z.string().min(1).max(max).refine(
   (value) => !/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(value),
@@ -74,6 +78,7 @@ const submitCommand = z.object({
   model: z.preprocess((value) => typeof value === "string" && value.trim() === "" ? undefined : value, z.string().min(1).max(500).optional()),
   desktopContext: desktopContextSchema.optional(),
   contextAttachments: z.array(contextAttachmentSelectionSchema).max(4).optional(),
+  webHandoffProvider: webHandoffProviderSchema.optional(),
   dangerousAutoApprove: z.boolean().optional()
 });
 const contextBeginCommand = z.object({
@@ -99,6 +104,16 @@ const browserCompanionCommand = z.object({
 const browserCompanionOpenSettingsCommand = z.object({
   type: z.literal("browser_companion_open_settings"),
   family: z.enum(["chromium", "firefox"])
+}).strict();
+const capabilityIdSchema = z.enum(["email", "calendar", "files", "projects", "messages", "meetings"]);
+const capabilitySetEnabledCommand = z.object({
+  type: z.literal("capability_set_enabled"),
+  id: capabilityIdSchema,
+  enabled: z.boolean()
+}).strict();
+const capabilityFilesRootSetCommand = z.object({
+  type: z.literal("capability_files_root_set"),
+  path: z.string().max(4_096)
 }).strict();
 const authBeginCommand = z.object({
   type: z.literal("auth_begin"),
@@ -153,6 +168,32 @@ const customProviderRemoveCommand = z.object({
   type: z.literal("custom_provider_remove"),
   id: z.string().min(1).max(64)
 });
+const cloudTtsProviderSchema = z.enum(["elevenlabs", "openai"]);
+const ttsKeySetCommand = z.object({
+  type: z.literal("tts_key_set"),
+  provider: cloudTtsProviderSchema,
+  apiKey: z.string().min(1).max(512)
+}).strict();
+const ttsKeyClearCommand = z.object({
+  type: z.literal("tts_key_clear"),
+  provider: cloudTtsProviderSchema
+}).strict();
+const ttsKeyTestCommand = z.object({
+  type: z.literal("tts_key_test"),
+  provider: cloudTtsProviderSchema,
+  apiKey: z.string().min(1).max(512)
+}).strict();
+const ttsSpeakCommand = z.object({
+  type: z.literal("tts_speak"),
+  id: z.string().min(1).max(128),
+  provider: z.enum(["kokoro", "elevenlabs", "openai"]),
+  model: z.string().min(1).max(128).optional(),
+  voice: z.string().min(1).max(128).optional(),
+  text: z.string().min(1).max(8000)
+}).strict();
+const ttsStopCommand = z.object({
+  type: z.literal("tts_stop")
+}).strict();
 
 export const commandSchema = z.discriminatedUnion("type", [
   initializeCommand,
@@ -162,6 +203,8 @@ export const commandSchema = z.discriminatedUnion("type", [
   contextCancelCommand,
   browserCompanionCommand,
   browserCompanionOpenSettingsCommand,
+  capabilitySetEnabledCommand,
+  capabilityFilesRootSetCommand,
   authBeginCommand,
   authResponseCommand,
   authCancelCommand,
@@ -176,7 +219,12 @@ export const commandSchema = z.discriminatedUnion("type", [
   customProviderAddCommand,
   z.object({ type: z.literal("voxtype_osd_set"), enabled: z.boolean() }),
   customProviderRemoveCommand,
-  z.object({ type: z.enum(["dictation_start", "dictation_stop", "dictation_cancel", "history_list", "history_clear", "custom_provider_list", "voxtype_osd_status", "shutdown"]) })
+  ttsKeySetCommand,
+  ttsKeyClearCommand,
+  ttsKeyTestCommand,
+  ttsSpeakCommand,
+  ttsStopCommand,
+  z.object({ type: z.enum(["dictation_start", "dictation_stop", "dictation_cancel", "history_list", "history_clear", "custom_provider_list", "capabilities_list", "voxtype_osd_status", "voice_status", "shutdown"]) })
 ]);
 export type BrokerCommand = z.infer<typeof commandSchema>;
 
@@ -269,6 +317,7 @@ export type ToolPermission = {
   title: string;
   kind: "execute";
   authority: "device";
+  risk?: CapabilityRisk;
   detail: string;
   options: Array<{
     id: string;
@@ -298,13 +347,21 @@ export type ChatRecord = {
 export type ChatView = Omit<ChatRecord, "images"> & { images: RenderableImage[] };
 
 export type BrokerEvent =
-  | { type: "ready"; protocolVersion: 2; features: Array<"desktop-context" | "context-attachments">; providers: ProviderInfo[]; history: ChatView[] }
+  | { type: "ready"; protocolVersion: 2; features: Array<"desktop-context" | "context-attachments" | "voice" | "capability-packs">; providers: ProviderInfo[]; history: ChatView[] }
+  | { type: "capabilities"; capabilities: CapabilityView[] }
   | { type: "providers"; providers: ProviderInfo[] }
   | { type: "custom_provider_saved"; provider: CustomProviderView }
   | { type: "custom_provider_tested"; result: CustomProviderProbeResult }
   | { type: "custom_provider_test_failed"; baseUrl: string; message: string }
   | { type: "custom_providers"; providers: CustomProviderView[] }
   | { type: "voxtype_osd"; available: boolean; enabled: boolean; message?: string }
+  | { type: "voice"; dictation: VoiceStatus["dictation"]; tts: TtsProviderStatus[] }
+  | { type: "tts_tested"; provider: "elevenlabs" | "openai"; result: TtsProviderStatus }
+  | { type: "tts_test_failed"; provider: "elevenlabs" | "openai"; message: string }
+  | { type: "tts_speaking"; id: string; metered: boolean }
+  | { type: "tts_level"; id: string; level: number }
+  | { type: "tts_spoken"; id: string }
+  | { type: "tts_speak_failed"; id: string; message: string }
   | { type: "auth_methods"; methods: BuiltinAuthMethod[] }
   | { type: "auth"; phase: "starting"; flowId: string; methodId: string; message: string }
   | { type: "auth"; phase: "prompt"; flowId: string; methodId: string; prompt: BuiltinAuthPrompt }

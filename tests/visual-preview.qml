@@ -6,6 +6,7 @@ import qs.Commons
 import qs.Ui
 import "components" as OmaPilot
 import "components/QuickActions.js" as ActionCatalog
+import "components/StatePhrases.js" as StatePhrases
 
 ShellRoot {
   id: root
@@ -60,12 +61,35 @@ ShellRoot {
       { value: "openai::api_key", label: "OpenAI API key",
         description: "Store this credential only in OmaPilot's private configuration." },
       { value: "xai::oauth", label: "xAI (Grok/X subscription)",
-        description: "Use your Anthropic subscription in OmaPilot." }
+        description: "Use your xAI subscription in OmaPilot." }
     ]
     property var customProviders: []
     property var customProviderSaved: null
     property string customProviderError: ""
     property var voxtypeOsd: ({ available: true, enabled: true, message: "" })
+    property var voiceStatus: ({
+      dictation: { available: true, message: "Voxtype is ready for dictation." },
+      tts: [
+        { id: "kokoro", name: "Kokoro", kind: "local", available: false, configured: false,
+          message: "Kokoro is not installed.",
+          models: [{ id: "kokoro-82m", name: "Kokoro 82M" }],
+          voices: [{ id: "af_heart", name: "Heart (American female)" }] },
+        { id: "elevenlabs", name: "ElevenLabs", kind: "cloud", available: false, configured: false,
+          message: "Add an ElevenLabs API key to enable this provider.",
+          models: [{ id: "eleven_multilingual_v2", name: "Multilingual v2" }],
+          voices: [{ id: "wyWA56cQNU2KqUW4eCsI", name: "Clyde" }] },
+        { id: "openai", name: "OpenAI", kind: "cloud", available: false, configured: false,
+          message: "Add an OpenAI API key to enable this provider.",
+          models: [{ id: "gpt-4o-mini-tts", name: "GPT-4o mini TTS" }],
+          voices: [{ id: "coral", name: "Coral" }] }
+      ]
+    })
+    property var ttsTest: null
+    property string ttsTestError: ""
+    property bool voiceEnabled: false
+    property string ttsProvider: "kokoro"
+    property string ttsModel: "kokoro-82m"
+    property string ttsVoice: "af_heart"
     property var browserCompanionStatus: ({
       phase: "ready", relayInstalled: false, setupAvailable: true,
       chromiumConnected: false, firefoxConnected: false,
@@ -73,6 +97,40 @@ ShellRoot {
     })
     property bool browserCompanionConnected: false
     property bool browserCompanionBusy: false
+    property bool brokerCapabilityPacksSupported: true
+    property string capabilityError: ""
+    property var capabilities: [
+      { id: "email", label: "Email", connector: "HEY", state: "ready", status: "Authenticated with HEY",
+        enabled: true, description: "Read, search, and send email.", setupHint: "", operations: [
+          { id: "search", label: "Search mail", risk: "inspect", available: true },
+          { id: "send", label: "Send or reply", risk: "external_write", available: true }
+        ] },
+      { id: "calendar", label: "Calendar", connector: "HEY", state: "ready", status: "Authenticated with HEY",
+        enabled: true, description: "Review events and manage personal to-dos.", setupHint: "", operations: [
+          { id: "events", label: "Read events", risk: "inspect", available: true },
+          { id: "todo_list", label: "Read to-dos", risk: "inspect", available: true },
+          { id: "todo_create", label: "Create a to-do", risk: "external_write", available: true }
+        ] },
+      { id: "files", label: "Files", connector: "Local folder", state: "needs_configuration",
+        status: "Choose a specific local or synced folder", enabled: true,
+        description: "Work inside one explicitly selected folder.",
+        setupHint: "Select a Dropbox folder or another bounded files root.", filesRoot: "", operations: [
+          { id: "read", label: "Read text files", risk: "inspect", available: false },
+          { id: "open", label: "Open a file", risk: "local_action", available: false }
+        ] },
+      { id: "projects", label: "Projects", connector: "Basecamp", state: "missing_connector",
+        status: "Basecamp CLI is not installed", enabled: true, description: "Search and update Basecamp work.",
+        setupHint: "Install the official basecamp-cli package, then run basecamp auth login.", operations: [] },
+      { id: "messages", label: "Messages", connector: "Signal", state: "needs_setup",
+        status: "Signal Desktop is not an automation connector", enabled: true,
+        description: "Send Signal messages through a private bridge.",
+        setupHint: "Pair a private signal-cli-rest-api service as a linked device.", operations: [] },
+      { id: "meetings", label: "Meetings", connector: "Zoom", state: "ready",
+        status: "Zoom links use the configured Omarchy handler", enabled: true,
+        description: "Find and join Zoom meetings.", setupHint: "", operations: [
+          { id: "join", label: "Join a Zoom meeting", risk: "local_action", available: true }
+        ] }
+    ]
     property var builtinAuth: ({ phase: "idle", flowId: "", methodId: "", message: "",
       url: "", verificationUri: "", userCode: "", prompt: null })
     property bool builtinAuthBusy: false
@@ -106,12 +164,15 @@ ShellRoot {
       if (contextAttachments.length > 0) contextAttachments[0].selectedRepresentationIds = String(mode).split("+")
     }
     function removeContextAttachment(id) { contextAttachments = [] }
+    function setCapabilityEnabled(id, enabled) {}
+    function setCapabilityFilesRoot(path) {}
+    function requestCapabilities() {}
   }
 
   Window {
     id: previewWindow
     width: 860
-    height: root.previewState === "settings" || root.previewState === "dangerous-settings"
+    height: root.previewState === "settings" || root.previewState === "skills-settings" || root.previewState === "dangerous-settings"
       || root.previewState === "actions-settings" || root.previewState === "history" ? 760
       : (root.previewState === "error-details" ? 520 : (root.previewState === "context" ? 430 : 320))
     visible: true
@@ -170,6 +231,7 @@ ShellRoot {
       OmaPilot.SettingsView {
         id: settingsView
         visible: root.previewState === "settings"
+          || root.previewState === "skills-settings"
           || root.previewState === "dangerous-settings"
           || root.previewState === "actions-settings"
         anchors.fill: parent
@@ -179,9 +241,15 @@ ShellRoot {
         anchors.bottomMargin: previewSurface.contentBottomInset + Style.spacing.popupPadding
         backend: backend
         selectedTab: root.previewState === "dangerous-settings" ? "desktop"
+          : (root.previewState === "skills-settings" ? "skills"
           : (root.previewState === "actions-settings" ? "actions" : "agent")
+          )
         dangerousAutoApprove: root.previewState === "dangerous-settings"
         desktopContextEnabled: true
+        voiceEnabled: false
+        ttsProvider: "kokoro"
+        ttsModel: "kokoro-82m"
+        ttsVoice: "af_heart"
         quickActions: root.previewState === "actions-settings"
           ? ActionCatalog.addAction(ActionCatalog.defaultActions(true, true),
             "Research this", "Research this topic using current sources.", 42)
@@ -270,7 +338,8 @@ ShellRoot {
               }
 
               Text {
-                text: root.previewState === "streaming" ? "Receiving response…" : backend.statusMessage
+                text: root.previewState === "waiting" || root.previewState === "streaming"
+                  ? StatePhrases.thinkingAt(0) : backend.statusMessage
                 color: Qt.darker(Color.popups.text, 1.25)
                 font.family: Style.font.family
                 font.pixelSize: Style.font.caption
@@ -330,6 +399,7 @@ ShellRoot {
         && (header.implicitHeight <= 0 || composer.implicitHeight <= 0
           || actions.implicitHeight <= 0)
       var invalidSettings = (root.previewState === "settings"
+          || root.previewState === "skills-settings"
           || root.previewState === "dangerous-settings"
           || root.previewState === "actions-settings")
         && settingsView.implicitHeight <= 0

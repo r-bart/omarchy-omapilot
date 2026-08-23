@@ -1,5 +1,47 @@
 # Quickchat implementation ledger
 
+## Marketplace submission preparation (2026-08-23)
+
+- Goal: prepare the public OmaPilot repository for its first
+  omarchyplugins.com submission through one reviewable `dev` to `main` pull
+  request.
+- Branch: `t3code/prepare-plugin-submission`, based exactly on `origin/dev`
+  commit `ae4378880c27927376f380636277c362c1982864`.
+- Allowed: scoped repository edits; local dependency installation, builds,
+  tests, packaging, installed-plugin/runtime verification, screenshot capture;
+  commit and push to `dev`; and creation or update of the `dev` to `main` pull
+  request.
+- Forbidden: marketplace issue submission without the owner's separate review
+  and approval of its exact title, body, and checklist; release publication;
+  production changes; secrets, billing, or customer-data changes; destructive
+  resets; and edits to other worktrees.
+- Required gates:
+  - [x] Current marketplace structure and security-baseline checks pass for the
+    exact public commit.
+  - [x] Root `preview.png` and the README preview use the reproducible current
+    QML surface, which was also verified open in the live Omarchy shell.
+  - [x] README, release metadata, dependencies, install/update/remove guidance,
+    and security reporting are current and internally consistent.
+  - [x] Source checks, generated-runtime parity, deterministic release package,
+    clean indexed-candidate Omarchy validation, live UI verification, and
+    candidate runtime verification pass.
+  - [x] Equivalent final diff audit has no unresolved
+    actionable findings.
+  - [x] The reviewed changes are committed and pushed to `dev`, and one
+    `dev` to `main` pull request is open with green required checks.
+- Worker state: none. `HERDR_ENV` is unavailable, so the orchestrator owns the
+  implementation, audit, and verification directly; no native/background
+  worker is authorized.
+- Cleanup owner: the orchestrator owns temporary build, validation, and capture
+  artifacts created by this stream. Existing user files and other worktrees are
+  out of scope.
+- Evidence so far: `npm audit` reports zero vulnerabilities; `npm run check`
+  passes 242 tests with 8 intentional skips; `bash tests/check-ui-contract.sh`
+  passes the QML, motion, and visual fixtures against pinned Quattro commit
+  `ef6d9e6605b121df15bf310e630e04f0c1119fc8`; generated runtimes reproduce
+  byte-for-byte across Arch and Debian build environments; and two release
+  archives have identical SHA-256 hashes.
+
 ## Goal
 
 Ship a public Omarchy Quattro bar-widget that provides themed, one-turn AI
@@ -1164,3 +1206,45 @@ turn per provider.
   user-owned file. The prior component is recoverable from
   `/home/sbull/.local/state/omarchy/quickchat-backups/20260818T193946Z-before-blur-only/`.
   Installed owner verification remains open.
+
+## Personal capability packs checkpoint 13 (2026-08-22)
+
+- Goal: make OmaPilot's personal-assistant integrations discoverable and
+  pluggable, with useful built-in defaults for Email, Calendar, Files,
+  Projects, Messages, and Meetings.
+- Done criteria: one broker-owned capability registry reports truthful
+  operation-level readiness; HEY email/calendar and a configured local-files
+  root use typed, bounded tools; meetings can open a validated join URL;
+  Basecamp and Signal surface actionable missing/setup states without being
+  installed automatically; Settings has an accessible Skills surface; Pi uses
+  the registered tools and ACP has a reviewed bridge plan or implementation;
+  external writes cannot inherit dangerous auto-approve or durable grants;
+  focused tests, the complete repository check, and final diff review pass.
+- Branch/worktree: implemented as `capability-packs` at
+  `/home/sbull/worktrees/omarchy-omapilot-capability-packs`, rebased on `dev`
+  commit `5767300`, then fast-forwarded into local `dev`.
+- Allowed: scoped repository source, QML, documentation, tests, generated
+  bundles, read-only local capability probes, and—following the owner's
+  2026-08-23 landing authorization—commit, rebase, and local merge. Forbidden:
+  package installs, OAuth/login, Signal pairing, container creation, plugin
+  installation, shell restart, user configuration edits, pushes, releases, and
+  reading personal email, calendar, files, projects, or messages during tests.
+- Verification gates:
+  - [x] Add the capability registry, schemas, probes, risk classes, and status protocol.
+  - [x] Add typed HEY Email/Calendar, scoped Files, and Meetings tools.
+  - [x] Add Basecamp and Signal readiness/setup reporting.
+  - [x] Add the Settings Skills surface and configuration flow.
+  - [x] Add Pi wiring and the safest practical ACP tool bridge.
+  - [x] Pass focused runtime and QML tests, full validation, and diff review.
+- No workers are assigned. The orchestrator owns implementation and review.
+- Current checkpoint: six default packs, their bundled skills, Pi tools, and a
+  read-only scoped ACP MCP bridge are implemented. External writes are one-shot
+  only; OpenCode receives no registry or Files tools under its no-host-reads
+  policy. Full repository validation passes 237 tests with 8 opt-in live ACP
+  tests skipped, the QML/UI contract and rendered Skills preview pass, release
+  packaging and checksums pass, and Git whitespace checks pass. Shellcheck is
+  unavailable and was skipped. The feature commit is `361c9a4`; local `dev`
+  also contains the canonical-checkout bundle normalization. The pre-existing
+  uncommitted policy-copy edits were restored byte-for-byte and remain owned by
+  their original author. No account setup, user configuration, push, install,
+  shell restart, or live personal-data read occurred.

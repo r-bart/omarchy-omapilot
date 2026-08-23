@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import { access } from "node:fs/promises";
 import { constants } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import type { HarnessId, ProviderId, ProviderInfo, ProviderPolicyInfo } from "./types.js";
 import type { ModelRuntime } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.js";
 import { quickchatPaths } from "./paths.js";
 import { resolveExecutable, runCommand, stripAnsi } from "./process.js";
+import { pluginRoot } from "./runtime-root.js";
 
 export type AgentCommand = { executable: string; args: string[]; env: NodeJS.ProcessEnv };
 export type DiscoveredProvider = ProviderInfo & {
@@ -73,7 +73,7 @@ async function isExecutable(path: string): Promise<boolean> {
 }
 
 function repoRoot(): string {
-  return resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+  return pluginRoot(import.meta.url);
 }
 
 export function automaticInstructionPath(): string {

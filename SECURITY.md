@@ -17,6 +17,13 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
   request and working directory; durable records contain hashes, not commands.
   Named agents cannot delegate recursively.
 
+- Personal capability packs are enabled only when broker probes establish a
+  ready connector. Built-in read operations are bounded and return connector or
+  file content marked as untrusted. File paths are contained both lexically and
+  canonically under one user-selected root. Email, calendar to-do, Basecamp, and
+  Signal writes always require a fresh one-time approval; session/durable grants
+  and Dangerous auto-approve cannot authorize them.
+
 - Codex starts in read-only, on-request mode with native web search disabled and only the
   strictly validated shell/unified-exec and skill-search features. It may read any file the current user can
   read without asking. Tool output is sent to Codex and may be retained in the
@@ -34,6 +41,12 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
   to a separately reviewed shell request; `bash` remains `ask`, and execution
   updates must correlate with the exact approved ACP tool-call ID. Every other
   OpenCode permission remains denied.
+- ACP answer sessions receive one repository-owned local MCP server. Its tool
+  list is a fixed allowlist of capability status and bounded read operations;
+  mutating capability tools and visible device actions are absent. Codex may use
+  bounded Files reads under its existing host-read policy; OpenCode receives no
+  registry or Files tools. Model probes start no MCP server. Provider-supplied
+  or arbitrary MCP remains denied.
 - Oversized requests and control or bidirectional-display characters fail
   closed rather than being truncated.
 - Dangerous auto-approval remains behind the provider's existing
@@ -49,7 +62,20 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
   installed harness. OmaPilot must not log, copy, or persist credential output.
   Credential entries may intentionally reference user-configured commands, so
   `auth.json` is trusted executable configuration and must be user-owned.
-- Adapter bundles are generated from exact package-lock versions and reviewed as tracked files in the same Git commit as their source. Published release archives add SHA-256 verification, provenance, and an SBOM; the runtime does not download or replace adapters.
+- ElevenLabs and OpenAI TTS keys are stored only in
+  `${XDG_CONFIG_HOME:-$HOME/.config}/omapilot/voice-auth.json` (mode 0600). They
+  are never written to widget settings, models.json, or chat history, and they
+  are never included in broker events. A key is probed before it is saved.
+  Kokoro is local and has no credential.
+- Broker and adapter launchers are generated from exact package-lock versions
+  and reviewed as tracked files in the same Git commit as their source. They
+  contain JavaScript payloads loaded directly from the read-only launcher file
+  and execute them with system Node 22 or newer; they do not unpack executable
+  code to a shared temporary path. The minimal static ELF wrapper is emitted by
+  a source-controlled deterministic generator and has no dynamic dependencies
+  or writable load segment.
+  Published release archives add SHA-256 verification, provenance, and an SBOM;
+  the runtime does not download or replace adapters.
 - Remote images require a user action and are subject to scheme, redirect, address, MIME, byte-size, complete decode, pixel-area, and cache-quota checks before Quickshell sees them.
 - Context capture is an explicit overlay gesture. The active target is latched
   before OmaPilot takes focus, monitor and region geometry are validated by the

@@ -128,22 +128,30 @@ to be a compositor binding that routes over IPC.
 
 ## Hotkeys
 
-Hyprland 0.56's Lua `hl.bind` accepts `release` and `long_press` options, which
-lets one key carry both gestures:
+The ambient surface never takes keyboard focus, so global hotkeys route through
+the plugin's IPC targets. Super+A owns a visible conversation lease: it starts
+fresh when the ambient flow is closed, continues while that flow is active, and
+finishes live dictation. The explicit fresh-chat variant remains available as a
+force-new escape hatch:
 
 ```lua
--- Hold to talk; the node lights while held and submits on release.
-o.bind("SUPER + SPACE", "Talk to OmaPilot",
-  "omarchy-shell -q io.github.spencerbull.omapilot voiceStart",
-  { long_press = true })
-o.bind("SUPER + SPACE", "Finish talking",
-  "omarchy-shell -q io.github.spencerbull.omapilot voiceStop",
-  { release = true })
+o.bind("SUPER + A", "Talk to OmaPilot",
+  "omarchy-shell -q io.github.spencerbull.omapilot voiceToggle")
 
--- Tap the same key for the typed console.
-o.bind("SUPER + SPACE", "OmaPilot console",
-  "omarchy-shell -q shell toggle io.github.spencerbull.omapilot")
+hl.unbind("SUPER + SHIFT + A")
+o.bind("SUPER + SHIFT + A", "New OmaPilot voice chat",
+  "omarchy-shell -q io.github.spencerbull.omapilot newVoiceChat")
+
+o.bind("SUPER + ALT + N", "New OmaPilot chat",
+  "omarchy-shell -q io.github.spencerbull.quickchat newChat")
+o.bind("SUPER + ALT + H", "Continue OmaPilot chat in Herdr",
+  "omarchy-shell -q io.github.spencerbull.quickchat continueInHerdr")
 ```
+
+The answer timer, explicit dismissal, and cancellation close the voice lease
+without deleting its completed history. The next Super+A resets the presentation
+and continuation immediately before recording, after any in-flight cancellation
+has settled.
 
 These are **documented user bindings, not something OmaPilot writes**. The
 plugin does not edit Hyprland configuration; that constraint is unchanged.

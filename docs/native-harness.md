@@ -138,6 +138,15 @@ fingerprints in `approvals.json`; command text is not stored. ACP harnesses
 surface their provider-native choices, including distinct session and durable
 options when supplied. Dangerous auto-approve can select only allow once.
 
+OmaPilot's capability registry adds typed personal tools when their connectors
+are ready and enabled. HEY email/calendar, scoped Files, Basecamp projects,
+Signal sending, and Zoom joining are discovered per session; connector output
+is bounded and framed as untrusted data. File operations cannot escape the
+configured canonical root through `..` or symlinks. `files_open` and
+`meeting_join` use the normal device approval. Email/reply, calendar to-do,
+Basecamp write, and Signal send operations are `external_write`: they omit
+session and durable allow choices and ignore Dangerous auto-approve.
+
 The native harness keeps Pi sessions in memory for a Quickchat turn. OmaPilot
 stores the completed answer under its existing bounded history policy, but not
 raw tool input/output, credentials, or Pi conversation files. Continue in Herdr
