@@ -105,6 +105,17 @@ begin_count=$(marker_count "$begin_marker")
 end_count=$(marker_count "$end_marker")
 (( begin_count <= 1 && end_count <= 1 && begin_count == end_count )) ||
   fail "refusing to edit malformed OmaPilot markers in $bindings_file"
+if ((begin_count == 1)); then
+  read -r begin_line end_line < <(
+    awk -v begin="$begin_marker" -v end="$end_marker" '
+      $0 == begin { begin_line = NR }
+      $0 == end { end_line = NR }
+      END { print begin_line, end_line }
+    ' "$bindings_file"
+  )
+  ((begin_line < end_line)) ||
+    fail "refusing to edit reversed OmaPilot markers in $bindings_file"
+fi
 
 remove_managed_block() {
   local temporary
@@ -141,7 +152,8 @@ has_user_binding() {
   local chord="$1"
   awk -v chord="$chord" '
     /^[[:space:]]*(o\.bind|hl\.bind|hl\.unbind)[[:space:]]*\(/ &&
-      index($0, "\"" chord "\"") { found = 1; exit }
+      (index($0, "\"" chord "\"") ||
+       index($0, sprintf("%c%s%c", 39, chord, 39))) { found = 1; exit }
     END { exit !found }
   ' "$bindings_file"
 }

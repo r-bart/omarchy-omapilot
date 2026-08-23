@@ -25,6 +25,7 @@ assert_absent() {
 cat >"$bindings" <<'LUA'
 -- Existing user configuration.
 o.bind("SUPER + A", "My existing assistant", "my-assistant")
+o.bind('SUPER + ALT + N', 'My existing new chat', 'my-new-chat')
 LUA
 
 "$installer" --once --installed-plugin-only
@@ -46,18 +47,21 @@ second_checksum=$(sha256sum "$bindings")
 test "$(grep -Fc -- '-- BEGIN OmaPilot managed hotkeys' "$bindings")" -eq 1
 test "$(grep -Fc -- 'o.bind("SUPER + A", "My existing assistant"' "$bindings")" -eq 1
 assert_absent 'o.bind("SUPER + A", "Talk to OmaPilot"' "$bindings"
+grep -Fq -- "o.bind('SUPER + ALT + N', 'My existing new chat'" "$bindings"
+assert_absent 'o.bind("SUPER + ALT + N", "New OmaPilot chat"' "$bindings"
 grep -Fq -- 'hl.unbind("SUPER + SHIFT + A")' "$bindings"
 grep -Fq -- 'io.github.spencerbull.omapilot newVoiceChat' "$bindings"
-grep -Fq -- 'io.github.spencerbull.omapilot newChat' "$bindings"
 grep -Fq -- 'io.github.spencerbull.omapilot continueInHerdr' "$bindings"
 grep -Fxq -- 'installed' "$XDG_STATE_HOME/omapilot/hotkeys-v1"
 
 "$installed_installer" --force
 grep -Fq -- 'o.bind("SUPER + A", "Talk to OmaPilot"' "$bindings"
+grep -Fq -- 'io.github.spencerbull.omapilot newChat' "$bindings"
 test "$(grep -Fc -- '-- BEGIN OmaPilot managed hotkeys' "$bindings")" -eq 1
 
 "$installed_installer" --remove
 grep -Fq -- 'My existing assistant' "$bindings"
+grep -Fq -- 'My existing new chat' "$bindings"
 assert_absent '-- BEGIN OmaPilot managed hotkeys' "$bindings"
 grep -Fxq -- 'removed' "$XDG_STATE_HOME/omapilot/hotkeys-v1"
 
@@ -66,13 +70,35 @@ assert_absent '-- BEGIN OmaPilot managed hotkeys' "$bindings"
 
 "$installed_installer"
 assert_absent 'o.bind("SUPER + A", "Talk to OmaPilot"' "$bindings"
+assert_absent 'o.bind("SUPER + ALT + N", "New OmaPilot chat"' "$bindings"
 test "$(grep -Fc -- '-- BEGIN OmaPilot managed hotkeys' "$bindings")" -eq 1
 
 "$installed_installer" --remove
+clean_bindings="$test_root/clean-bindings.lua"
+cp -- "$bindings" "$clean_bindings"
+for mode in --remove --force; do
+  cp -- "$clean_bindings" "$bindings"
+  printf '%s\n' \
+    '-- END OmaPilot managed hotkeys' \
+    '-- user configuration between reversed markers' \
+    '-- BEGIN OmaPilot managed hotkeys' \
+    '-- user configuration after reversed markers' >>"$bindings"
+  reversed_checksum=$(sha256sum "$bindings")
+  if "$installed_installer" "$mode" 2>/dev/null; then
+    printf 'expected reversed marker check to fail for %s\n' "$mode" >&2
+    exit 1
+  fi
+  test "$(sha256sum "$bindings")" = "$reversed_checksum"
+  grep -Fq -- '-- user configuration after reversed markers' "$bindings"
+done
+
+cp -- "$clean_bindings" "$bindings"
 printf '%s\n' '-- BEGIN OmaPilot managed hotkeys' >>"$bindings"
+unmatched_checksum=$(sha256sum "$bindings")
 if "$installed_installer" 2>/dev/null; then
   printf 'expected malformed marker check to fail\n' >&2
   exit 1
 fi
+test "$(sha256sum "$bindings")" = "$unmatched_checksum"
 
 printf 'Hotkey installer tests: ok\n'
