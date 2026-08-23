@@ -16,7 +16,7 @@
   production changes; secrets, billing, or customer-data changes; destructive
   resets; and edits to other worktrees.
 - Required gates:
-  - [ ] Current marketplace structure and security-baseline checks pass for the
+  - [x] Current marketplace structure and security-baseline checks pass for the
     exact public commit.
   - [x] Root `preview.png` and the README preview use the reproducible current
     QML surface, which was also verified open in the live Omarchy shell.
@@ -27,7 +27,7 @@
     candidate runtime verification pass.
   - [x] Equivalent final diff audit has no unresolved
     actionable findings.
-  - [ ] The reviewed changes are committed and pushed to `dev`, and one
+  - [x] The reviewed changes are committed and pushed to `dev`, and one
     `dev` to `main` pull request is open with green required checks.
 - Worker state: none. `HERDR_ENV` is unavailable, so the orchestrator owns the
   implementation, audit, and verification directly; no native/background
