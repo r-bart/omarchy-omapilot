@@ -82,13 +82,17 @@ omarchy plugin validate ~/.config/omarchy/plugins/io.github.spencerbull.omapilot
 omarchy plugin enable io.github.spencerbull.omapilot right
 ```
 
-The Omarchy installer only clones, validates, and enables the plugin. It runs no
-install hook, does not request administrator access, and does not invoke a
-package manager or mutate host configuration. The reviewed repository revision
-includes reproducible Linux x86-64 broker and Codex ACP launchers, so a normal
-install does not run `npm`, `npx`, or silently download executable code. The
-launchers execute their embedded JavaScript payloads directly from the
-read-only launcher file with system Node;
+The Omarchy installer only clones, validates, and enables the plugin. Omarchy
+runs no plugin install hook, and OmaPilot does not request administrator access
+or invoke a package manager. Installation and first load do not edit Hyprland
+configuration. To add the described global shortcuts, explicitly choose
+**Settings → Desktop → Install global hotkeys**. OmaPilot then adds one marked
+block to `~/.config/hypr/bindings.lua` while preserving every shortcut chord
+already defined there. The reviewed repository revision includes
+reproducible Linux x86-64 broker and Codex ACP launchers, so a normal install
+does not run `npm`, `npx`, or silently download executable code. The launchers
+execute their embedded JavaScript payloads directly from the read-only launcher
+file with system Node;
 Git history anchors those generated files to their TypeScript source and pinned
 lockfile. Release archives add an SBOM, provenance record, and SHA-256 checksum.
 
@@ -103,7 +107,9 @@ omarchy plugin remove io.github.spencerbull.omapilot
 
 OmaPilot exposes compositor-safe IPC actions for a contextual voice session,
 forced-fresh typed or voice conversations, and handing the current chat to
-Herdr. Add the bindings you want to `~/.config/hypr/bindings.lua`:
+Herdr. Choose **Settings → Desktop → Install global hotkeys** to add these
+bindings to `~/.config/hypr/bindings.lua`, where their descriptions appear in
+**Learn → Keybindings**:
 
 ```lua
 -- Start fresh when the ambient flow is closed; continue while it is visible.
@@ -127,8 +133,25 @@ live dictation or begins a follow-up in the same conversation. The answer timer,
 explicit dismissal, and cancellation close the voice session; they do not erase
 its saved history. `Super+Shift+A` remains the force-new escape hatch. New typed
 chat opens the panel with an empty composer. Continue in Herdr does nothing until
-the current conversation has a saved chat ID. These are user-owned bindings:
-installing or updating the plugin does not rewrite Hyprland configuration.
+the current conversation has a saved chat ID.
+
+The managed block is written only after that explicit action and becomes normal
+user-owned Hyprland configuration. Existing user-defined collisions are left
+alone. To install from a terminal while still preserving collisions, or to
+deliberately replace every chord, run:
+
+```bash
+~/.config/omarchy/plugins/io.github.spencerbull.omapilot/scripts/install-hotkeys.sh
+~/.config/omarchy/plugins/io.github.spencerbull.omapilot/scripts/install-hotkeys.sh --force
+```
+
+Before removing the plugin, remove only its managed block, then use Omarchy's
+standard removal command:
+
+```bash
+~/.config/omarchy/plugins/io.github.spencerbull.omapilot/scripts/install-hotkeys.sh --remove
+omarchy plugin remove io.github.spencerbull.omapilot
+```
 
 Removal deletes the cloned plugin. OmaPilot deliberately leaves user-owned history and cached runtime files in place. Use **Clear all** before removal to erase history and cached chat images. If the plugin is already gone, inspect and remove the OmaPilot directories under your effective `XDG_STATE_HOME` and `XDG_CACHE_HOME` with a file manager; the default locations are `~/.local/state/omapilot` and `~/.cache/omapilot`.
 

@@ -22,6 +22,14 @@ Scope {
     return url
   }
   readonly property string brokerPath: Quickshell.env("OMAPILOT_BROKER_PATH") || bundledBrokerPath
+  readonly property string hotkeyInstallerPath: {
+    var url = String(Qt.resolvedUrl("../scripts/install-hotkeys.sh"))
+    if (url.indexOf("file://") === 0) {
+      try { return decodeURIComponent(url.slice("file://".length)) }
+      catch (error) { return url.slice("file://".length) }
+    }
+    return url
+  }
   property string state: "preparing"
   property string statusMessage: "Starting OmaPilot…"
   property string currentId: ""
@@ -43,6 +51,9 @@ Scope {
   property bool customProviderTestPending: false
   property string customProviderTestError: ""
   property var voxtypeOsd: ({ available: false, enabled: true, message: "" })
+  property string hotkeyAction: ""
+  property string hotkeyMessage: ""
+  property string hotkeyProcessError: ""
   property var voiceStatus: Protocol.emptyVoiceStatus()
   property var ttsTest: null
   property bool ttsTestPending: false
@@ -114,6 +125,7 @@ Scope {
     || browserCompanionStatus.firefoxConnected === true
   readonly property bool browserCompanionBusy: browserCompanionStatus.phase === "installing"
     || browserCompanionStatus.phase === "removing"
+  readonly property bool hotkeyBusy: hotkeyInstaller.running
   readonly property bool builtinAuthBusy: ["starting", "prompt", "info", "browser", "device_code"]
     .indexOf(String(builtinAuth.phase || "")) >= 0
 
@@ -126,6 +138,12 @@ Scope {
   signal ipcToggleRequested()
   signal ipcHistoryRequested()
   signal ipcSettingsRequested()
+  signal ipcVoiceStartRequested()
+  signal ipcVoiceStopRequested()
+  signal ipcVoiceToggleRequested()
+  signal ipcNewVoiceChatRequested()
+  signal ipcVoiceCancelRequested()
+  signal ipcAmbientDismissRequested()
   signal contextOverlayRequested(string payload)
   signal contextBrowserPickerRequested()
   signal ttsSpoken()
@@ -328,6 +346,24 @@ Scope {
   function uninstallBrowserCompanion() {
     if (browserCompanionBusy) return
     sendCommand(Protocol.command("browser_companion_uninstall"))
+  }
+
+  function installHotkeys() {
+    if (hotkeyBusy) return
+    hotkeyAction = "install"
+    hotkeyMessage = "Installing global hotkeys…"
+    hotkeyProcessError = ""
+    hotkeyInstaller.command = [hotkeyInstallerPath, "--installed-plugin-only"]
+    hotkeyInstaller.running = true
+  }
+
+  function removeHotkeys() {
+    if (hotkeyBusy) return
+    hotkeyAction = "remove"
+    hotkeyMessage = "Removing managed hotkeys…"
+    hotkeyProcessError = ""
+    hotkeyInstaller.command = [hotkeyInstallerPath, "--installed-plugin-only", "--remove"]
+    hotkeyInstaller.running = true
   }
 
   function openBrowserCompanionSettings(family) {
@@ -1097,6 +1133,46 @@ Scope {
     function continueInHerdr() { root.continueInHerdr() }
     function history() { root.routeIpc("history") }
     function settings() { root.routeIpc("settings") }
+    function voiceStart(): string { root.ipcVoiceStartRequested(); return "ok" }
+    function voiceStop(): string { root.ipcVoiceStopRequested(); return "ok" }
+    function voiceToggle(): string { root.ipcVoiceToggleRequested(); return "ok" }
+    function newVoiceChat(): string { root.ipcNewVoiceChatRequested(); return "ok" }
+    function voiceCancel(): string { root.ipcVoiceCancelRequested(); return "ok" }
+    function dismiss(): string { root.ipcAmbientDismissRequested(); return "ok" }
+    function status(): string { return "store=" + root.state }
+  }
+
+  // Hotkeys modify user-owned compositor configuration, so this helper starts
+  // only after the user chooses an action in Settings > Desktop. It refuses
+  // development/preview paths, preserves collisions, and owns only its marked
+  // block.
+  Process {
+    id: hotkeyInstaller
+    command: [root.hotkeyInstallerPath, "--installed-plugin-only"]
+    running: false
+
+    onExited: function(exitCode, exitStatus) {
+      if (exitCode === 0) {
+        root.hotkeyMessage = root.hotkeyAction === "remove"
+          ? "Managed global hotkeys removed."
+          : "Global hotkeys installed. Existing bindings were preserved."
+      } else {
+        root.hotkeyMessage = root.hotkeyProcessError !== ""
+          ? root.hotkeyProcessError
+          : "Hotkey setup failed with exit code " + exitCode + "."
+        console.warn("omapilot: hotkey setup failed with exit code " + exitCode)
+      }
+      root.hotkeyAction = ""
+    }
+
+    stderr: SplitParser {
+      onRead: function(line) {
+        var message = String(line || "").trim()
+        if (message === "") return
+        root.hotkeyProcessError = message.replace(/^install-hotkeys: /, "")
+        console.warn("omapilot: " + message)
+      }
+    }
   }
 
   Process {

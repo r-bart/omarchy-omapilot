@@ -106,6 +106,12 @@ Item {
       if (!root.voiceEngaged || root.storeState !== "complete") return
       root.answerSpoken = true
     }
+    function onIpcVoiceStartRequested() { root.voiceStart() }
+    function onIpcVoiceStopRequested() { root.voiceStop() }
+    function onIpcVoiceToggleRequested() { root.voiceToggle() }
+    function onIpcNewVoiceChatRequested() { root.newVoiceChat() }
+    function onIpcVoiceCancelRequested() { root.voiceCancel() }
+    function onIpcAmbientDismissRequested() { root.dismiss() }
   }
 
   // Presentation and conversation lifetime are deliberately separate. A failed
@@ -356,37 +362,14 @@ Item {
     onTriggered: root.dismiss()
   }
 
-  // ------------------------------------------------------------------- IPC
+  // --------------------------------------------------------------- IPC routing
   // The voice gesture cannot be a surface keybinding, because the ambient
   // surfaces never take keyboard focus by design. It has to arrive over IPC from
-  // a compositor binding. The default gesture derives fresh-versus-continue
-  // from the ambient session lease; `newVoiceChat` remains an explicit force-new
-  // escape hatch while that lease is still active.
-  IpcHandler {
-    target: "io.github.spencerbull.omapilot"
-    function voiceStart(): string {
-      var result = root.voiceStart()
-      return result ? String(result) : "listening"
-    }
-    function voiceStop(): string { root.voiceStop(); return "ok" }
-    function voiceToggle(): string {
-      var result = root.voiceToggle()
-      return result ? String(result) : "ok"
-    }
-    function newVoiceChat(): string {
-      var result = root.newVoiceChat()
-      return result ? String(result) : "ok"
-    }
-    function voiceCancel(): string { root.voiceCancel(); return "ok" }
-    function dismiss(): string { root.dismiss(); return "ok" }
-    function status(): string {
-      return "phase=" + root.phase
-        + " store=" + root.storeState
-        + " session=" + (root.voiceSessionActive ? "active" : "closed")
-        + " screen=" + (root.activeScreen ? root.activeScreen.name : "none")
-        + " dismissMs=" + root.dismissDelay
-    }
-  }
+  // a compositor binding. OmaPilotStore owns the plugin's one IPC target and
+  // relays voice requests here; registering a second handler would make
+  // Quickshell reject one entire action set. The default gesture derives
+  // fresh-versus-continue from the ambient session lease; `newVoiceChat`
+  // remains an explicit force-new escape hatch while that lease is still active.
 
   // --------------------------------------------------------------- surfaces
   OmaPilot.VoiceNode {
