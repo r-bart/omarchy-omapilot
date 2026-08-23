@@ -10,11 +10,18 @@ the compatibility-path `quickchat` user data directories.
 
 ## Preview
 
-![OmaPilot composing with a reviewed contextual desktop clip](preview.png)
+![OmaPilot ambient voice listening on a blank workspace](screenshots/omapilot-voice-active.gif)
 
-This preview is rendered from the current QML components against the pinned
-Omarchy Quattro imports with `npm run preview`; the same panel and components
-are exercised by the UI contract suite and verified in the live shell.
+Ambient voice stays out of the way until it has something useful to show. The
+listening surface above is the real animated `VoiceNode` component recorded on
+an isolated blank workspace.
+
+![OmaPilot main screen in a new chat](preview.png)
+
+The new-chat screen is rendered from the current QML components against the
+pinned Omarchy Quattro imports with `npm run preview`; the same panel and
+components are exercised by the UI contract suite and verified in the live
+shell.
 
 The compact composer expands from the right side of the bar. Device changes
 stay behind an exact, inspectable approval unless you explicitly enable
