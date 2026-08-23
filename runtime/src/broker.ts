@@ -689,13 +689,21 @@ export class QuickchatBroker {
     if (!isTtsProviderId(command.provider)) return;
     this.#voice.stop();
     this.#ttsSpeakId = command.id;
-    this.#emit({ type: "tts_speaking", id: command.id });
     try {
       await this.#voice.speak({
         provider: command.provider,
         model: command.model,
         voice: command.voice,
         text: command.text
+      }, {
+        started: (metered) => {
+          if (this.#ttsSpeakId !== command.id) return;
+          this.#emit({ type: "tts_speaking", id: command.id, metered });
+        },
+        level: (level) => {
+          if (this.#ttsSpeakId !== command.id) return;
+          this.#emit({ type: "tts_level", id: command.id, level });
+        }
       });
       if (this.#ttsSpeakId !== command.id) return;
       this.#ttsSpeakId = undefined;

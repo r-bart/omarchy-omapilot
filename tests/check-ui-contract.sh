@@ -29,6 +29,8 @@ qml_files=(
   "$repo_dir/components/SettingsView.qml"
   "$repo_dir/components/SettingsTabs.qml"
   "$repo_dir/components/StateLightBar.qml"
+  "$repo_dir/components/VoiceNode.qml"
+  "$repo_dir/components/VoiceWave.qml"
   "$repo_dir/components/ActivityFilament.qml"
   "$repo_dir/components/ResponseActivityBorder.qml"
   "$repo_dir/components/internal/PermissionFocusGuard.qml"
@@ -40,6 +42,8 @@ qml_files=(
   "$repo_dir/components/Presentation.js"
   "$repo_dir/components/QuickActions.js"
   "$repo_dir/tests/motion-preview.qml"
+  "$repo_dir/tests/state-motion-preview.qml"
+  "$repo_dir/tests/voice-node-preview.qml"
 )
 
 /usr/lib/qt6/bin/qmllint -I "$omarchy_shell" -I "$repo_dir" "${qml_files[@]}" >/dev/null 2>&1
@@ -158,6 +162,8 @@ grep -Fq '&& (phase === "listening" || phase === "thinking")' \
 grep -Fq 'running: root.atmosphereActive' "$repo_dir/components/StateLightBar.qml"
 grep -Fq 'StateColor.forPhase' "$repo_dir/components/StateLightBar.qml"
 grep -Fq 'colorizationColor: root.displayedColor' "$repo_dir/components/StateLightBar.qml"
+grep -Fq 'readonly property real glowCenter: thinking' "$repo_dir/components/StateLightBar.qml"
+grep -Fq 'root.travel = (root.travel + 0.0095) % 1' "$repo_dir/components/StateLightBar.qml"
 grep -Fq 'id: promptRow' "$repo_dir/components/Composer.qml"
 grep -Fq 'iconText: "󰹑"' "$repo_dir/components/Composer.qml"
 grep -Fq '󰍬' "$repo_dir/components/Composer.qml"
@@ -273,9 +279,15 @@ grep -Fq 'wyWA56cQNU2KqUW4eCsI' "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'wyWA56cQNU2KqUW4eCsI' "$repo_dir/components/Protocol.js"
 grep -Fq 'function ttsSpeakCommand' "$repo_dir/components/Protocol.js"
 grep -Fq 'function speakAnswer' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'property bool ttsPlaybackMetered: false' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'if (type === "tts_level")' "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'playbackLevel: OmaPilot.QuickchatStore.ttsLevel' "$repo_dir/Ambient.qml"
+grep -Fq 'function normalizedTtsLevel(event)' "$repo_dir/components/Protocol.js"
 grep -Fq 'OmaPilot.QuickchatStore.speakAnswer(answer)' "$repo_dir/Ambient.qml"
 grep -Fq 'https://api.elevenlabs.io/v1/text-to-speech/' "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'https://api.openai.com/v1/audio/speech' "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'export function pcm16Envelope(' "$repo_dir/runtime/src/tts.ts"
+grep -Fq 'type: "tts_level"' "$repo_dir/runtime/src/types.ts"
 grep -Fq 'https://api.openai.com/v1/models' "$repo_dir/runtime/src/tts.ts"
 grep -Fq 'text: "Browser context"' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'onDesktopContextRequested:' "$repo_dir/Panel.qml"
@@ -329,12 +341,27 @@ grep -Fq 'anchors { left: parent.left; right: parent.right }' "$repo_dir/compone
 grep -Fq 'property real tide: 0.35' "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'property real drift: 0' "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'readonly property bool atmosphereActive: motionEnabled' "$repo_dir/components/VoiceNode.qml"
+grep -Fq '|| phase === "thinking" || speaking' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'readonly property bool voiceWaveActive:' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'playbackMetered ? Math.max(0, Math.min(1, playbackLevel))' \
+  "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'running: root.atmosphereActive' "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'running: root.motionEnabled && root.lit && root.phase !== "listening"' "$repo_dir/components/VoiceNode.qml"
 grep -Fq '0.50 + root.organicDrift * 0.075' "$repo_dir/components/VoiceNode.qml"
 grep -Fq 'Math.sin(livingPhase * 1.618 + 1.1)' "$repo_dir/components/VoiceNode.qml"
-grep -Fq 'motionStyle: root.phase' "$repo_dir/components/VoiceNode.qml"
-grep -Fq 'root.motionStyle === "thinking"' "$repo_dir/components/VoiceWave.qml"
+grep -Fq 'motionStyle: root.speaking ? "speaking" : root.phase' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'readonly property real motionPace: thinking ? 0.084 : (speaking ? 0.056 : 0.022)' \
+  "$repo_dir/components/VoiceWave.qml"
+grep -Fq 'var travel = (root.phase * 0.095) % 1' "$repo_dir/components/VoiceWave.qml"
+grep -Fq 'root.speaking ? 0.04 + boundedLevel * 0.96' "$repo_dir/components/VoiceWave.qml"
+grep -Fq 'interval: 2800' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'StatePhrases.thinkingStatus(thinkingPhraseIndex, status)' \
+  "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'onMotionEnabledChanged: {' "$repo_dir/components/VoiceNode.qml"
+grep -Fq 'readonly property bool rotatingActivityStatus:' "$repo_dir/Panel.qml"
+grep -Fq 'onRotatingActivityStatusChanged:' "$repo_dir/Panel.qml"
+grep -Fq 'text: root.activityStatusText' "$repo_dir/Panel.qml"
+grep -Fq 'StatePhrases.thinkingAt(0)' "$repo_dir/tests/visual-preview.qml"
 grep -Fq 'StateColor.forPhase' "$repo_dir/components/AnswerCurtain.qml"
 grep -Fq 'colorizationColor: root.accent' "$repo_dir/components/ActivityFilament.qml"
 grep -Fq 'id: responseStatusSlot' "$repo_dir/Panel.qml"
@@ -372,8 +399,9 @@ fi
 # the panel closes instead of animating off screen.
 grep -Fq 'motionEnabled: root.motionEnabled && root.opened' "$repo_dir/Panel.qml"
 grep -Fq 'id: activityStatus' "$repo_dir/Panel.qml"
-if grep -Eq 'WaitingIndicator|signalClock|FrameAnimation|onTriggered:' \
-    "$repo_dir/Panel.qml" "$repo_dir/components/ResponseActivityBorder.qml"; then
+if grep -Eq 'WaitingIndicator|signalClock|FrameAnimation' \
+    "$repo_dir/Panel.qml" "$repo_dir/components/ResponseActivityBorder.qml" \
+    || grep -Eq 'onTriggered:' "$repo_dir/components/ResponseActivityBorder.qml"; then
   printf 'OmaPilot perimeter motion must not retain the per-frame route implementation\n' >&2
   exit 1
 fi
@@ -512,6 +540,10 @@ QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -import "$repo_dir" || fail "state colour tests failed"
 
 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
+  -input "$repo_dir/tests/tst_state_phrases.qml" \
+  -import "$repo_dir" || fail "state phrase tests failed"
+
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -input "$repo_dir/tests/tst_quick_actions.qml" \
   -import "$repo_dir" \
   -import "$omarchy_shell"
@@ -597,6 +629,23 @@ if grep -Eq "omapilot motion preview failed|Failed to load|Type .* unavailable|C
     || ! grep -Fq 'OMAPILOT_MOTION_PREVIEW_OK' "$smoke_root/motion-preview.log" \
     || [[ $(find "$motion_frame_root" -maxdepth 1 -type f -name 'frame-*.png' | wc -l) -ne 14 ]]; then
   cat "$smoke_root/motion-preview.log"
+  exit 1
+fi
+
+state_frame_root="$smoke_root/state-frames"
+mkdir -p "$state_frame_root"
+cp "$repo_dir/tests/state-motion-preview.qml" "$smoke_root/shell.qml"
+if ! OMAPILOT_STATE_FRAME_DIR="$state_frame_root" QT_QPA_PLATFORM=offscreen \
+    timeout 7s quickshell --no-duplicate --path "$smoke_root" --no-color \
+    >"$smoke_root/state-motion-preview.log" 2>&1; then
+  cat "$smoke_root/state-motion-preview.log"
+  exit 1
+fi
+if grep -Eq "omapilot state motion preview failed|Failed to load|Type .* unavailable|Cannot assign|TypeError" \
+    "$smoke_root/state-motion-preview.log" \
+    || ! grep -Fq 'OMAPILOT_STATE_MOTION_PREVIEW_OK' "$smoke_root/state-motion-preview.log" \
+    || [[ $(find "$state_frame_root" -maxdepth 1 -type f -name 'state-*.png' | wc -l) -ne 8 ]]; then
+  cat "$smoke_root/state-motion-preview.log"
   exit 1
 fi
 

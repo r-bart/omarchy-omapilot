@@ -298319,6 +298319,10 @@ var SPEECH_TIMEOUT_MS = 3e4;
 var PLAY_TIMEOUT_MS = 18e4;
 var KOKORO_TIMEOUT_MS = 3e3;
 var KOKORO_SPEAK_TIMEOUT_MS = 12e4;
+var AUDIO_METER_SAMPLE_RATE = 1e3;
+var AUDIO_METER_INTERVAL_MS = 50;
+var AUDIO_METER_MAX_BYTES = 512 * 1024;
+var AUDIO_METER_TIMEOUT_MS = 3e4;
 var OPTION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 var MAX_MODELS = 32;
 var MAX_VOICES = 100;
@@ -298427,6 +298431,7 @@ var VoiceService = class {
   #fetch;
   #dictationAvailable;
   #kokoroAvailable;
+  #analyzeAudio;
   #playAudio;
   #playback;
   constructor(env2 = process.env, options = {}) {
@@ -298434,7 +298439,8 @@ var VoiceService = class {
     this.#fetch = options.fetch ?? fetch;
     this.#dictationAvailable = options.dictationAvailable ?? (() => new DictationService(quickchatPaths(env2), env2).available());
     this.#kokoroAvailable = options.kokoroAvailable ?? (() => probeKokoro(env2));
-    this.#playAudio = options.playAudio ?? ((path16, signal) => playAudioFile(path16, env2, signal));
+    this.#analyzeAudio = options.analyzeAudio ?? ((path16, signal) => analyzeAudioFile(path16, env2, signal));
+    this.#playAudio = options.playAudio ?? ((path16, signal, telemetry) => playAudioFile(path16, env2, signal, telemetry));
   }
   async status() {
     const [dictation, kokoro, auth] = await Promise.all([
@@ -298482,7 +298488,7 @@ var VoiceService = class {
     this.#playback?.abort();
     this.#playback = void 0;
   }
-  async speak(input2) {
+  async speak(input2, observer) {
     this.stop();
     const spoken = spokenText(input2.text);
     if (spoken === "") throw new VoiceError("tts_empty", "There is nothing to speak");
@@ -298494,7 +298500,15 @@ var VoiceService = class {
       const path16 = join49(root, audio.extension === "wav" ? "speech.wav" : "speech.mp3");
       await writeFile4(path16, audio.bytes, { mode: 384 });
       if (controller.signal.aborted) throw cancelled();
-      await this.#playAudio(path16, controller.signal);
+      const levels = observer === void 0 ? [] : await this.#analyzeAudio(path16, controller.signal);
+      if (controller.signal.aborted) throw cancelled();
+      const telemetry = observer === void 0 ? void 0 : {
+        levels,
+        intervalMs: AUDIO_METER_INTERVAL_MS,
+        onStarted: () => observer.started(levels.length > 0),
+        onLevel: observer.level
+      };
+      await this.#playAudio(path16, controller.signal, telemetry);
     } catch (error48) {
       if (controller.signal.aborted) throw cancelled();
       throw error48;
@@ -298870,19 +298884,73 @@ var PLAYERS = [
   { name: "pw-play", args: (path16) => [path16] },
   { name: "paplay", args: (path16) => [path16] }
 ];
-async function playAudioFile(path16, env2, signal) {
+function pcm16Envelope(pcm, sampleRate = AUDIO_METER_SAMPLE_RATE, intervalMs = AUDIO_METER_INTERVAL_MS) {
+  const samplesPerBucket = Math.max(1, Math.floor(sampleRate * intervalMs / 1e3));
+  const levels = [];
+  let smoothed = 0;
+  for (let sampleOffset = 0; sampleOffset * 2 + 1 < pcm.byteLength; sampleOffset += samplesPerBucket) {
+    const end = Math.min(sampleOffset + samplesPerBucket, Math.floor(pcm.byteLength / 2));
+    let energy = 0;
+    let count = 0;
+    for (let sample = sampleOffset; sample < end; sample += 1) {
+      const normalized = pcm.readInt16LE(sample * 2) / 32768;
+      energy += normalized * normalized;
+      count += 1;
+    }
+    if (count === 0) continue;
+    const rms = Math.sqrt(energy / count);
+    const target = Math.min(1, Math.sqrt(Math.max(0, (rms - 4e-3) * 3.4)));
+    smoothed = target > smoothed ? target * 0.72 + smoothed * 0.28 : target * 0.34 + smoothed * 0.66;
+    levels.push(smoothed);
+  }
+  return levels;
+}
+async function analyzeAudioFile(path16, env2, signal) {
+  if (signal.aborted) throw cancelled();
+  const ffmpeg = await resolveExecutable("ffmpeg", env2);
+  if (ffmpeg === void 0) return [];
+  try {
+    const result = await runBinaryCommand(ffmpeg, [
+      "-v",
+      "error",
+      "-i",
+      path16,
+      "-vn",
+      "-ac",
+      "1",
+      "-ar",
+      String(AUDIO_METER_SAMPLE_RATE),
+      "-f",
+      "s16le",
+      "pipe:1"
+    ], {
+      env: env2,
+      timeoutMs: AUDIO_METER_TIMEOUT_MS,
+      maxOutput: AUDIO_METER_MAX_BYTES
+    });
+    if (signal.aborted) throw cancelled();
+    if (result.code !== 0 || result.stdout.byteLength < 2) return [];
+    return pcm16Envelope(result.stdout);
+  } catch {
+    if (signal.aborted) throw cancelled();
+    return [];
+  }
+}
+async function playAudioFile(path16, env2, signal, telemetry) {
   if (signal.aborted) throw cancelled();
   for (const player of PLAYERS) {
     const executable2 = await resolveExecutable(player.name, env2);
     if (executable2 === void 0) continue;
-    await runPlayer(executable2, player.args(path16), env2, signal);
+    await runPlayer(executable2, player.args(path16), env2, signal, telemetry);
     return;
   }
   throw new VoiceError("tts_playback_failed", "No audio player is available. Install mpv or PipeWire.");
 }
-function runPlayer(executable2, args, env2, signal) {
+function runPlayer(executable2, args, env2, signal, telemetry) {
   return new Promise((resolve20, reject) => {
     let settled = false;
+    let levelTimer;
+    let levelIndex = 0;
     const child = spawn15(executable2, args, {
       env: env2,
       stdio: "ignore",
@@ -298892,7 +298960,9 @@ function runPlayer(executable2, args, env2, signal) {
       if (settled) return;
       settled = true;
       signal.removeEventListener("abort", onAbort);
-      clearTimeout(timer);
+      clearTimeout(timeoutTimer);
+      if (levelTimer !== void 0) clearInterval(levelTimer);
+      if (telemetry !== void 0 && telemetry.levels.length > 0) telemetry.onLevel(0);
       if (error48 !== void 0) reject(error48);
       else resolve20();
     };
@@ -298900,16 +298970,35 @@ function runPlayer(executable2, args, env2, signal) {
       terminateProcessGroup(child.pid);
       finish(cancelled());
     };
+    const timeoutTimer = setTimeout(() => {
+      terminateProcessGroup(child.pid);
+      finish(new VoiceError("tts_playback_failed", "Speaking took too long"));
+    }, PLAY_TIMEOUT_MS);
+    timeoutTimer.unref();
     if (signal.aborted) {
       onAbort();
       return;
     }
     signal.addEventListener("abort", onAbort, { once: true });
-    const timer = setTimeout(() => {
-      terminateProcessGroup(child.pid);
-      finish(new VoiceError("tts_playback_failed", "Speaking took too long"));
-    }, PLAY_TIMEOUT_MS);
-    timer.unref();
+    child.once("spawn", () => {
+      if (telemetry === void 0) return;
+      telemetry.onStarted();
+      if (telemetry.levels.length === 0) return;
+      const emitNextLevel = () => {
+        const level = telemetry.levels[levelIndex];
+        if (level === void 0) {
+          if (levelTimer !== void 0) clearInterval(levelTimer);
+          levelTimer = void 0;
+          telemetry.onLevel(0);
+          return;
+        }
+        telemetry.onLevel(level);
+        levelIndex += 1;
+      };
+      emitNextLevel();
+      levelTimer = setInterval(emitNextLevel, telemetry.intervalMs);
+      levelTimer.unref();
+    });
     child.once("error", () => finish(new VoiceError("tts_playback_failed", "Could not start the audio player")));
     child.once("close", (code) => {
       if (signal.aborted) finish(cancelled());
@@ -301423,13 +301512,21 @@ var QuickchatBroker = class {
     if (!isTtsProviderId(command.provider)) return;
     this.#voice.stop();
     this.#ttsSpeakId = command.id;
-    this.#emit({ type: "tts_speaking", id: command.id });
     try {
       await this.#voice.speak({
         provider: command.provider,
         model: command.model,
         voice: command.voice,
         text: command.text
+      }, {
+        started: (metered) => {
+          if (this.#ttsSpeakId !== command.id) return;
+          this.#emit({ type: "tts_speaking", id: command.id, metered });
+        },
+        level: (level) => {
+          if (this.#ttsSpeakId !== command.id) return;
+          this.#emit({ type: "tts_level", id: command.id, level });
+        }
       });
       if (this.#ttsSpeakId !== command.id) return;
       this.#ttsSpeakId = void 0;

@@ -767,6 +767,13 @@ function ttsStopCommand() {
   return command("tts_stop")
 }
 
+function normalizedTtsLevel(event) {
+  if (!event || String(event.type || "") !== "tts_level") return null
+  var level = Number(event.level)
+  if (!Number.isFinite(level)) return null
+  return Math.max(0, Math.min(1, level))
+}
+
 function normalizedProvider(value) {
   var provider = String(value || "").toLowerCase()
   return ["builtin", "codex", "opencode"].indexOf(provider) >= 0 ? provider : ""

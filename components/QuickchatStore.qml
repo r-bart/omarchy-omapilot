@@ -43,6 +43,9 @@ Scope {
   property bool ttsTestPending: false
   property string ttsTestError: ""
   property bool ttsSpeaking: false
+  property bool ttsPlaybackActive: false
+  property bool ttsPlaybackMetered: false
+  property real ttsLevel: 0
   property string ttsSpeakId: ""
   property bool voiceEnabled: false
   property string ttsProvider: "kokoro"
@@ -519,6 +522,9 @@ Scope {
     if (!Protocol.ttsVoiceAvailable(catalog, model, voice)) voice = Protocol.ttsDefaultVoice(catalog, model)
     ttsSpeakId = "qml-tts-" + Date.now() + "-" + Math.floor(Math.random() * 100000)
     ttsSpeaking = true
+    ttsPlaybackActive = false
+    ttsPlaybackMetered = false
+    ttsLevel = 0
     sendCommand(Protocol.ttsSpeakCommand(ttsSpeakId, ttsProvider, model, voice, spoken.slice(0, 8000)))
     return true
   }
@@ -526,6 +532,9 @@ Scope {
     if (!ttsSpeaking && ttsSpeakId === "") return
     sendCommand(Protocol.ttsStopCommand())
     ttsSpeaking = false
+    ttsPlaybackActive = false
+    ttsPlaybackMetered = false
+    ttsLevel = 0
     ttsSpeakId = ""
   }
 
@@ -739,19 +748,37 @@ Scope {
       return
     }
     if (type === "tts_speaking") {
-      if (event.id && ttsSpeakId !== "" && String(event.id) !== ttsSpeakId) return
+      if (ttsSpeakId === "" || String(event.id || "") !== ttsSpeakId) return
       ttsSpeaking = true
+      ttsPlaybackActive = true
+      ttsPlaybackMetered = event.metered === true
+      ttsLevel = 0
+      return
+    }
+    if (type === "tts_level") {
+      if (!ttsPlaybackActive || ttsSpeakId === ""
+          || String(event.id || "") !== ttsSpeakId) return
+      var playbackLevel = Protocol.normalizedTtsLevel(event)
+      if (playbackLevel === null) return
+      ttsPlaybackMetered = true
+      ttsLevel = playbackLevel
       return
     }
     if (type === "tts_spoken") {
-      if (event.id && ttsSpeakId !== "" && String(event.id) !== ttsSpeakId) return
+      if (ttsSpeakId === "" || String(event.id || "") !== ttsSpeakId) return
       ttsSpeaking = false
+      ttsPlaybackActive = false
+      ttsPlaybackMetered = false
+      ttsLevel = 0
       ttsSpeakId = ""
       return
     }
     if (type === "tts_speak_failed") {
-      if (event.id && ttsSpeakId !== "" && String(event.id) !== ttsSpeakId) return
+      if (ttsSpeakId === "" || String(event.id || "") !== ttsSpeakId) return
       ttsSpeaking = false
+      ttsPlaybackActive = false
+      ttsPlaybackMetered = false
+      ttsLevel = 0
       ttsSpeakId = ""
       toastRequested(String(event.message || "Could not speak that answer"))
       return

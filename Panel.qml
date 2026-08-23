@@ -10,6 +10,7 @@ import "components/internal" as QuickchatInternal
 import "components/Presentation.js" as Presentation
 import "components/Protocol.js" as Protocol
 import "components/QuickActions.js" as ActionCatalog
+import "components/StatePhrases.js" as StatePhrases
 
 Panel {
   id: root
@@ -73,6 +74,13 @@ Panel {
   readonly property bool responseActivityActive:
     Quickchat.QuickchatStore.state === "preparing"
     || Quickchat.QuickchatStore.state === "streaming"
+  property int thinkingPhraseIndex: 0
+  readonly property bool genericActivityStatus: responseActivityActive
+    && StatePhrases.isGenericStatus(Quickchat.QuickchatStore.statusMessage)
+  readonly property string activityStatusText: StatePhrases.thinkingStatus(
+    thinkingPhraseIndex, Quickchat.QuickchatStore.statusMessage)
+  readonly property bool rotatingActivityStatus: root.opened
+    && root.genericActivityStatus && root.motionEnabled
   readonly property bool panelWindowActive: panelFocus.Window.window
     ? panelFocus.Window.window.active : false
   readonly property bool modalInteractionActive: composer.popupOpen
@@ -82,6 +90,43 @@ Panel {
     || (root.viewMode === "history" && historyView.modalInteractionActive)
   readonly property bool workInAppActionAvailable:
     ActionCatalog.promptFor(root.quickActionItems, "work-in-app") !== ""
+
+  Timer {
+    id: thinkingPhraseTimer
+    interval: 2800
+    running: root.rotatingActivityStatus
+    repeat: true
+    triggeredOnStart: false
+    onTriggered: thinkingPhraseSwap.restart()
+  }
+
+  SequentialAnimation {
+    id: thinkingPhraseSwap
+    PropertyAnimation {
+      target: activityStatus; property: "opacity"
+      to: 0; duration: 180; easing.type: Easing.OutQuad
+    }
+    ScriptAction {
+      script: root.thinkingPhraseIndex = (root.thinkingPhraseIndex + 1)
+        % StatePhrases.thinkingCount()
+    }
+    PropertyAnimation {
+      target: activityStatus; property: "opacity"
+      to: 1; duration: 260; easing.type: Easing.InQuad
+    }
+  }
+
+  function resetThinkingPhrase() {
+    thinkingPhraseSwap.stop()
+    activityStatus.opacity = 1
+    if (!responseActivityActive) thinkingPhraseIndex = 0
+  }
+
+  onGenericActivityStatusChanged: resetThinkingPhrase()
+  onResponseActivityActiveChanged: resetThinkingPhrase()
+  onRotatingActivityStatusChanged: {
+    if (!rotatingActivityStatus) resetThinkingPhrase()
+  }
 
   function persistSettings(values) {
     var entry = { id: root.moduleName }
@@ -393,10 +438,7 @@ Panel {
                   anchors.right: parent.right
                   anchors.verticalCenter: parent.verticalCenter
                   width: parent.width
-                  text: Quickchat.QuickchatStore.statusMessage !== ""
-                    ? Quickchat.QuickchatStore.statusMessage
-                    : (Quickchat.QuickchatStore.state === "streaming" ? "Receiving response…"
-                      : "Waiting for " + Protocol.providerLabel(Quickchat.QuickchatStore.provider) + "…")
+                  text: root.activityStatusText
                   visible: root.responseActivityActive
                   color: Qt.darker(root.foreground, 1.25)
                   font.family: root.fontFamily

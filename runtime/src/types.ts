@@ -358,7 +358,8 @@ export type BrokerEvent =
   | { type: "voice"; dictation: VoiceStatus["dictation"]; tts: TtsProviderStatus[] }
   | { type: "tts_tested"; provider: "elevenlabs" | "openai"; result: TtsProviderStatus }
   | { type: "tts_test_failed"; provider: "elevenlabs" | "openai"; message: string }
-  | { type: "tts_speaking"; id: string }
+  | { type: "tts_speaking"; id: string; metered: boolean }
+  | { type: "tts_level"; id: string; level: number }
   | { type: "tts_spoken"; id: string }
   | { type: "tts_speak_failed"; id: string; message: string }
   | { type: "auth_methods"; methods: BuiltinAuthMethod[] }

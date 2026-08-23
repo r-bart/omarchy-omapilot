@@ -6,6 +6,7 @@ import qs.Commons
 import qs.Ui
 import "components" as OmaPilot
 import "components/QuickActions.js" as ActionCatalog
+import "components/StatePhrases.js" as StatePhrases
 
 ShellRoot {
   id: root
@@ -337,7 +338,8 @@ ShellRoot {
               }
 
               Text {
-                text: root.previewState === "streaming" ? "Receiving response…" : backend.statusMessage
+                text: root.previewState === "waiting" || root.previewState === "streaming"
+                  ? StatePhrases.thinkingAt(0) : backend.statusMessage
                 color: Qt.darker(Color.popups.text, 1.25)
                 font.family: Style.font.family
                 font.pixelSize: Style.font.caption

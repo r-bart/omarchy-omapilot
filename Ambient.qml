@@ -368,6 +368,10 @@ Item {
   OmaPilot.VoiceNode {
     phase: root.phase
     transcript: root.captionText
+    status: OmaPilot.QuickchatStore.statusMessage
+    speaking: OmaPilot.QuickchatStore.ttsPlaybackActive
+    playbackMetered: OmaPilot.QuickchatStore.ttsPlaybackMetered
+    playbackLevel: OmaPilot.QuickchatStore.ttsLevel
     hint: root.captionHint
     targetScreen: root.activeScreen
     motionEnabled: root.motionEnabled

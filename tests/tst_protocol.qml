@@ -444,6 +444,10 @@ TestCase {
     compare(speak.provider, "elevenlabs")
     compare(speak.voice, "wyWA56cQNU2KqUW4eCsI")
     compare(Protocol.ttsStopCommand().type, "tts_stop")
+    compare(Protocol.normalizedTtsLevel({ type: "tts_level", level: 0.72 }), 0.72)
+    compare(Protocol.normalizedTtsLevel({ type: "tts_level", level: 4 }), 1)
+    compare(Protocol.normalizedTtsLevel({ type: "tts_level", level: -2 }), 0)
+    compare(Protocol.normalizedTtsLevel({ type: "tts_level", level: "bad" }), null)
   }
 
   function test_customProviderProbeAndSaveKeepDiscoveredModelMetadata() {

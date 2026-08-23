@@ -42,15 +42,40 @@ ShellRoot {
         if (node.level !== root.frozenLevel || node.tide !== root.frozenTide
             || node.drift !== root.frozenDrift)
           root.fail("reduced motion changed atmosphere values across phases")
+        if (node.captionMessage !== "Thinking it through…")
+          root.fail("reduced motion did not hold the first thinking phrase")
         node.motionEnabled = true
         node.phase = "thinking"
       } else if (root.stage === 3) {
         if (!node.atmosphereActive || node.tide === 0.4)
           root.fail("active thinking atmosphere did not start")
+        node.status = "Waiting for tool approval…"
+        if (node.captionMessage !== node.status)
+          root.fail("actionable thinking status was replaced by decorative copy")
         node.phase = "error"
       } else if (root.stage === 4) {
         if (node.atmosphereActive || node.tide !== 0.4 || node.drift !== 0)
           root.fail("terminal phase left the atmosphere cycle active")
+        node.phase = "answering"
+        node.speaking = true
+        node.playbackMetered = true
+        node.playbackLevel = 0.76
+      } else if (root.stage === 5) {
+        if (!node.atmosphereActive || !node.voiceWaveActive)
+          root.fail("speaking did not activate the measured playback atmosphere")
+        if (Math.abs(node.visualLevel - 0.76) > 0.001)
+          root.fail("speaking did not expose the measured playback level")
+        if (node.captionMessage !== "Speaking…")
+          root.fail("speaking did not expose its playback caption")
+        node.motionEnabled = false
+        node.playbackLevel = 0.94
+      } else if (root.stage === 6) {
+        if (node.visualLevel !== 0.5)
+          root.fail("reduced motion did not freeze measured playback animation")
+        node.speaking = false
+      } else if (root.stage === 7) {
+        if (node.atmosphereActive || node.voiceWaveActive)
+          root.fail("completed playback left its animation active")
         if (!root.failed) console.log("OMAPILOT_VOICE_NODE_LIFECYCLE_PROBE_OK")
         probeTimer.stop()
         Qt.quit()

@@ -459,7 +459,14 @@ describe("voice provider status", () => {
         dictationAvailable: () => Promise.resolve(true),
         kokoroAvailable: () => Promise.resolve(false),
         fetch: fetcher,
-        playAudio: () => Promise.resolve()
+        analyzeAudio: () => Promise.resolve([0.18, 0.72]),
+        playAudio: (_path, _signal, telemetry) => {
+          if (telemetry !== undefined) {
+            telemetry.onStarted();
+            for (const level of telemetry.levels) telemetry.onLevel(level);
+          }
+          return Promise.resolve();
+        }
       }
     );
     const broker = new QuickchatBroker(events.push.bind(events), { voice, env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config } });
@@ -469,7 +476,10 @@ describe("voice provider status", () => {
     while (Date.now() < deadline && !events.some((event) => event.type === "tts_spoken" && event.id === "speak-1")) {
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
-    expect(events.some((event) => event.type === "tts_speaking" && event.id === "speak-1")).toBe(true);
+    expect(events.some((event) => event.type === "tts_speaking"
+      && event.id === "speak-1" && event.metered)).toBe(true);
+    expect(events.filter((event) => event.type === "tts_level").map((event) => event.level))
+      .toEqual([0.18, 0.72]);
     expect(events.some((event) => event.type === "tts_spoken" && event.id === "speak-1")).toBe(true);
     expect(JSON.stringify(events)).not.toContain("eleven-test-key");
   });
