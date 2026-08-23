@@ -15,11 +15,37 @@ for relative in manifest.json package.json package-lock.json runtime/adapters.re
   runtime/licenses/ignore-5.3.2-MIT.txt \
   runtime/licenses/ignore-7.0.5-MIT.txt \
   runtime/licenses/ignore-7.0.6-MIT.txt \
+  runtime/dist/quickchat-broker \
+  runtime/dist/quickchat-broker.LEGAL.txt \
   runtime/dist/quickchat-broker.THIRD_PARTY_LICENSES.txt \
   runtime/dist/capability-mcp.js \
+  runtime/dist/adapters/codex-acp \
   runtime/dist/adapters/Apache-2.0.txt \
   THIRD_PARTY_NOTICES.md; do
   [[ -f "$repo_root/$relative" ]] || fail "missing $relative"
+done
+
+[[ -x "$repo_root/runtime/dist/quickchat-broker" ]] || fail "broker launcher is not executable"
+[[ -x "$repo_root/runtime/dist/adapters/codex-acp" ]] || fail "Codex ACP launcher is not executable"
+command -v file >/dev/null || fail "file is required"
+command -v readelf >/dev/null || fail "readelf is required"
+for launcher in runtime/dist/quickchat-broker runtime/dist/adapters/codex-acp; do
+  file "$repo_root/$launcher" | grep -Fq 'ELF 64-bit LSB executable, x86-64' || {
+    fail "$launcher is not a Linux x86-64 ELF executable"
+  }
+  readelf -W -h "$repo_root/$launcher" | grep -Fq 'Machine:                           Advanced Micro Devices X86-64' || {
+    fail "$launcher has an unexpected ELF machine"
+  }
+  readelf -W -d "$repo_root/$launcher" | grep -Fq 'BIND_NOW' || {
+    fail "$launcher is missing immediate relocation binding"
+  }
+  if readelf -W -l "$repo_root/$launcher" | awk '$1 == "GNU_STACK" && $NF ~ /E/ { found=1 } END { exit !found }'; then
+    fail "$launcher requests an executable stack"
+  fi
+done
+for stale in runtime/dist/quickchat-broker.js runtime/dist/quickchat-broker.js.map \
+  runtime/dist/capability-mcp.js.map runtime/dist/adapters/codex-acp.js; do
+  [[ ! -e "$repo_root/$stale" ]] || fail "stale text bundle remains: $stale"
 done
 
 grep -Fq 'OmaPilot bundled broker third-party licenses' \

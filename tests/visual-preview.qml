@@ -61,7 +61,7 @@ ShellRoot {
       { value: "openai::api_key", label: "OpenAI API key",
         description: "Store this credential only in OmaPilot's private configuration." },
       { value: "xai::oauth", label: "xAI (Grok/X subscription)",
-        description: "Use your Anthropic subscription in OmaPilot." }
+        description: "Use your xAI subscription in OmaPilot." }
     ]
     property var customProviders: []
     property var customProviderSaved: null

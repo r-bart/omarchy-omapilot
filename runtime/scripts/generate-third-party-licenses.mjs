@@ -42,7 +42,7 @@ export async function generateThirdPartyLicenses({ projectRoot, sourceMap, lockP
     "OmaPilot bundled broker third-party licenses",
     "",
     "Generated deterministically from package-lock.json and the broker source map.",
-    "Only packages whose source is present in quickchat-broker.js are listed.",
+    "Only packages whose source is present in the generated Quickchat broker runtime are listed.",
     "",
     "PACKAGES",
     ""

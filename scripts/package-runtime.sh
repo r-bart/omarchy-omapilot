@@ -40,11 +40,11 @@ done
 required=(
   package.json
   package-lock.json
-  runtime/dist/quickchat-broker.js
-  runtime/dist/quickchat-broker.js.LEGAL.txt
+  runtime/dist/quickchat-broker
+  runtime/dist/quickchat-broker.LEGAL.txt
   runtime/dist/quickchat-broker.THIRD_PARTY_LICENSES.txt
   runtime/dist/capability-mcp.js
-  runtime/dist/adapters/codex-acp.js
+  runtime/dist/adapters/codex-acp
   runtime/dist/adapters/Apache-2.0.txt
   runtime/policies/automatic.md
   runtime/bin/quickchat-broker
@@ -107,11 +107,11 @@ stage="$stage_parent/$bundle_name"
 mkdir -p "$stage/runtime/dist/adapters" "$stage/runtime/bin" "$stage/runtime/policies"
 
 cp "$repo_root/package.json" "$repo_root/package-lock.json" "$stage/"
-cp "$repo_root/runtime/dist/quickchat-broker.js" "$stage/runtime/dist/"
-cp "$repo_root/runtime/dist/quickchat-broker.js.LEGAL.txt" "$stage/runtime/dist/"
+cp "$repo_root/runtime/dist/quickchat-broker" "$stage/runtime/dist/"
+cp "$repo_root/runtime/dist/quickchat-broker.LEGAL.txt" "$stage/runtime/dist/"
 cp "$repo_root/runtime/dist/quickchat-broker.THIRD_PARTY_LICENSES.txt" "$stage/runtime/dist/"
 cp "$repo_root/runtime/dist/capability-mcp.js" "$stage/runtime/dist/"
-cp "$repo_root/runtime/dist/adapters/codex-acp.js" "$stage/runtime/dist/adapters/"
+cp "$repo_root/runtime/dist/adapters/codex-acp" "$stage/runtime/dist/adapters/"
 cp "$repo_root/runtime/dist/adapters/Apache-2.0.txt" "$stage/runtime/dist/adapters/"
 cp "$repo_root/runtime/policies/automatic.md" "$stage/runtime/policies/"
 cp "$repo_root/runtime/bin/quickchat-broker" "$repo_root/runtime/bin/codex-acp" \
@@ -120,14 +120,14 @@ cp "$repo_root/runtime/adapters.release.json" "$stage/runtime/"
 cp "$repo_root/runtime/policies/automatic.md" "$stage/runtime/policies/"
 cp "$repo_root/THIRD_PARTY_NOTICES.md" "$repo_root/LICENSE" "$stage/"
 chmod 0755 "$stage/runtime/bin/quickchat-broker" "$stage/runtime/bin/codex-acp" \
+  "$stage/runtime/dist/quickchat-broker" "$stage/runtime/dist/adapters/codex-acp" \
   "$stage/runtime/dist/capability-mcp.js"
 
 (
   cd "$stage"
-  # The three executables are already self-contained bundles. The lockfile is
-  # retained for exact source provenance and SBOM generation; including a
-  # second node_modules copy would add hundreds of megabytes without changing
-  # runtime behavior.
+  # The three executables are self-contained generated runtimes. The broker and
+  # Codex adapter are reproducible Linux launchers with their Node payloads
+  # embedded; the lockfile remains the source and SBOM authority.
   npm sbom --package-lock-only --omit=dev --sbom-format cyclonedx \
     | jq 'del(.serialNumber, .metadata.timestamp)' > sbom.cdx.json
 )

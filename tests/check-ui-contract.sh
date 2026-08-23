@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-omarchy_shell="${OMARCHY_PATH:-/home/sbull/omarchy}/shell"
+omarchy_shell="${OMARCHY_PATH:-/usr/share/omarchy}/shell"
 smoke_root=""
 preview_root=""
 

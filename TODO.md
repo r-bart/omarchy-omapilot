@@ -1,5 +1,46 @@
 # Quickchat implementation ledger
 
+## Marketplace submission preparation (2026-08-23)
+
+- Goal: prepare the public OmaPilot repository for its first
+  omarchyplugins.com submission through one reviewable `dev` to `main` pull
+  request.
+- Branch: `t3code/prepare-plugin-submission`, based exactly on `origin/dev`
+  commit `ae4378880c27927376f380636277c362c1982864`.
+- Allowed: scoped repository edits; local dependency installation, builds,
+  tests, packaging, installed-plugin/runtime verification, screenshot capture;
+  commit and push to `dev`; and creation or update of the `dev` to `main` pull
+  request.
+- Forbidden: marketplace issue submission without the owner's separate review
+  and approval of its exact title, body, and checklist; release publication;
+  production changes; secrets, billing, or customer-data changes; destructive
+  resets; and edits to other worktrees.
+- Required gates:
+  - [ ] Current marketplace structure and security-baseline checks pass for the
+    exact public commit.
+  - [x] Root `preview.png` and the README preview use the reproducible current
+    QML surface, which was also verified open in the live Omarchy shell.
+  - [x] README, release metadata, dependencies, install/update/remove guidance,
+    and security reporting are current and internally consistent.
+  - [x] Source checks, generated-runtime parity, deterministic release package,
+    clean indexed-candidate Omarchy validation, live UI verification, and
+    candidate runtime verification pass.
+  - [x] Equivalent final diff audit has no unresolved
+    actionable findings.
+  - [ ] The reviewed changes are committed and pushed to `dev`, and one
+    `dev` to `main` pull request is open with green required checks.
+- Worker state: none. `HERDR_ENV` is unavailable, so the orchestrator owns the
+  implementation, audit, and verification directly; no native/background
+  worker is authorized.
+- Cleanup owner: the orchestrator owns temporary build, validation, and capture
+  artifacts created by this stream. Existing user files and other worktrees are
+  out of scope.
+- Evidence so far: `npm audit` reports zero vulnerabilities; `npm run check`
+  passes 239 tests with 8 intentional skips; `bash tests/check-ui-contract.sh`
+  passes the QML, motion, and visual fixtures against pinned Quattro commit
+  `ef6d9e6605b121df15bf310e630e04f0c1119fc8`; generated runtimes reproduce
+  byte-for-byte; and two release archives have identical SHA-256 hashes.
+
 ## Goal
 
 Ship a public Omarchy Quattro bar-widget that provides themed, one-turn AI

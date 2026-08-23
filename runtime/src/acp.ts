@@ -1,8 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import * as acp from "@agentclientprotocol/sdk";
 import type { ContentBlock, NewSessionRequest, RequestPermissionRequest, SessionConfigOption } from "@agentclientprotocol/sdk";
@@ -13,6 +12,7 @@ import { ImageStore } from "./images.js";
 import { presentImage } from "./history.js";
 import { quickchatPaths } from "./paths.js";
 import { runCommand, terminateProcessGroup } from "./process.js";
+import { pluginRoot } from "./runtime-root.js";
 
 export type AcpResult = {
   answer: string;
@@ -467,7 +467,7 @@ export function providerSessionRequest(
     cwd,
     mcpServers: [{
       name: "OmaPilot personal capabilities (read only)",
-      command: fileURLToPath(new URL("../dist/capability-mcp.js", import.meta.url)),
+      command: resolve(pluginRoot(import.meta.url), "runtime/dist/capability-mcp.js"),
       args: [],
       env
     }]

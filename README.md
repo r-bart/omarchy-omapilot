@@ -1,19 +1,24 @@
 # OmaPilot for Omarchy
 
-OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget and contextual-capture overlay for asking questions and working on your desktop through an authenticated AI harness. Device actions stay behind an exact, inspectable approval unless you explicitly enable **Dangerous auto-approve** in settings. OmaPilot can attach a bounded desktop snapshot, clip a window or exact region with a reviewed Text/Screenshot choice, render Markdown in a themed panel, remember the latest 30 completed chats, and hand an answer to Herdr when you want to keep working.
+OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget and contextual-capture overlay for asking questions and working on your desktop through an authenticated AI harness. It can summarize the active window, research current information, clip a window or exact region, work through bounded app connectors, remember the latest 30 completed chats, and hand a conversation to Herdr when you want to keep going.
 
 The public project and product name is now OmaPilot. The existing plugin ID, IPC target, package/runtime identifiers, and local `quickchat` data paths remain unchanged so current installations and user data continue to work.
 
-> [!IMPORTANT]
-> The compatibility-ID `0.1.1` build is the current published release. Protocol-2 version `0.2.0`
-> remains unreleased until its release and marketplace gates are complete in
-> [`TODO.md`](TODO.md).
+The repository carries the `0.2.0` marketplace candidate. The permanent plugin
+ID remains `io.github.spencerbull.quickchat`, preserving existing installs and
+the compatibility-path `quickchat` user data directories.
 
 ## Preview
 
-![OmaPilot answering from OpenCode in the active Omarchy Quattro theme](docs/assets/quickchat-live.png)
+![OmaPilot composing with a reviewed contextual desktop clip](preview.png)
 
-The compact composer expands from the right side of the bar. Its result panel
+This preview is rendered from the current QML components against the pinned
+Omarchy Quattro imports with `npm run preview`; the same panel and components
+are exercised by the UI contract suite and verified in the live shell.
+
+The compact composer expands from the right side of the bar. Device changes
+stay behind an exact, inspectable approval unless you explicitly enable
+**Dangerous auto-approve** in settings. Its result panel
 supports selectable Markdown, code blocks, tables, safe clickable links,
 bounded images, Copy, New chat, History, and Continue in Herdr. The in-panel
 settings pane can add, edit, remove, and reorder up to five quick actions.
@@ -31,7 +36,8 @@ compact error notice opens an inspectable details pane.
 
 - Omarchy Quattro with the native shell plugin architecture.
 - Linux x86-64 for the initial prebuilt runtime.
-- Node.js 22 or newer for the broker and pinned ACP adapters.
+- Node.js 22 or newer. The checked-in Linux launchers contain the reviewed
+  broker and Codex ACP payloads but execute them with the system Node runtime.
 - Credentials for the built-in harness, or an installed and authenticated ACP harness.
 - Optional: Voxtype for dictation and Herdr for durable continuation.
 - Optional: a TTS provider to speak answers. Kokoro is local
@@ -71,7 +77,14 @@ omarchy plugin validate ~/.config/omarchy/plugins/io.github.spencerbull.quickcha
 omarchy plugin enable io.github.spencerbull.quickchat right
 ```
 
-The Omarchy installer only clones, validates, and enables the plugin. It runs no install hook, `sudo`, package manager, or host-configuration mutation. The reviewed repository revision includes self-contained broker and ACP adapter bundles, so a normal install does not run `npm`, `npx`, or silently download executable code. Git history anchors those checked-in bundles to their TypeScript source and pinned lockfile; release archives add an SBOM, provenance record, and SHA-256 checksum.
+The Omarchy installer only clones, validates, and enables the plugin. It runs no
+install hook, does not request administrator access, and does not invoke a
+package manager or mutate host configuration. The reviewed repository revision
+includes reproducible Linux x86-64 broker and Codex ACP launchers, so a normal
+install does not run `npm`, `npx`, or silently download executable code. The
+launchers execute their embedded, sealed JavaScript payloads with system Node;
+Git history anchors those generated files to their TypeScript source and pinned
+lockfile. Release archives add an SBOM, provenance record, and SHA-256 checksum.
 
 Update or remove it with the standard plugin commands:
 
@@ -402,6 +415,7 @@ out of scope; they would need their own inspectable per-action approval boundary
 ```bash
 ./scripts/validate.sh
 ./scripts/package-runtime.sh --dry-run
+npm run preview
 ```
 
 After the broker has been built, assemble a local release artifact without publishing it:
@@ -412,7 +426,11 @@ npm run build
 ./scripts/package-runtime.sh --output-dir dist/release
 ```
 
-The package helper stages the self-contained checked-in runtime, emits a lockfile-derived CycloneDX SBOM, normalizes timestamps and ownership, creates a deterministic archive, and writes `SHA256SUMS`. Release details and marketplace gates are in [`docs/release.md`](docs/release.md).
+Runtime builds require Linux x86-64, a C compiler, and GNU `ld`/`strip`. The
+package helper stages the self-contained checked-in runtime, emits a
+lockfile-derived CycloneDX SBOM, normalizes timestamps and ownership, creates a
+deterministic archive, and writes `SHA256SUMS`. Release details and marketplace
+gates are in [`docs/release.md`](docs/release.md).
 
 ## License and attribution
 

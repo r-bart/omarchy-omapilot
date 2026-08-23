@@ -43,7 +43,16 @@ rather than creating a file.
 
 The UI starts a separate Quickchat broker and communicates using newline-delimited JSON on stdin/stdout. The broker owns selected-harness discovery and authentication readiness, the embedded Pi lifecycle, ACP lifecycle, permission handling, streaming, cancellation, validation, history, and optional integration commands. Provider stderr is diagnostic input and must never be forwarded to persisted history without redaction.
 
-The reviewed plugin revision contains self-contained broker and adapter bundles usable immediately after a plain clone. Release builds package those tracked bundles into a deterministic, checksum-addressed `linux-x86_64` archive with lockfile-derived SBOM and provenance. Omarchy itself still performs no install hook. Contributors use `npm ci && npm run build` to reproduce checked-in bundles; missing or incompatible runtimes fail closed.
+The reviewed plugin revision contains self-contained, generated Linux x86-64
+launchers usable immediately after a plain clone. Each launcher embeds its
+minified JavaScript payload, copies it into a sealed in-memory file at runtime,
+and executes it with system Node 22 or newer. The source tree, exact lockfile,
+build generator, legal inventory, and generated launchers live in the same
+commit. Release builds package those tracked files into a deterministic,
+checksum-addressed archive with a lockfile-derived SBOM and provenance. Omarchy
+itself performs no install hook. Contributors use `npm ci && npm run build` on
+Linux x86-64 with a C compiler and GNU binutils to reproduce the checked-in
+runtime; missing or incompatible prerequisites fail closed.
 
 ## Runtime command/event contract
 

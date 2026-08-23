@@ -3,7 +3,6 @@ import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { createAgentSession } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/sdk.js";
 import { DefaultResourceLoader } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js";
 import { AuthStorage, readStoredCredential } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/auth-storage.js";
@@ -29,6 +28,7 @@ import type { AcpResult, AcpRun, PermissionHandler } from "./acp.js";
 import { automaticInstructions, type PiDiscoveredProvider } from "./providers.js";
 import type { BrokerEvent, BuiltinAuthMethod, ModelOption, ProviderPolicyInfo, WebHandoffProvider } from "./types.js";
 import { quickchatPaths } from "./paths.js";
+import { pluginRoot } from "./runtime-root.js";
 import {
   createPersonalAssistantTools,
   desktopToolTitle,
@@ -764,7 +764,7 @@ export function existingSkillPaths(directory: string, cwd: string, home = homedi
 }
 
 export function bundledSkillPaths(): string[] {
-  const path = resolve(dirname(fileURLToPath(import.meta.url)), "../../skills");
+  const path = resolve(pluginRoot(import.meta.url), "skills");
   return existsSync(path) ? [path] : [];
 }
 

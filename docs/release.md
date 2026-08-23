@@ -1,38 +1,54 @@
 # Release and marketplace checklist
 
-OmaPilot is submitted only from a public GitHub repository whose default branch is the exact commit validated below. The marketplace validates metadata, not plugin security.
+OmaPilot is submitted only from a public GitHub repository whose default branch
+is the exact commit validated below. Marketplace validation checks structure
+and compatibility; it is not a plugin security review.
 
 ## Release preparation
 
-1. Update the manifest and package versions together.
-2. Review ACP package versions, upstream source, licenses, and release notes; update `THIRD_PARTY_NOTICES.md` and the locked runtime metadata deliberately.
-3. Run `npm ci`, the broker check suite, QML checks, and `./scripts/validate.sh`.
-4. Build with `npm run build`, then run `./scripts/package-runtime.sh --output-dir dist/release` twice and compare archive hashes.
-5. Inspect archive contents, `sbom.cdx.json`, `provenance.json`, and `SHA256SUMS`. Test extraction and broker startup on a clean x86-64 Omarchy Quattro environment.
-6. Confirm the checked-in bundles reproduce from source without a diff. Upload the archive, checksum file, SBOM, and provenance to a GitHub draft release.
-7. Install the exact public release revision with the commands in the README and verify startup, missing/corrupt-runtime failure, update, and removal.
+1. Update `manifest.json`, `package.json`, and `package-lock.json` together.
+2. Review exact runtime dependencies, licenses, upstream changes, and
+   `THIRD_PARTY_NOTICES.md`.
+3. On Linux x86-64 with Node 22, a C compiler, and GNU binutils, run `npm ci`,
+   `npm run check`, `./scripts/validate.sh`, and `bash tests/check-ui-contract.sh`.
+4. Rebuild twice and confirm that every tracked file under `runtime/dist/` and
+   `browser-companion/dist/` is byte-identical.
+5. Run `./scripts/package-runtime.sh --output-dir dist/release` twice and compare
+   archive hashes. Inspect the archive, `sbom.cdx.json`, `provenance.json`, and
+   `SHA256SUMS`.
+6. Render `preview.png` with `npm run preview`, inspect it, and verify the same
+   surface in the live Omarchy shell.
+7. Validate a clean archive of the exact candidate commit with Omarchy Quattro.
+   This `0.2.0` candidate is pinned to Quattro commit
+   `ef6d9e6605b121df15bf310e630e04f0c1119fc8`.
+8. Push the exact candidate to `dev`, merge it to the default `main` branch only
+   after review and green CI, then rerun the marketplace validator and security
+   baseline against that public `main` commit.
 
-The packaging workflow builds artifacts for review; it does not create or publish a GitHub Release.
-
-## Required product evidence
-
-- Add a verified screenshot from the live Quattro shell using the active
-  Omarchy theme and update the README preview section.
-- Verify open, compose, provider/model selection, desktop context On/Off and active-app latching, automatic web/tool use and permission enforcement, stream/stop, Markdown, safe links, images, history/clear, dictation, Herdr continuation, keyboard navigation, narrow geometry, theme reload, shell reload, and all missing/error states.
-- Record the exact Omarchy Quattro commit used for validation.
-- Complete independent security, implementation, and design review with no unresolved actionable findings.
-- Run `bash tests/check-ui-contract.sh` on a workstation with the pinned Quattro QML imports, Qt 6 tools, Quickshell, and a Wayland compositor. Hosted CI cannot substitute for this required environment gate.
+The packaging workflow builds artifacts for review; it does not create or
+publish a GitHub Release.
 
 ## Marketplace submission
 
-The target is <https://omarchyplugins.com>. Its current publishing guide requires a public GitHub repository, root manifest, README, license, safe install/removal, and optional preview before submitting the repository URL through its GitHub issue form.
-
-Submission metadata:
+The current publishing target is <https://omarchyplugins.com>. The repository
+is prepared with:
 
 - Repository: `https://github.com/spencerbull/omarchy-omapilot`
 - Plugin ID: `io.github.spencerbull.quickchat`
-- Category: Widgets
+- Category: `Widgets`
 - Tags: `ai`, `bar`, `quickshell`
-- Preview: verified implementation screenshot
+- Root preview: `preview.png`
+- License: MIT, with external dependencies documented in
+  `THIRD_PARTY_NOTICES.md`
 
-Do not submit while `TODO.md` has an incomplete public-release or live-verification gate. The marketplace's agent instructions also require showing the exact issue title/body to the owner and receiving explicit approval before creating the issue.
+The official automated baseline limits scanned text files to 512 KiB each and
+8 MiB in aggregate. OmaPilot's generated broker and Codex ACP launchers are
+expected to produce a truthful `review-required` result for bundled executable
+binaries; that disposition requires marketplace maintainer review but is not a
+selectively blocking finding. Any `needs-fixes` result or incomplete scan blocks
+submission readiness.
+
+The exact proposed issue is in [`marketplace-submission.md`](marketplace-submission.md).
+Do not create it until the owner reviews that exact title/body, confirms all
+five checklist statements (including preview ownership), and explicitly
+approves submission.

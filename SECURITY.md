@@ -67,7 +67,12 @@ Omarchy plugins run unsandboxed inside the long-lived `omarchy-shell` process. R
   are never written to widget settings, models.json, or chat history, and they
   are never included in broker events. A key is probed before it is saved.
   Kokoro is local and has no credential.
-- Adapter bundles are generated from exact package-lock versions and reviewed as tracked files in the same Git commit as their source. Published release archives add SHA-256 verification, provenance, and an SBOM; the runtime does not download or replace adapters.
+- Broker and adapter launchers are generated from exact package-lock versions
+  and reviewed as tracked files in the same Git commit as their source. They
+  contain sealed JavaScript payloads and execute them with system Node 22 or
+  newer; they do not unpack executable code to a shared temporary path.
+  Published release archives add SHA-256 verification, provenance, and an SBOM;
+  the runtime does not download or replace adapters.
 - Remote images require a user action and are subject to scheme, redirect, address, MIME, byte-size, complete decode, pixel-area, and cache-quota checks before Quickshell sees them.
 - Context capture is an explicit overlay gesture. The active target is latched
   before OmaPilot takes focus, monitor and region geometry are validated by the
