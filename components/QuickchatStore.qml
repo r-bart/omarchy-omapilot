@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "Protocol.js" as Protocol
+import "SessionLifecycle.js" as SessionLifecycle
 
 // One process and one ephemeral UI model for every screen. The broker is the
 // only durable authority; this singleton merely normalizes its NDJSON stream
@@ -25,6 +26,10 @@ Scope {
   property string statusMessage: "Starting OmaPilot…"
   property string currentId: ""
   property string currentChatId: ""
+  // `submit()` clears currentChatId while a new history record is pending. Keep
+  // the last committed chat separately so an interrupted follow-up can resume
+  // the conversation that existed before that canceled/failed turn.
+  property string submittedResumeChatId: ""
   property string question: ""
   property string answerMarkdown: ""
   property var errorDetails: null
@@ -258,6 +263,7 @@ Scope {
     var prompt = String(text || "").trim()
     if (!prompt || !canSubmit) return false
     var resumeChatId = currentChatId
+    submittedResumeChatId = resumeChatId
     currentId = "qml-" + Date.now() + "-" + Math.floor(Math.random() * 100000)
     currentChatId = ""
     question = prompt
@@ -440,6 +446,7 @@ Scope {
     clearContextAttachments()
     currentId = ""
     currentChatId = ""
+    submittedResumeChatId = ""
     question = ""
     answerMarkdown = ""
     errorDetails = null
@@ -466,6 +473,12 @@ Scope {
       return
     }
     resetChat()
+  }
+
+  function restoreSubmittedContinuation() {
+    currentChatId = SessionLifecycle.settledChatId(
+      currentChatId, submittedResumeChatId)
+    submittedResumeChatId = ""
   }
 
   onBusyChanged: {
@@ -627,6 +640,7 @@ Scope {
 
   function loadChat(chat) {
     if (!chat) return
+    submittedResumeChatId = ""
     currentChatId = String(chat.id || "")
     currentId = ""
     question = String(chat.question || "")
@@ -936,6 +950,7 @@ Scope {
         if (Array.isArray(event.chat.images)) images = event.chat.images
         prependHistory(event.chat)
       } else if (event.chatId) currentChatId = String(event.chatId)
+      restoreSubmittedContinuation()
       if (event.history) history = Protocol.normalizedHistory(event.history)
       state = "complete"
       errorDetails = null
@@ -984,6 +999,7 @@ Scope {
       if (String(event.code || "").toLowerCase() === "cancelled") {
         answerMarkdown = ""
         images = []
+        restoreSubmittedContinuation()
         state = "canceled"
         pendingPermission = null
         permissionQueue = []
@@ -999,6 +1015,7 @@ Scope {
         images = []
         answerChanged()
       }
+      restoreSubmittedContinuation()
       state = event.unavailable === true ? "unavailable" : "error"
       pendingPermission = null
       permissionQueue = []

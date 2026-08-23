@@ -249,8 +249,16 @@ grep -Fq 'Protocol.ttsKeySetCommand(provider, apiKey)' "$repo_dir/components/Qui
 grep -Fq 'onVoiceEnabledRequested:' "$repo_dir/Panel.qml"
 grep -Fq 'if (!OmaPilot.QuickchatStore.voiceEnabled)' "$repo_dir/Ambient.qml"
 grep -Fq 'function newVoiceChat(): string {' "$repo_dir/Ambient.qml"
-grep -Fq 'freshVoiceStartPending = freshChat' "$repo_dir/Ambient.qml"
-grep -Fq 'if (freshChat && !freshChatReset) OmaPilot.QuickchatStore.newChat()' \
+grep -Fq 'property bool voiceSessionActive: false' "$repo_dir/Ambient.qml"
+grep -Fq 'SessionLifecycle.voiceActivationMode(' "$repo_dir/Ambient.qml"
+grep -Fq 'voiceSessionActive = false' "$repo_dir/Ambient.qml"
+grep -Fq 'session=" + (root.voiceSessionActive ? "active" : "closed")' \
+  "$repo_dir/Ambient.qml"
+grep -Fq 'freshVoiceStartPending = freshVoiceStartPending || freshChat' \
+  "$repo_dir/Ambient.qml"
+grep -Fq 'property bool freshChatResetInProgress: false' "$repo_dir/Ambient.qml"
+grep -Fq 'if (freshChatResetInProgress) return' "$repo_dir/Ambient.qml"
+grep -Fq 'if (freshChat && !freshChatReset) resetFreshVoiceChat()' \
   "$repo_dir/Ambient.qml"
 grep -Fq 'function continueInHerdr() { root.continueInHerdr() }' \
   "$repo_dir/components/QuickchatStore.qml"
@@ -258,6 +266,9 @@ grep -Fq '|| (pendingHerdrChatId === "" && currentId !== "" && busy)' \
   "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'if (root.newChatPending && !root.busy) root.resetChat()' \
   "$repo_dir/components/QuickchatStore.qml"
+grep -Fq 'submittedResumeChatId = resumeChatId' "$repo_dir/components/QuickchatStore.qml"
+test "$(grep -Fc 'restoreSubmittedContinuation()' \
+  "$repo_dir/components/QuickchatStore.qml")" -ge 3
 grep -Fq 'pendingHerdrChatId = currentChatId' "$repo_dir/components/QuickchatStore.qml"
 grep -Fq 'String(event.chatId || "") !== pendingHerdrChatId' \
   "$repo_dir/components/QuickchatStore.qml"
@@ -565,13 +576,18 @@ QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -import "$repo_dir" || fail "state phrase tests failed"
 
 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
+  -input "$repo_dir/tests/tst_session_lifecycle.qml" \
+  -import "$repo_dir" || fail "session lifecycle tests failed"
+
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -input "$repo_dir/tests/tst_quick_actions.qml" \
   -import "$repo_dir" \
   -import "$omarchy_shell"
 
 smoke_root="$(mktemp -d)"
 cp "$repo_dir/tests/smoke.qml" "$smoke_root/shell.qml"
-cp "$repo_dir/BarWidget.qml" "$repo_dir/ContextCaptureOverlay.qml" "$repo_dir/Panel.qml" "$smoke_root/"
+cp "$repo_dir/Ambient.qml" "$repo_dir/BarWidget.qml" \
+  "$repo_dir/ContextCaptureOverlay.qml" "$repo_dir/Panel.qml" "$smoke_root/"
 cp -a "$repo_dir/components" "$smoke_root/components"
 cp -a "$repo_dir/assets" "$smoke_root/assets"
 cp -a "$omarchy_shell/Commons" "$omarchy_shell/Ui" "$smoke_root/"
@@ -581,6 +597,21 @@ QUICKCHAT_BROKER_PATH=/usr/bin/false QT_QPA_PLATFORM=wayland \
   >"$smoke_root/output.log" 2>&1
 if grep -Eq "smoke loader failed|overlay smoke loader failed|Failed to load|Type .* unavailable|Cannot assign" "$smoke_root/output.log"; then
   cat "$smoke_root/output.log"
+  exit 1
+fi
+
+cp "$repo_dir/tests/ambient-session-lifecycle-probe.qml" "$smoke_root/shell.qml"
+if ! QUICKCHAT_BROKER_PATH=/usr/bin/false QT_QPA_PLATFORM=wayland \
+    timeout 5s quickshell --no-duplicate --path "$smoke_root" --no-color \
+    >"$smoke_root/ambient-session-lifecycle.log" 2>&1; then
+  cat "$smoke_root/ambient-session-lifecycle.log"
+  exit 1
+fi
+if grep -Eq "omapilot ambient session lifecycle probe failed|Failed to load|Type .* unavailable|Cannot assign|TypeError|ReferenceError" \
+    "$smoke_root/ambient-session-lifecycle.log" \
+    || ! grep -Fq 'OMAPILOT_AMBIENT_SESSION_LIFECYCLE_PROBE_OK' \
+      "$smoke_root/ambient-session-lifecycle.log"; then
+  cat "$smoke_root/ambient-session-lifecycle.log"
   exit 1
 fi
 

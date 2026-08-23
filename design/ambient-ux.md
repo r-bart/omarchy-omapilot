@@ -129,8 +129,10 @@ to be a compositor binding that routes over IPC.
 ## Hotkeys
 
 The ambient surface never takes keyboard focus, so global hotkeys route through
-the plugin's IPC targets. The default conversation gesture and its fresh-chat
-variant are:
+the plugin's IPC targets. Super+A owns a visible conversation lease: it starts
+fresh when the ambient flow is closed, continues while that flow is active, and
+finishes live dictation. The explicit fresh-chat variant remains available as a
+force-new escape hatch:
 
 ```lua
 o.bind("SUPER + A", "Talk to OmaPilot",
@@ -145,6 +147,11 @@ o.bind("SUPER + ALT + N", "New OmaPilot chat",
 o.bind("SUPER + ALT + H", "Continue OmaPilot chat in Herdr",
   "omarchy-shell -q io.github.spencerbull.quickchat continueInHerdr")
 ```
+
+The answer timer, explicit dismissal, and cancellation close the voice lease
+without deleting its completed history. The next Super+A resets the presentation
+and continuation immediately before recording, after any in-flight cancellation
+has settled.
 
 These are **documented user bindings, not something OmaPilot writes**. The
 plugin does not edit Hyprland configuration; that constraint is unchanged.
