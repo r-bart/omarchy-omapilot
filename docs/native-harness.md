@@ -36,7 +36,7 @@ from `OPENAI_API_KEY`, `XAI_API_KEY`, or `auth.json`:
 ```
 
 Completed Built-in turns are written to durable Pi JSONL sessions under
-`${XDG_STATE_HOME:-$HOME/.local/state}/quickchat/pi-sessions/`. A follow-up from
+`${XDG_STATE_HOME:-$HOME/.local/state}/omapilot/pi-sessions/`. A follow-up from
 the main screen or Recent chats resumes that exact session; **New chat** creates
 a new one. Session-scoped approvals remain active for the conversation while
 the broker is running, while persistent approvals remain in `approvals.json`.
@@ -147,7 +147,7 @@ configured canonical root through `..` or symlinks. `files_open` and
 Basecamp write, and Signal send operations are `external_write`: they omit
 session and durable allow choices and ignore Dangerous auto-approve.
 
-The native harness keeps Pi sessions in memory for a Quickchat turn. OmaPilot
+The native harness keeps Pi sessions in memory for a OmaPilot turn. OmaPilot
 stores the completed answer under its existing bounded history policy, but not
 raw tool input/output, credentials, or Pi conversation files. Continue in Herdr
 therefore uses the transcript handoff for native Pi chats.

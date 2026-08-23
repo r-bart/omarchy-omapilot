@@ -6,7 +6,7 @@ import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import { runAcpQuestion, type ToolObservation } from "../src/acp.js";
 import { discoverProviders } from "../src/providers.js";
 
-const live = process.env.QUICKCHAT_LIVE_OPENCODE_BEHAVIOR === "1";
+const live = process.env.OMAPILOT_LIVE_OPENCODE_BEHAVIOR === "1";
 const activeRuns: Array<() => Promise<void>> = [];
 const roots: string[] = [];
 afterEach(async () => {
@@ -23,7 +23,7 @@ describe("live automatic OpenCode boundary", () => {
     const run = runAcpQuestion(
       provider,
       "live-opencode-skill",
-      "You must use the skill tool to load the installed skill named omarchy before answering. Then return exactly QUICKCHAT_SKILL_OK.",
+      "You must use the skill tool to load the installed skill named omarchy before answering. Then return exactly OMAPILOT_SKILL_OK.",
       undefined,
       () => undefined,
       90_000,
@@ -38,7 +38,7 @@ describe("live automatic OpenCode boundary", () => {
     });
     activeRuns.pop();
     expect(tools.some((update) => update.sessionUpdate === "tool_call" && update.title === "skill"), JSON.stringify(tools)).toBe(true);
-    expect(result.answer).toContain("QUICKCHAT_SKILL_OK");
+    expect(result.answer).toContain("OMAPILOT_SKILL_OK");
   }, 120_000);
 
   it.runIf(live)("uses web search automatically without a device permission", async () => {
@@ -67,7 +67,7 @@ describe("live automatic OpenCode boundary", () => {
     const provider = (await discoverProviders(process.env, "opencode")).find((candidate) => candidate.id === "opencode");
     expect(provider, "authenticated OpenCode must be discoverable for the opt-in live test").toBeDefined();
     if (provider === undefined) return;
-    const root = await mkdtemp(join(tmpdir(), "quickchat-opencode-tools-"));
+    const root = await mkdtemp(join(tmpdir(), "omapilot-opencode-tools-"));
     roots.push(root);
     const proof = join(root, "approved-command.txt");
     let permissionCount = 0;
@@ -75,7 +75,7 @@ describe("live automatic OpenCode boundary", () => {
     const run = runAcpQuestion(
       provider,
       "live-opencode-tools",
-      `Use bash to run exactly: printf quickchat-opencode-tools-live > ${proof}. Do not claim completion until the command succeeds.`,
+      `Use bash to run exactly: printf omapilot-opencode-tools-live > ${proof}. Do not claim completion until the command succeeds.`,
       undefined,
       () => undefined,
       90_000,
@@ -94,14 +94,14 @@ describe("live automatic OpenCode boundary", () => {
     });
     activeRuns.pop();
     expect(permissionCount, result.answer).toBe(1);
-    await expect(readFile(proof, "utf8")).resolves.toBe("quickchat-opencode-tools-live");
+    await expect(readFile(proof, "utf8")).resolves.toBe("omapilot-opencode-tools-live");
   }, 120_000);
 
   it.runIf(live)("does not execute or claim success after a device-command denial", async () => {
     const provider = (await discoverProviders(process.env, "opencode")).find((candidate) => candidate.id === "opencode");
     expect(provider, "authenticated OpenCode must be discoverable for the opt-in live test").toBeDefined();
     if (provider === undefined) return;
-    const root = await mkdtemp(join(tmpdir(), "quickchat-opencode-deny-"));
+    const root = await mkdtemp(join(tmpdir(), "omapilot-opencode-deny-"));
     roots.push(root);
     const proof = join(root, "must-not-exist.txt");
     let permissionCount = 0;

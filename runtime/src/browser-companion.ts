@@ -116,7 +116,7 @@ export class BrowserCompanionServer {
     const configuredRuntimeRoot = env.XDG_RUNTIME_DIR?.trim();
     const runtimeRoot = configuredRuntimeRoot === undefined || configuredRuntimeRoot === ""
       ? join(env.HOME ?? "/tmp", ".cache") : configuredRuntimeRoot;
-    this.socketPath = join(runtimeRoot, "quickchat", "browser-companion.sock");
+    this.socketPath = join(runtimeRoot, "omapilot", "browser-companion.sock");
     this.#callbacks = callbacks;
   }
 

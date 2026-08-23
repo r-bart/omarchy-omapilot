@@ -49,14 +49,14 @@ Item {
     var cancelId = opened ? requestId : ""
     opened = false
     resetGesture()
-    if (cancelId !== "") OmaPilot.QuickchatStore.cancelContextCapture(cancelId)
+    if (cancelId !== "") OmaPilot.OmaPilotStore.cancelContextCapture(cancelId)
     if (cancelId !== "") requestId = ""
   }
 
   function dismiss() {
     close()
     if (shell && typeof shell.hide === "function")
-      shell.hide((manifest && manifest.id) || "io.github.spencerbull.quickchat")
+      shell.hide((manifest && manifest.id) || "io.github.spencerbull.omapilot")
   }
 
   function resetGesture() {
@@ -96,7 +96,7 @@ Item {
     interval: 32
     repeat: false
     onTriggered: {
-      OmaPilot.QuickchatStore.captureContext(root.requestId, pending.mode, pending.region, pending.anchor)
+      OmaPilot.OmaPilotStore.captureContext(root.requestId, pending.mode, pending.region, pending.anchor)
       root.dismiss()
     }
   }

@@ -3,7 +3,7 @@ import QtTest
 import "../components/Presentation.js" as Presentation
 
 TestCase {
-  name: "QuickchatPresentation"
+  name: "OmaPilotPresentation"
 
   function test_heightGrowsFromMinimumAndCapsToScreen() {
     compare(Presentation.boundedPanelHeight(120, 280, 680, 900, 28), 308)

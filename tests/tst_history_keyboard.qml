@@ -1,6 +1,6 @@
 import QtQuick
 import QtTest
-import "../components/internal" as QuickchatInternal
+import "../components/internal" as OmaPilotInternal
 
 Item {
   id: root
@@ -29,7 +29,7 @@ Item {
     Keys.onPressed: function(event) { historyKeyboard.handleKey(event) }
     delegate: Rectangle { required property int index; width: 200; height: 40 }
 
-    QuickchatInternal.HistoryListKeyboardHandler {
+    OmaPilotInternal.HistoryListKeyboardHandler {
       id: historyKeyboard
       list: historyList
       history: root.historyItems

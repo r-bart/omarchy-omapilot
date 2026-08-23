@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { quickchatPaths } from "../paths.js";
+import { omapilotPaths } from "../paths.js";
 import { CAPABILITY_IDS, type CapabilityConfig, type CapabilityId } from "./types.js";
 
 const MAX_CONFIG_BYTES = 128 * 1024;
@@ -27,7 +27,7 @@ function defaults(): CapabilityConfig {
 }
 
 export function capabilityConfigPath(env: NodeJS.ProcessEnv = process.env): string {
-  return join(quickchatPaths(env).config, "capabilities.json");
+  return join(omapilotPaths(env).config, "capabilities.json");
 }
 
 export function readCapabilityConfig(env: NodeJS.ProcessEnv = process.env): CapabilityConfig {

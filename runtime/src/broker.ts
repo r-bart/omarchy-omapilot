@@ -54,7 +54,7 @@ type AuthFlow = {
   prompt?: AuthPromptWaiter;
 };
 
-export class QuickchatBroker {
+export class OmaPilotBroker {
   readonly #emit: (event: BrokerEvent) => void;
   readonly #history: HistoryStore;
   readonly #images: ImageStore;
@@ -170,7 +170,7 @@ export class QuickchatBroker {
 
   async #initialize(command: Extract<BrokerCommand, { type: "initialize" }>): Promise<void> {
     if (command.protocolVersion !== 2) {
-      this.#error("unsupported_protocol", "Quickchat supports broker protocol version 2", false);
+      this.#error("unsupported_protocol", "OmaPilot supports broker protocol version 2", false);
       return;
     }
     const [discovered, authMethods] = await Promise.all([

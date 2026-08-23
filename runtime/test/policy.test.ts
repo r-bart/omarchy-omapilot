@@ -144,7 +144,7 @@ describe("provider security profiles", () => {
         undefined,
         (request) => {
           permissions += 1;
-          expect(request.toolCall).toMatchObject({ kind: "execute", rawInput: { command: "printf quickchat" } });
+          expect(request.toolCall).toMatchObject({ kind: "execute", rawInput: { command: "printf omapilot" } });
           const kind = decision === "allow" ? "allow_once" : "reject_once";
           return Promise.resolve(request.options.find((option) => option.kind === kind)?.optionId);
         }
@@ -263,7 +263,7 @@ describe("provider security profiles", () => {
     const providers = await discoverProviders({
       ...process.env,
       PATH: `${resolve("runtime/test/fixtures/bin-unsafe")}:${process.env.PATH ?? ""}`,
-      QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs")
+      OMAPILOT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs")
     }, "codex");
     expect(providers.some((provider) => provider.id === "codex")).toBe(false);
   });
@@ -272,7 +272,7 @@ describe("provider security profiles", () => {
     const env = {
       ...process.env,
       PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`,
-      QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs")
+      OMAPILOT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs")
     };
     const providers = (await Promise.all([
       discoverProviders(env, "codex"),
@@ -293,9 +293,9 @@ describe("provider security profiles", () => {
   it("never substitutes ACP when the selected built-in harness is disabled", async () => {
     const providers = await discoverProviders({
       ...process.env,
-      QUICKCHAT_DISABLE_PI: "1",
+      OMAPILOT_DISABLE_PI: "1",
       PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`,
-      QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs")
+      OMAPILOT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs")
     }, "builtin");
     expect(providers).toEqual([]);
   });
@@ -330,7 +330,7 @@ async function openCodeToolUpdateFixture(
   completeAfterReject = false,
   updateCommand = ""
 ): Promise<{ root: string; audit: string; provider: DiscoveredProvider }> {
-  const root = await mkdtemp(join(tmpdir(), "quickchat-opencode-tool-update-"));
+  const root = await mkdtemp(join(tmpdir(), "omapilot-opencode-tool-update-"));
   const script = join(root, "agent.mjs");
   const audit = join(root, "audit.log");
   const sdk = pathToFileURL(resolve("node_modules/@agentclientprotocol/sdk/dist/acp.js")).href;
@@ -345,7 +345,7 @@ process.on("uncaughtException", (error) => { log("uncaught:" + String(error?.sta
 process.on("unhandledRejection", (error) => { log("rejection:" + String(error?.stack || error)); process.exit(1); });
 let pending;
 const stream = acp.ndJsonStream(Writable.toWeb(process.stdout), Readable.toWeb(process.stdin));
-const server = acp.agent({ name: "quickchat-opencode-tool-update" })
+const server = acp.agent({ name: "omapilot-opencode-tool-update" })
   .onRequest(acp.methods.agent.initialize, () => { log("initialize"); return { protocolVersion: acp.PROTOCOL_VERSION, agentCapabilities: {} }; })
   .onRequest(acp.methods.agent.session.new, () => ({
     sessionId: "tool-update-session",
@@ -414,7 +414,7 @@ server.connect(stream);
           FAKE_TOOL_KIND: kind,
           FAKE_TOOL_TITLE: title,
           FAKE_TOOL_UPDATE_KIND: updateKind,
-          FAKE_TOOL_COMMAND: kind === "execute" ? "printf quickchat" : "",
+          FAKE_TOOL_COMMAND: kind === "execute" ? "printf omapilot" : "",
           FAKE_TOOL_REQUEST_PERMISSION: requestPermission ? "1" : "0",
           FAKE_TOOL_INITIAL_INPUT: initialInput ? "1" : "0",
           FAKE_TOOL_COMPLETE_AFTER_REJECT: completeAfterReject ? "1" : "0",

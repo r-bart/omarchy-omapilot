@@ -81,13 +81,13 @@ Item {
   // widget stays authoritative until it is removed.
   function applyOwnSettings() {
     if (!root.ownSettings) return
-    OmaPilot.QuickchatStore.configure(root.ownSettings)
+    OmaPilot.OmaPilotStore.configure(root.ownSettings)
   }
 
   onOwnSettingsChanged: applyOwnSettings()
   Component.onCompleted: {
     applyOwnSettings()
-    storeState = OmaPilot.QuickchatStore.state
+    storeState = OmaPilot.OmaPilotStore.state
   }
 
   // ---------------------------------------------------------------- phase
@@ -95,13 +95,13 @@ Item {
   // The overlay's own derived phase feeds surfaces that participate in shell
   // loading, which made a direct cross-singleton binding loop during updates.
   property string storeState: ""
-  readonly property bool hasAnswer: OmaPilot.QuickchatStore.answerMarkdown !== ""
-    || OmaPilot.QuickchatStore.images.length > 0
+  readonly property bool hasAnswer: OmaPilot.OmaPilotStore.answerMarkdown !== ""
+    || OmaPilot.OmaPilotStore.images.length > 0
   readonly property bool failed: storeState === "error" || storeState === "unavailable"
 
   Connections {
-    target: OmaPilot.QuickchatStore
-    function onStateChanged() { root.storeState = OmaPilot.QuickchatStore.state }
+    target: OmaPilot.OmaPilotStore
+    function onStateChanged() { root.storeState = OmaPilot.OmaPilotStore.state }
     function onTtsSpoken() {
       if (!root.voiceEngaged || root.storeState !== "complete") return
       root.answerSpoken = true
@@ -132,7 +132,7 @@ Item {
   // The caption shows the live transcript while listening, and nothing after —
   // once the curtain carries the question, repeating it below is noise.
   readonly property string captionText: voiceNotice !== "" ? voiceNotice
-    : (phase === "listening" ? OmaPilot.QuickchatStore.transcript : "")
+    : (phase === "listening" ? OmaPilot.OmaPilotStore.transcript : "")
 
   // Shown under the caption while listening. Without it the only way to learn
   // how to finish is to be told, and the surface deliberately has no controls.
@@ -146,7 +146,7 @@ Item {
   // starts recording. A fresh-chat hotkey can arrive while a turn or dictation
   // is still unwinding, so the reset has to wait for the broker to settle.
   property bool freshVoiceStartPending: false
-  // QuickchatStore.newChat() synchronously publishes its composing state. Keep
+  // OmaPilotStore.newChat() synchronously publishes its composing state. Keep
   // that intentional reset distinct from an empty completed dictation, which
   // the normal state handler dismisses as a silence-only voice turn.
   property bool freshChatResetInProgress: false
@@ -158,7 +158,7 @@ Item {
 
   function resetFreshVoiceChat() {
     freshChatResetInProgress = true
-    OmaPilot.QuickchatStore.newChat()
+    OmaPilot.OmaPilotStore.newChat()
     freshChatResetInProgress = false
   }
 
@@ -169,39 +169,39 @@ Item {
     // binding.
     var freshChatReset = false
 
-    if (!freshChat && OmaPilot.QuickchatStore.state === "dictating")
+    if (!freshChat && OmaPilot.OmaPilotStore.state === "dictating")
       return "already listening"
 
-    OmaPilot.QuickchatStore.stopSpeaking()
+    OmaPilot.OmaPilotStore.stopSpeaking()
     voiceNotice = ""
     answerSpoken = false
     voiceEngaged = true
 
-    if (!OmaPilot.QuickchatStore.voiceEnabled) {
+    if (!OmaPilot.OmaPilotStore.voiceEnabled) {
       voiceNotice = "Enable voice in OmaPilot Settings"
       return "disabled"
     }
 
-    if (!OmaPilot.QuickchatStore.initialized) {
+    if (!OmaPilot.OmaPilotStore.initialized) {
       // Light the node instead of failing invisibly, so a hotkey press always
       // produces something on screen.
-      voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
-        ? OmaPilot.QuickchatStore.statusMessage
+      voiceNotice = OmaPilot.OmaPilotStore.statusMessage !== ""
+        ? OmaPilot.OmaPilotStore.statusMessage
         : "OmaPilot is not ready yet"
       return "not ready"
     }
 
     // A fresh chat deliberately clears a saved conversation's continuation
     // block, but it still needs the currently selected harness to be ready.
-    if (!OmaPilot.QuickchatStore.providerReady
-        || (!freshChat && OmaPilot.QuickchatStore.continuationBlocked)) {
-      voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
-        ? OmaPilot.QuickchatStore.statusMessage
+    if (!OmaPilot.OmaPilotStore.providerReady
+        || (!freshChat && OmaPilot.OmaPilotStore.continuationBlocked)) {
+      voiceNotice = OmaPilot.OmaPilotStore.statusMessage !== ""
+        ? OmaPilot.OmaPilotStore.statusMessage
         : "Choose an available harness in OmaPilot Settings"
       return "not ready"
     }
 
-    if (!freshChat && OmaPilot.QuickchatStore.pendingHerdrChatId !== "") {
+    if (!freshChat && OmaPilot.OmaPilotStore.pendingHerdrChatId !== "") {
       voiceNotice = "Continue in Herdr is still opening"
       return "busy"
     }
@@ -211,14 +211,14 @@ Item {
     // A fresh voice gesture supersedes presentation of an in-flight Herdr
     // handoff. The external handoff may still finish, but its tagged outcome is
     // ignored once newChat clears pendingHerdrChatId.
-    if (freshChat && OmaPilot.QuickchatStore.pendingHerdrChatId !== "") {
+    if (freshChat && OmaPilot.OmaPilotStore.pendingHerdrChatId !== "") {
       resetFreshVoiceChat()
       freshChatReset = true
     }
 
-    OmaPilot.QuickchatStore.latchDesktopContext()
+    OmaPilot.OmaPilotStore.latchDesktopContext()
 
-    if (OmaPilot.QuickchatStore.busy) {
+    if (OmaPilot.OmaPilotStore.busy) {
       // Dictation cannot start while the broker is mid-response, and the broker
       // clears busy asynchronously, so arm the start and let the state change
       // below run it once the previous turn has unwound.
@@ -226,15 +226,15 @@ Item {
       // Once any gesture has requested a fresh session, later taps during the
       // same cancellation window must not downgrade it back to continuation.
       freshVoiceStartPending = freshVoiceStartPending || freshChat
-      OmaPilot.QuickchatStore.cancel()
+      OmaPilot.OmaPilotStore.cancel()
       return "preempting"
     }
 
     if (freshChat && !freshChatReset) resetFreshVoiceChat()
 
-    if (!OmaPilot.QuickchatStore.startDictation()) {
-      voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
-        ? OmaPilot.QuickchatStore.statusMessage : "Voice input is not available right now"
+    if (!OmaPilot.OmaPilotStore.startDictation()) {
+      voiceNotice = OmaPilot.OmaPilotStore.statusMessage !== ""
+        ? OmaPilot.OmaPilotStore.statusMessage : "Voice input is not available right now"
       return "not ready"
     }
     return "listening"
@@ -245,8 +245,8 @@ Item {
   function newVoiceChat() { return beginVoiceChat(true) }
 
   function voiceStop() {
-    if (OmaPilot.QuickchatStore.state !== "dictating") return
-    OmaPilot.QuickchatStore.stopDictation()
+    if (OmaPilot.OmaPilotStore.state !== "dictating") return
+    OmaPilot.OmaPilotStore.stopDictation()
   }
 
   // Toggle is the default gesture because nothing can detect end-of-speech for
@@ -257,16 +257,16 @@ Item {
   // prefers true push-to-talk.
   function voiceToggle() {
     var activation = SessionLifecycle.voiceActivationMode(
-      voiceSessionActive, OmaPilot.QuickchatStore.state)
+      voiceSessionActive, OmaPilot.OmaPilotStore.state)
     if (activation === "finish") {
-      OmaPilot.QuickchatStore.stopDictation()
+      OmaPilot.OmaPilotStore.stopDictation()
       return "finishing"
     }
     return beginVoiceChat(activation === "fresh")
   }
 
   function voiceCancel() {
-    OmaPilot.QuickchatStore.cancel()
+    OmaPilot.OmaPilotStore.cancel()
     dismiss()
   }
 
@@ -275,15 +275,15 @@ Item {
     freshVoiceStartPending = false
     voiceNotice = ""
     answerSpoken = false
-    OmaPilot.QuickchatStore.stopSpeaking()
+    OmaPilot.OmaPilotStore.stopSpeaking()
     // Releasing the surfaces must also release the microphone. Dismissing while
     // dictation is still live would leave a hot mic with no indicator on screen,
     // which is the one failure mode an invisible ambient layer must never have.
-    if (OmaPilot.QuickchatStore.state === "dictating")
-      OmaPilot.QuickchatStore.cancel()
+    if (OmaPilot.OmaPilotStore.state === "dictating")
+      OmaPilot.OmaPilotStore.cancel()
     voiceSessionActive = false
     voiceEngaged = false
-    OmaPilot.QuickchatStore.clearDesktopContextLatch()
+    OmaPilot.OmaPilotStore.clearDesktopContextLatch()
   }
 
   // Dictation ends in "composing" with the transcript populated. In the voice
@@ -291,7 +291,7 @@ Item {
   // making them confirm it in a text box would defeat the gesture.
   onStoreStateChanged: {
     if (freshChatResetInProgress) return
-    if (voiceStartPending && !OmaPilot.QuickchatStore.busy) {
+    if (voiceStartPending && !OmaPilot.OmaPilotStore.busy) {
       var freshChat = freshVoiceStartPending
       voiceStartPending = false
       freshVoiceStartPending = false
@@ -301,25 +301,25 @@ Item {
       Qt.callLater(function() {
         if (!root.voiceEngaged) return
         if (freshChat) root.resetFreshVoiceChat()
-        if (!OmaPilot.QuickchatStore.startDictation()) {
-          root.voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
-            ? OmaPilot.QuickchatStore.statusMessage : "Voice input is not available right now"
+        if (!OmaPilot.OmaPilotStore.startDictation()) {
+          root.voiceNotice = OmaPilot.OmaPilotStore.statusMessage !== ""
+            ? OmaPilot.OmaPilotStore.statusMessage : "Voice input is not available right now"
         }
       })
       return
     }
     if (!voiceEngaged) return
     if (storeState === "complete") {
-      var answer = String(OmaPilot.QuickchatStore.answerMarkdown || "").trim()
-      if (answer !== "") OmaPilot.QuickchatStore.speakAnswer(answer)
+      var answer = String(OmaPilot.OmaPilotStore.answerMarkdown || "").trim()
+      if (answer !== "") OmaPilot.OmaPilotStore.speakAnswer(answer)
       return
     }
     if (storeState !== "composing") return
-    var spoken = String(OmaPilot.QuickchatStore.transcript || "").trim()
+    var spoken = String(OmaPilot.OmaPilotStore.transcript || "").trim()
     if (spoken === "") { dismiss(); return }
-    if (!OmaPilot.QuickchatStore.submit(spoken)) {
-      voiceNotice = OmaPilot.QuickchatStore.statusMessage !== ""
-        ? OmaPilot.QuickchatStore.statusMessage : "The selected harness cannot accept this request"
+    if (!OmaPilot.OmaPilotStore.submit(spoken)) {
+      voiceNotice = OmaPilot.OmaPilotStore.statusMessage !== ""
+        ? OmaPilot.OmaPilotStore.statusMessage : "The selected harness cannot accept this request"
     }
   }
 
@@ -330,7 +330,7 @@ Item {
   // desktop.
   readonly property int dismissDelay: {
     if (root.answerSpoken) return 2000
-    var words = String(OmaPilot.QuickchatStore.answerMarkdown || "")
+    var words = String(OmaPilot.OmaPilotStore.answerMarkdown || "")
       .split(/\s+/).filter(function(w) { return w !== "" }).length
     return Math.max(6000, Math.min(40000, 4500 + words * 240))
   }
@@ -352,7 +352,7 @@ Item {
     // Only armed once the answer has settled, so streaming never races it.
     // Errors stay until dismissed: a failure the user missed is worse than a
     // surface that lingers.
-    running: root.phase === "answering" && !OmaPilot.QuickchatStore.ttsSpeaking
+    running: root.phase === "answering" && !OmaPilot.OmaPilotStore.ttsSpeaking
     onTriggered: root.dismiss()
   }
 
@@ -392,10 +392,10 @@ Item {
   OmaPilot.VoiceNode {
     phase: root.phase
     transcript: root.captionText
-    status: OmaPilot.QuickchatStore.statusMessage
-    speaking: OmaPilot.QuickchatStore.ttsPlaybackActive
-    playbackMetered: OmaPilot.QuickchatStore.ttsPlaybackMetered
-    playbackLevel: OmaPilot.QuickchatStore.ttsLevel
+    status: OmaPilot.OmaPilotStore.statusMessage
+    speaking: OmaPilot.OmaPilotStore.ttsPlaybackActive
+    playbackMetered: OmaPilot.OmaPilotStore.ttsPlaybackMetered
+    playbackLevel: OmaPilot.OmaPilotStore.ttsLevel
     hint: root.captionHint
     targetScreen: root.activeScreen
     motionEnabled: root.motionEnabled
@@ -403,17 +403,17 @@ Item {
 
   OmaPilot.AnswerCurtain {
     shown: root.curtainShown
-    question: OmaPilot.QuickchatStore.question
-    markdown: OmaPilot.QuickchatStore.answerMarkdown
-    images: OmaPilot.QuickchatStore.images
+    question: OmaPilot.OmaPilotStore.question
+    markdown: OmaPilot.OmaPilotStore.answerMarkdown
+    images: OmaPilot.OmaPilotStore.images
     failed: root.failed
     provenance: root.failed
-      ? String(OmaPilot.QuickchatStore.statusMessage || "could not answer")
-      : (OmaPilot.QuickchatStore.provider
-         + (OmaPilot.QuickchatStore.model !== "" ? " · " + OmaPilot.QuickchatStore.model : ""))
+      ? String(OmaPilot.OmaPilotStore.statusMessage || "could not answer")
+      : (OmaPilot.OmaPilotStore.provider
+         + (OmaPilot.OmaPilotStore.model !== "" ? " · " + OmaPilot.OmaPilotStore.model : ""))
     targetScreen: root.activeScreen
     motionEnabled: root.motionEnabled
-    onLinkActivated: function(url) { OmaPilot.QuickchatStore.activateLink(url) }
+    onLinkActivated: function(url) { OmaPilot.OmaPilotStore.activateLink(url) }
   }
 
   // The explicit context-capture overlay is unchanged and still owns the

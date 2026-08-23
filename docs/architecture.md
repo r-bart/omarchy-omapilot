@@ -2,21 +2,21 @@
 
 ## Omarchy ownership
 
-Quickchat is one third-party `bar-widget`; it is not a replacement bar, panel plugin, service plugin, or second Quickshell process. Its repository-root `manifest.json` declares schema version 1 and the relative `BarWidget.qml` entrypoint. Omarchy owns discovery, enabled state, placement, settings persistence, theme services, panel coordination, and hot reload.
+OmaPilot is one third-party `bar-widget`; it is not a replacement bar, panel plugin, service plugin, or second Quickshell process. Its repository-root `manifest.json` declares schema version 1 and the relative `BarWidget.qml` entrypoint. Omarchy owns discovery, enabled state, placement, settings persistence, theme services, panel coordination, and hot reload.
 
 The widget follows the current Quattro host contract:
 
-- installation is a plain git clone under `~/.config/omarchy/plugins/io.github.spencerbull.quickchat`;
+- installation is a plain git clone under `~/.config/omarchy/plugins/io.github.spencerbull.omapilot`;
 - enablement adds one inline entry to `bar.layout.right` in `shell.json`;
 - the host injects `settings`, `manifest`, `shell`, `pluginRegistry`, and `barWidgetRegistry` where supported;
 - preferences are inline widget settings—there is no second configuration authority;
 - colors, type, borders, radii, and motion come from public `qs.Commons` and `qs.Ui` theme roles;
 - the widget coordinates one nested Omarchy `Panel` through the same open/close/anchor/popout behavior used by first-party bar widgets.
-- one monitor instance conditionally owns the direct Quickchat IPC target, then
+- one monitor instance conditionally owns the direct OmaPilot IPC target, then
   routes panel actions through Quattro's focused-monitor bar-widget resolver;
   ownership follows the host's reassigned module list across monitor changes.
 
-Quickchat does not edit `shell.json`, Omarchy sources, Hyprland configuration, or Herdr configuration directly.
+OmaPilot does not edit `shell.json`, Omarchy sources, Hyprland configuration, or Herdr configuration directly.
 
 Voice is opt-in from Settings after install. Widget settings store only
 `voiceEnabled`, `ttsProvider`, `ttsModel`, and `ttsVoice`. Cloud TTS keys live
@@ -41,7 +41,7 @@ rather than creating a file.
 
 ## Process boundary
 
-The UI starts a separate Quickchat broker and communicates using newline-delimited JSON on stdin/stdout. The broker owns selected-harness discovery and authentication readiness, the embedded Pi lifecycle, ACP lifecycle, permission handling, streaming, cancellation, validation, history, and optional integration commands. Provider stderr is diagnostic input and must never be forwarded to persisted history without redaction.
+The UI starts a separate OmaPilot broker and communicates using newline-delimited JSON on stdin/stdout. The broker owns selected-harness discovery and authentication readiness, the embedded Pi lifecycle, ACP lifecycle, permission handling, streaming, cancellation, validation, history, and optional integration commands. Provider stderr is diagnostic input and must never be forwarded to persisted history without redaction.
 
 The reviewed plugin revision contains self-contained, generated Linux x86-64
 launchers usable immediately after a plain clone. A source-controlled Node
@@ -102,8 +102,8 @@ Quickshell's public Hyprland and MPRIS objects at submit time; it does not poll
 field counts, lengths, and control characters, then frames the snapshot as
 untrusted observational JSON before the authoritative user request. It sends
 the combined prompt to the selected ACP session but stores only the original
-question in Quickchat history. The Built-in runtime stores Pi sessions beneath
-the Quickchat XDG state root and resolves continuation only through a validated
+question in OmaPilot history. The Built-in runtime stores Pi sessions beneath
+the OmaPilot XDG state root and resolves continuation only through a validated
 saved chat and session identity. Native Herdr resume therefore inherits the Pi
 conversation and uses a pane-scoped OmaPilot configuration environment; the
 transcript fallback remains available when a native harness cannot resume.
@@ -132,7 +132,7 @@ submit or explicit removal.
 
 The representation contract implements `element` through the separately
 installed browser companion. The broker owns a mode-0600 Unix socket below
-`$XDG_RUNTIME_DIR/quickchat`; browser-native relay processes connect that socket
+`$XDG_RUNTIME_DIR/omapilot`; browser-native relay processes connect that socket
 to an allowlisted extension ID through the browser's native-messaging transport.
 The relay exposes only versioned hello, probe, arm, result, cancel, and error
 messages. It is not a general browser command channel.

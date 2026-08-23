@@ -78,6 +78,6 @@ jobs:
         run: cd dist/release && sha256sum --check SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: quickchat-runtime-linux-x86_64
+          name: omapilot-runtime-linux-x86_64
           path: dist/release/
           if-no-files-found: error

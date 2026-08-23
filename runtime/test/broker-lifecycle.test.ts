@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { deleteAcpSession } from "../src/acp.js";
-import { QuickchatBroker } from "../src/broker.js";
+import { OmaPilotBroker } from "../src/broker.js";
 import * as piHarness from "../src/pi-harness.js";
 import { HerdrHandoffError } from "../src/herdr.js";
 import { HistoryStore } from "../src/history.js";
 import { VoiceService } from "../src/tts.js";
 import { ImageStore } from "../src/images.js";
-import { quickchatPaths } from "../src/paths.js";
+import { omapilotPaths } from "../src/paths.js";
 import type { DiscoveredProvider } from "../src/providers.js";
 import type { BrokerEvent, ChatRecord, ProviderId } from "../src/types.js";
 
@@ -25,7 +25,7 @@ describe("broker lifecycle cleanup", () => {
     const fixture = await setup();
     await fixture.history.save(record(1));
     const cleaned: string[] = [];
-    const broker = new QuickchatBroker(fixture.events.push.bind(fixture.events), {
+    const broker = new OmaPilotBroker(fixture.events.push.bind(fixture.events), {
       history: fixture.history, images: new ImageStore(fixture.paths), env: fixture.env,
       sessionCleaner: (_provider, sessionId) => { cleaned.push(sessionId); return Promise.reject(new Error("provider offline")); }
     });
@@ -41,7 +41,7 @@ describe("broker lifecycle cleanup", () => {
     await fixture.history.save(record(1));
     await fixture.history.save(record(2));
     const cleaned: string[] = [];
-    const broker = new QuickchatBroker(() => undefined, {
+    const broker = new OmaPilotBroker(() => undefined, {
       history: fixture.history, images: new ImageStore(fixture.paths), env: fixture.env,
       sessionCleaner: (_provider, sessionId) => { cleaned.push(sessionId); return Promise.resolve(sessionId !== "provider-session-1"); }
     });
@@ -55,7 +55,7 @@ describe("broker lifecycle cleanup", () => {
     const fixture = await setup();
     for (let index = 0; index < 30; index += 1) await fixture.history.save(record(index));
     const cleaned: string[] = [];
-    const broker = new QuickchatBroker(fixture.events.push.bind(fixture.events), {
+    const broker = new OmaPilotBroker(fixture.events.push.bind(fixture.events), {
       history: fixture.history, images: new ImageStore(fixture.paths), env: fixture.env,
       sessionCleaner: (_provider, sessionId) => { cleaned.push(sessionId); return Promise.resolve(true); }
     });
@@ -66,7 +66,7 @@ describe("broker lifecycle cleanup", () => {
   }, 20_000);
 
   it("uses OpenCode's native CLI when ACP cannot delete persisted sessions", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-opencode-delete-")); roots.push(root);
+    const root = await mkdtemp(join(tmpdir(), "omapilot-opencode-delete-")); roots.push(root);
     const audit = join(root, "session-audit.txt");
     const agentEnvironment = { ...process.env, FAKE_ACP_NO_DELETE: "1", OPENCODE_SESSION_AUDIT: audit };
     const provider: DiscoveredProvider = {
@@ -84,7 +84,7 @@ describe("dictation generation guard", () => {
     const events: BrokerEvent[] = [];
     let finishStop: (text: string) => void = () => undefined;
     const stopResult = new Promise<string>((resolveStop) => { finishStop = resolveStop; });
-    const broker = new QuickchatBroker(events.push.bind(events), {
+    const broker = new OmaPilotBroker(events.push.bind(events), {
       dictation: { start: () => Promise.resolve(), stop: () => stopResult, cancel: () => Promise.resolve() }
     });
     const stopping = broker.handle({ type: "dictation_stop" });
@@ -101,10 +101,10 @@ describe("dictation generation guard", () => {
 
 describe("custom provider registration", () => {
   it("acknowledges the durable write after credential cleanup", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-provider-save-")); roots.push(root);
+    const root = await mkdtemp(join(tmpdir(), "omapilot-provider-save-")); roots.push(root);
     const config = join(root, ".config/omapilot");
     const events: BrokerEvent[] = [];
-    const broker = new QuickchatBroker(events.push.bind(events), {
+    const broker = new OmaPilotBroker(events.push.bind(events), {
       env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config }
     });
 
@@ -139,7 +139,7 @@ describe("custom provider registration", () => {
     vi.stubGlobal("fetch", vi.fn<typeof fetch>(() => Promise.resolve(new Response(JSON.stringify({
       data: [{ id: "qwen3.8-27b", max_model_len: 262_144 }]
     }), { status: 200 }))));
-    const broker = new QuickchatBroker(events.push.bind(events));
+    const broker = new OmaPilotBroker(events.push.bind(events));
 
     await broker.handle({
       type: "custom_provider_test",
@@ -156,7 +156,7 @@ describe("custom provider registration", () => {
   });
 
   it("preserves an existing server credential when a same-endpoint edit omits the unreadable key", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-provider-edit-auth-")); roots.push(root);
+    const root = await mkdtemp(join(tmpdir(), "omapilot-provider-edit-auth-")); roots.push(root);
     const config = join(root, ".config/omapilot");
     await mkdir(config, { recursive: true });
     await writeFile(join(config, "models.json"), JSON.stringify({ providers: { finn: {
@@ -166,7 +166,7 @@ describe("custom provider registration", () => {
     } } }));
     await writeFile(join(config, "auth.json"), JSON.stringify({ finn: { type: "api_key", key: "stored-secret" } }));
     const events: BrokerEvent[] = [];
-    const broker = new QuickchatBroker(events.push.bind(events), {
+    const broker = new OmaPilotBroker(events.push.bind(events), {
       env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config }
     });
 
@@ -186,7 +186,7 @@ describe("custom provider registration", () => {
   });
 
   it("clears an existing server credential when an endpoint edit omits a replacement key", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-provider-edit-endpoint-")); roots.push(root);
+    const root = await mkdtemp(join(tmpdir(), "omapilot-provider-edit-endpoint-")); roots.push(root);
     const config = join(root, ".config/omapilot");
     await mkdir(config, { recursive: true });
     await writeFile(join(config, "models.json"), JSON.stringify({ providers: { finn: {
@@ -196,7 +196,7 @@ describe("custom provider registration", () => {
     } } }));
     await writeFile(join(config, "auth.json"), JSON.stringify({ finn: { type: "api_key", key: "stored-secret" } }));
     const events: BrokerEvent[] = [];
-    const broker = new QuickchatBroker(events.push.bind(events), {
+    const broker = new OmaPilotBroker(events.push.bind(events), {
       env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config }
     });
 
@@ -217,7 +217,7 @@ describe("custom provider registration", () => {
   });
 
   it("restores both the provider definition and credential when endpoint auth cleanup fails", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-provider-edit-rollback-")); roots.push(root);
+    const root = await mkdtemp(join(tmpdir(), "omapilot-provider-edit-rollback-")); roots.push(root);
     const config = join(root, ".config/omapilot");
     await mkdir(config, { recursive: true });
     const originalProvider = {
@@ -229,7 +229,7 @@ describe("custom provider registration", () => {
     await writeFile(join(config, "auth.json"), JSON.stringify({ finn: { type: "api_key", key: "stored-secret" } }));
     vi.spyOn(piHarness, "logoutPiProvider").mockRejectedValueOnce(new Error("auth store unavailable"));
     const events: BrokerEvent[] = [];
-    const broker = new QuickchatBroker(events.push.bind(events), {
+    const broker = new OmaPilotBroker(events.push.bind(events), {
       env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config }
     });
 
@@ -247,10 +247,10 @@ describe("custom provider registration", () => {
   });
 
   it("emits a rejection without a saved acknowledgement or config write", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-provider-reject-")); roots.push(root);
+    const root = await mkdtemp(join(tmpdir(), "omapilot-provider-reject-")); roots.push(root);
     const config = join(root, ".config/omapilot");
     const events: BrokerEvent[] = [];
-    const broker = new QuickchatBroker(events.push.bind(events), {
+    const broker = new OmaPilotBroker(events.push.bind(events), {
       env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config }
     });
 
@@ -274,10 +274,10 @@ describe("custom provider registration", () => {
 
 describe("embedded built-in authentication", () => {
   it("round-trips a secret prompt without launching a terminal", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-broker-auth-")); roots.push(root);
+    const root = await mkdtemp(join(tmpdir(), "omapilot-broker-auth-")); roots.push(root);
     const config = join(root, ".config/omapilot");
     const events: BrokerEvent[] = [];
-    const broker = new QuickchatBroker(events.push.bind(events), {
+    const broker = new OmaPilotBroker(events.push.bind(events), {
       env: {
         ...process.env,
         HOME: root,
@@ -304,9 +304,9 @@ describe("embedded built-in authentication", () => {
 
   it("owns the Codex OAuth callback and never exposes manual callback input", async () => {
     vi.stubEnv("PI_OAUTH_CALLBACK_HOST", "127.0.0.2");
-    const root = await mkdtemp(join(tmpdir(), "quickchat-broker-oauth-")); roots.push(root);
+    const root = await mkdtemp(join(tmpdir(), "omapilot-broker-oauth-")); roots.push(root);
     const events: BrokerEvent[] = [];
-    const broker = new QuickchatBroker(events.push.bind(events), {
+    const broker = new OmaPilotBroker(events.push.bind(events), {
       env: {
         ...process.env,
         HOME: root,
@@ -343,7 +343,7 @@ describe("embedded built-in authentication", () => {
 describe("tool permission lifecycle", () => {
   it("expires a pending permission with a nonce-bound closure before completing", async () => {
     const fixture = await setup();
-    const broker = new QuickchatBroker(fixture.events.push.bind(fixture.events), {
+    const broker = new OmaPilotBroker(fixture.events.push.bind(fixture.events), {
       history: fixture.history,
       images: new ImageStore(fixture.paths),
       env: { ...fixture.env, FAKE_ACP_PERMISSION_ATTEMPT: "1" },
@@ -373,7 +373,7 @@ describe("Herdr handoff serialization", () => {
     let finish: (value: { mode: "native"; reused: boolean }) => void = () => undefined;
     const result = new Promise<{ mode: "native"; reused: boolean }>((resolveResult) => { finish = resolveResult; });
     let handoffCount = 0;
-    const broker = new QuickchatBroker(events.push.bind(events), {
+    const broker = new OmaPilotBroker(events.push.bind(events), {
       history: fixture.history,
       images: new ImageStore(fixture.paths),
       env: fixture.env,
@@ -396,7 +396,7 @@ describe("Herdr handoff serialization", () => {
     let fail: (error: Error) => void = () => undefined;
     const result = new Promise<{ mode: "native"; reused: boolean }>((_resolveResult, rejectResult) => { fail = rejectResult; });
     let handoffCount = 0;
-    const broker = new QuickchatBroker(events.push.bind(events), {
+    const broker = new OmaPilotBroker(events.push.bind(events), {
       history: fixture.history,
       images: new ImageStore(fixture.paths),
       env: fixture.env,
@@ -413,14 +413,14 @@ describe("Herdr handoff serialization", () => {
       state: "failed",
       stage: "focus",
       errorCode: "window_not_focused",
-      message: "The session opened in Herdr, but Quickchat could not focus it"
+      message: "The session opened in Herdr, but OmaPilot could not focus it"
     }]);
   });
 });
 
 describe("voice provider status", () => {
   it("emits a voice catalog without secrets and acknowledges a tested key", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-voice-")); roots.push(root);
+    const root = await mkdtemp(join(tmpdir(), "omapilot-voice-")); roots.push(root);
     const config = join(root, ".config/omapilot");
     const events: BrokerEvent[] = [];
     const voice = new VoiceService(
@@ -431,7 +431,7 @@ describe("voice provider status", () => {
         fetch: () => Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
       }
     );
-    const broker = new QuickchatBroker(events.push.bind(events), { voice, env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config } });
+    const broker = new OmaPilotBroker(events.push.bind(events), { voice, env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config } });
     await broker.handle({ type: "voice_status" });
     const status = events.find((event) => event.type === "voice");
     expect(status?.type === "voice" ? status.dictation.available : false).toBe(true);
@@ -442,7 +442,7 @@ describe("voice provider status", () => {
   });
 
   it("speaks a stored ElevenLabs answer without leaking the key", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-voice-speak-")); roots.push(root);
+    const root = await mkdtemp(join(tmpdir(), "omapilot-voice-speak-")); roots.push(root);
     const config = join(root, ".config/omapilot");
     const events: BrokerEvent[] = [];
     const fetcher: typeof fetch = (input, init) => {
@@ -469,7 +469,7 @@ describe("voice provider status", () => {
         }
       }
     );
-    const broker = new QuickchatBroker(events.push.bind(events), { voice, env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config } });
+    const broker = new OmaPilotBroker(events.push.bind(events), { voice, env: { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: config } });
     await voice.setKey("elevenlabs", "eleven-test-key");
     await broker.handle({ type: "tts_speak", id: "speak-1", provider: "elevenlabs", text: "Hello **world**" });
     const deadline = Date.now() + 2_000;
@@ -486,14 +486,14 @@ describe("voice provider status", () => {
 });
 
 async function setup(): Promise<{
-  paths: ReturnType<typeof quickchatPaths>;
+  paths: ReturnType<typeof omapilotPaths>;
   history: HistoryStore;
   events: BrokerEvent[];
   env: NodeJS.ProcessEnv;
 }> {
-  const root = await mkdtemp(join(tmpdir(), "quickchat-broker-lifecycle-"));
+  const root = await mkdtemp(join(tmpdir(), "omapilot-broker-lifecycle-"));
   roots.push(root);
-  const paths = quickchatPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
+  const paths = omapilotPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
   return {
     paths,
     history: new HistoryStore(paths),
@@ -501,7 +501,7 @@ async function setup(): Promise<{
     env: {
       ...process.env,
       XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run"),
-      QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+      OMAPILOT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
       PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
     }
   };

@@ -34,7 +34,7 @@ The current publishing target is <https://omarchyplugins.com>. The repository
 is prepared with:
 
 - Repository: `https://github.com/spencerbull/omarchy-omapilot`
-- Plugin ID: `io.github.spencerbull.quickchat`
+- Plugin ID: `io.github.spencerbull.omapilot`
 - Category: `Widgets`
 - Tags: `ai`, `bar`, `quickshell`
 - Root preview: `preview.png`

@@ -19,19 +19,19 @@ ShellRoot {
     interval: 80
     running: true
     onTriggered: {
-      OmaPilot.QuickchatStore.initialized = true
-      OmaPilot.QuickchatStore.dictationPhase = ""
-      OmaPilot.QuickchatStore.currentId = ""
-      OmaPilot.QuickchatStore.currentChatId = "completed-chat"
-      OmaPilot.QuickchatStore.transcript = ""
-      OmaPilot.QuickchatStore.answerMarkdown = "A completed answer"
-      OmaPilot.QuickchatStore.state = "complete"
+      OmaPilot.OmaPilotStore.initialized = true
+      OmaPilot.OmaPilotStore.dictationPhase = ""
+      OmaPilot.OmaPilotStore.currentId = ""
+      OmaPilot.OmaPilotStore.currentChatId = "completed-chat"
+      OmaPilot.OmaPilotStore.transcript = ""
+      OmaPilot.OmaPilotStore.answerMarkdown = "A completed answer"
+      OmaPilot.OmaPilotStore.state = "complete"
       ambient.voiceEngaged = true
       ambient.voiceSessionActive = true
 
-      OmaPilot.QuickchatStore.ttsSpeakId = "failed-speech"
-      OmaPilot.QuickchatStore.ttsSpeaking = true
-      OmaPilot.QuickchatStore.applyEvent({
+      OmaPilot.OmaPilotStore.ttsSpeakId = "failed-speech"
+      OmaPilot.OmaPilotStore.ttsSpeaking = true
+      OmaPilot.OmaPilotStore.applyEvent({
         type: "tts_speak_failed",
         id: "failed-speech",
         message: "Playback failed"
@@ -41,9 +41,9 @@ ShellRoot {
       if (ambient.dismissDelay < 6000)
         root.fail("failed speech did not preserve the reading-time dismissal")
 
-      OmaPilot.QuickchatStore.ttsSpeakId = "completed-speech"
-      OmaPilot.QuickchatStore.ttsSpeaking = true
-      OmaPilot.QuickchatStore.applyEvent({ type: "tts_spoken", id: "completed-speech" })
+      OmaPilot.OmaPilotStore.ttsSpeakId = "completed-speech"
+      OmaPilot.OmaPilotStore.ttsSpeaking = true
+      OmaPilot.OmaPilotStore.applyEvent({ type: "tts_spoken", id: "completed-speech" })
       if (!ambient.answerSpoken)
         root.fail("completed speech did not select the spoken-answer dismissal")
       if (ambient.dismissDelay !== 2000)
@@ -56,9 +56,9 @@ ShellRoot {
         root.fail("fresh reset dismissed the ambient presentation")
       if (!ambient.voiceSessionActive)
         root.fail("fresh reset closed the voice-session lease")
-      if (OmaPilot.QuickchatStore.state !== "composing")
+      if (OmaPilot.OmaPilotStore.state !== "composing")
         root.fail("fresh reset did not return the store to composing")
-      if (OmaPilot.QuickchatStore.currentChatId !== "")
+      if (OmaPilot.OmaPilotStore.currentChatId !== "")
         root.fail("fresh reset retained the completed chat continuation")
 
       if (!root.failed) console.log("OMAPILOT_AMBIENT_SESSION_LIFECYCLE_PROBE_OK")

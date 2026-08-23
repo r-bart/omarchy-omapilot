@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtTest
-import "../components/internal" as QuickchatInternal
+import "../components/internal" as OmaPilotInternal
 
 Item {
   width: 320
@@ -10,13 +10,13 @@ Item {
   Button { id: denyButton; text: "Deny" }
   Button { id: allowButton; text: "Allow once"; x: 140 }
 
-  QuickchatInternal.PermissionFocusGuard {
+  OmaPilotInternal.PermissionFocusGuard {
     id: guard
     defaultTarget: denyButton
   }
 
   TestCase {
-    name: "QuickchatPermissionFocus"
+    name: "OmaPilotPermissionFocus"
     when: windowShown
 
     function test_eachQueuedPermissionDefaultsBackToDeny() {

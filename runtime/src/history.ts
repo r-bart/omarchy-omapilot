@@ -3,14 +3,14 @@ import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { ChatRecord, ChatView, StoredImage } from "./types.js";
 import { pruneImageCache } from "./images.js";
-import { quickchatPaths, type QuickchatPaths } from "./paths.js";
+import { omapilotPaths, type OmaPilotPaths } from "./paths.js";
 
 const MAX_CHATS = 30;
 
 export class HistoryStore {
-  readonly #paths: QuickchatPaths;
+  readonly #paths: OmaPilotPaths;
 
-  constructor(paths: QuickchatPaths = quickchatPaths()) {
+  constructor(paths: OmaPilotPaths = omapilotPaths()) {
     this.#paths = paths;
   }
 
@@ -113,11 +113,11 @@ export class HistoryStore {
 
 }
 
-export function presentImage(image: StoredImage, paths: QuickchatPaths = quickchatPaths()): StoredImage & { localUrl: string } {
+export function presentImage(image: StoredImage, paths: OmaPilotPaths = omapilotPaths()): StoredImage & { localUrl: string } {
   return { ...image, path: basename(image.path), localUrl: pathToFileURL(join(paths.images, basename(image.path))).toString() };
 }
 
-export function presentChat(chat: ChatRecord, paths: QuickchatPaths = quickchatPaths()): ChatView {
+export function presentChat(chat: ChatRecord, paths: OmaPilotPaths = omapilotPaths()): ChatView {
   return {
     schemaVersion: chat.schemaVersion,
     id: chat.id,

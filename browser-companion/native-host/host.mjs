@@ -14,7 +14,7 @@ if (process.env.OMAPILOT_BROWSER_HOST_TEST !== "1"
 
 const runtimeRoot = process.env.XDG_RUNTIME_DIR?.trim()
   || join(process.env.HOME ?? "/tmp", ".cache");
-const socketPath = join(runtimeRoot, "quickchat", "browser-companion.sock");
+const socketPath = join(runtimeRoot, "omapilot", "browser-companion.sock");
 const socket = connect(socketPath);
 let nativeBuffer = Buffer.alloc(0);
 let socketBuffer = "";

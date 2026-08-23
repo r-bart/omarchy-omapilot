@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageStore } from "./images.js";
 import { presentImage } from "./history.js";
-import { quickchatPaths, type QuickchatPaths } from "./paths.js";
+import { omapilotPaths, type OmaPilotPaths } from "./paths.js";
 import { resolveExecutable, runBinaryCommand, runCommand } from "./process.js";
 import type { ImageBlock, TextBlock } from "./context.js";
 import type { ContextAttachmentSelection, ContextAttachmentView, StoredImage } from "./types.js";
@@ -33,12 +33,12 @@ export class ContextAttachmentError extends Error {
 
 export class ContextAttachmentStore {
   readonly #images: ImageStore;
-  readonly #paths: QuickchatPaths;
+  readonly #paths: OmaPilotPaths;
   readonly #env: NodeJS.ProcessEnv;
   readonly #targets = new Map<string, CaptureTarget>();
   readonly #attachments = new Map<string, PendingAttachment>();
 
-  constructor(images = new ImageStore(), paths = quickchatPaths(), env = process.env) {
+  constructor(images = new ImageStore(), paths = omapilotPaths(), env = process.env) {
     this.#images = images;
     this.#paths = paths;
     this.#env = env;

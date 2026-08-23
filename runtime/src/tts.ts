@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DictationService } from "./dictation.js";
-import { quickchatPaths } from "./paths.js";
+import { omapilotPaths } from "./paths.js";
 import { resolveExecutable, runBinaryCommand, runCommand, terminateProcessGroup } from "./process.js";
 
 export const ttsProviderIds = ["kokoro", "elevenlabs", "openai"] as const;
@@ -155,7 +155,7 @@ function text(value: unknown): string {
 function voiceConfigDirectory(env: NodeJS.ProcessEnv): string {
   const explicit = env.OMAPILOT_CONFIG_DIR?.trim();
   if (explicit !== undefined && explicit.startsWith("/")) return explicit;
-  return quickchatPaths(env).config;
+  return omapilotPaths(env).config;
 }
 
 function authPath(env: NodeJS.ProcessEnv): string {
@@ -267,7 +267,7 @@ export class VoiceService {
     this.#env = env;
     this.#fetch = options.fetch ?? fetch;
     this.#dictationAvailable = options.dictationAvailable
-      ?? (() => new DictationService(quickchatPaths(env), env).available());
+      ?? (() => new DictationService(omapilotPaths(env), env).available());
     this.#kokoroAvailable = options.kokoroAvailable ?? (() => probeKokoro(env));
     this.#analyzeAudio = options.analyzeAudio ?? ((path, signal) => analyzeAudioFile(path, env, signal));
     this.#playAudio = options.playAudio

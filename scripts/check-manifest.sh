@@ -14,7 +14,7 @@ jq -e . "$manifest" >/dev/null || fail "manifest.json is not valid JSON"
 
 jq -e '
   .schemaVersion == 1
-  and .id == "io.github.spencerbull.quickchat"
+  and .id == "io.github.spencerbull.omapilot"
   and .name == "OmaPilot"
   and (.version | type == "string" and test("^[0-9]+\\.[0-9]+\\.[0-9]+([.-][A-Za-z0-9.-]+)?$"))
   and .license == "MIT"
@@ -24,7 +24,6 @@ jq -e '
   and .barWidget.category == "AI"
   and .barWidget.displayName == "OmaPilot"
   and (.barWidget.aliases | index("omapilot") != null)
-  and (.barWidget.aliases | index("quickchat") != null)
   and .barWidget.allowMultiple == false
   and .barWidget.defaultSection == "right"
   and .barWidget.defaults == {
@@ -72,7 +71,7 @@ jq -e '
     "defaultValue":"kokoro",
     "description":"Kokoro is local. ElevenLabs and OpenAI need an API key stored in voice-auth.json."
   }
-' "$manifest" >/dev/null || fail "manifest contract drifted from the Quickchat v0.1 schema"
+' "$manifest" >/dev/null || fail "OmaPilot manifest contract drifted"
 
 [[ -f "$repo_root/BarWidget.qml" ]] || fail "manifest entry point is missing: BarWidget.qml"
 [[ -f "$repo_root/ContextCaptureOverlay.qml" ]] || fail "manifest entry point is missing: ContextCaptureOverlay.qml"

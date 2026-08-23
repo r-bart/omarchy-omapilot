@@ -5,7 +5,7 @@ import { isIP } from "node:net";
 import { lookup } from "node:dns/promises";
 import { basename, extname, join } from "node:path";
 import type { StoredImage } from "./types.js";
-import { quickchatPaths, type QuickchatPaths } from "./paths.js";
+import { omapilotPaths, type OmaPilotPaths } from "./paths.js";
 import { resolveExecutable, runCommand } from "./process.js";
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -19,10 +19,10 @@ const MIME_EXTENSIONS = new Map([
 ]);
 
 export class ImageStore {
-  readonly #paths: QuickchatPaths;
+  readonly #paths: OmaPilotPaths;
   readonly #env: NodeJS.ProcessEnv;
 
-  constructor(paths: QuickchatPaths = quickchatPaths(), env: NodeJS.ProcessEnv = process.env) {
+  constructor(paths: OmaPilotPaths = omapilotPaths(), env: NodeJS.ProcessEnv = process.env) {
     this.#paths = paths;
     this.#env = env;
   }
@@ -75,7 +75,7 @@ export class ImageStore {
   }
 }
 
-async function normalizeImage(bytes: Buffer, mime: string, paths: QuickchatPaths, env: NodeJS.ProcessEnv): Promise<Buffer> {
+async function normalizeImage(bytes: Buffer, mime: string, paths: OmaPilotPaths, env: NodeJS.ProcessEnv): Promise<Buffer> {
   const magick = await resolveExecutable("magick", env);
   if (magick === undefined) throw new ImagePolicyError("image_decoder_unavailable", "Secure image decoding is unavailable");
   await mkdir(paths.runtime, { recursive: true, mode: 0o700 });
@@ -224,7 +224,7 @@ function validateDimensions(dimensions: { mime: string; width: number; height: n
   return dimensions;
 }
 
-export async function pruneImageCache(paths: QuickchatPaths = quickchatPaths()): Promise<void> {
+export async function pruneImageCache(paths: OmaPilotPaths = omapilotPaths()): Promise<void> {
   await mkdir(paths.images, { recursive: true, mode: 0o700 });
   const files = (await Promise.all((await readdir(paths.images)).map(async (name) => {
     try {
@@ -247,7 +247,7 @@ export async function pruneImageCache(paths: QuickchatPaths = quickchatPaths()):
   await Promise.all(evicted.map((name) => rm(join(paths.images, name), { force: true })));
 }
 
-async function removeEvictedImageReferences(paths: QuickchatPaths, evicted: ReadonlySet<string>): Promise<void> {
+async function removeEvictedImageReferences(paths: OmaPilotPaths, evicted: ReadonlySet<string>): Promise<void> {
   await mkdir(paths.records, { recursive: true, mode: 0o700 });
   for (const name of (await readdir(paths.records)).filter((value) => /^[0-9a-f-]{36}\.json$/iu.test(value))) {
     const destination = join(paths.records, name);

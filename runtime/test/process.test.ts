@@ -9,7 +9,7 @@ afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recur
 
 describe("detached process launch", () => {
   it("returns after spawn without waiting for or terminating the launched process", async () => {
-    const root = await mkdtemp(join(tmpdir(), "quickchat-detached-"));
+    const root = await mkdtemp(join(tmpdir(), "omapilot-detached-"));
     roots.push(root);
     const marker = join(root, "opened.txt");
     const launched = await launchDetached(process.execPath, [
@@ -24,6 +24,6 @@ describe("detached process launch", () => {
   });
 
   it("reports a launch failure", async () => {
-    expect(await launchDetached(join(tmpdir(), "quickchat-missing-executable"), [])).toBe(false);
+    expect(await launchDetached(join(tmpdir(), "omapilot-missing-executable"), [])).toBe(false);
   });
 });

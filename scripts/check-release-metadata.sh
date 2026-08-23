@@ -15,9 +15,9 @@ for relative in manifest.json package.json package-lock.json runtime/adapters.re
   runtime/licenses/ignore-5.3.2-MIT.txt \
   runtime/licenses/ignore-7.0.5-MIT.txt \
   runtime/licenses/ignore-7.0.6-MIT.txt \
-  runtime/dist/quickchat-broker \
-  runtime/dist/quickchat-broker.LEGAL.txt \
-  runtime/dist/quickchat-broker.THIRD_PARTY_LICENSES.txt \
+  runtime/dist/omapilot-broker \
+  runtime/dist/omapilot-broker.LEGAL.txt \
+  runtime/dist/omapilot-broker.THIRD_PARTY_LICENSES.txt \
   runtime/dist/capability-mcp.js \
   runtime/dist/adapters/codex-acp \
   runtime/dist/adapters/Apache-2.0.txt \
@@ -25,11 +25,11 @@ for relative in manifest.json package.json package-lock.json runtime/adapters.re
   [[ -f "$repo_root/$relative" ]] || fail "missing $relative"
 done
 
-[[ -x "$repo_root/runtime/dist/quickchat-broker" ]] || fail "broker launcher is not executable"
+[[ -x "$repo_root/runtime/dist/omapilot-broker" ]] || fail "broker launcher is not executable"
 [[ -x "$repo_root/runtime/dist/adapters/codex-acp" ]] || fail "Codex ACP launcher is not executable"
 command -v file >/dev/null || fail "file is required"
 command -v readelf >/dev/null || fail "readelf is required"
-for launcher in runtime/dist/quickchat-broker runtime/dist/adapters/codex-acp; do
+for launcher in runtime/dist/omapilot-broker runtime/dist/adapters/codex-acp; do
   file "$repo_root/$launcher" | grep -Fq 'ELF 64-bit LSB executable, x86-64' || {
     fail "$launcher is not a Linux x86-64 ELF executable"
   }
@@ -52,13 +52,13 @@ for launcher in runtime/dist/quickchat-broker runtime/dist/adapters/codex-acp; d
     fail "$launcher contains a writable load segment"
   fi
 done
-for stale in runtime/dist/quickchat-broker.js runtime/dist/quickchat-broker.js.map \
+for stale in runtime/dist/omapilot-broker.js runtime/dist/omapilot-broker.js.map \
   runtime/dist/capability-mcp.js.map runtime/dist/adapters/codex-acp.js; do
   [[ ! -e "$repo_root/$stale" ]] || fail "stale text bundle remains: $stale"
 done
 
 grep -Fq 'OmaPilot bundled broker third-party licenses' \
-  "$repo_root/runtime/dist/quickchat-broker.THIRD_PARTY_LICENSES.txt" || {
+  "$repo_root/runtime/dist/omapilot-broker.THIRD_PARTY_LICENSES.txt" || {
   fail "bundled broker third-party license inventory is invalid"
 }
 

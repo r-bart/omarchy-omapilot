@@ -2,11 +2,9 @@
 
 OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget and contextual-capture overlay for asking questions and working on your desktop through an authenticated AI harness. It can summarize the active window, research current information, clip a window or exact region, work through bounded app connectors, remember the latest 30 completed chats, and hand a conversation to Herdr when you want to keep going.
 
-The public project and product name is now OmaPilot. The existing plugin ID, IPC target, package/runtime identifiers, and local `quickchat` data paths remain unchanged so current installations and user data continue to work.
-
-The repository carries the `0.2.0` marketplace candidate. The permanent plugin
-ID remains `io.github.spencerbull.quickchat`, preserving existing installs and
-the compatibility-path `quickchat` user data directories.
+The repository carries the `0.2.0` marketplace candidate under the permanent
+plugin ID `io.github.spencerbull.omapilot`. Its plugin, IPC, package, runtime,
+and user-data identifiers consistently use the OmaPilot namespace.
 
 ## Preview
 
@@ -80,8 +78,8 @@ Review the repository before enabling it: Omarchy plugins execute unsandboxed in
 
 ```bash
 omarchy plugin add https://github.com/spencerbull/omarchy-omapilot.git
-omarchy plugin validate ~/.config/omarchy/plugins/io.github.spencerbull.quickchat
-omarchy plugin enable io.github.spencerbull.quickchat right
+omarchy plugin validate ~/.config/omarchy/plugins/io.github.spencerbull.omapilot
+omarchy plugin enable io.github.spencerbull.omapilot right
 ```
 
 The Omarchy installer only clones, validates, and enables the plugin. It runs no
@@ -97,8 +95,8 @@ lockfile. Release archives add an SBOM, provenance record, and SHA-256 checksum.
 Update or remove it with the standard plugin commands:
 
 ```bash
-omarchy plugin update io.github.spencerbull.quickchat
-omarchy plugin remove io.github.spencerbull.quickchat
+omarchy plugin update io.github.spencerbull.omapilot
+omarchy plugin remove io.github.spencerbull.omapilot
 ```
 
 ## Global hotkeys
@@ -118,9 +116,9 @@ o.bind("SUPER + SHIFT + A", "New OmaPilot voice chat",
   "omarchy-shell -q io.github.spencerbull.omapilot newVoiceChat")
 
 o.bind("SUPER + ALT + N", "New OmaPilot chat",
-  "omarchy-shell -q io.github.spencerbull.quickchat newChat")
+  "omarchy-shell -q io.github.spencerbull.omapilot newChat")
 o.bind("SUPER + ALT + H", "Continue OmaPilot chat in Herdr",
-  "omarchy-shell -q io.github.spencerbull.quickchat continueInHerdr")
+  "omarchy-shell -q io.github.spencerbull.omapilot continueInHerdr")
 ```
 
 `Super+A` starts a new durable conversation whenever the ambient node and answer
@@ -132,7 +130,7 @@ chat opens the panel with an empty composer. Continue in Herdr does nothing unti
 the current conversation has a saved chat ID. These are user-owned bindings:
 installing or updating the plugin does not rewrite Hyprland configuration.
 
-Removal deletes the cloned plugin. OmaPilot deliberately leaves user-owned history and cached runtime files in place. Use **Clear all** before removal to erase history and cached chat images. If the plugin is already gone, inspect and remove the compatibility-path `quickchat` directories under your effective `XDG_STATE_HOME` and `XDG_CACHE_HOME` with a file manager; the default locations are `~/.local/state/quickchat` and `~/.cache/quickchat`.
+Removal deletes the cloned plugin. OmaPilot deliberately leaves user-owned history and cached runtime files in place. Use **Clear all** before removal to erase history and cached chat images. If the plugin is already gone, inspect and remove the OmaPilot directories under your effective `XDG_STATE_HOME` and `XDG_CACHE_HOME` with a file manager; the default locations are `~/.local/state/omapilot` and `~/.cache/omapilot`.
 
 ## How it works
 
@@ -317,17 +315,17 @@ invalid entries, and caps it at five.
 
 | Path | Purpose |
 | --- | --- |
-| `${XDG_STATE_HOME:-~/.local/state}/quickchat/` | Atomic local history and durable Pi conversation sessions |
+| `${XDG_STATE_HOME:-~/.local/state}/omapilot/` | Atomic local history and durable Pi conversation sessions |
 | `${XDG_CONFIG_HOME:-~/.config}/omapilot/capabilities.json` | Enabled packs and the canonical Files root (mode 0600) |
-| `${XDG_CACHE_HOME:-~/.cache}/quickchat/` | Bounded, validated image cache |
-| `${XDG_RUNTIME_DIR}/quickchat/` | Per-login sockets, temporary dictation, and in-flight data |
+| `${XDG_CACHE_HOME:-~/.cache}/omapilot/` | Bounded, validated image cache |
+| `${XDG_RUNTIME_DIR}/omapilot/` | Per-login sockets, temporary dictation, and in-flight data |
 
 Remote Markdown images are not fetched automatically. OmaPilot shows the origin and requires a click before loading a validated HTTPS image. Links are scheme-checked and never interpolated into a shell command. See [`SECURITY.md`](SECURITY.md) for the threat model and reporting process.
 
 ## Optional integrations
 
-- **Voxtype:** when `voxtype` is installed and ready, the microphone records directly to a file under `$XDG_RUNTIME_DIR/quickchat`; OmaPilot reads that transcript after recording stops. It never simulates keyboard input or modifies Voxtype configuration.
-- **Herdr:** when `herdr` is installed, Continue in Herdr launches it when needed or raises its existing window, creates or reuses the compatibility-named `Quickchat` workspace, creates a labeled tab, closes the OmaPilot panel, and focuses the resumed agent pane. It resumes the native harness session when possible, otherwise starts the matching agent with a compact transcript and labels the fallback. A native resume retains whatever context the provider kept in that session; a transcript fallback receives only the stored question and answer, not the raw desktop snapshot. This is an explicit handoff from OmaPilot's one-shot permission boundary to Herdr's normal native-agent permission model; Codex resumes read-only and asks before commands.
+- **Voxtype:** when `voxtype` is installed and ready, the microphone records directly to a file under `$XDG_RUNTIME_DIR/omapilot`; OmaPilot reads that transcript after recording stops. It never simulates keyboard input or modifies Voxtype configuration.
+- **Herdr:** when `herdr` is installed, Continue in Herdr launches it when needed or raises its existing window, creates or reuses the `OmaPilot` workspace, creates a labeled tab, closes the OmaPilot panel, and focuses the resumed agent pane. It resumes the native harness session when possible, otherwise starts the matching agent with a compact transcript and labels the fallback. A native resume retains whatever context the provider kept in that session; a transcript fallback receives only the stored question and answer, not the raw desktop snapshot. This is an explicit handoff from OmaPilot's one-shot permission boundary to Herdr's normal native-agent permission model; Codex resumes read-only and asks before commands.
 
 Both integrations disappear or show a clear unavailable state when their required command is missing.
 

@@ -4,7 +4,7 @@ import { constants } from "node:fs";
 import { resolve } from "node:path";
 import type { HarnessId, ProviderId, ProviderInfo, ProviderPolicyInfo } from "./types.js";
 import type { ModelRuntime } from "../../node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.js";
-import { quickchatPaths } from "./paths.js";
+import { omapilotPaths } from "./paths.js";
 import { resolveExecutable, runCommand, stripAnsi } from "./process.js";
 import { pluginRoot } from "./runtime-root.js";
 
@@ -102,9 +102,9 @@ export function openCodePolicyEnvironment(env: NodeJS.ProcessEnv, disabledMcp: s
 }
 
 async function adapterExecutable(provider: "codex", env: NodeJS.ProcessEnv): Promise<string | undefined> {
-  const explicit = env.QUICKCHAT_CODEX_ACP;
+  const explicit = env.OMAPILOT_CODEX_ACP;
   const binary = "codex-acp";
-  const paths = quickchatPaths(env);
+  const paths = omapilotPaths(env);
   const candidates = [
     explicit,
     resolve(repoRoot(), `runtime/bin/${binary}`),
@@ -146,12 +146,12 @@ export async function discoverProviders(
 ): Promise<DiscoveredProvider[]> {
   if (harness === "builtin") {
     try {
-      if (env.QUICKCHAT_DISABLE_PI === "1") return [];
+      if (env.OMAPILOT_DISABLE_PI === "1") return [];
       const { discoverPiProviders } = await import("./pi-harness.js");
       const providers = await discoverPiProviders(env);
       return providers;
     } catch (error) {
-      if (env.QUICKCHAT_DEBUG_PI === "1") {
+      if (env.OMAPILOT_DEBUG_PI === "1") {
         const detail = error instanceof Error ? `${error.name}: ${error.message}` : "unknown error";
         process.stderr.write(`OmaPilot Pi discovery failed: ${detail.replaceAll(/[\u0000-\u001f\u007f-\u009f]/gu, " ").slice(0, 500)}\n`);
       }

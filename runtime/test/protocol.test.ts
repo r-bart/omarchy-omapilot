@@ -97,7 +97,7 @@ describe("NDJSON protocol", () => {
     child.stdin.write('{"type":"initialize","protocolVersion":1,"harness":"codex"}\n');
     await until(() => events.some((event) => event.code === "unsupported_protocol"));
     expect(events.some((event) => event.type === "ready")).toBe(false);
-    expect(events.find((event) => event.code === "unsupported_protocol")?.message).toBe("Quickchat supports broker protocol version 2");
+    expect(events.find((event) => event.code === "unsupported_protocol")?.message).toBe("OmaPilot supports broker protocol version 2");
     child.stdin.end('{"type":"shutdown"}\n');
     await new Promise((resolveExit) => child.once("close", resolveExit));
   });
@@ -114,7 +114,7 @@ describe("NDJSON protocol", () => {
   });
 
   it("initializes, exposes models, streams markdown, and stores completion", async () => {
-    const state = await mkdtemp(join(tmpdir(), "quickchat-protocol-")); roots.push(state);
+    const state = await mkdtemp(join(tmpdir(), "omapilot-protocol-")); roots.push(state);
     const fake = resolve("runtime/test/fake-acp-agent.mjs");
     const audit = join(state, "acp-audit.txt");
     const promptCapture = join(state, "prompt-capture.jsonl");
@@ -122,7 +122,7 @@ describe("NDJSON protocol", () => {
     const env = {
       ...process.env,
       XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
-      QUICKCHAT_CODEX_ACP: fake,
+      OMAPILOT_CODEX_ACP: fake,
       FAKE_ACP_AUDIT_FILE: audit,
       FAKE_ACP_PROMPT_CAPTURE: promptCapture,
       PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
@@ -163,14 +163,14 @@ describe("NDJSON protocol", () => {
     expect(events).toContainEqual({ type: "state", id: "wire-1", state: "streaming", message: "Waiting for Codex…" });
     const complete = completeSchema.parse(events.find((event) => event.type === "complete"));
     expect(complete.chat.answer).toContain("Hello");
-    const saved = await readFile(join(state, "state/quickchat/chats", `${complete.chat.id}.json`), "utf8");
+    const saved = await readFile(join(state, "state/omapilot/chats", `${complete.chat.id}.json`), "utf8");
     expect(saved).not.toContain("localUrl");
     expect(saved).not.toContain("Context-only browser title");
     expect(JSON.parse(saved)).toMatchObject({ question: "Say hello" });
     const capturedPrompt: unknown = JSON.parse((await readFile(promptCapture, "utf8")).trim());
     const promptBlocks = z.array(z.object({ type: z.literal("text"), text: z.string() })).parse(capturedPrompt);
     expect(promptBlocks).toHaveLength(2);
-    expect(promptBlocks[0]?.text).toContain("QUICKCHAT DESKTOP CONTEXT");
+    expect(promptBlocks[0]?.text).toContain("OMAPILOT DESKTOP CONTEXT");
     expect(promptBlocks[0]?.text).toContain("Context-only browser title");
     expect(promptBlocks[0]?.text).toContain('"activeWorkspace":2');
     expect(promptBlocks[0]?.text).toContain('"status":"playing"');
@@ -182,12 +182,12 @@ describe("NDJSON protocol", () => {
   }, 25_000);
 
   it("forwards a sub-64-character answer before the turn completes", async () => {
-    const state = await mkdtemp(join(tmpdir(), "quickchat-short-stream-")); roots.push(state);
+    const state = await mkdtemp(join(tmpdir(), "omapilot-short-stream-")); roots.push(state);
     const child = spawn(brokerExecutable(), [], {
       env: {
         ...process.env,
         XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
-        QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+        OMAPILOT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
         FAKE_ACP_STREAM_CHUNKS: JSON.stringify(["Short ", "answer ", "streams ", "in ", "pieces."]),
         FAKE_ACP_CHUNK_DELAY_MS: "50",
         PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
@@ -211,14 +211,14 @@ describe("NDJSON protocol", () => {
   }, 20_000);
 
   it("sends only the selected broker-owned context representations and removes the input image", async () => {
-    const state = await mkdtemp(join(tmpdir(), "quickchat-context-wire-")); roots.push(state);
+    const state = await mkdtemp(join(tmpdir(), "omapilot-context-wire-")); roots.push(state);
     const promptCapture = join(state, "prompt-capture.jsonl");
     const child = spawn(brokerExecutable(), [], {
       env: {
         ...process.env,
         HOME: state,
         XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
-        QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+        OMAPILOT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
         FAKE_ACP_PROMPT_CAPTURE: promptCapture,
         PATH: `${resolve("runtime/test/fixtures/context-bin")}:${resolve("runtime/test/fixtures/image-bin")}:${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
       },
@@ -267,12 +267,12 @@ describe("NDJSON protocol", () => {
   }, 20_000);
 
   it("refreshes provider models from the real answer session", async () => {
-    const state = await mkdtemp(join(tmpdir(), "quickchat-late-models-")); roots.push(state);
+    const state = await mkdtemp(join(tmpdir(), "omapilot-late-models-")); roots.push(state);
     const child = spawn(brokerExecutable(), [], {
       env: {
         ...process.env,
         XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
-        QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+        OMAPILOT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
         PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
       },
       stdio: ["pipe", "pipe", "pipe"]
@@ -292,14 +292,14 @@ describe("NDJSON protocol", () => {
   }, 20_000);
 
   it("routes action-shaped prompts through ACP without broker hardcoding", async () => {
-    const state = await mkdtemp(join(tmpdir(), "quickchat-action-prompt-")); roots.push(state);
+    const state = await mkdtemp(join(tmpdir(), "omapilot-action-prompt-")); roots.push(state);
     const audit = join(state, "prompt-audit.txt");
     const child = spawn(brokerExecutable(), [], {
       env: {
         ...process.env,
         FAKE_ACP_PROMPT_AUDIT: audit,
         XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
-        QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+        OMAPILOT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
         PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
       },
       stdio: ["pipe", "pipe", "pipe"]
@@ -322,7 +322,7 @@ describe("NDJSON protocol", () => {
     const events = await forbiddenAttempt("opencode", { FAKE_ACP_PERMISSION_ATTEMPT: "1", FAKE_ACP_PERMISSION_KIND: "edit" });
     expect(events.find((event) => event.type === "error")).toMatchObject({
       code: "forbidden_tool_attempt",
-      message: "The selected harness attempted a device tool that Quickchat cannot safely authorize",
+      message: "The selected harness attempted a device tool that OmaPilot cannot safely authorize",
       retryable: false
     });
     expect(events.some((event) => event.type === "complete")).toBe(false);
@@ -330,14 +330,14 @@ describe("NDJSON protocol", () => {
   }, 20_000);
 
   it.each(["codex", "opencode"] as const)("round-trips a bounded allow-once tool decision for %s without exposing provider option IDs", async (provider) => {
-    const state = await mkdtemp(join(tmpdir(), "quickchat-tool-permission-")); roots.push(state);
+    const state = await mkdtemp(join(tmpdir(), "omapilot-tool-permission-")); roots.push(state);
     const child = spawn(brokerExecutable(), [], {
       env: {
         ...process.env,
         FAKE_ACP_PERMISSION_ATTEMPT: "1",
         FAKE_ACP_EXPECT_ALLOW: "1",
         XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
-        QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+        OMAPILOT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
         PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
       },
       stdio: ["pipe", "pipe", "pipe"]
@@ -387,13 +387,13 @@ describe("NDJSON protocol", () => {
   }, 25_000);
 
   it("round-trips a deny decision and lets the harness answer without the tool", async () => {
-    const state = await mkdtemp(join(tmpdir(), "quickchat-tool-deny-")); roots.push(state);
+    const state = await mkdtemp(join(tmpdir(), "omapilot-tool-deny-")); roots.push(state);
     const child = spawn(brokerExecutable(), [], {
       env: {
         ...process.env,
         FAKE_ACP_PERMISSION_ATTEMPT: "1",
         XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
-        QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+        OMAPILOT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
         PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
       },
       stdio: ["pipe", "pipe", "pipe"]
@@ -425,11 +425,11 @@ describe("NDJSON protocol", () => {
   }, 20_000);
 
   it("never forwards provider stderr or exception details", async () => {
-    const state = await mkdtemp(join(tmpdir(), "quickchat-errors-")); roots.push(state);
+    const state = await mkdtemp(join(tmpdir(), "omapilot-errors-")); roots.push(state);
     const child = spawn(brokerExecutable(), [], {
       env: {
         ...process.env, FAKE_ACP_FAIL_SECRET: "1", XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
-        QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"), PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
+        OMAPILOT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"), PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
       },
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -448,13 +448,13 @@ describe("NDJSON protocol", () => {
   }, 20_000);
 
   it("cooperatively cancels an active ACP turn without saving it", async () => {
-    const state = await mkdtemp(join(tmpdir(), "quickchat-cancel-")); roots.push(state);
+    const state = await mkdtemp(join(tmpdir(), "omapilot-cancel-")); roots.push(state);
     const fake = resolve("runtime/test/fake-acp-agent.mjs");
     const chunkAudit = join(state, "chunk-audit.txt");
     const child = spawn(brokerExecutable(), [], {
       env: {
         ...process.env, FAKE_ACP_WAIT: "1", XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
-        QUICKCHAT_CODEX_ACP: fake,
+        OMAPILOT_CODEX_ACP: fake,
         FAKE_ACP_STREAM_CHUNKS: JSON.stringify(["partial <"]), FAKE_ACP_CHUNK_AUDIT: chunkAudit,
         FAKE_ACP_LATE_AFTER_CANCEL: "1",
         PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
@@ -509,17 +509,17 @@ function parseObject(line: string): Record<string, unknown> {
 }
 
 function brokerExecutable(): string {
-  return process.env.QUICKCHAT_TEST_BROKER ?? resolve("runtime/bin/quickchat-broker");
+  return process.env.OMAPILOT_TEST_BROKER ?? resolve("runtime/bin/omapilot-broker");
 }
 
 async function forbiddenAttempt(provider: "codex" | "opencode", extraEnv: NodeJS.ProcessEnv): Promise<Record<string, unknown>[]> {
-  const state = await mkdtemp(join(tmpdir(), "quickchat-forbidden-tool-")); roots.push(state);
+  const state = await mkdtemp(join(tmpdir(), "omapilot-forbidden-tool-")); roots.push(state);
   const child = spawn(brokerExecutable(), [], {
     env: {
       ...process.env,
       ...extraEnv,
       XDG_STATE_HOME: join(state, "state"), XDG_CACHE_HOME: join(state, "cache"), XDG_RUNTIME_DIR: join(state, "run"),
-      QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+      OMAPILOT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
       PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
     },
     stdio: ["pipe", "pipe", "pipe"]
@@ -539,7 +539,7 @@ async function autoApproveAttempt(
   provider: "codex" | "opencode",
   extraEnv: NodeJS.ProcessEnv
 ): Promise<Record<string, unknown>[]> {
-  const state = await mkdtemp(join(tmpdir(), "quickchat-auto-approve-")); roots.push(state);
+  const state = await mkdtemp(join(tmpdir(), "omapilot-auto-approve-")); roots.push(state);
   const child = spawn(brokerExecutable(), [], {
     env: {
       ...process.env,
@@ -548,7 +548,7 @@ async function autoApproveAttempt(
       XDG_STATE_HOME: join(state, "state"),
       XDG_CACHE_HOME: join(state, "cache"),
       XDG_RUNTIME_DIR: join(state, "run"),
-      QUICKCHAT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
+      OMAPILOT_CODEX_ACP: resolve("runtime/test/fake-acp-agent.mjs"),
       PATH: `${resolve("runtime/test/fixtures/bin")}:${process.env.PATH ?? ""}`
     },
     stdio: ["pipe", "pipe", "pipe"]

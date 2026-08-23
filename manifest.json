@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "id": "io.github.spencerbull.quickchat",
+  "id": "io.github.spencerbull.omapilot",
   "name": "OmaPilot",
   "version": "0.2.0",
   "author": "Spencer Bull",
@@ -17,7 +17,7 @@
     "displayName": "OmaPilot",
     "description": "Work through an authenticated AI harness without leaving the Omarchy bar.",
     "category": "AI",
-    "aliases": ["ai", "chat", "pilot", "omapilot", "quickchat", "codex", "openai", "grok", "xai", "opencode", "pi"],
+    "aliases": ["ai", "chat", "pilot", "omapilot", "codex", "openai", "grok", "xai", "opencode", "pi"],
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
