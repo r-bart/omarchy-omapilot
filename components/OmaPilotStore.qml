@@ -134,6 +134,12 @@ Scope {
   signal ipcToggleRequested()
   signal ipcHistoryRequested()
   signal ipcSettingsRequested()
+  signal ipcVoiceStartRequested()
+  signal ipcVoiceStopRequested()
+  signal ipcVoiceToggleRequested()
+  signal ipcNewVoiceChatRequested()
+  signal ipcVoiceCancelRequested()
+  signal ipcAmbientDismissRequested()
   signal contextOverlayRequested(string payload)
   signal contextBrowserPickerRequested()
   signal ttsSpoken()
@@ -1105,6 +1111,13 @@ Scope {
     function continueInHerdr() { root.continueInHerdr() }
     function history() { root.routeIpc("history") }
     function settings() { root.routeIpc("settings") }
+    function voiceStart(): string { root.ipcVoiceStartRequested(); return "ok" }
+    function voiceStop(): string { root.ipcVoiceStopRequested(); return "ok" }
+    function voiceToggle(): string { root.ipcVoiceToggleRequested(); return "ok" }
+    function newVoiceChat(): string { root.ipcNewVoiceChatRequested(); return "ok" }
+    function voiceCancel(): string { root.ipcVoiceCancelRequested(); return "ok" }
+    function dismiss(): string { root.ipcAmbientDismissRequested(); return "ok" }
+    function status(): string { return "store=" + root.state }
   }
 
   // Omarchy intentionally has no plugin install hooks. The first real plugin
