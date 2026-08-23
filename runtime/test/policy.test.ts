@@ -26,6 +26,15 @@ describe("provider security profiles", () => {
     expect(instructions).toMatch(/use web search when it is\s+available/u);
     expect(instructions).toContain("Never say an app, URL, command, or device action succeeded");
     expect(instructions).toMatch(/preserve every\s+permission boundary/u);
+    expect(instructions).toContain("not like an activity log");
+    expect(instructions).toContain("already shows progress, approvals, tool activity");
+    expect(instructions).toMatch(/Do\s+not begin with "Done", "Completed", or "Successfully"/u);
+    expect(instructions).toContain("usually no more than about");
+    expect(instructions).toContain("15 words");
+    expect(instructions).toContain('Do not automatically add "How can I help?"');
+    expect(instructions).toContain("do not recite every");
+    expect(instructions).toContain("command or source you checked");
+    expect(instructions).toContain("Never omit a material warning, unresolved choice, failure, or uncertainty");
   });
 
   it("normalizes the Codex app-server model catalog without hidden or invalid rows", () => {
