@@ -51,6 +51,9 @@ Scope {
   property bool customProviderTestPending: false
   property string customProviderTestError: ""
   property var voxtypeOsd: ({ available: false, enabled: true, message: "" })
+  property string hotkeyAction: ""
+  property string hotkeyMessage: ""
+  property string hotkeyProcessError: ""
   property var voiceStatus: Protocol.emptyVoiceStatus()
   property var ttsTest: null
   property bool ttsTestPending: false
@@ -122,6 +125,7 @@ Scope {
     || browserCompanionStatus.firefoxConnected === true
   readonly property bool browserCompanionBusy: browserCompanionStatus.phase === "installing"
     || browserCompanionStatus.phase === "removing"
+  readonly property bool hotkeyBusy: hotkeyInstaller.running
   readonly property bool builtinAuthBusy: ["starting", "prompt", "info", "browser", "device_code"]
     .indexOf(String(builtinAuth.phase || "")) >= 0
 
@@ -342,6 +346,24 @@ Scope {
   function uninstallBrowserCompanion() {
     if (browserCompanionBusy) return
     sendCommand(Protocol.command("browser_companion_uninstall"))
+  }
+
+  function installHotkeys() {
+    if (hotkeyBusy) return
+    hotkeyAction = "install"
+    hotkeyMessage = "Installing global hotkeys…"
+    hotkeyProcessError = ""
+    hotkeyInstaller.command = [hotkeyInstallerPath, "--installed-plugin-only"]
+    hotkeyInstaller.running = true
+  }
+
+  function removeHotkeys() {
+    if (hotkeyBusy) return
+    hotkeyAction = "remove"
+    hotkeyMessage = "Removing managed hotkeys…"
+    hotkeyProcessError = ""
+    hotkeyInstaller.command = [hotkeyInstallerPath, "--installed-plugin-only", "--remove"]
+    hotkeyInstaller.running = true
   }
 
   function openBrowserCompanionSettings(family) {
@@ -1120,23 +1142,35 @@ Scope {
     function status(): string { return "store=" + root.state }
   }
 
-  // Omarchy intentionally has no plugin install hooks. The first real plugin
-  // load is therefore the only reliable place to add compositor bindings. The
-  // helper refuses development/preview paths, records its one-time attempt,
-  // preserves user-defined collisions, and owns only its marked block.
+  // Hotkeys modify user-owned compositor configuration, so this helper starts
+  // only after the user chooses an action in Settings > Desktop. It refuses
+  // development/preview paths, preserves collisions, and owns only its marked
+  // block.
   Process {
     id: hotkeyInstaller
-    command: [root.hotkeyInstallerPath, "--once", "--installed-plugin-only"]
-    running: true
+    command: [root.hotkeyInstallerPath, "--installed-plugin-only"]
+    running: false
 
     onExited: function(exitCode, exitStatus) {
-      if (exitCode !== 0)
-        console.warn("omapilot: automatic hotkey installation failed with exit code " + exitCode)
+      if (exitCode === 0) {
+        root.hotkeyMessage = root.hotkeyAction === "remove"
+          ? "Managed global hotkeys removed."
+          : "Global hotkeys installed. Existing bindings were preserved."
+      } else {
+        root.hotkeyMessage = root.hotkeyProcessError !== ""
+          ? root.hotkeyProcessError
+          : "Hotkey setup failed with exit code " + exitCode + "."
+        console.warn("omapilot: hotkey setup failed with exit code " + exitCode)
+      }
+      root.hotkeyAction = ""
     }
 
     stderr: SplitParser {
       onRead: function(line) {
-        if (String(line || "").trim() !== "") console.warn("omapilot: " + line)
+        var message = String(line || "").trim()
+        if (message === "") return
+        root.hotkeyProcessError = message.replace(/^install-hotkeys: /, "")
+        console.warn("omapilot: " + message)
       }
     }
   }

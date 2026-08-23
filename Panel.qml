@@ -967,6 +967,8 @@ Panel {
         onBrowserCompanionRefreshRequested: OmaPilot.OmaPilotStore.requestBrowserCompanionStatus()
         onBrowserCompanionOpenSettingsRequested: function(family) { OmaPilot.OmaPilotStore.openBrowserCompanionSettings(family) }
         onBrowserCompanionCopyPathRequested: function(family) { OmaPilot.OmaPilotStore.copyBrowserCompanionPath(family) }
+        onHotkeyInstallRequested: OmaPilot.OmaPilotStore.installHotkeys()
+        onHotkeyRemoveRequested: OmaPilot.OmaPilotStore.removeHotkeys()
         onCustomProviderAddRequested: function(id, name, baseUrl, api, models, apiKey) {
           OmaPilot.OmaPilotStore.addCustomProvider(id, name, baseUrl, api, models, apiKey)
         }

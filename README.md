@@ -84,13 +84,11 @@ omarchy plugin enable io.github.spencerbull.omapilot right
 
 The Omarchy installer only clones, validates, and enables the plugin. Omarchy
 runs no plugin install hook, and OmaPilot does not request administrator access
-or invoke a package manager. On the first real plugin load, OmaPilot adds its
-described global shortcuts to `~/.config/hypr/bindings.lua`. It skips any chord
-already defined in that user file, except for replacing Omarchy's stock
-`Super+Shift+A` ChatGPT shortcut. A one-time marker under
-`${XDG_STATE_HOME:-$HOME/.local/state}/omapilot` prevents later shell starts from
-reapplying shortcuts the user has changed or removed. Development previews and
-worktrees never trigger the edit. The reviewed repository revision includes
+or invoke a package manager. Installation and first load do not edit Hyprland
+configuration. To add the described global shortcuts, explicitly choose
+**Settings → Desktop → Install global hotkeys**. OmaPilot then adds one marked
+block to `~/.config/hypr/bindings.lua` while preserving every shortcut chord
+already defined there. The reviewed repository revision includes
 reproducible Linux x86-64 broker and Codex ACP launchers, so a normal install
 does not run `npm`, `npx`, or silently download executable code. The launchers
 execute their embedded JavaScript payloads directly from the read-only launcher
@@ -109,8 +107,8 @@ omarchy plugin remove io.github.spencerbull.omapilot
 
 OmaPilot exposes compositor-safe IPC actions for a contextual voice session,
 forced-fresh typed or voice conversations, and handing the current chat to
-Herdr. The first installed load adds these bindings to
-`~/.config/hypr/bindings.lua`, where their descriptions appear in
+Herdr. Choose **Settings → Desktop → Install global hotkeys** to add these
+bindings to `~/.config/hypr/bindings.lua`, where their descriptions appear in
 **Learn → Keybindings**:
 
 ```lua
@@ -137,9 +135,10 @@ its saved history. `Super+Shift+A` remains the force-new escape hatch. New typed
 chat opens the panel with an empty composer. Continue in Herdr does nothing until
 the current conversation has a saved chat ID.
 
-The managed block is written only once and becomes normal user-owned Hyprland
-configuration. Existing user-defined collisions are left alone. To retry while
-still preserving collisions, or to deliberately replace every chord, run:
+The managed block is written only after that explicit action and becomes normal
+user-owned Hyprland configuration. Existing user-defined collisions are left
+alone. To install from a terminal while still preserving collisions, or to
+deliberately replace every chord, run:
 
 ```bash
 ~/.config/omarchy/plugins/io.github.spencerbull.omapilot/scripts/install-hotkeys.sh

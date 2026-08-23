@@ -17,12 +17,13 @@ The widget follows the current Quattro host contract:
   ownership follows the host's reassigned module list across monitor changes.
 
 OmaPilot does not edit `shell.json`, Omarchy sources, or Herdr configuration.
-Because Omarchy intentionally exposes no plugin install hook, the first loaded
-installed copy runs a repository-owned helper that appends one marked block to
-`~/.config/hypr/bindings.lua`. The helper runs only once, skips chords already
-defined in the user file, validates the generated Lua when `luac` is available,
-reloads Hyprland, and can remove only its own block. Preview and development
-paths fail closed without touching the desktop configuration.
+Installation and first load do not edit Hyprland configuration. An explicit
+**Settings → Desktop → Install global hotkeys** action runs a repository-owned
+helper that appends one marked block to `~/.config/hypr/bindings.lua`. The
+helper skips chords already defined in the user file, validates the generated
+Lua when `luac` is available, reloads Hyprland, and can remove only its own
+block. Preview and development paths fail closed without touching the desktop
+configuration.
 
 Voice is opt-in from Settings after install. Widget settings store only
 `voiceEnabled`, `ttsProvider`, `ttsModel`, and `ttsVoice`. Cloud TTS keys live

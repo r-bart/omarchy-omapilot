@@ -28,8 +28,10 @@ o.bind("SUPER + A", "My existing assistant", "my-assistant")
 o.bind('SUPER + ALT + N', 'My existing new chat', 'my-new-chat')
 LUA
 
-"$installer" --once --installed-plugin-only
-[[ ! -e $XDG_STATE_HOME/omapilot/hotkeys-v1 ]]
+if "$installer" --installed-plugin-only 2>/dev/null; then
+  printf 'expected development-path installation to fail closed\n' >&2
+  exit 1
+fi
 assert_absent '-- BEGIN OmaPilot managed hotkeys' "$bindings"
 
 installed_dir="$HOME/.config/omarchy/plugins/io.github.spencerbull.omapilot"
@@ -38,9 +40,9 @@ mkdir -p -- "$(dirname -- "$installed_installer")"
 cp -- "$installer" "$installed_installer"
 chmod 0755 "$installed_installer"
 
-"$installed_installer" --once --installed-plugin-only
+"$installed_installer" --installed-plugin-only
 first_checksum=$(sha256sum "$bindings")
-"$installed_installer" --once --installed-plugin-only
+"$installed_installer" --installed-plugin-only
 second_checksum=$(sha256sum "$bindings")
 [[ $first_checksum == "$second_checksum" ]]
 
@@ -52,8 +54,6 @@ assert_absent 'o.bind("SUPER + ALT + N", "New OmaPilot chat"' "$bindings"
 grep -Fq -- 'hl.unbind("SUPER + SHIFT + A")' "$bindings"
 grep -Fq -- 'io.github.spencerbull.omapilot newVoiceChat' "$bindings"
 grep -Fq -- 'io.github.spencerbull.omapilot continueInHerdr' "$bindings"
-grep -Fxq -- 'installed' "$XDG_STATE_HOME/omapilot/hotkeys-v1"
-
 "$installed_installer" --force
 grep -Fq -- 'o.bind("SUPER + A", "Talk to OmaPilot"' "$bindings"
 grep -Fq -- 'io.github.spencerbull.omapilot newChat' "$bindings"
@@ -62,10 +62,6 @@ test "$(grep -Fc -- '-- BEGIN OmaPilot managed hotkeys' "$bindings")" -eq 1
 "$installed_installer" --remove
 grep -Fq -- 'My existing assistant' "$bindings"
 grep -Fq -- 'My existing new chat' "$bindings"
-assert_absent '-- BEGIN OmaPilot managed hotkeys' "$bindings"
-grep -Fxq -- 'removed' "$XDG_STATE_HOME/omapilot/hotkeys-v1"
-
-"$installed_installer" --once --installed-plugin-only
 assert_absent '-- BEGIN OmaPilot managed hotkeys' "$bindings"
 
 "$installed_installer"

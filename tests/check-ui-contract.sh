@@ -55,8 +55,19 @@ grep -Fq 'Quickshell.env("OMAPILOT_BROKER_PATH") || bundledBrokerPath' \
   "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'Qt.resolvedUrl("../scripts/install-hotkeys.sh")' \
   "$repo_dir/components/OmaPilotStore.qml"
-grep -Fq 'command: [root.hotkeyInstallerPath, "--once", "--installed-plugin-only"]' \
+grep -Fq 'command: [root.hotkeyInstallerPath, "--installed-plugin-only"]' \
   "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'running: false' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'function installHotkeys()' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'onHotkeyInstallRequested: OmaPilot.OmaPilotStore.installHotkeys()' \
+  "$repo_dir/Panel.qml"
+grep -Fq 'text: root.hotkeyBusy ? "Updating hotkeys…" : "Install global hotkeys"' \
+  "$repo_dir/components/SettingsView.qml"
+if grep -Fq 'command: [root.hotkeyInstallerPath, "--once"' \
+  "$repo_dir/components/OmaPilotStore.qml"; then
+  printf 'Hotkey installation must require an explicit settings action\n' >&2
+  exit 1
+fi
 grep -Fq -- '-- BEGIN OmaPilot managed hotkeys' \
   "$repo_dir/scripts/install-hotkeys.sh"
 grep -Fq 'property string configuredProvider: "builtin"' \
@@ -506,7 +517,7 @@ grep -Fq 'Protocol.historyContinuationBlocked(' "$repo_dir/components/OmaPilotSt
 grep -Fq 'if (!providerReady || continuationBlocked || busy) return false' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'if (!OmaPilot.OmaPilotStore.submit(spoken))' "$repo_dir/Ambient.qml"
 # The broker's Voxtype OSD switch is a separate config-write boundary from the
-# first-load hotkey helper. It must stay a single-key, comment-preserving,
+# opt-in hotkey helper. It must stay a single-key, comment-preserving,
 # backed-up, user-initiated edit, and the exception must stay documented.
 grep -Fq '.omapilot.bak' "$repo_dir/runtime/src/voxtype-osd.ts"
 grep -Fq 'One separate, narrowly scoped exception exists for Voxtype' \

@@ -5,19 +5,17 @@ plugin_id="io.github.spencerbull.omapilot"
 begin_marker="-- BEGIN OmaPilot managed hotkeys"
 end_marker="-- END OmaPilot managed hotkeys"
 
-once=0
 installed_plugin_only=0
 force=0
 remove=0
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/install-hotkeys.sh [--once] [--installed-plugin-only] [--force|--remove]
+Usage: scripts/install-hotkeys.sh [--installed-plugin-only] [--force|--remove]
 
 Install OmaPilot's global bindings into the user's Hyprland bindings.lua.
 
-  --once                   Do nothing after the first automatic attempt.
-  --installed-plugin-only  Run only from OmaPilot's normal installed path.
+  --installed-plugin-only  Require OmaPilot's normal installed path.
   --force                  Replace colliding user bindings for OmaPilot's chords.
   --remove                 Remove only the block managed by this script.
 USAGE
@@ -30,9 +28,6 @@ fail() {
 
 while (($#)); do
   case "$1" in
-    --once)
-      once=1
-      ;;
     --installed-plugin-only)
       installed_plugin_only=1
       ;;
@@ -61,24 +56,20 @@ plugin_dir=$(cd -- "$script_dir/.." && pwd -L)
 
 if ((installed_plugin_only)); then
   expected_plugin_dir="${HOME:?HOME is required}/.config/omarchy/plugins/$plugin_id"
-  [[ $plugin_dir == "$expected_plugin_dir" ]] || exit 0
+  [[ $plugin_dir == "$expected_plugin_dir" ]] ||
+    fail "refusing to edit bindings outside the installed plugin: $expected_plugin_dir"
 fi
 
 config_home="${XDG_CONFIG_HOME:-${HOME:?HOME is required}/.config}"
 bindings_file="${OMAPILOT_HOTKEYS_BINDINGS_FILE:-$config_home/hypr/bindings.lua}"
 state_root="${XDG_STATE_HOME:-$HOME/.local/state}"
 state_dir="${OMAPILOT_HOTKEYS_STATE_DIR:-$state_root/omapilot}"
-once_marker="$state_dir/hotkeys-v1"
 lock_file="$state_dir/hotkeys.lock"
 
 mkdir -p -- "$state_dir"
 command -v flock >/dev/null || fail "flock is required"
 exec 9>"$lock_file"
 flock 9
-
-if ((once)) && [[ -f $once_marker ]]; then
-  exit 0
-fi
 
 [[ -f $bindings_file ]] || fail "Hyprland bindings file not found: $bindings_file"
 
@@ -134,7 +125,6 @@ if ((remove)); then
     remove_managed_block
     reload_hyprland
   fi
-  printf 'removed\n' >"$once_marker"
   exit 0
 fi
 
@@ -143,7 +133,6 @@ if ((begin_count == 1)); then
     remove_managed_block
   else
     reload_hyprland
-    printf 'installed\n' >"$once_marker"
     exit 0
   fi
 fi
@@ -184,7 +173,7 @@ trap 'rm -f -- "${block_file:-}" "${candidate_file:-}"' EXIT
 installed_count=0
 {
   printf '%s\n' "$begin_marker"
-  printf '%s\n' '-- Added once by the installed OmaPilot plugin. Edit these bindings freely.'
+  printf '%s\n' '-- Added at the user request from OmaPilot settings. Edit these bindings freely.'
   for index in "${!chords[@]}"; do
     if ((!force)) && has_user_binding "${chords[$index]}"; then
       printf 'install-hotkeys: leaving existing %s binding unchanged\n' \
@@ -215,5 +204,3 @@ if ((installed_count > 0)); then
   cat "$block_file" >>"$bindings_file"
   reload_hyprland
 fi
-
-printf 'installed\n' >"$once_marker"

@@ -19,7 +19,7 @@ jobs:
           cache: npm
       - name: Check manifest contract
         run: ./scripts/check-manifest.sh
-      - name: Check first-run hotkey installation
+      - name: Check opt-in hotkey installation
         run: ./tests/test-hotkey-installer.sh
       - name: Validate with pinned Omarchy Quattro
         env:
