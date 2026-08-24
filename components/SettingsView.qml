@@ -31,7 +31,7 @@ Item {
   readonly property var voiceStatus: backend && backend.voiceStatus
     ? backend.voiceStatus : Protocol.emptyVoiceStatus()
   property bool voiceEnabled: false
-  property string ttsProvider: "kokoro"
+  property string ttsProvider: "elevenlabs"
   property string ttsModel: ""
   property string ttsVoice: ""
   property string ttsDraftKey: ""
@@ -930,7 +930,7 @@ Item {
           Text {
             Layout.fillWidth: true
             wrapMode: Text.Wrap
-            text: "Kokoro runs locally. ElevenLabs and OpenAI need an API key, stored in voice-auth.json — never in widget settings."
+            text: "ElevenLabs is the guided default. Add its API key here for spoken replies. Kokoro runs locally; cloud keys stay in voice-auth.json — never in widget settings."
             color: root.mutedForeground
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption

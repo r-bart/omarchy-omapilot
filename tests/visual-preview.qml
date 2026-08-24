@@ -87,9 +87,9 @@ ShellRoot {
     property var ttsTest: null
     property string ttsTestError: ""
     property bool voiceEnabled: false
-    property string ttsProvider: "kokoro"
-    property string ttsModel: "kokoro-82m"
-    property string ttsVoice: "af_heart"
+    property string ttsProvider: "elevenlabs"
+    property string ttsModel: "eleven_multilingual_v2"
+    property string ttsVoice: "wyWA56cQNU2KqUW4eCsI"
     property var browserCompanionStatus: ({
       phase: "ready", relayInstalled: false, setupAvailable: true,
       chromiumConnected: false, firefoxConnected: false,
@@ -172,9 +172,13 @@ ShellRoot {
   Window {
     id: previewWindow
     width: 860
-    height: root.previewState === "settings" || root.previewState === "skills-settings" || root.previewState === "dangerous-settings"
+    height: root.previewState === "settings" || root.previewState === "skills-settings"
+      || root.previewState === "voice-settings" || root.previewState === "desktop-settings"
+      || root.previewState === "dangerous-settings"
       || root.previewState === "actions-settings" || root.previewState === "history" ? 760
-      : (root.previewState === "error-details" ? 520 : (root.previewState === "context" ? 430 : 320))
+      : (root.previewState === "error-details" ? 520
+        : (root.previewState === "context" ? 430
+          : (root.previewState === "setup-voice" || root.previewState === "setup-hotkeys" ? 420 : 320)))
     visible: true
     color: "transparent"
     flags: Qt.FramelessWindowHint
@@ -189,7 +193,9 @@ ShellRoot {
       radius: Style.cornerRadius
 
       ColumnLayout {
-        visible: root.previewState === "empty" || root.previewState === "dangerous" || root.previewState === "context"
+        visible: root.previewState === "empty" || root.previewState === "dangerous"
+          || root.previewState === "context" || root.previewState === "setup-voice"
+          || root.previewState === "setup-hotkeys"
         anchors.fill: parent
         anchors.leftMargin: previewSurface.contentLeftInset + Style.spacing.popupPadding
         anchors.rightMargin: previewSurface.contentRightInset + Style.spacing.popupPadding
@@ -221,6 +227,17 @@ ShellRoot {
         OmaPilot.QuickActions {
           id: actions
           Layout.fillWidth: true
+          visible: root.previewState !== "setup-voice" && root.previewState !== "setup-hotkeys"
+          foreground: Color.popups.text
+          background: Color.popups.background
+          accent: Color.accent
+          fontFamily: Style.font.family
+        }
+
+        OmaPilot.SetupGuide {
+          Layout.fillWidth: true
+          visible: root.previewState === "setup-voice" || root.previewState === "setup-hotkeys"
+          stage: root.previewState === "setup-hotkeys" ? "hotkeys" : "voice"
           foreground: Color.popups.text
           background: Color.popups.background
           accent: Color.accent
@@ -232,6 +249,8 @@ ShellRoot {
         id: settingsView
         visible: root.previewState === "settings"
           || root.previewState === "skills-settings"
+          || root.previewState === "voice-settings"
+          || root.previewState === "desktop-settings"
           || root.previewState === "dangerous-settings"
           || root.previewState === "actions-settings"
         anchors.fill: parent
@@ -240,16 +259,17 @@ ShellRoot {
         anchors.topMargin: previewSurface.contentTopInset + Style.spacing.popupPadding
         anchors.bottomMargin: previewSurface.contentBottomInset + Style.spacing.popupPadding
         backend: backend
-        selectedTab: root.previewState === "dangerous-settings" ? "desktop"
+        selectedTab: root.previewState === "dangerous-settings" || root.previewState === "desktop-settings" ? "desktop"
           : (root.previewState === "skills-settings" ? "skills"
+          : (root.previewState === "voice-settings" ? "voice"
           : (root.previewState === "actions-settings" ? "actions" : "agent")
-          )
+          ))
         dangerousAutoApprove: root.previewState === "dangerous-settings"
         desktopContextEnabled: true
         voiceEnabled: false
-        ttsProvider: "kokoro"
-        ttsModel: "kokoro-82m"
-        ttsVoice: "af_heart"
+        ttsProvider: "elevenlabs"
+        ttsModel: "eleven_multilingual_v2"
+        ttsVoice: "wyWA56cQNU2KqUW4eCsI"
         quickActions: root.previewState === "actions-settings"
           ? ActionCatalog.addAction(ActionCatalog.defaultActions(true, true),
             "Research this", "Research this topic using current sources.", 42)

@@ -29,6 +29,15 @@ TestCase {
     verify(Presentation.permissionNotice(true).indexOf("auto-approved") >= 0)
   }
 
+  function test_setupAdvancesInOrder() {
+    compare(Presentation.setupStage(false, false, false, false), "authentication")
+    compare(Presentation.setupStage(true, false, false, false), "voice")
+    compare(Presentation.setupStage(true, true, false, false), "voice")
+    compare(Presentation.setupStage(true, true, true, false), "hotkeys")
+    compare(Presentation.setupStage(true, true, true, true), "complete")
+    compare(Presentation.setupStage(true, false, false, true), "complete")
+  }
+
   function test_waitingAndStreamingPhasesDoNotFakeProgress() {
     var waiting = Presentation.responsePhase("preparing", false)
     compare(waiting.label, "WAITING")

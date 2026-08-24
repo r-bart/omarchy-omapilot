@@ -1251,3 +1251,45 @@ turn per provider.
   uncommitted policy-copy edits were restored byte-for-byte and remain owned by
   their original author. No account setup, user configuration, push, install,
   shell restart, or live personal-data read occurred.
+
+## Guided first-run setup checkpoint 14 (2026-08-23)
+
+- Goal: turn OmaPilot's existing authentication failure recovery into a small,
+  ordered first-run path that continues through voice and explicit global-hotkey
+  setup.
+- Done criteria: unauthenticated users retain the existing sign-in recovery;
+  successful authentication reveals a focused Voice next step; new installs
+  default to ElevenLabs; completing voice reveals a shortcut next step that
+  opens the existing explicit-consent Global hotkeys control; successful hotkey
+  installation persists setup completion; focused, full, rendered/runtime, and
+  independent Fable review gates pass; a PR is opened against `dev`.
+- Branch/worktree: `feat/oobe-guided-setup` at
+  `/home/sbull/.t3/worktrees/omarchy-omapilot/t3code-bb33724e`, based exactly on
+  `origin/dev` commit `cb34395`.
+- Allowed: scoped QML, manifest, docs/tests, local build and rendered/runtime
+  verification, commit, push, and PR creation. Forbidden: merge, release,
+  production/customer data, secrets, billing, edits to other worktrees, or
+  implicit hotkey installation without the user's button press.
+- Verification gates:
+  - [x] Align the isolated worktree to current `origin/dev` and inventory the
+    authentication, voice, and explicit-consent hotkey paths.
+  - [x] Implement the ordered setup guide and ElevenLabs default with coverage.
+  - [x] Pass focused tests, full validation, generated-artifact, and diff gates.
+  - [x] Render and exercise the first-run states in the local UI.
+  - [ ] Receive a clean independent Fable review or resolve every finding.
+  - [ ] Commit, push, inspect CI, and open the PR against `dev`.
+- Worker state: `HERDR_ENV` is unset in this T3 session, so no named Herdr
+  worker may be started or controlled yet. The required Fable review remains a
+  checkpoint; the orchestrator owns implementation and local verification.
+- Current checkpoint: the existing authentication recovery remains unchanged;
+  authenticated empty chats now show Voice step 2 and Global keybinds step 3.
+  Voice opens with ElevenLabs selected, and Desktop opens with the explicit
+  installer visible. Completion is persisted only after voice is ready and the
+  existing hotkey installer exits successfully; the user remains in Settings to
+  see its result. `./scripts/validate.sh` passes 243 runtime tests with 8 opt-in
+  live-provider skips plus manifest, hotkey, browser, release, typecheck, lint,
+  build, QML/UI, native Wayland smoke, rendered-state, plugin-validation, and
+  Git whitespace gates. Shellcheck is unavailable and skipped. Rendered evidence
+  is in ignored `screenshots/implementation-omapilot-{setup-voice,setup-hotkeys,
+  voice-settings,desktop-settings}.png`. Fable review remains pending because
+  this session is outside Herdr.

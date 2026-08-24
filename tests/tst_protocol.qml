@@ -415,7 +415,7 @@ TestCase {
     compare(status.dictation.available, true)
     compare(status.tts.length, 2)
     compare(Protocol.normalizedTtsProvider("ElevenLabs"), "elevenlabs")
-    compare(Protocol.ttsProviderOptions()[0].value, "kokoro")
+    compare(Protocol.ttsProviderOptions()[0].value, "elevenlabs")
     var openai = Protocol.ttsProviderStatus(status, "openai")
     compare(Protocol.ttsDefaultModel(openai), "gpt-4o-mini-tts")
     compare(Protocol.ttsVoiceOptions(openai, "tts-1").length, 1)

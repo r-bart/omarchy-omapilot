@@ -45,9 +45,10 @@ compact error notice opens an inspectable details pane.
   broker and Codex ACP payloads but execute them with the system Node runtime.
 - Credentials for the built-in harness, or an installed and authenticated ACP harness.
 - Optional: Voxtype for dictation and Herdr for durable continuation.
-- Optional: a TTS provider to speak answers. Kokoro is local
-  (`pip install kokoro soundfile` on Python 3.10–3.12, plus `espeak-ng`).
-  ElevenLabs and OpenAI need an API key entered in Settings; keys are stored
+- Optional: a TTS provider to speak answers. ElevenLabs is the guided default
+  and needs an API key entered in Settings. Kokoro is local
+  (`pip install kokoro soundfile` on Python 3.10–3.12, plus `espeak-ng`), while
+  OpenAI also needs an API key. Cloud keys are stored
   in `~/.config/omapilot/voice-auth.json`, not widget settings. Voice stays
   off until enabled there.
 - `grim` for contextual screenshots. ImageMagick, already used by OmaPilot's
@@ -71,6 +72,11 @@ inside the broker, opens the provider's browser page for OAuth when needed, and
 renders provider choices, device codes, progress, and errors in Settings.
 Browser OAuth completes through a broker-owned localhost callback; callback
 URLs are never user input. It never opens the Pi terminal.
+
+After authentication, the empty conversation shows the next first-run step:
+configure Voice with ElevenLabs, then open Desktop settings and explicitly press
+**Install global hotkeys**. Chat remains usable throughout; setup never edits
+Hyprland configuration without that final button press.
 
 ## Install
 
