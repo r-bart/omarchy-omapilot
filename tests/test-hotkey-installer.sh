@@ -53,6 +53,8 @@ grep -Fq -- "o.bind('SUPER + ALT + N', 'My existing new chat'" "$bindings"
 assert_absent 'o.bind("SUPER + ALT + N", "New OmaPilot chat"' "$bindings"
 grep -Fq -- 'hl.unbind("SUPER + SHIFT + A")' "$bindings"
 grep -Fq -- 'io.github.spencerbull.omapilot newVoiceChat' "$bindings"
+grep -Fq -- 'hl.unbind("SUPER + ALT + X")' "$bindings"
+grep -Fq -- 'io.github.spencerbull.omapilot voiceCancel' "$bindings"
 grep -Fq -- 'io.github.spencerbull.omapilot continueInHerdr' "$bindings"
 "$installed_installer" --force
 grep -Fq -- 'o.bind("SUPER + A", "Talk to OmaPilot"' "$bindings"
@@ -75,6 +77,7 @@ cp -- "$bindings" "$clean_bindings"
 
 cat >>"$bindings" <<'LUA'
 o.bind("SUPER + SHIFT + A", "My existing voice chat", "my-voice-chat")
+o.bind("SUPER + ALT + X", "My existing voice cancel", "my-voice-cancel")
 o.bind("SUPER + ALT + H", "My existing handoff", "my-handoff")
 LUA
 all_collisions_checksum=$(sha256sum "$bindings")
@@ -84,6 +87,28 @@ if "$installed_installer" 2>/dev/null; then
 fi
 test "$(sha256sum "$bindings")" = "$all_collisions_checksum"
 assert_absent '-- BEGIN OmaPilot managed hotkeys' "$bindings"
+
+cp -- "$clean_bindings" "$bindings"
+cat >>"$bindings" <<'LUA'
+-- BEGIN OmaPilot managed hotkeys
+-- Legacy block from before the voice-cancel shortcut was added.
+hl.unbind("SUPER + SHIFT + A")
+o.bind("SUPER + SHIFT + A", "New OmaPilot voice chat",
+  "omarchy-shell -q io.github.spencerbull.omapilot newVoiceChat")
+hl.unbind("SUPER + ALT + H")
+o.bind("SUPER + ALT + H", "Continue OmaPilot chat in Herdr",
+  "omarchy-shell -q io.github.spencerbull.omapilot continueInHerdr")
+-- END OmaPilot managed hotkeys
+LUA
+legacy_checksum=$(sha256sum "$bindings")
+"$installed_installer"
+test "$(grep -Fc -- '-- BEGIN OmaPilot managed hotkeys' "$bindings")" -eq 1
+grep -Fq -- 'hl.unbind("SUPER + ALT + X")' "$bindings"
+grep -Fq -- 'io.github.spencerbull.omapilot voiceCancel' "$bindings"
+test "$(sha256sum "$bindings")" != "$legacy_checksum"
+upgraded_checksum=$(sha256sum "$bindings")
+"$installed_installer"
+test "$(sha256sum "$bindings")" = "$upgraded_checksum"
 
 for mode in --remove --force; do
   cp -- "$clean_bindings" "$bindings"
