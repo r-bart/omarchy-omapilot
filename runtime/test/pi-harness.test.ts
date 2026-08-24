@@ -37,6 +37,7 @@ describe("native Pi harness", () => {
       { file: "omarchy-shell", args: ["media", "next"] }
     ]);
     expect((opened as { isError?: boolean }).isError).not.toBe(true);
+    expect((opened as { content: Array<{ text: string }> }).content[0]?.text).not.toContain("https://example.com/");
     expect((mediaResult as { isError?: boolean }).isError).toBe(true);
   });
 
@@ -213,6 +214,7 @@ describe("native Pi harness", () => {
     expect(existingSkillPaths(agentDir, project, root)).toEqual([userSkills, globalPiSkills, projectSkills, piProjectSkills]);
     expect(bundledSkillPaths()).toEqual([resolve("skills")]);
     expect(requiresPiPermission("desktop_state")).toBe(false);
+    expect(requiresPiPermission("omarchy_commands")).toBe(false);
     expect(requiresPiPermission("web_handoff")).toBe(true);
     expect(requiresPiPermission("app_open")).toBe(true);
     expect(requiresPiPermission("window_action")).toBe(true);
@@ -343,6 +345,7 @@ describe("native Pi harness", () => {
       expect(JSON.stringify(requests[0])).toContain('"desktop_state"');
       expect(JSON.stringify(requests[0])).toContain('"window_action"');
       expect(JSON.stringify(requests[0])).toContain('"workspace_action"');
+      expect(JSON.stringify(requests[0])).toContain('"omarchy_commands"');
       expect(authorizationHeaders).toEqual([undefined, undefined]);
       const sessionDir = join(root, ".local/state/omapilot/pi-sessions");
       const sessionFiles = await readdir(sessionDir);
