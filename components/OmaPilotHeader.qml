@@ -13,11 +13,6 @@ Item {
   // ellipsis — the part most worth reading. Stacked, each line gets the full
   // width. `false` keeps the panel's single meta row unchanged.
   property bool stackedMeta: false
-  // A chosen surface carries its own way out. The panel is reachable from
-  // settings either way, so `false` leaves every other host's header as it is.
-  property bool surfaceCycleVisible: false
-  readonly property string nextSurface: root.backend
-    ? Protocol.nextSurface(root.backend.configuredSurface) : "panel"
   property bool dangerousAutoApprove: false
   property bool motionEnabled: true
   property color foreground: Color.popups.text
@@ -26,7 +21,6 @@ Item {
   property string fontFamily: Style.font.family
 
   signal settingsRequested()
-  signal surfaceCycleRequested()
 
   implicitHeight: headerContent.implicitHeight
 
@@ -69,18 +63,6 @@ Item {
           font.pixelSize: Style.font.bodySmall
           elide: Text.ElideRight
         }
-      }
-
-      PanelActionButton {
-        visible: root.surfaceCycleVisible
-        iconText: Presentation.surfaceIcon(root.nextSurface)
-        tooltipText: Presentation.surfaceTooltip(root.nextSurface)
-        foreground: root.foreground
-        size: Style.space(34)
-        bordered: true
-        focusable: true
-        Accessible.name: tooltipText
-        onClicked: root.surfaceCycleRequested()
       }
 
       PanelActionButton {

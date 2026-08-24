@@ -218,7 +218,6 @@ Item {
       Layout.fillWidth: true
       backend: root.backend
       stackedMeta: root.tightMeta
-      surfaceCycleVisible: true
       dangerousAutoApprove: root.dangerousAutoApprove
       motionEnabled: root.motionEnabled
       foreground: root.foreground
@@ -226,13 +225,6 @@ Item {
       accent: root.accent
       fontFamily: root.fontFamily
       onSettingsRequested: root.viewMode === "settings" ? root.showChat() : root.openSettings()
-      // Ambient owns what the change does to the window — closing it for the
-      // panel, resizing it between docked and fullscreen. This only records the
-      // choice; acting on it here as well would race that.
-      onSurfaceCycleRequested: {
-        if (root.backend && typeof root.backend.cycleSurface === "function")
-          root.backend.cycleSurface()
-      }
     }
 
     Rectangle {

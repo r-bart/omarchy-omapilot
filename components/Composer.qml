@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Protocol.js" as Protocol
+import "Presentation.js" as Presentation
 
 Item {
   id: root
@@ -16,6 +17,9 @@ Item {
   property color background: Color.popups.background
   property color accent: Color.accent
   property string fontFamily: Style.font.family
+
+  readonly property string nextSurface: root.backend
+    ? Protocol.nextSurface(root.backend.configuredSurface) : "panel"
 
   signal providerChanged(string provider)
   signal modelChanged(string provider, string model)
@@ -273,6 +277,26 @@ Item {
         anchors.right: parent.right
         anchors.top: parent.top
         spacing: Style.spacing.xs
+
+        // The surface switch lives here, beside the other composer actions,
+        // because the composer is the one piece all three surfaces share. In
+        // the header it existed only inside the console — reachable to leave a
+        // surface, never to enter one, which left the bar panel with no way in
+        // short of a dropdown five tabs deep in settings.
+        PanelActionButton {
+          iconText: Presentation.surfaceIcon(root.nextSurface)
+          tooltipText: Presentation.surfaceTooltip(root.nextSurface)
+          foreground: root.foreground
+          focusable: true
+          // Moving surfaces mid-turn would tear the answer out from under the
+          // user; the settings dropdown holds the same line.
+          enabled: root.backend && !root.backend.busy
+          Accessible.name: tooltipText
+          onClicked: {
+            if (root.backend && typeof root.backend.cycleSurface === "function")
+              root.backend.cycleSurface()
+          }
+        }
 
         PanelActionButton {
           iconText: "󰹑"

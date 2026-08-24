@@ -86,13 +86,11 @@ fi
 # Paired with exclusiveZone 0, which is what keeps it from reserving its own.
 grep -Fq 'exclusionMode: ExclusionMode.Normal' "$repo_dir/components/Console.qml"
 grep -Fq 'exclusiveZone: 0' "$repo_dir/components/Console.qml"
-# Collapsing narrows the surface itself, so its input region shrinks with it and
-# a collapsed console stops swallowing clicks meant for the windows behind it.
-grep -Fq 'implicitWidth: Style.space(root.collapsed ? root.handleWidth : root.surfaceWidth)' \
-  "$repo_dir/components/Console.qml"
-# A collapsed console never holds the compositor's keyboard.
-grep -Fq 'WlrLayershell.keyboardFocus: root.invoked && !root.collapsed' \
-  "$repo_dir/components/Console.qml"
+# Dismissing is the bar button pressed again, routed through the store's toggle.
+# No second fold-to-a-handle state: it would spend a column of the surface on a
+# gesture the bar icon already performs.
+grep -Fq 'function toggle() {' "$repo_dir/components/Console.qml"
+! grep -q 'collapsed' "$repo_dir/components/Console.qml"
 grep -Fq 'WlrLayershell.layer: WlrLayer.Overlay' "$repo_dir/components/Console.qml"
 grep -Fq 'WlrLayershell.namespace: "omapilot-console"' "$repo_dir/components/Console.qml"
 grep -Fq '? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None' \
@@ -103,8 +101,11 @@ grep -Fq 'anchors { right: true; top: true; bottom: true; left: root.fullscreen 
   "$repo_dir/components/Console.qml"
 grep -Fq 'fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"' \
   "$repo_dir/Ambient.qml"
-# Fullscreen has no edge to fold into, so it must not offer the handle.
-grep -Fq 'visible: !root.fullscreen' "$repo_dir/components/Console.qml"
+# The surface switch lives with the composer, the one piece all three surfaces
+# share, so it is reachable to enter a surface and not only to leave one.
+grep -Fq 'onClicked: {' "$repo_dir/components/Composer.qml"
+grep -Fq 'Presentation.surfaceIcon(root.nextSurface)' "$repo_dir/components/Composer.qml"
+! grep -q 'surfaceCycle' "$repo_dir/components/OmaPilotHeader.qml"
 # The content column stops growing past a readable measure and centres instead.
 # min() keeps every docked width inert, so the docked render is unchanged.
 grep -Fq 'readonly property int contentWidth: Math.min(' \
