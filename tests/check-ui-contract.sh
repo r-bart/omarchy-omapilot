@@ -692,6 +692,19 @@ if grep -Eq "omapilot server save probe failed|Failed to load|Type .* unavailabl
   exit 1
 fi
 
+cp "$repo_dir/tests/console-escape-probe.qml" "$smoke_root/shell.qml"
+if ! QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \
+    --path "$smoke_root" --no-color >"$smoke_root/console-escape.log" 2>&1; then
+  cat "$smoke_root/console-escape.log"
+  exit 1
+fi
+if grep -Eq "omapilot console escape probe failed|Failed to load|Type .* unavailable|Cannot assign|TypeError|ReferenceError" \
+    "$smoke_root/console-escape.log" \
+    || ! grep -Fq 'OMAPILOT_CONSOLE_ESCAPE_PROBE_OK' "$smoke_root/console-escape.log"; then
+  cat "$smoke_root/console-escape.log"
+  exit 1
+fi
+
 cp "$repo_dir/tests/response-activity-border-probe.qml" "$smoke_root/shell.qml"
 if ! QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \
     --path "$smoke_root" --no-color >"$smoke_root/motion.log" 2>&1; then
