@@ -37,6 +37,13 @@ function permissionNotice(dangerousAutoApprove) {
     : "Device changes require an exact approval."
 }
 
+function setupStage(providerReady, voiceEnabled, ttsReady, onboardingComplete) {
+  if (providerReady !== true) return "authentication"
+  if (onboardingComplete === true) return "complete"
+  if (voiceEnabled !== true || ttsReady !== true) return "voice"
+  return "hotkeys"
+}
+
 function responsePhase(state, hasAnswer) {
   var value = String(state || "")
   var contentVisible = hasAnswer === true

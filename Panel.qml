@@ -40,9 +40,17 @@ Panel {
     ? Protocol.normalizedWebHandoffProvider(settings.webHandoffProvider) : "duckduckgo"
   readonly property bool voiceEnabled: settings && settings.voiceEnabled === true
   readonly property string ttsProvider: settings && Protocol.normalizedTtsProvider(settings.ttsProvider)
-    ? Protocol.normalizedTtsProvider(settings.ttsProvider) : "kokoro"
+    ? Protocol.normalizedTtsProvider(settings.ttsProvider) : "elevenlabs"
   readonly property string ttsModel: settings && typeof settings.ttsModel === "string" ? settings.ttsModel : ""
   readonly property string ttsVoice: settings && typeof settings.ttsVoice === "string" ? settings.ttsVoice : ""
+  readonly property bool onboardingComplete: settings && settings.onboardingComplete === true
+  readonly property var selectedTtsCatalog: Protocol.ttsProviderStatus(
+    OmaPilot.OmaPilotStore.voiceStatus, root.ttsProvider)
+  readonly property bool voiceSetupReady: root.voiceEnabled
+    && root.selectedTtsCatalog && root.selectedTtsCatalog.available === true
+  readonly property string setupStage: Presentation.setupStage(
+    OmaPilot.OmaPilotStore.providerReady, root.voiceEnabled,
+    root.voiceSetupReady, root.onboardingComplete)
   readonly property string quickActionsJson: settings
     && typeof settings.quickActionsJson === "string" ? settings.quickActionsJson : ""
   readonly property var quickActionItems: ActionCatalog.actionsFromSettings(
@@ -188,7 +196,8 @@ Panel {
     Qt.callLater(function() { historyView.forceInitialFocus() })
   }
 
-  function openSettings() {
+  function openSettings(tab) {
+    if (tab) settingsView.selectTab(tab)
     viewMode = "settings"
     OmaPilot.OmaPilotStore.requestCustomProviders()
     OmaPilot.OmaPilotStore.requestVoxtypeOsd()
@@ -274,6 +283,9 @@ Panel {
         OmaPilot.OmaPilotStore.toastRequested("Context capture overlay could not be opened")
     }
     function onContextBrowserPickerRequested() { root.closeForExternalHandoff() }
+    function onHotkeyInstalled() {
+      if (root.voiceSetupReady) root.persistSettings({ onboardingComplete: true })
+    }
   }
 
   Shortcut {
@@ -366,6 +378,21 @@ Panel {
           onSubmitted: answerScroll.resetForNewTurn()
           onHistoryRequested: root.viewMode === "history" ? root.showChat() : root.openHistory()
           onEscapeRequested: root.close()
+        }
+
+        OmaPilot.SetupGuide {
+          id: setupGuide
+          Layout.fillWidth: true
+          visible: (root.setupStage === "voice" || root.setupStage === "hotkeys")
+            && OmaPilot.OmaPilotStore.question === ""
+            && OmaPilot.OmaPilotStore.answerMarkdown === ""
+            && !OmaPilot.OmaPilotStore.busy
+          stage: root.setupStage
+          foreground: root.foreground
+          background: root.surface
+          accent: root.accent
+          fontFamily: root.fontFamily
+          onActionRequested: root.openSettings(root.setupStage === "voice" ? "voice" : "desktop")
         }
         // The answer, unboxed. It used to live in a filled, bordered card with a
         // runner travelling its perimeter — a window inside a window. Now it sits
@@ -982,7 +1009,7 @@ Panel {
           root.persistSettings({ voiceEnabled: enabled === true })
         }
         onTtsProviderRequested: function(provider) {
-          var selected = Protocol.normalizedTtsProvider(provider) || "kokoro"
+          var selected = Protocol.normalizedTtsProvider(provider) || "elevenlabs"
           var catalog = Protocol.ttsProviderStatus(OmaPilot.OmaPilotStore.voiceStatus, selected)
           var model = Protocol.ttsDefaultModel(catalog)
           var voice = Protocol.ttsDefaultVoice(catalog, model)

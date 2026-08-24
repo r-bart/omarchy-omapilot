@@ -189,18 +189,19 @@ installed_count=0
   printf '%s\n' "$end_marker"
 } >"$block_file"
 
-if ((installed_count > 0)); then
-  {
-    cat "$bindings_file"
-    printf '\n'
-    cat "$block_file"
-  } >"$candidate_file"
+((installed_count > 0)) ||
+  fail "no global hotkeys were installed because all shortcut chords are already in use"
 
-  if command -v luac >/dev/null; then
-    luac -p "$candidate_file" || fail "generated bindings are not valid Lua"
-  fi
+{
+  cat "$bindings_file"
+  printf '\n'
+  cat "$block_file"
+} >"$candidate_file"
 
-  printf '\n' >>"$bindings_file"
-  cat "$block_file" >>"$bindings_file"
-  reload_hyprland
+if command -v luac >/dev/null; then
+  luac -p "$candidate_file" || fail "generated bindings are not valid Lua"
 fi
+
+printf '\n' >>"$bindings_file"
+cat "$block_file" >>"$bindings_file"
+reload_hyprland

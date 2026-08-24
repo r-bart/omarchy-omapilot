@@ -579,8 +579,8 @@ function normalizedTtsProvider(value) {
 
 function ttsProviderOptions() {
   return [
-    { value: "kokoro", label: "Kokoro (local)" },
     { value: "elevenlabs", label: "ElevenLabs" },
+    { value: "kokoro", label: "Kokoro (local)" },
     { value: "openai", label: "OpenAI" }
   ]
 }
@@ -663,7 +663,7 @@ function normalizedVoiceStatus(event) {
 }
 
 function ttsProviderStatus(status, provider) {
-  var id = normalizedTtsProvider(provider) || "kokoro"
+  var id = normalizedTtsProvider(provider) || "elevenlabs"
   var rows = status && Array.isArray(status.tts) ? status.tts : []
   for (var i = 0; i < rows.length; i++)
     if (String(rows[i] && rows[i].id || "") === id) return rows[i]
@@ -753,7 +753,7 @@ function ttsKeyTestCommand(provider, apiKey) {
 function ttsSpeakCommand(id, provider, model, voice, text) {
   var payload = {
     id: String(id || ""),
-    provider: normalizedTtsProvider(provider) || "kokoro",
+    provider: normalizedTtsProvider(provider) || "elevenlabs",
     text: String(text || "").slice(0, 8000)
   }
   var selectedModel = String(model || "").trim()
