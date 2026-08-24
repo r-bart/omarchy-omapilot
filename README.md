@@ -127,6 +127,9 @@ hl.unbind("SUPER + SHIFT + A")
 o.bind("SUPER + SHIFT + A", "New OmaPilot voice chat",
   "omarchy-shell -q io.github.spencerbull.omapilot newVoiceChat")
 
+o.bind("SUPER + ALT + X", "Cancel OmaPilot voice mode",
+  "omarchy-shell -q io.github.spencerbull.omapilot voiceCancel")
+
 o.bind("SUPER + ALT + N", "New OmaPilot chat",
   "omarchy-shell -q io.github.spencerbull.omapilot newChat")
 o.bind("SUPER + ALT + H", "Continue OmaPilot chat in Herdr",
@@ -137,14 +140,16 @@ o.bind("SUPER + ALT + H", "Continue OmaPilot chat in Herdr",
 curtain have closed. While that flow remains active, pressing it again finishes
 live dictation or begins a follow-up in the same conversation. The answer timer,
 explicit dismissal, and cancellation close the voice session; they do not erase
-its saved history. `Super+Shift+A` remains the force-new escape hatch. New typed
-chat opens the panel with an empty composer. Continue in Herdr does nothing until
-the current conversation has a saved chat ID.
+its saved history. `Super+Shift+A` remains the force-new escape hatch, while
+`Super+Alt+X` cancels and closes the active voice flow. New typed chat opens the
+panel with an empty composer. Continue in Herdr does nothing until the current
+conversation has a saved chat ID.
 
 The managed block is written only after that explicit action and becomes normal
 user-owned Hyprland configuration. Existing user-defined collisions are left
-alone. To install from a terminal while still preserving collisions, or to
-deliberately replace every chord, run:
+alone. Running the installer again adds newly introduced defaults to its marked
+block without rewriting existing bindings. To install from a terminal while
+still preserving collisions, or to deliberately replace every chord, run:
 
 ```bash
 ~/.config/omarchy/plugins/io.github.spencerbull.omapilot/scripts/install-hotkeys.sh
