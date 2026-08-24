@@ -19,11 +19,11 @@ substance of this document.
 | Surface | Edge | Focus | Input region | Purpose |
 | --- | --- | --- | --- | --- |
 | **Node** | bottom | never | none (`mask: Region {}`) | Voice presence and live transcript. Light, not a widget. |
-| **Curtain** | top, under the bar | none, grabbable | none until grabbed | The answer. Glance, then gone. |
+| **Curtain** | top, under the bar | none | card only | The answer. Glance, scroll if needed, then gone. |
 | **Console** | centred | exclusive while open | full | The deliberate lane: typing, choices, settings, history, permissions, auth. |
 
-The node and the curtain are **ambient**: they never take a click or a
-keystroke, so they cannot interrupt what the user is doing. The console is the
+The node and the curtain are **ambient**: they never take a keystroke, and the
+curtain takes pointer input only inside its card. The console is the
 only surface that takes focus, and only on explicit summon or when a decision
 genuinely blocks progress.
 
@@ -45,7 +45,7 @@ Every capability the panel and bar widget own today, and where it goes.
 | Provider / model selection | Composer dropdowns | Console → settings |
 | Submit | Composer send button | Voice release, or console Enter |
 | Streaming answer | panel response card | Curtain |
-| Markdown, images, links | `MarkdownView` in panel | Curtain (grab to scroll, copy, open) |
+| Markdown, images, links | `MarkdownView` in panel | Curtain (scroll overflowing answers without keyboard focus) |
 | Response activity runner | response card perimeter | Node filament runner (ported) |
 | Quick actions | panel chips | Console, keyboard-first list |
 | History (latest 30) | `HistoryView` in panel | Console → history lane |
@@ -115,9 +115,10 @@ user is typing in, the illusion dies immediately.
 
 - Node — `WlrKeyboardFocus.None`, `mask: Region {}`, `ExclusionMode.Ignore`.
   Permanently inert. Feedback only.
-- Curtain — `keyboardFocus: None` and click-through by default, so an answer can
-  appear while the user keeps typing. A hotkey *grabs* it, switching it to
-  focused and interactive for scrolling, copying, and opening links.
+- Curtain — `keyboardFocus: None` and click-through outside its card, so an
+  answer can appear while the user keeps typing. Its response viewport accepts
+  pointer input, enabling bounded wheel and touch scrolling when content
+  overflows without taking keyboard focus.
   `ExclusionMode.Normal` with `exclusiveZone: 0`, so it respects the bar's
   reserved strip and reserves nothing itself — no window ever reflows.
 - Console — `WlrKeyboardFocus.Exclusive` while open, `ExclusionMode.Ignore`.
@@ -248,12 +249,9 @@ a 31-word answer computes 11 940 ms.
 The timer only runs once the answer has settled, so streaming never races it,
 and it restarts when new content arrives.
 
-**Accepted cost.** Production should also hold the timer while the curtain is
-grabbed, but it cannot pause on hover: the node and curtain are click-through
-(`mask: Region {}`), so they receive no pointer events at all. Giving the
-curtain an input region would buy hover-to-pause at the price of intercepting
-clicks in a strip across the top of the screen. Never intercepting a click is
-worth more than hover-to-pause, so the grab hotkey is the escape hatch.
+**Accepted cost.** The timer does not yet pause while the user scrolls. The
+curtain's input region is limited to the card rather than the whole
+top strip, so the rest of the surface remains click-through.
 
 When dormant, every OmaPilot surface unmaps — the plugin leaves nothing on the
 output while idle.
