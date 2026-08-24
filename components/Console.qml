@@ -132,6 +132,27 @@ Item {
     content.showChat(false)
   }
 
+  // The console asks to be a column pinned to the right edge, under the bar.
+  // It asks at exactly three moments — when it maps, and when either setting
+  // that decides its shape changes while it is up — and at no other. In
+  // between the geometry belongs to the user: a window they dragged or resized
+  // by hand stays where they put it until the next of the three. Nothing is
+  // persisted, so the next open is the column again.
+  //
+  // `reservesSpace` is the same promise the exclusive zone used to make, kept
+  // the way a window keeps it: not floating. Tiled, the layout puts the user's
+  // windows beside the console instead of behind it, and opening or closing it
+  // reflows them.
+  function applyPlacement() {
+    if (!engaged || fullscreen) return
+    ConsolePlacement.placeColumn(root.windowTitle, Style.space(root.surfaceWidth),
+                                 !root.reservesSpace)
+  }
+
+  onEngagedChanged: if (engaged) applyPlacement()
+  onSurfaceWidthChanged: applyPlacement()
+  onReservesSpaceChanged: applyPlacement()
+
   // One tick is enough for the compositor to see the surface go away and come
   // back; anything shorter and Qt coalesces the two into no change at all.
   Timer {

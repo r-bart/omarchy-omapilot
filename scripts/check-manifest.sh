@@ -58,7 +58,7 @@ jq -e '
     "type":"boolean",
     "label":"Hold the column open",
     "defaultValue":false,
-    "description":"Reserve the docked console width so windows tile beside it instead of behind it. Opening and closing the console reflows the layout."
+    "description":"Let the docked console tile with your windows instead of floating over them. Opening and closing it reflows the layout."
   }
   and (.barWidget.schema[] | select(.key == "webHandoffProvider")) == {
     "key":"webHandoffProvider",

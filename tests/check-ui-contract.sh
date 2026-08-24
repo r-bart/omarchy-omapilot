@@ -142,6 +142,32 @@ grep -Fq 'if (ConsolePlacement.activate(' "$repo_dir/components/Console.qml"
 # conversation is done with, and only one may reset the lanes.
 grep -Fq 'onVisibleChanged: if (!visible && !root.remapping) content.reset()' \
   "$repo_dir/components/Console.qml"
+
+# The dispatch acts on the active window, so it may only run once the active
+# window is known to be ours. Placing someone else's window is worse than
+# leaving ours where the compositor put it.
+grep -Fq 'function placeColumn(' "$repo_dir/components/ConsolePlacement.qml"
+grep -Fq 'Hyprland.activeToplevel' "$repo_dir/components/ConsolePlacement.qml"
+# Measured, at the cost of a whole round of tests: in this Hyprland a dispatch
+# in the classic syntax does not fail, it does nothing. Nothing checks a return
+# value because there is none — dispatch() is void and the socket's `ok` means
+# "accepted", not "had an effect" — so the compositor is asked which language
+# it speaks instead of one of the two being guessed at.
+grep -Fq 'Hyprland.usingLua' "$repo_dir/components/ConsolePlacement.qml"
+# float and pin are toggles. Sending them without reading the current state is
+# how a second placement undoes the first.
+grep -Fq 'if (state.floating !== floating)' "$repo_dir/components/ConsolePlacement.qml"
+# Placed at three moments and no others, so a window the user dragged stays
+# where they put it until the next of the three.
+grep -Fq 'onEngagedChanged: if (engaged) applyPlacement()' "$repo_dir/components/Console.qml"
+grep -Fq 'onSurfaceWidthChanged: applyPlacement()' "$repo_dir/components/Console.qml"
+grep -Fq 'onReservesSpaceChanged: applyPlacement()' "$repo_dir/components/Console.qml"
+# Holding the column open is now "do not float": tiled, the compositor puts the
+# user's windows beside the console instead of behind it. Same promise the
+# exclusive zone made, same cost, kept the way a window can keep it.
+grep -Fq '!root.reservesSpace)' "$repo_dir/components/Console.qml"
+grep -Fq '"consoleReservesSpace": false' "$repo_dir/manifest.json"
+
 # The stored value keeps its name: it is the word the user sees and the one the
 # surface cycle advances through. The implementation changes, not the vocabulary.
 grep -Fq 'fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"' \

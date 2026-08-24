@@ -66,5 +66,105 @@ QtObject {
     return true
   }
 
+  // ------------------------------------------------------------------ placing
+  //
+  // Everything below acts on the ACTIVE window, because that is the only window
+  // a dispatch can address without a selector. So it may only run once the
+  // active window is known to be ours: placing someone else's window is worse
+  // than leaving ours where the compositor put it.
+  //
+  // Focus arrives from the compositor as an event, not as the return of a call,
+  // and the toplevel model refreshes over IPC. Both are why this is a request
+  // now and a decision one round trip later, rather than a single function.
+
+  property string pendingTitle: ""
+  property int pendingWidth: 0
+  property bool pendingFloating: false
+
+  property Timer confirmTimer: Timer {
+    interval: 120
+    repeat: false
+    onTriggered: root.applyPending()
+  }
+
+  // Ask for the console to become a column pinned to the right edge, under
+  // whatever the bar reserves. `floating` false is the other half of the same
+  // request: leave it tiled, so the user's windows sit beside it.
+  function placeColumn(title, width, floating) {
+    if (!root.available) return
+    root.pendingTitle = String(title || "")
+    root.pendingWidth = Math.round(width)
+    root.pendingFloating = floating !== false
+    root.activate(root.pendingTitle)
+    root.refresh()
+    confirmTimer.restart()
+  }
+
+  function applyPending() {
+    var title = root.pendingTitle
+    var width = root.pendingWidth
+    var floating = root.pendingFloating
+    root.pendingTitle = ""
+
+    if (title === "") return
+    var active = Hyprland.activeToplevel
+    if (!active || String(active.title || "") !== title) return
+
+    // MEASURED: `hl.dsp.window.float` and `.pin` are the toggles Hyprland has
+    // always had under other names, so they are only safe to send against a
+    // known current state. That state is why the refresh above matters.
+    var state = active.lastIpcObject || {}
+    if (state.floating !== floating) root.dispatch("window.float()", "togglefloating active")
+    if (!floating) {
+      // Tiled: the layout owns the geometry, and a pinned tiled window is a
+      // contradiction the compositor resolves however it likes.
+      if (state.pinned === true) root.dispatch("window.pin()", "pin active")
+      return
+    }
+    if (state.pinned !== true) root.dispatch("window.pin()", "pin active")
+
+    var box = root.columnBox(width)
+    if (!box) return
+    root.dispatch("window.resize({" + box.width + "," + box.height + "})",
+                  "resizewindowpixel exact " + box.width + " " + box.height + ",activewindow")
+    root.dispatch("window.move({" + box.x + "," + box.y + "})",
+                  "movewindowpixel exact " + box.x + " " + box.y + ",activewindow")
+  }
+
+  // The right-hand column of the monitor that currently holds our window,
+  // inside whatever the bar and anything else have reserved.
+  function columnBox(width) {
+    var monitor = Hyprland.focusedMonitor
+    if (!monitor || width <= 0) return null
+    // Hyprland reports monitor size in device pixels and everything else in
+    // logical ones. Verified at scale 1; the division is what makes the other
+    // scales arithmetic rather than a special case.
+    var scale = monitor.scale > 0 ? monitor.scale : 1
+    var logicalWidth = Math.round(monitor.width / scale)
+    var logicalHeight = Math.round(monitor.height / scale)
+    var reserved = (monitor.lastIpcObject || {}).reserved || [0, 0, 0, 0]
+    var top = Number(reserved[1]) || 0
+    var bottom = Number(reserved[3]) || 0
+    return {
+      width: width,
+      height: Math.max(1, logicalHeight - top - bottom),
+      x: monitor.x + logicalWidth - width,
+      y: monitor.y + top
+    }
+  }
+
+  // MEASURED, and it cost a whole round of tests: this Hyprland reads its
+  // config in Lua, and a dispatch in the classic syntax does not fail there —
+  // it silently does nothing. `usingLua` is the compositor telling us which
+  // language it speaks, so neither form has to be guessed at.
+  //
+  // Nothing checks the result because there is nothing to check: dispatch()
+  // returns void in this Quickshell, and `ok` from the socket means "accepted",
+  // not "had an effect". The guard is the state read above, not a return value.
+  function dispatch(lua, classic) {
+    if (!root.available) return
+    Hyprland.dispatch(Hyprland.usingLua ? "hl.dsp." + lua : classic)
+  }
+
   Component.onCompleted: root.refresh()
 }
