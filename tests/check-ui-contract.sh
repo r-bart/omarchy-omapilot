@@ -19,6 +19,7 @@ qml_files=(
   "$repo_dir/components/Composer.qml"
   "$repo_dir/components/Console.qml"
   "$repo_dir/components/ConsoleContent.qml"
+  "$repo_dir/components/ConsolePlacement.qml"
   "$repo_dir/components/ContextAttachmentPreview.qml"
   "$repo_dir/components/ErrorDetailsView.qml"
   "$repo_dir/components/ErrorNotice.qml"
@@ -113,11 +114,34 @@ grep -Fq 'readonly property bool focused: surface.visible && shellItem.windowAct
 # question.
 grep -Fq 'onClosed: root.close()' "$repo_dir/components/Console.qml"
 
-# Dismissing is the bar button pressed again, routed through the store's toggle.
+# Three states, not two: a window can be visible without holding the keyboard.
+# Pressed over a console the user can already see but is not typing into, the
+# bar icon means "take me there" — hiding what someone just asked for is the
+# surprise this project has already paid for twice.
 grep -Fq 'function toggle() {' "$repo_dir/components/Console.qml"
+# takeFocus, not focus: QQuickItem has a final `focus` property, and shadowing
+# it with a method is a warning today and a silent misbinding tomorrow.
+grep -Fq 'else if (!root.focused) takeFocus()' "$repo_dir/components/Console.qml"
 # No fold-to-a-handle state: it would spend a column of the surface on a gesture
 # the bar icon already performs, from a control the user has to discover.
 ! grep -q 'collapsed' "$repo_dir/components/Console.qml"
+# All compositor coupling lives in one place. Console.qml is about a window;
+# ConsolePlacement is about Hyprland. Keeping the import out is what keeps that
+# true, and what makes the no-Hyprland path a single check instead of a habit.
+! grep -qE '^import Quickshell\.Hyprland' "$repo_dir/components/Console.qml"
+grep -Fq 'singleton ConsolePlacement 1.0 ConsolePlacement.qml' "$repo_dir/components/qmldir"
+grep -Fq 'readonly property bool available' "$repo_dir/components/ConsolePlacement.qml"
+# The toplevel model is populated lazily and starts empty, so a lookup that runs
+# before the first refresh finds nothing and says nothing about why.
+grep -Fq 'Hyprland.refreshToplevels()' "$repo_dir/components/ConsolePlacement.qml"
+# Focusing has a floor. If activation fails or Hyprland is absent, remap: a
+# window that is hidden and shown again comes back focused — measured. The
+# ladder ends somewhere guaranteed, so focus() has no failure branch.
+grep -Fq 'if (ConsolePlacement.activate(' "$repo_dir/components/Console.qml"
+# A remap is not a close. Both unmap the window; only one of them means the
+# conversation is done with, and only one may reset the lanes.
+grep -Fq 'onVisibleChanged: if (!visible && !root.remapping) content.reset()' \
+  "$repo_dir/components/Console.qml"
 # The stored value keeps its name: it is the word the user sees and the one the
 # surface cycle advances through. The implementation changes, not the vocabulary.
 grep -Fq 'fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"' \

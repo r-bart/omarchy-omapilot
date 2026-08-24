@@ -59,14 +59,38 @@ Item {
   // corrects it — it was already true.
   readonly property bool focused: surface.visible && shellItem.windowActive
 
+  // True only for the instant the focus fallback takes to unmap and remap the
+  // window. `opened` deliberately stays true across it, so nothing downstream
+  // reads a blink as a close.
+  property bool remapping: false
+
   function open(withFocus) {
     if (!opened && backend && typeof backend.latchDesktopContext === "function")
       backend.latchDesktopContext()
+    var wasOpen = opened
     opened = true
     // Mapping is what takes the compositor's keyboard — measured, and true of
-    // any toplevel. All this decides is where the caret lands inside it.
-    if (withFocus !== false)
-      Qt.callLater(function() { content.forceComposerFocus() })
+    // any toplevel. Opening onto an already-mapped window takes nothing, so
+    // that case has to ask.
+    if (withFocus === false) return
+    if (wasOpen && !focused) takeFocus()
+    Qt.callLater(function() { content.forceComposerFocus() })
+  }
+
+  // Take the keyboard back for a window the user can already see.
+  //
+  // MEASURED (A1): activating our own toplevel by title moves the compositor's
+  // focus with no remap and no blink. When that is unavailable — no Hyprland,
+  // or we are not in the toplevel model yet — remap instead: a window hidden
+  // and shown again comes back focused, also measured. The ladder ends
+  // somewhere guaranteed, so this has no failure branch.
+  //
+  // Not `focus()`: QQuickItem already has a final property by that name, and
+  // shadowing it is a warning today and a silent misbinding tomorrow.
+  function takeFocus() {
+    if (ConsolePlacement.activate(root.windowTitle)) return
+    remapping = true
+    remapTimer.restart()
   }
 
   function close() {
@@ -75,14 +99,19 @@ Item {
       backend.clearDesktopContextLatch()
   }
 
-  // Dismissing is the bar button pressed a second time, which already routes
-  // here through the store. A dedicated fold-to-a-handle state was tried and
-  // removed: it spent a permanent column of the surface on a gesture the bar
-  // icon already performs, from a control the user has to discover, and left
-  // the console mapped and holding a strip of the screen to no purpose.
+  // Three states, not two. A window can be visible without holding the
+  // keyboard, and pressed over a console the user can already see but is not
+  // typing into, the bar icon means "take me there" — hiding what someone just
+  // asked for is the surprise this project has already paid for twice.
+  //
+  // A dedicated fold-to-a-handle state was tried and removed: it spent a
+  // permanent column of the surface on a gesture the bar icon already
+  // performs, from a control the user has to discover, and left the console
+  // mapped and holding a strip of the screen to no purpose.
   function toggle() {
-    if (opened) close()
-    else open(true)
+    if (!opened) open(true)
+    else if (!root.focused) takeFocus()
+    else close()
   }
 
   function openHistory() {
@@ -103,6 +132,15 @@ Item {
     content.showChat(false)
   }
 
+  // One tick is enough for the compositor to see the surface go away and come
+  // back; anything shorter and Qt coalesces the two into no change at all.
+  Timer {
+    id: remapTimer
+    interval: 1
+    repeat: false
+    onTriggered: root.remapping = false
+  }
+
   FloatingWindow {
     id: surface
     title: root.windowTitle
@@ -118,12 +156,15 @@ Item {
     // this is the same floor, so a drag cannot squash the console below the
     // narrowest width the settings will offer.
     minimumSize: Qt.size(Style.space(360), Style.space(280))
-    visible: root.opened
+    visible: root.opened && !root.remapping
     // No slide of our own any more. Omarchy pins layersIn/layersOut to a global
     // fade, which is why the layer-shell console animated its own x; a toplevel
     // gets windowsIn/windowsOut instead, the animation the user already has for
     // every other window.
-    onVisibleChanged: if (!visible) content.reset()
+    //
+    // The remap guard is what separates a close from the focus fallback: both
+    // unmap the window, only one of them means the conversation is done with.
+    onVisibleChanged: if (!visible && !root.remapping) content.reset()
 
     // The X, or Super+W, or any other way the compositor closes a window. This
     // is a close, not a hide: the desktop-context latch freezes the active
