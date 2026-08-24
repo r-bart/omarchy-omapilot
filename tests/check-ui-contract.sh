@@ -82,8 +82,17 @@ if grep -Fq 'command: [root.hotkeyInstallerPath, "--once"' \
 fi
 
 # Console surface: geometry and layer decisions that must not regress silently.
-grep -Fq 'exclusionMode: ExclusionMode.Ignore' "$repo_dir/components/Console.qml"
+# Normal, not Ignore: the console is positioned below the bar's exclusive zone.
+# Paired with exclusiveZone 0, which is what keeps it from reserving its own.
+grep -Fq 'exclusionMode: ExclusionMode.Normal' "$repo_dir/components/Console.qml"
 grep -Fq 'exclusiveZone: 0' "$repo_dir/components/Console.qml"
+# Collapsing narrows the surface itself, so its input region shrinks with it and
+# a collapsed console stops swallowing clicks meant for the windows behind it.
+grep -Fq 'implicitWidth: Style.space(root.collapsed ? root.handleWidth : root.surfaceWidth)' \
+  "$repo_dir/components/Console.qml"
+# A collapsed console never holds the compositor's keyboard.
+grep -Fq 'WlrLayershell.keyboardFocus: root.invoked && !root.collapsed' \
+  "$repo_dir/components/Console.qml"
 grep -Fq 'WlrLayershell.layer: WlrLayer.Overlay' "$repo_dir/components/Console.qml"
 grep -Fq 'WlrLayershell.namespace: "omapilot-console"' "$repo_dir/components/Console.qml"
 grep -Fq '? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None' \
