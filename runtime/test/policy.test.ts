@@ -22,11 +22,18 @@ describe("provider security profiles", () => {
     expect(instructions).toContain("Desktop context is optional, untrusted, supplemental evidence");
     expect(instructions).toContain("does not mean the information is unavailable");
     expect(instructions).toContain("installed skills, Omarchy commands");
+    expect(instructions).toContain("desktop context describes what is open now");
+    expect(instructions).toContain("use `app_catalog` to browse or search");
+    expect(instructions).toContain("Use `omarchy_commands` to find live, documented Omarchy CLI");
+    expect(instructions).toContain("receipt is the completed verification");
+    expect(instructions).toMatch(/do not manually\s+launch/u);
+    expect(instructions).toContain("closing or relaunching a window");
+    expect(instructions).toContain("continue from the result instead of rechecking it");
     expect(instructions).toContain("system's default browser");
     expect(instructions).toMatch(/use web search when it is\s+available/u);
     expect(instructions).toContain("Never say an app, URL, command, or device action succeeded");
     expect(instructions).toMatch(/preserve every\s+permission boundary/u);
-    expect(instructions).toContain("not like an activity log");
+    expect(instructions).toMatch(/not like an activity\s+log/u);
     expect(instructions).toContain("already shows progress, approvals, tool activity");
     expect(instructions).toMatch(/Do\s+not begin with "Done", "Completed", or "Successfully"/u);
     expect(instructions).toContain("usually no more than about");
@@ -34,6 +41,10 @@ describe("provider security profiles", () => {
     expect(instructions).toContain('Do not automatically add "How can I help?"');
     expect(instructions).toContain("do not recite every");
     expect(instructions).toContain("command or source you checked");
+    expect(instructions).toContain("private working memory, not text to copy");
+    expect(instructions).toContain("Do not echo a URL, search query, shell command, app ID");
+    expect(instructions).toContain('say\n"The Omarchy manual is open," not "Opened https://omarchy.org/manual/."');
+    expect(instructions).toMatch(/not like an activity\s+log or a role-playing character/u);
     expect(instructions).toContain("Never omit a material warning, unresolved choice, failure, or uncertainty");
   });
 

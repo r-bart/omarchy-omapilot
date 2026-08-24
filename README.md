@@ -271,6 +271,16 @@ bundled MCP server. OpenCode receives connector reads but no Files tools, which
 preserves its fixed no-host-reads policy. Mutations remain exclusive to the
 built-in Pi harness until ACP can preserve the same one-shot contract.
 
+## Installed apps and Omarchy commands
+
+Built-in OmaPilot can browse or search installed graphical apps and executable
+CLI programs with `app_catalog`; this inventory is separate from submit-time
+desktop context, which reports only currently open apps. It can also search the
+installed system's documented `omarchy commands --json` catalog with the
+read-only `omarchy_commands` tool. Finding a command does not execute it:
+structured actions remain preferred, and any shell fallback keeps the normal
+exact approval boundary.
+
 ## Browser search handoff
 
 Built-in OmaPilot can hand a current-information question to a browser without
