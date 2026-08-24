@@ -114,8 +114,15 @@ Item {
     // nothing. VoiceNode's PanelWindow is the canonical reference.
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "omapilot-console"
+    // OnDemand, not Exclusive. Exclusive holds the compositor's keyboard for as
+    // long as the surface is up — clicking another window does not move focus,
+    // which is how an open console could strand a session with no way out but
+    // the keyboard it was holding. OnDemand lets the compositor hand focus back
+    // and forth the way it does for any window, so clicking away just works.
+    // `None` while at rest is still what the escape ladder's release-focus step
+    // does: it is the only way a client can put the keyboard down.
     WlrLayershell.keyboardFocus: root.invoked
-      ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+      ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
     Item {
       id: shellItem

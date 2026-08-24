@@ -93,8 +93,11 @@ grep -Fq 'function toggle() {' "$repo_dir/components/Console.qml"
 ! grep -q 'collapsed' "$repo_dir/components/Console.qml"
 grep -Fq 'WlrLayershell.layer: WlrLayer.Overlay' "$repo_dir/components/Console.qml"
 grep -Fq 'WlrLayershell.namespace: "omapilot-console"' "$repo_dir/components/Console.qml"
-grep -Fq '? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None' \
+# Never Exclusive: a surface that holds the keyboard against the compositor is
+# a surface that can strand a session.
+grep -Fq '? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None' \
   "$repo_dir/components/Console.qml"
+! grep -q 'WlrKeyboardFocus.Exclusive' "$repo_dir/components/Console.qml"
 # Docked pins three edges; fullscreen adds the fourth and lets the compositor
 # size the surface. One window, two geometries — not two surfaces to keep in step.
 grep -Fq 'anchors { right: true; top: true; bottom: true; left: root.fullscreen }' \
