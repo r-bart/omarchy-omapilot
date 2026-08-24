@@ -81,27 +81,45 @@ if grep -Fq 'command: [root.hotkeyInstallerPath, "--once"' \
   exit 1
 fi
 
-# Console surface: geometry and layer decisions that must not regress silently.
-# Normal, not Ignore: the console is positioned below the bar's exclusive zone.
-# Paired with exclusiveZone 0, which is what keeps it from reserving its own.
-grep -Fq 'exclusionMode: ExclusionMode.Normal' "$repo_dir/components/Console.qml"
-grep -Fq 'exclusiveZone: 0' "$repo_dir/components/Console.qml"
+# The console is a real window, not a layer-shell surface. This is not a style
+# preference: it was measured. A probe of two pure OnDemand surfaces, one on
+# Overlay and one on Top, trapped the keyboard in both — on Hyprland 0.56.2 a
+# layer-shell surface does not hand focus back whatever its interactivity, and
+# an open console could strand the session. Going back is going back to that.
+grep -Fq 'FloatingWindow {' "$repo_dir/components/Console.qml"
+# Anchored so the comments above may still name what this file stopped being;
+# the import is the real gate, since WlrLayershell cannot be used without it.
+! grep -qE '^import Quickshell\.Wayland' "$repo_dir/components/Console.qml"
+! grep -qE '^[[:space:]]*PanelWindow[[:space:]]*\{' "$repo_dir/components/Console.qml"
+! grep -qE '^[[:space:]]*WlrLayershell\.' "$repo_dir/components/Console.qml"
+# Quickshell sets app_id per process, so every toplevel of the shell arrives as
+# org.quickshell and the title is the only stable identifier — Omarchy singles
+# out its own dev gallery the same way. One source of truth for it, because the
+# placement lookup matches on it: a title that drifts is a console that cannot
+# be found, and therefore cannot be focused or placed.
+grep -Fq 'readonly property string windowTitle: "OmaPilot"' \
+  "$repo_dir/components/Console.qml"
+grep -Fq 'title: root.windowTitle' "$repo_dir/components/Console.qml"
+# Focus is derived and includes `visible`, never stored. Measured: after the
+# compositor closes the window Qt never emits active=false, so a stored flag
+# keeps a stale true and the next open never corrects it — it was already true.
+grep -Fq 'readonly property bool windowActive: Window.active' \
+  "$repo_dir/components/Console.qml"
+grep -Fq 'readonly property bool focused: surface.visible && shellItem.windowActive' \
+  "$repo_dir/components/Console.qml"
+# Closing from the compositor is closing, not hiding. The desktop-context latch
+# freezes the active window and workspace from the moment the console opened;
+# held past a close, it attaches a desktop that no longer exists to the next
+# question.
+grep -Fq 'onClosed: root.close()' "$repo_dir/components/Console.qml"
+
 # Dismissing is the bar button pressed again, routed through the store's toggle.
-# No second fold-to-a-handle state: it would spend a column of the surface on a
-# gesture the bar icon already performs.
 grep -Fq 'function toggle() {' "$repo_dir/components/Console.qml"
+# No fold-to-a-handle state: it would spend a column of the surface on a gesture
+# the bar icon already performs, from a control the user has to discover.
 ! grep -q 'collapsed' "$repo_dir/components/Console.qml"
-grep -Fq 'WlrLayershell.layer: WlrLayer.Overlay' "$repo_dir/components/Console.qml"
-grep -Fq 'WlrLayershell.namespace: "omapilot-console"' "$repo_dir/components/Console.qml"
-# Never Exclusive: a surface that holds the keyboard against the compositor is
-# a surface that can strand a session.
-grep -Fq '? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None' \
-  "$repo_dir/components/Console.qml"
-! grep -q 'WlrKeyboardFocus.Exclusive' "$repo_dir/components/Console.qml"
-# Docked pins three edges; fullscreen adds the fourth and lets the compositor
-# size the surface. One window, two geometries — not two surfaces to keep in step.
-grep -Fq 'anchors { right: true; top: true; bottom: true; left: root.fullscreen }' \
-  "$repo_dir/components/Console.qml"
+# The stored value keeps its name: it is the word the user sees and the one the
+# surface cycle advances through. The implementation changes, not the vocabulary.
 grep -Fq 'fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"' \
   "$repo_dir/Ambient.qml"
 # The surface switch lives with the composer, the one piece all three surfaces

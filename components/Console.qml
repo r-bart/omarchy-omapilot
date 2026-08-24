@@ -1,11 +1,9 @@
 import QtQuick
 import Quickshell
-import Quickshell.Wayland
 import qs.Commons
 import "." as OmaPilot
 
-// The console: OmaPilot's full-height deliberate surface, docked to the right
-// edge of the focused output.
+// The console: OmaPilot's deliberate surface, and a window like any other.
 //
 // This is the third ambient surface of design/ambient-ux.md — the node listens,
 // the curtain answers, the console is where typing, choices, history, settings,
@@ -14,9 +12,18 @@ import "." as OmaPilot
 // one entry point per plugin and an extra `entryPoints` key would be silently
 // ignored.
 //
-// The window stays mechanical on purpose: geometry, layer, focus policy, and
-// the slide. Everything with an opinion lives in ConsoleContent, so the layout
-// can iterate offscreen while only this file needs a live Wayland session.
+// It used to be a layer-shell surface, and that was measured to be a trap. A
+// probe of two pure OnDemand surfaces — one on Overlay, one on Top, with no
+// plugin code at all — trapped the keyboard in both: on Hyprland 0.56.2 a
+// layer-shell surface does not hand focus back whatever its interactivity, so
+// an open console could strand a session with no way out but the keyboard it
+// was holding. A real xdg-toplevel gets the compositor's ordinary focus
+// handling for free, and with it the window cycle, the close button, and every
+// keybinding the user already has.
+//
+// The window stays mechanical on purpose: identity, geometry, and lifecycle.
+// Everything with an opinion lives in ConsoleContent, so the layout can iterate
+// offscreen while only this file needs a live Wayland session.
 Item {
   id: root
 
@@ -26,8 +33,8 @@ Item {
   // Value at scale 1; Style.space applies the host's spacing scale below.
   property int surfaceWidth: 440
   // Same content, whole screen. ConsoleContent was split from this window so a
-  // second host could exist; this is that host, and it costs one anchor rather
-  // than a second surface to keep in step. Docked stays the default.
+  // second host could exist; this is that host, and it costs one property
+  // rather than a second surface to keep in step. Docked stays the default.
   property bool fullscreen: false
   // Whether the compositor should hold a column open for the console the way it
   // holds the strip open for the bar, so windows tile beside it instead of
@@ -36,25 +43,33 @@ Item {
   property bool reservesSpace: false
 
   property bool opened: false
-  // Mapped, including the exit slide. Owners that tear the console down (the
-  // loader in Ambient.qml) must wait for this, not for `opened`.
+  // Mapped. Owners that tear the console down (the loader in Ambient.qml) must
+  // wait for this, not for `opened`.
   readonly property bool engaged: surface.visible
-  // Holding the compositor's keyboard. Escape at rest releases this without
-  // closing; clicking anywhere on the surface takes it back.
-  property bool invoked: false
+
+  // Quickshell sets app_id per process, so every toplevel of the shell arrives
+  // as org.quickshell and the title is the only stable identifier — Omarchy
+  // singles out its own dev gallery the same way. One source of truth for it,
+  // because everything that has to find this window matches on it.
+  readonly property string windowTitle: "OmaPilot"
+
+  // Derived, never stored, and `visible` is part of the expression rather than
+  // decoration. Measured: after the compositor closes the window Qt never emits
+  // active=false, so a stored flag keeps a stale true and the next open never
+  // corrects it — it was already true.
+  readonly property bool focused: surface.visible && shellItem.windowActive
 
   function open(withFocus) {
     if (!opened && backend && typeof backend.latchDesktopContext === "function")
       backend.latchDesktopContext()
     opened = true
-    if (withFocus !== false) {
-      invoked = true
+    // Mapping is what takes the compositor's keyboard — measured, and true of
+    // any toplevel. All this decides is where the caret lands inside it.
+    if (withFocus !== false)
       Qt.callLater(function() { content.forceComposerFocus() })
-    }
   }
 
   function close() {
-    invoked = false
     opened = false
     if (backend && typeof backend.clearDesktopContextLatch === "function")
       backend.clearDesktopContextLatch()
@@ -88,63 +103,42 @@ Item {
     content.showChat(false)
   }
 
-  PanelWindow {
+  FloatingWindow {
     id: surface
+    title: root.windowTitle
+    // Advisory only. A layer-shell surface belongs to an output; a toplevel is
+    // placed by the compositor, which will honour this or not as it sees fit.
     screen: root.targetScreen
     color: "transparent"
-    // Anchoring left as well is the whole of the fullscreen mode: with both
-    // sides pinned the compositor sizes the surface and implicitWidth stops
-    // being consulted, so the docked width needs no special case.
-    anchors { right: true; top: true; bottom: true; left: root.fullscreen }
     implicitWidth: Style.space(root.surfaceWidth)
-    // Normal, not Ignore. `exclusiveZone: 0` is what keeps the console from
-    // reserving a strip of its own, so nothing reflows when it opens — that
-    // part is unchanged. Ignore additionally opted the surface out of being
-    // moved by *other* surfaces' exclusive zones, which is what laid it over
-    // the bar. Normal leaves the bar's own strip alone and starts underneath it.
-    exclusionMode: ExclusionMode.Normal
-    // Fullscreen is excluded rather than guarded against: a surface that covers
-    // the output has no room to leave for anything to tile into, and asking the
-    // compositor to reserve all of it would leave nowhere for windows to go.
-    exclusiveZone: root.reservesSpace && !root.fullscreen ? implicitWidth : 0
-    // Keep the surface mapped while the exit slide plays out.
-    visible: root.opened || shellItem.slid > 0.001
+    // Only consulted until the placement dispatch exists, and on any compositor
+    // that cannot be dispatched to: ask for the full height of the output.
+    implicitHeight: root.targetScreen ? root.targetScreen.height : Style.space(900)
+    // The stored width is already clamped to 360-560 in OmaPilotStore.configure;
+    // this is the same floor, so a drag cannot squash the console below the
+    // narrowest width the settings will offer.
+    minimumSize: Qt.size(Style.space(360), Style.space(280))
+    visible: root.opened
+    // No slide of our own any more. Omarchy pins layersIn/layersOut to a global
+    // fade, which is why the layer-shell console animated its own x; a toplevel
+    // gets windowsIn/windowsOut instead, the animation the user already has for
+    // every other window.
+    onVisibleChanged: if (!visible) content.reset()
 
-    // Attached, not direct: written as plain properties these compile and do
-    // nothing. VoiceNode's PanelWindow is the canonical reference.
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "omapilot-console"
-    // OnDemand, not Exclusive. Exclusive holds the compositor's keyboard for as
-    // long as the surface is up — clicking another window does not move focus,
-    // which is how an open console could strand a session with no way out but
-    // the keyboard it was holding. OnDemand lets the compositor hand focus back
-    // and forth the way it does for any window, so clicking away just works.
-    // `None` while at rest is still what the escape ladder's release-focus step
-    // does: it is the only way a client can put the keyboard down.
-    WlrLayershell.keyboardFocus: root.invoked
-      ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // The X, or Super+W, or any other way the compositor closes a window. This
+    // is a close, not a hide: the desktop-context latch freezes the active
+    // window and workspace from the moment the console opened, and held past a
+    // close it would attach a desktop that no longer exists to the next
+    // question.
+    onClosed: root.close()
 
     Item {
       id: shellItem
-      // 0 = parked beyond the right edge, 1 = docked. The slide is ours rather
-      // than the compositor's: Omarchy pins layersIn/layersOut to a global
-      // fade, the same reason the curtain animates its own y.
-      property real slid: root.opened ? 1 : 0
-      Behavior on slid {
-        enabled: root.motionEnabled
-        NumberAnimation {
-          duration: root.opened ? 220 : 160
-          easing.type: Easing.OutQuint
-        }
-      }
-      // Reset the lanes only once the slide has finished: snapping settings or
-      // history back to the empty chat while the surface is still leaving the
-      // screen reads as a glitch, not a close.
-      onSlidChanged: if (slid < 0.001 && !root.opened) content.reset()
-
-      width: parent.width
-      height: parent.height
-      x: parent.width * (1 - slid)
+      anchors.fill: parent
+      // Whether the compositor has given us the keyboard, as Qt sees it. It is
+      // an attached property, so it only resolves inside the window: read here
+      // and lifted to `root.focused` above.
+      readonly property bool windowActive: Window.active
 
       Rectangle {
         anchors.fill: parent
@@ -152,27 +146,16 @@ Item {
                        Color.popups.background.b, 0.97)
       }
 
-      // Releasing keyboard focus never releases the pointer, so the surface
-      // keeps receiving clicks while unfocused — and a click anywhere is the
-      // gesture that takes the keyboard back.
-      TapHandler {
-        onTapped: {
-          if (!root.invoked) {
-            root.invoked = true
-            Qt.callLater(function() { content.forceComposerFocus() })
-          }
-        }
-      }
-
       OmaPilot.ConsoleContent {
         id: content
         anchors.fill: parent
         backend: root.backend
-        focused: root.invoked
-        // Keyed to the mapped surface, not `opened`, so the filament does not
-        // freeze mid-frame during the exit slide.
+        focused: root.focused
         motionEnabled: root.motionEnabled && surface.visible
-        onReleaseFocusRequested: root.invoked = false
+        // No releaseFocusRequested handler: no Wayland protocol lets a client
+        // put the keyboard down, so there is nothing this window could do with
+        // it. Escape at rest is therefore inert until the escape ladder learns
+        // that this host closes instead of releasing.
         onCloseRequested: root.close()
       }
     }
