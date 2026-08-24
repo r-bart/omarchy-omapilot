@@ -1277,10 +1277,12 @@ turn per provider.
   - [x] Pass focused tests, full validation, generated-artifact, and diff gates.
   - [x] Render and exercise the first-run states in the local UI.
   - [ ] Receive a clean independent Fable review or resolve every finding.
-  - [ ] Commit, push, inspect CI, and open the PR against `dev`.
+  - [x] Commit, push, and open PR 26 against `dev`.
+  - [ ] Confirm PR 26 CI passes on the final head.
 - Worker state: `HERDR_ENV` is unset in this T3 session, so no named Herdr
-  worker may be started or controlled yet. The required Fable review remains a
-  checkpoint; the orchestrator owns implementation and local verification.
+  worker may be started or controlled. The required Fable review remains a PR
+  checkpoint. After local validation, the owner explicitly instructed the
+  orchestrator to publish the PR before that review could run.
 - Current checkpoint: the existing authentication recovery remains unchanged;
   authenticated empty chats now show Voice step 2 and Global keybinds step 3.
   Voice opens with ElevenLabs selected, and Desktop opens with the explicit
@@ -1292,4 +1294,6 @@ turn per provider.
   Git whitespace gates. Shellcheck is unavailable and skipped. Rendered evidence
   is in ignored `screenshots/implementation-omapilot-{setup-voice,setup-hotkeys,
   voice-settings,desktop-settings}.png`. Fable review remains pending because
-  this session is outside Herdr.
+  this session is outside Herdr. The reviewed candidate was committed as
+  `79e53ab`; PR 26 is open at
+  `https://github.com/spencerbull/omarchy-omapilot/pull/26` against `dev`.
