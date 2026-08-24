@@ -61,7 +61,7 @@ describe("voice TTS providers", () => {
       `#!${process.execPath}`,
       "const source = process.argv[3] ?? '';",
       "const imports = ['import numpy as np', 'import soundfile as sf', 'from kokoro import KPipeline'];",
-      "process.exit(process.argv[2] === '-c' && imports.every((value) => source.includes(value)) ? 0 : 1);"
+      "setTimeout(() => process.exit(process.argv[2] === '-c' && imports.every((value) => source.includes(value)) ? 0 : 1), 3_500);"
     ].join("\n"));
     await chmod(python, 0o700);
 
