@@ -1278,7 +1278,7 @@ turn per provider.
   - [x] Render and exercise the first-run states in the local UI.
   - [ ] Receive a clean independent Fable review or resolve every finding.
   - [x] Commit, push, and open PR 26 against `dev`.
-  - [ ] Confirm PR 26 CI passes on the final head.
+  - [x] Confirm PR 26 CI passes on the published implementation head.
 - Worker state: `HERDR_ENV` is unset in this T3 session, so no named Herdr
   worker may be started or controlled. The required Fable review remains a PR
   checkpoint. After local validation, the owner explicitly instructed the
@@ -1297,3 +1297,5 @@ turn per provider.
   this session is outside Herdr. The reviewed candidate was committed as
   `79e53ab`; PR 26 is open at
   `https://github.com/spencerbull/omarchy-omapilot/pull/26` against `dev`.
+  GitHub CI passed `validate` in 1m42s and `package` in 23s on the published
+  implementation-plus-publication-ledger head `a996e10`.
