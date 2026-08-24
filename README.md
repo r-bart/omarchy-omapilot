@@ -45,9 +45,10 @@ compact error notice opens an inspectable details pane.
   broker and Codex ACP payloads but execute them with the system Node runtime.
 - Credentials for the built-in harness, or an installed and authenticated ACP harness.
 - Optional: Voxtype for dictation and Herdr for durable continuation.
-- Optional: a TTS provider to speak answers. Kokoro is local
-  (`pip install kokoro soundfile` on Python 3.10–3.12, plus `espeak-ng`).
-  ElevenLabs and OpenAI need an API key entered in Settings; keys are stored
+- Optional: a TTS provider to speak answers. ElevenLabs is the guided default
+  and needs an API key entered in Settings. Kokoro is local
+  (`pip install kokoro soundfile` on Python 3.10–3.12, plus `espeak-ng`), while
+  OpenAI also needs an API key. Cloud keys are stored
   in `~/.config/omapilot/voice-auth.json`, not widget settings. Voice stays
   off until enabled there.
 - `grim` for contextual screenshots. ImageMagick, already used by OmaPilot's
@@ -71,6 +72,11 @@ inside the broker, opens the provider's browser page for OAuth when needed, and
 renders provider choices, device codes, progress, and errors in Settings.
 Browser OAuth completes through a broker-owned localhost callback; callback
 URLs are never user input. It never opens the Pi terminal.
+
+After authentication, the empty conversation shows the next first-run step:
+configure Voice with ElevenLabs, then open Desktop settings and explicitly press
+**Install global hotkeys**. Chat remains usable throughout; setup never edits
+Hyprland configuration without that final button press.
 
 ## Install
 
@@ -121,6 +127,9 @@ hl.unbind("SUPER + SHIFT + A")
 o.bind("SUPER + SHIFT + A", "New OmaPilot voice chat",
   "omarchy-shell -q io.github.spencerbull.omapilot newVoiceChat")
 
+o.bind("SUPER + ALT + X", "Cancel OmaPilot voice mode",
+  "omarchy-shell -q io.github.spencerbull.omapilot voiceCancel")
+
 o.bind("SUPER + ALT + N", "New OmaPilot chat",
   "omarchy-shell -q io.github.spencerbull.omapilot newChat")
 o.bind("SUPER + ALT + H", "Continue OmaPilot chat in Herdr",
@@ -131,14 +140,16 @@ o.bind("SUPER + ALT + H", "Continue OmaPilot chat in Herdr",
 curtain have closed. While that flow remains active, pressing it again finishes
 live dictation or begins a follow-up in the same conversation. The answer timer,
 explicit dismissal, and cancellation close the voice session; they do not erase
-its saved history. `Super+Shift+A` remains the force-new escape hatch. New typed
-chat opens the panel with an empty composer. Continue in Herdr does nothing until
-the current conversation has a saved chat ID.
+its saved history. `Super+Shift+A` remains the force-new escape hatch, while
+`Super+Alt+X` cancels and closes the active voice flow. New typed chat opens the
+panel with an empty composer. Continue in Herdr does nothing until the current
+conversation has a saved chat ID.
 
 The managed block is written only after that explicit action and becomes normal
 user-owned Hyprland configuration. Existing user-defined collisions are left
-alone. To install from a terminal while still preserving collisions, or to
-deliberately replace every chord, run:
+alone. Running the installer again adds newly introduced defaults to its marked
+block without rewriting existing bindings. To install from a terminal while
+still preserving collisions, or to deliberately replace every chord, run:
 
 ```bash
 ~/.config/omarchy/plugins/io.github.spencerbull.omapilot/scripts/install-hotkeys.sh
@@ -264,6 +275,16 @@ Codex receives the registry and bounded read-only pack tools through OmaPilot's
 bundled MCP server. OpenCode receives connector reads but no Files tools, which
 preserves its fixed no-host-reads policy. Mutations remain exclusive to the
 built-in Pi harness until ACP can preserve the same one-shot contract.
+
+## Installed apps and Omarchy commands
+
+Built-in OmaPilot can browse or search installed graphical apps and executable
+CLI programs with `app_catalog`; this inventory is separate from submit-time
+desktop context, which reports only currently open apps. It can also search the
+installed system's documented `omarchy commands --json` catalog with the
+read-only `omarchy_commands` tool. Finding a command does not execute it:
+structured actions remain preferred, and any shell fallback keeps the normal
+exact approval boundary.
 
 ## Browser search handoff
 

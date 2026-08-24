@@ -128,12 +128,12 @@ if ((remove)); then
   exit 0
 fi
 
+update_existing=0
 if ((begin_count == 1)); then
   if ((force)); then
     remove_managed_block
   else
-    reload_hyprland
-    exit 0
+    update_existing=1
   fi
 fi
 
@@ -150,18 +150,21 @@ has_user_binding() {
 chords=(
   "SUPER + A"
   "SUPER + SHIFT + A"
+  "SUPER + ALT + X"
   "SUPER + ALT + N"
   "SUPER + ALT + H"
 )
 descriptions=(
   "Talk to OmaPilot"
   "New OmaPilot voice chat"
+  "Cancel OmaPilot voice mode"
   "New OmaPilot chat"
   "Continue OmaPilot chat in Herdr"
 )
 commands=(
   "omarchy-shell -q io.github.spencerbull.omapilot voiceToggle"
   "omarchy-shell -q io.github.spencerbull.omapilot newVoiceChat"
+  "omarchy-shell -q io.github.spencerbull.omapilot voiceCancel"
   "omarchy-shell -q io.github.spencerbull.omapilot newChat"
   "omarchy-shell -q io.github.spencerbull.omapilot continueInHerdr"
 )
@@ -172,8 +175,10 @@ trap 'rm -f -- "${block_file:-}" "${candidate_file:-}"' EXIT
 
 installed_count=0
 {
-  printf '%s\n' "$begin_marker"
-  printf '%s\n' '-- Added at the user request from OmaPilot settings. Edit these bindings freely.'
+  if ((!update_existing)); then
+    printf '%s\n' "$begin_marker"
+    printf '%s\n' '-- Added at the user request from OmaPilot settings. Edit these bindings freely.'
+  fi
   for index in "${!chords[@]}"; do
     if ((!force)) && has_user_binding "${chords[$index]}"; then
       printf 'install-hotkeys: leaving existing %s binding unchanged\n' \
@@ -186,21 +191,38 @@ installed_count=0
       "${chords[$index]}" "${descriptions[$index]}" "${commands[$index]}"
     installed_count=$((installed_count + 1))
   done
-  printf '%s\n' "$end_marker"
+  if ((!update_existing)); then
+    printf '%s\n' "$end_marker"
+  fi
 } >"$block_file"
 
-if ((installed_count > 0)); then
+if ((installed_count == 0)); then
+  if ((update_existing)); then
+    reload_hyprland
+    exit 0
+  fi
+  fail "no global hotkeys were installed because all shortcut chords are already in use"
+fi
+
+if ((update_existing)); then
+  awk -v end="$end_marker" -v additions="$block_file" '
+    $0 == end {
+      while ((getline line < additions) > 0) print line
+      close(additions)
+    }
+    { print }
+  ' "$bindings_file" >"$candidate_file"
+else
   {
     cat "$bindings_file"
     printf '\n'
     cat "$block_file"
   } >"$candidate_file"
-
-  if command -v luac >/dev/null; then
-    luac -p "$candidate_file" || fail "generated bindings are not valid Lua"
-  fi
-
-  printf '\n' >>"$bindings_file"
-  cat "$block_file" >>"$bindings_file"
-  reload_hyprland
 fi
+
+if command -v luac >/dev/null; then
+  luac -p "$candidate_file" || fail "generated bindings are not valid Lua"
+fi
+
+cat "$candidate_file" >"$bindings_file"
+reload_hyprland

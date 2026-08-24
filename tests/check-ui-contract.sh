@@ -28,6 +28,7 @@ qml_files=(
   "$repo_dir/components/QuickActionEditor.qml"
   "$repo_dir/components/SettingsView.qml"
   "$repo_dir/components/SettingsTabs.qml"
+  "$repo_dir/components/SetupGuide.qml"
   "$repo_dir/components/StateLightBar.qml"
   "$repo_dir/components/ThinkingScanner.qml"
   "$repo_dir/components/VoiceNode.qml"
@@ -63,6 +64,15 @@ grep -Fq 'onHotkeyInstallRequested: OmaPilot.OmaPilotStore.installHotkeys()' \
   "$repo_dir/Panel.qml"
 grep -Fq 'text: root.hotkeyBusy ? "Updating hotkeys…" : "Install global hotkeys"' \
   "$repo_dir/components/SettingsView.qml"
+grep -Fq 'OmaPilot.SetupGuide {' "$repo_dir/Panel.qml"
+grep -Fq 'function setupStage(providerReady, voiceEnabled, ttsReady, onboardingComplete)' \
+  "$repo_dir/components/Presentation.js"
+grep -Fq 'onActionRequested: root.openSettings(root.setupStage === "voice" ? "voice" : "desktop")' \
+  "$repo_dir/Panel.qml"
+grep -Fq 'function onHotkeyInstalled()' "$repo_dir/Panel.qml"
+grep -Fq 'if (root.voiceSetupReady) root.persistSettings({ onboardingComplete: true })' \
+  "$repo_dir/Panel.qml"
+grep -Fq 'signal hotkeyInstalled()' "$repo_dir/components/OmaPilotStore.qml"
 if grep -Fq 'command: [root.hotkeyInstallerPath, "--once"' \
   "$repo_dir/components/OmaPilotStore.qml"; then
   printf 'Hotkey installation must require an explicit settings action\n' >&2
@@ -751,7 +761,8 @@ if grep -Eq "visual preview failed|Failed to load|Type .* unavailable|Cannot ass
   exit 1
 fi
 
-for preview_state in settings skills-settings actions-settings history waiting streaming error error-details context; do
+for preview_state in settings skills-settings voice-settings desktop-settings actions-settings \
+    setup-voice setup-hotkeys history waiting streaming error error-details context; do
   preview_output="$repo_dir/screenshots/implementation-omapilot-$preview_state.png"
   OMAPILOT_PREVIEW_STATE="$preview_state" OMAPILOT_PREVIEW_PATH="$preview_output" \
     QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \

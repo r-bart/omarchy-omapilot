@@ -64,7 +64,7 @@ Scope {
   property real ttsLevel: 0
   property string ttsSpeakId: ""
   property bool voiceEnabled: false
-  property string ttsProvider: "kokoro"
+  property string ttsProvider: "elevenlabs"
   property string ttsModel: ""
   property string ttsVoice: ""
   // Last server-registration failure, surfaced in settings rather than the chat
@@ -147,6 +147,7 @@ Scope {
   signal contextOverlayRequested(string payload)
   signal contextBrowserPickerRequested()
   signal ttsSpoken()
+  signal hotkeyInstalled()
   signal contextAttachmentAdded()
 
   function routeIpc(method) {
@@ -168,7 +169,7 @@ Scope {
     var desiredDesktopContext = String(source.desktopContext || "On") !== "Off"
     var desiredWebHandoffProvider = Protocol.normalizedWebHandoffProvider(source.webHandoffProvider) || "duckduckgo"
     var desiredVoiceEnabled = source.voiceEnabled === true
-    var desiredTtsProvider = Protocol.normalizedTtsProvider(source.ttsProvider) || "kokoro"
+    var desiredTtsProvider = Protocol.normalizedTtsProvider(source.ttsProvider) || "elevenlabs"
     var desiredTtsModel = String(source.ttsModel || "")
     var desiredTtsVoice = String(source.ttsVoice || "")
     var harnessChanged = desiredProvider !== configuredProvider
@@ -1156,6 +1157,7 @@ Scope {
         root.hotkeyMessage = root.hotkeyAction === "remove"
           ? "Managed global hotkeys removed."
           : "Global hotkeys installed. Existing bindings were preserved."
+        if (root.hotkeyAction === "install") root.hotkeyInstalled()
       } else {
         root.hotkeyMessage = root.hotkeyProcessError !== ""
           ? root.hotkeyProcessError

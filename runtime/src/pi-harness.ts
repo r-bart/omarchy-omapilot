@@ -46,6 +46,7 @@ import {
 export {
   createPersonalAssistantTools,
   discoverInstalledApps,
+  discoverOmarchyCommands,
   normalizeWindowAddress,
   readDesktopState,
   windowActionCommand,
@@ -64,7 +65,7 @@ const MUTATING_TOOLS = new Set([
 const AGENT_PROFILE_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
 const PI_TOOLS = [
   ...AGENT_PROFILE_TOOLS, "agent", "open_url", "web_handoff", "media_control", "app_catalog", "app_open", "desktop_state",
-  "window_action", "workspace_action"
+  "window_action", "workspace_action", "omarchy_commands"
 ];
 const SAFE_AGENT_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const MAX_AGENT_FILE_BYTES = 128 * 1024;
@@ -571,7 +572,7 @@ export function createDesktopTools(run: DesktopCommandRunner = runDesktopCommand
       try {
         const url = normalizeOpenUrl(input.url);
         await run("omarchy", ["launch", "browser", url], signal);
-        return { content: [{ type: "text", text: `Launched ${url} in the default browser.` }], details: { url } };
+        return { content: [{ type: "text", text: "The requested page opened in the default browser." }], details: { url } };
       } catch (error) { return commandToolError("Opening the URL", error); }
     }
   };

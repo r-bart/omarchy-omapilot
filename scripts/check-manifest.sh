@@ -36,9 +36,10 @@ jq -e '
     "webHandoffProvider":"duckduckgo",
     "dangerousAutoApprove":false,
     "voiceEnabled":false,
-    "ttsProvider":"kokoro",
+    "ttsProvider":"elevenlabs",
     "ttsModel":"",
-    "ttsVoice":""
+    "ttsVoice":"",
+    "onboardingComplete":false
   }
   and ([.barWidget.schema[].key] | sort) == (["builtinModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "provider", "ttsModel", "ttsProvider", "ttsVoice", "voiceEnabled", "webHandoffProvider"] | sort)
   and (.barWidget.schema[] | select(.key == "webHandoffProvider")) == {
@@ -67,9 +68,9 @@ jq -e '
     "key":"ttsProvider",
     "type":"enum",
     "label":"TTS provider",
-    "options":["kokoro", "elevenlabs", "openai"],
-    "defaultValue":"kokoro",
-    "description":"Kokoro is local. ElevenLabs and OpenAI need an API key stored in voice-auth.json."
+    "options":["elevenlabs", "kokoro", "openai"],
+    "defaultValue":"elevenlabs",
+    "description":"ElevenLabs is the guided default. Kokoro is local; ElevenLabs and OpenAI keys are stored in voice-auth.json."
   }
 ' "$manifest" >/dev/null || fail "OmaPilot manifest contract drifted"
 

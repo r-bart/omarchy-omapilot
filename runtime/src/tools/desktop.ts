@@ -1,11 +1,11 @@
 import { accessSync, constants, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { delimiter, join, relative, sep } from "node:path";
 import { Type } from "typebox";
 import type { ToolDefinition } from "../../../node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/types.js";
 
-const MAX_COMMAND_OUTPUT = 128 * 1024;
+const MAX_COMMAND_OUTPUT = 512 * 1024;
 const MAX_DESKTOP_FILE_BYTES = 256 * 1024;
 const MAX_WINDOWS = 200;
 const MAX_WORKSPACES = 100;
@@ -14,12 +14,20 @@ const MAX_DIRECTORY_ENTRIES = 5_000;
 const MAX_CATALOG_ENTRIES = 10_000;
 const VERIFY_ATTEMPTS = 30;
 const VERIFY_DELAY_MS = 50;
-const APP_VERIFY_ATTEMPTS = 100;
-const APP_VERIFY_DELAY_MS = 100;
+const APP_VERIFY_ATTEMPTS = 40;
+const APP_VERIFY_DELAY_MS = 50;
+const SAFE_CLI_APP_ID = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,255}$/u;
+const UNSAFE_DISPLAY_TEXT = /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u;
 
 const appCatalogParameters = Type.Object({
-  query: Type.String({ description: "App name or command to find", minLength: 1, maxLength: 128 }),
+  query: Type.Optional(Type.String({ description: "Optional app name or command to find; omit to browse installed apps", minLength: 1, maxLength: 128 })),
   kind: Type.Optional(Type.Union([Type.Literal("all"), Type.Literal("desktop"), Type.Literal("cli")])),
+  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 40 }))
+});
+
+const omarchyCommandsParameters = Type.Object({
+  query: Type.Optional(Type.String({ description: "Optional command, task, or keyword to find", minLength: 1, maxLength: 128 })),
+  group: Type.Optional(Type.String({ description: "Optional exact Omarchy command group, such as launch, menu, or theme", minLength: 1, maxLength: 64 })),
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 40 }))
 });
 
@@ -70,6 +78,15 @@ export type InstalledApp = {
   name: string;
   description?: string;
   startupWmClass?: string;
+  terminal?: boolean;
+};
+
+export type OmarchyCommand = {
+  route: string;
+  summary: string;
+  args?: string;
+  aliases?: string[];
+  requiresSudo: boolean;
 };
 
 export type DesktopWindow = {
@@ -172,6 +189,32 @@ export const runDesktopCommand: DesktopCommandRunner = (file, args, signal) => n
   }, (error, stdout, stderr) => {
     if (error !== null) reject(error);
     else resolve({ stdout, stderr });
+  });
+});
+
+export const launchDesktopCommand: DesktopCommandRunner = (file, args, signal) => new Promise((resolve, reject) => {
+  if (signal?.aborted === true) {
+    reject(signal.reason);
+    return;
+  }
+  let settled = false;
+  const child = spawn(file, args, { detached: true, stdio: "ignore" });
+  const finish = (error?: Error): void => {
+    if (settled) return;
+    settled = true;
+    signal?.removeEventListener("abort", abort);
+    if (error === undefined) resolve({ stdout: "", stderr: "" });
+    else reject(error);
+  };
+  const abort = (): void => {
+    child.kill();
+    finish(signal?.reason instanceof Error ? signal.reason : new Error("The app launch was cancelled"));
+  };
+  signal?.addEventListener("abort", abort, { once: true });
+  child.once("error", finish);
+  child.once("spawn", () => {
+    child.unref();
+    finish();
   });
 });
 
@@ -308,6 +351,16 @@ export async function readDesktopState(
   };
 }
 
+async function readDesktopWindows(
+  run: DesktopCommandRunner,
+  includeTitles: boolean,
+  signal?: AbortSignal
+): Promise<DesktopWindow[]> {
+  const result = await run("hyprctl", ["-j", "clients"], signal);
+  return jsonObjects(result.stdout, "window").slice(0, MAX_WINDOWS)
+    .map((value) => parseWindow(value, includeTitles)).filter((value): value is DesktopWindow => value !== undefined);
+}
+
 function desktopAppDirectories(env: NodeJS.ProcessEnv): string[] {
   const home = env.HOME ?? homedir();
   const configuredDataHome = env.XDG_DATA_HOME?.trim();
@@ -331,6 +384,7 @@ function desktopFiles(directory: string, depth = 0): string[] {
 
 function parseDesktopApp(path: string, id: string): InstalledApp | undefined {
   try {
+    if (id.length > 256 || id.trim() !== id || /[/\\]/u.test(id) || UNSAFE_DISPLAY_TEXT.test(id)) return undefined;
     if (statSync(path).size > MAX_DESKTOP_FILE_BYTES) return undefined;
     const values = new Map<string, string>();
     let inDesktopEntry = false;
@@ -345,16 +399,20 @@ function parseDesktopApp(path: string, id: string): InstalledApp | undefined {
     }
     if (values.get("Type") !== "Application" || values.get("Hidden") === "true" || values.get("NoDisplay") === "true") return undefined;
     const name = values.get("Name")?.trim();
-    if (!name) return undefined;
+    if (!name || UNSAFE_DISPLAY_TEXT.test(name)) return undefined;
     const genericName = values.get("GenericName")?.trim();
-    const description = genericName === undefined || genericName === "" ? values.get("Comment")?.trim() : genericName;
-    const startupWmClass = values.get("StartupWMClass")?.trim();
+    const rawDescription = genericName === undefined || genericName === "" ? values.get("Comment")?.trim() : genericName;
+    const description = rawDescription !== undefined && !UNSAFE_DISPLAY_TEXT.test(rawDescription) ? rawDescription : undefined;
+    const rawStartupWmClass = values.get("StartupWMClass")?.trim();
+    const startupWmClass = rawStartupWmClass !== undefined && !UNSAFE_DISPLAY_TEXT.test(rawStartupWmClass) ? rawStartupWmClass : undefined;
+    const terminal = values.get("Terminal")?.trim().toLocaleLowerCase() === "true";
     return {
       kind: "desktop",
       id,
       name,
       ...(description ? { description: description.slice(0, 240) } : {}),
-      ...(startupWmClass ? { startupWmClass: startupWmClass.slice(0, 240) } : {})
+      ...(startupWmClass ? { startupWmClass: startupWmClass.slice(0, 240) } : {}),
+      ...(terminal ? { terminal: true } : {})
     };
   } catch { return undefined; }
 }
@@ -383,7 +441,7 @@ function installedCliApps(env: NodeJS.ProcessEnv): InstalledApp[] {
     try { entries = readdirSync(directory, { withFileTypes: true }); } catch { continue; }
     for (const entry of entries.slice(0, MAX_DIRECTORY_ENTRIES)) {
       if (apps.length >= MAX_CATALOG_ENTRIES) return apps;
-      if (seen.has(entry.name) || (!entry.isFile() && !entry.isSymbolicLink())) continue;
+      if (seen.has(entry.name) || !SAFE_CLI_APP_ID.test(entry.name) || (!entry.isFile() && !entry.isSymbolicLink())) continue;
       seen.add(entry.name);
       try { accessSync(join(directory, entry.name), constants.X_OK); } catch { continue; }
       apps.push({ kind: "cli", id: entry.name, name: entry.name });
@@ -393,18 +451,17 @@ function installedCliApps(env: NodeJS.ProcessEnv): InstalledApp[] {
 }
 
 export function discoverInstalledApps(
-  query: string,
+  query = "",
   kind: "all" | "desktop" | "cli" = "all",
   limit = 20,
   env: NodeJS.ProcessEnv = process.env
 ): InstalledApp[] {
   const needle = query.trim().toLocaleLowerCase();
-  if (needle === "") throw new DesktopToolError("invalid_app_query", "Enter an app name or command to find");
   const candidates = [
     ...(kind === "cli" ? [] : installedDesktopApps(env)),
     ...(kind === "desktop" ? [] : installedCliApps(env))
   ];
-  return candidates.filter((app) => `${app.name}\n${app.id}\n${app.description ?? ""}`.toLocaleLowerCase().includes(needle))
+  return candidates.filter((app) => needle === "" || `${app.name}\n${app.id}\n${app.description ?? ""}`.toLocaleLowerCase().includes(needle))
     .sort((left, right) => {
       const leftExact = left.id.toLocaleLowerCase() === needle || left.name.toLocaleLowerCase() === needle ? 0 : 1;
       const rightExact = right.id.toLocaleLowerCase() === needle || right.name.toLocaleLowerCase() === needle ? 0 : 1;
@@ -412,8 +469,75 @@ export function discoverInstalledApps(
     }).slice(0, Math.max(1, Math.min(limit, 40)));
 }
 
+function boundedCommandText(value: unknown, maximum: number): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const text = value.trim();
+  return text === "" || UNSAFE_DISPLAY_TEXT.test(text) ? undefined : text.slice(0, maximum);
+}
+
+function parseOmarchyCommands(stdout: string): Array<OmarchyCommand & { group: string; search: string }> {
+  let parsed: unknown;
+  try { parsed = JSON.parse(stdout); }
+  catch { throw new DesktopToolError("omarchy_commands_unavailable", "Omarchy returned an invalid command catalog"); }
+  if (!isObject(parsed) || !Array.isArray(parsed.commands)) {
+    throw new DesktopToolError("omarchy_commands_unavailable", "Omarchy returned an invalid command catalog");
+  }
+  const commands: Array<OmarchyCommand & { group: string; search: string }> = [];
+  for (const raw of parsed.commands.slice(0, 2_000)) {
+    if (!isObject(raw) || raw.hidden === true) continue;
+    const route = boundedCommandText(raw.route, 256);
+    const summary = boundedCommandText(raw.summary, 500);
+    if (route === undefined || summary === undefined || !route.startsWith("omarchy ")) continue;
+    const group = boundedCommandText(raw.group, 64)?.toLocaleLowerCase() ?? "";
+    const args = boundedCommandText(raw.args, 256);
+    const aliases = Array.isArray(raw.aliases)
+      ? raw.aliases.map((alias) => boundedCommandText(alias, 256)).filter((alias): alias is string => alias !== undefined).slice(0, 12)
+      : [];
+    commands.push({
+      route,
+      summary,
+      ...(args === undefined ? {} : { args }),
+      ...(aliases.length === 0 ? {} : { aliases }),
+      requiresSudo: raw.requires_sudo === true,
+      group,
+      search: `${route}\n${summary}\n${args ?? ""}\n${aliases.join("\n")}`.toLocaleLowerCase()
+    });
+  }
+  return commands;
+}
+
+export async function discoverOmarchyCommands(
+  query = "",
+  group = "",
+  limit = 20,
+  run: DesktopCommandRunner = runDesktopCommand,
+  signal?: AbortSignal
+): Promise<OmarchyCommand[]> {
+  const result = await run("omarchy", ["commands", "--json"], signal);
+  const needle = query.trim().toLocaleLowerCase();
+  const requestedGroup = group.trim().toLocaleLowerCase();
+  return parseOmarchyCommands(result.stdout)
+    .filter((command) => (requestedGroup === "" || command.group === requestedGroup) && (needle === "" || command.search.includes(needle)))
+    .sort((left, right) => {
+      const leftExact = left.route.toLocaleLowerCase() === needle ? 0 : 1;
+      const rightExact = right.route.toLocaleLowerCase() === needle ? 0 : 1;
+      return leftExact - rightExact || left.route.localeCompare(right.route);
+    })
+    .slice(0, Math.max(1, Math.min(limit, 40)))
+    .map((command) => ({
+      route: command.route,
+      summary: command.summary,
+      ...(command.args === undefined ? {} : { args: command.args }),
+      ...(command.aliases === undefined ? {} : { aliases: command.aliases }),
+      requiresSudo: command.requiresSudo
+    }));
+}
+
 function resolveInstalledApp(kind: "desktop" | "cli", id: string, env: NodeJS.ProcessEnv): InstalledApp {
-  if (!/^[A-Za-z0-9][A-Za-z0-9._+-]{0,255}$/u.test(id)) {
+  const validId = kind === "desktop"
+    ? id.length <= 256 && id.trim() === id && !/[/\\]/u.test(id) && !UNSAFE_DISPLAY_TEXT.test(id)
+    : SAFE_CLI_APP_ID.test(id);
+  if (!validId) {
     throw new DesktopToolError("invalid_app", "Use an exact app ID returned by app_catalog");
   }
   const candidates = kind === "desktop" ? installedDesktopApps(env) : installedCliApps(env);
@@ -601,23 +725,91 @@ function normalizedIdentity(value: string | undefined): string {
   return (value ?? "").toLocaleLowerCase().replace(/\.desktop$/u, "");
 }
 
-function appWindows(app: InstalledApp, state: DesktopState): DesktopWindow[] {
+function compactIdentity(value: string | undefined): string {
+  return normalizedIdentity(value).replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+function terminalTitleMatches(app: InstalledApp, title: string | undefined): boolean {
+  if (app.terminal !== true || title === undefined) return false;
+  const identities = new Set([
+    compactIdentity(app.id),
+    compactIdentity(app.id.split(".").at(-1)),
+    compactIdentity(app.name)
+  ].filter((value) => value.length >= 2));
+  if (identities.size === 0) return false;
+  const segments = [title, ...title.split(/[|:—–-]/u)].map(compactIdentity).filter(Boolean);
+  return segments.some((segment) => identities.has(segment));
+}
+
+type KnownAppWindows = Map<string, Map<string, number | undefined>>;
+
+function appKey(app: InstalledApp): string {
+  return `${app.kind}:${app.id}`;
+}
+
+function rememberAppWindows(known: KnownAppWindows, app: InstalledApp, windows: DesktopWindow[]): void {
+  const remembered = known.get(appKey(app)) ?? new Map<string, number | undefined>();
+  for (const window of windows) remembered.set(window.address, window.pid);
+  known.set(appKey(app), remembered);
+}
+
+function appWindows(app: InstalledApp, state: DesktopState, known?: KnownAppWindows): DesktopWindow[] {
   const identities = new Set([
     normalizedIdentity(app.id),
     normalizedIdentity(app.id.split(".").at(-1)),
     normalizedIdentity(app.startupWmClass),
     ...(app.kind === "cli" ? [normalizedIdentity(`org.omarchy.${app.id}`)] : [])
   ].filter(Boolean));
-  return state.windows.filter((window) => {
+  const remembered = known?.get(appKey(app));
+  const matches = state.windows.filter((window) => {
     const classes = [normalizedIdentity(window.class), normalizedIdentity(window.initialClass)];
-    return classes.some((candidate) => identities.has(candidate));
+    const knownPid = remembered?.get(window.address);
+    const knownMatch = remembered?.has(window.address) === true
+      && (knownPid === undefined || knownPid === window.pid);
+    return knownMatch || classes.some((candidate) => identities.has(candidate)) || terminalTitleMatches(app, window.title);
   });
+  if (remembered !== undefined) {
+    const liveAddresses = new Set(state.windows.map((window) => window.address));
+    for (const address of remembered.keys()) if (!liveAddresses.has(address)) remembered.delete(address);
+  }
+  return matches;
+}
+
+async function waitForWindows(
+  run: DesktopCommandRunner,
+  predicate: (windows: DesktopWindow[]) => boolean,
+  signal?: AbortSignal
+): Promise<DesktopWindow[]> {
+  let windows = await readDesktopWindows(run, true, signal);
+  for (let attempt = 0; attempt < APP_VERIFY_ATTEMPTS && !predicate(windows); attempt += 1) {
+    await delay(APP_VERIFY_DELAY_MS, signal);
+    windows = await readDesktopWindows(run, true, signal);
+  }
+  return windows;
+}
+
+function newVisibleWindows(windows: DesktopWindow[], previousAddresses: Set<string>): DesktopWindow[] {
+  return windows.filter((window) => !previousAddresses.has(window.address) && window.mapped && !window.hidden);
+}
+
+function attributedLaunchWindows(
+  app: InstalledApp,
+  windows: DesktopWindow[],
+  previousAddresses: Set<string>,
+  known: KnownAppWindows
+): { windows: DesktopWindow[]; matchedBy?: "identity" | "single_new_window" } {
+  const state: DesktopState = { monitors: [], workspaces: [], windows };
+  const identityMatches = appWindows(app, state, known).filter((window) => !previousAddresses.has(window.address));
+  if (identityMatches.length > 0) return { windows: identityMatches, matchedBy: "identity" };
+  const newWindows = newVisibleWindows(windows, previousAddresses);
+  return newWindows.length === 1 ? { windows: newWindows, matchedBy: "single_new_window" } : { windows: [] };
 }
 
 async function focusAppWindow(
   run: DesktopCommandRunner,
   app: InstalledApp,
   matches: DesktopWindow[],
+  known: KnownAppWindows,
   signal?: AbortSignal
 ): Promise<ActionReceipt> {
   if (matches.length !== 1) {
@@ -628,9 +820,10 @@ async function focusAppWindow(
   }
   const target = matches[0];
   if (target === undefined) throw new DesktopToolError("app_window_unavailable", "No matching app window is open");
-  const before = await readDesktopState(run, false, signal);
-  const currentTarget = appWindows(app, before).find((window) => window.address === target.address);
+  const before = await readDesktopState(run, true, signal);
+  const currentTarget = appWindows(app, before, known).find((window) => window.address === target.address);
   if (currentTarget === undefined) throw new DesktopToolError("app_window_unavailable", "That exact app window is no longer available");
+  rememberAppWindows(known, app, [currentTarget]);
   if (before.activeWindow?.address === currentTarget.address) {
     return {
       action: "focus_existing_app", target: { app: app.id, address: currentTarget.address }, requested: {},
@@ -653,8 +846,10 @@ async function focusAppWindow(
 
 async function openApp(
   run: DesktopCommandRunner,
+  launch: DesktopCommandRunner,
   env: NodeJS.ProcessEnv,
   input: AppOpenInput,
+  known: KnownAppWindows,
   signal?: AbortSignal
 ): Promise<ActionReceipt> {
   const app = resolveInstalledApp(input.kind, input.id, env);
@@ -662,23 +857,29 @@ async function openApp(
   if (!["focus_or_launch", "focus_existing", "new_window"].includes(mode)) {
     throw new DesktopToolError("invalid_app_mode", "That app-open mode is unavailable");
   }
-  const before = await readDesktopState(run, false, signal);
-  const matches = appWindows(app, before);
-  if (mode !== "new_window" && matches.length > 0) return focusAppWindow(run, app, matches, signal);
-  if (mode === "focus_existing") return focusAppWindow(run, app, matches, signal);
+  const before = await readDesktopState(run, true, signal);
+  const matches = appWindows(app, before, known);
+  if (mode !== "new_window" && matches.length > 0) return focusAppWindow(run, app, matches, known, signal);
+  if (mode === "focus_existing") return focusAppWindow(run, app, matches, known, signal);
   const previousAddresses = new Set(before.windows.map((window) => window.address));
-  if (app.kind === "desktop") await run("uwsm-app", ["--", "gtk-launch", `${app.id}.desktop`], signal);
-  else await run("omarchy", ["launch", "tui", `--app-id=org.omarchy.${app.id}`, app.id], signal);
-  const after = await waitForState(run, (state) => {
-    return appWindows(app, state).some((window) => !previousAddresses.has(window.address));
-  }, signal, APP_VERIFY_ATTEMPTS, APP_VERIFY_DELAY_MS);
-  const opened = appWindows(app, after).filter((window) => !previousAddresses.has(window.address));
+  if (app.kind === "desktop") await launch("uwsm-app", ["--", "gtk-launch", `${app.id}.desktop`], signal);
+  else await launch("omarchy", ["launch", "tui", `--app-id=org.omarchy.${app.id}`, app.id], signal);
+  const afterWindows = await waitForWindows(run, (windows) => {
+    return attributedLaunchWindows(app, windows, previousAddresses, known).windows.length > 0;
+  }, signal);
+  const attributed = attributedLaunchWindows(app, afterWindows, previousAddresses, known);
+  const observed = newVisibleWindows(afterWindows, previousAddresses);
+  if (attributed.windows.length > 0) rememberAppWindows(known, app, attributed.windows);
   return {
     action: "open_app", target: { kind: app.kind, id: app.id }, requested: { mode },
     before: { matchingWindows: matches.map((window) => window.address) },
-    after: { newWindows: opened.map((window) => window.address) },
-    changed: opened.length > 0,
-    verified: opened.length > 0
+    after: {
+      newWindows: attributed.windows.map((window) => window.address),
+      ...(attributed.matchedBy === undefined ? {} : { matchedBy: attributed.matchedBy }),
+      ...(attributed.windows.length > 0 || observed.length === 0 ? {} : { ambiguousWindows: observed.map((window) => window.address) })
+    },
+    changed: observed.length > 0,
+    verified: attributed.windows.length > 0
   };
 }
 
@@ -693,6 +894,12 @@ async function executeWindowAction(
   if (beforeWindow === undefined) throw new DesktopToolError("window_unavailable", "That exact window is no longer available");
   if (beforeWindow.pid !== input.pid) {
     throw new DesktopToolError("window_identity_changed", "That window address no longer belongs to the inspected process");
+  }
+  if (input.action === "resize" && !beforeWindow.floating) {
+    throw new DesktopToolError(
+      "tiled_window_resize_unsupported",
+      "Exact pixel resizing is unavailable while the window is tiled; do not retry, close, or relaunch it"
+    );
   }
   const command = windowActionCommand(input);
   const requested: Record<string, unknown> = {
@@ -850,14 +1057,18 @@ export function desktopToolTitle(name: string, input: Record<string, unknown>): 
 
 export function createPersonalAssistantTools(
   run: DesktopCommandRunner = runDesktopCommand,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  launch: DesktopCommandRunner = run === runDesktopCommand ? launchDesktopCommand : run
 ): [
   ToolDefinition<typeof appCatalogParameters>,
   ToolDefinition<typeof appOpenParameters>,
   ToolDefinition<typeof desktopStateParameters>,
   ToolDefinition<typeof windowActionParameters>,
-  ToolDefinition<typeof workspaceActionParameters>
+  ToolDefinition<typeof workspaceActionParameters>,
+  ToolDefinition<typeof omarchyCommandsParameters>
 ] {
+  const knownAppWindows: KnownAppWindows = new Map();
+  let appOpenQueue: Promise<void> = Promise.resolve();
   const appCatalog: ToolDefinition<typeof appCatalogParameters> = {
     name: "app_catalog",
     label: "Find installed apps",
@@ -866,7 +1077,7 @@ export function createPersonalAssistantTools(
     parameters: appCatalogParameters,
     execute(_toolCallId, input) {
       try {
-        const apps = discoverInstalledApps(input.query, input.kind ?? "all", input.limit ?? 20, env);
+        const apps = discoverInstalledApps(input.query ?? "", input.kind ?? "all", input.limit ?? 20, env);
         return Promise.resolve({
           content: [{ type: "text" as const, text: apps.length === 0 ? "No matching installed apps were found." : JSON.stringify(apps, undefined, 2) }],
           details: { apps }
@@ -877,11 +1088,16 @@ export function createPersonalAssistantTools(
   const appOpen: ToolDefinition<typeof appOpenParameters> = {
     name: "app_open",
     label: "Open installed app",
-    description: "Focus one unambiguous matching window or launch an exact app returned by app_catalog, then verify the resulting window.",
-    promptSnippet: "Focus or launch a discovered app and verify it",
+    description: "Focus one unambiguous matching window or launch an exact app returned by app_catalog. The tool serializes launches and verifies the resulting window internally.",
+    promptSnippet: "Focus or launch a discovered app with internal verification",
     parameters: appOpenParameters,
     async execute(_toolCallId, input, signal) {
-      try { return receiptResult(await openApp(run, env, input, signal)); }
+      const operation = appOpenQueue.then(
+        () => openApp(run, launch, env, input, knownAppWindows, signal),
+        () => openApp(run, launch, env, input, knownAppWindows, signal)
+      );
+      appOpenQueue = operation.then(() => undefined, () => undefined);
+      try { return receiptResult(await operation); }
       catch (error) { return toolFailure("Opening the app", error); }
     }
   };
@@ -920,5 +1136,21 @@ export function createPersonalAssistantTools(
       catch (error) { return toolFailure("The workspace action", error); }
     }
   };
-  return [appCatalog, appOpen, desktopState, windowAction, workspaceAction];
+  const omarchyCommands: ToolDefinition<typeof omarchyCommandsParameters> = {
+    name: "omarchy_commands",
+    label: "Find Omarchy commands",
+    description: "Search or browse the live read-only `omarchy commands --json` catalog before guessing a route or claiming an Omarchy action is unavailable. This discovers commands but does not execute them.",
+    promptSnippet: "Search documented commands supported by the installed Omarchy CLI",
+    parameters: omarchyCommandsParameters,
+    async execute(_toolCallId, input, signal) {
+      try {
+        const commands = await discoverOmarchyCommands(input.query ?? "", input.group ?? "", input.limit ?? 20, run, signal);
+        return {
+          content: [{ type: "text" as const, text: commands.length === 0 ? "No matching Omarchy commands were found." : JSON.stringify(commands, undefined, 2) }],
+          details: { commands }
+        };
+      } catch (error) { return toolFailure("Reading the Omarchy command catalog", error); }
+    }
+  };
+  return [appCatalog, appOpen, desktopState, windowAction, workspaceAction, omarchyCommands];
 }
