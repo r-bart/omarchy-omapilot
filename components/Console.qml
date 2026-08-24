@@ -27,6 +27,9 @@ Item {
   property int surfaceWidth: 440
 
   property bool opened: false
+  // Mapped, including the exit slide. Owners that tear the console down (the
+  // loader in Ambient.qml) must wait for this, not for `opened`.
+  readonly property bool engaged: surface.visible
   // Holding the compositor's keyboard. Escape at rest releases this without
   // closing; clicking anywhere on the surface takes it back.
   property bool invoked: false
@@ -44,7 +47,6 @@ Item {
   function close() {
     invoked = false
     opened = false
-    content.reset()
     if (backend && typeof backend.clearDesktopContextLatch === "function")
       backend.clearDesktopContextLatch()
   }
@@ -62,6 +64,14 @@ Item {
   function openSettings() {
     open(true)
     content.openSettings()
+  }
+
+  // A real blocker summons the chat lane specifically: the approval card only
+  // renders there, and an approval the user cannot see is a stalled turn with
+  // no indication of why.
+  function openApproval() {
+    open(true)
+    content.showChat(false)
   }
 
   PanelWindow {
@@ -96,6 +106,10 @@ Item {
           easing.type: Easing.OutQuint
         }
       }
+      // Reset the lanes only once the slide has finished: snapping settings or
+      // history back to the empty chat while the surface is still leaving the
+      // screen reads as a glitch, not a close.
+      onSlidChanged: if (slid < 0.001 && !root.opened) content.reset()
 
       width: parent.width
       height: parent.height
@@ -124,10 +138,11 @@ Item {
         anchors.fill: parent
         backend: root.backend
         focused: root.invoked
-        motionEnabled: root.motionEnabled && root.opened
+        // Keyed to the mapped surface, not `opened`, so the filament does not
+        // freeze mid-frame during the exit slide.
+        motionEnabled: root.motionEnabled && surface.visible
         onReleaseFocusRequested: root.invoked = false
         onCloseRequested: root.close()
-        onFocusRequested: root.invoked = true
       }
     }
   }

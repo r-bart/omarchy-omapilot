@@ -68,6 +68,25 @@ Item {
     return null
   }
 
+  // Whether a bar widget instance of this plugin is placed in bar.layout. The
+  // widget's settings-persist relay is deliberately unguarded, so while one is
+  // placed it owns persistence; writing the plugins[] entry too would merge
+  // from a different, staler base and resurrect old values into shell.json.
+  readonly property bool barWidgetPlaced: {
+    var config = root.shell ? root.shell.shellConfig : null
+    var layout = config && config.bar ? config.bar.layout : null
+    if (!layout) return false
+    var sections = ["left", "center", "right"]
+    for (var s = 0; s < sections.length; s++) {
+      var section = layout[sections[s]] || []
+      for (var i = 0; i < section.length; i++) {
+        var entry = section[i]
+        if (entry && String(entry.id || "").indexOf(root.pluginId) === 0) return true
+      }
+    }
+    return false
+  }
+
   function persistSettings(values) {
     var entry = { id: root.pluginId }
     for (var existing in root.ownSettings)
@@ -113,10 +132,17 @@ Item {
     function onIpcVoiceCancelRequested() { root.voiceCancel() }
     function onIpcAmbientDismissRequested() { root.dismiss() }
     function onSettingsPersistRequested(values) {
-      // Only claim settings authority once we actually own a plugins[] entry;
-      // while the bar widget exists, its relay handles persistence.
-      if (!root.ownSettings) return
+      // Only claim settings authority once we actually own a plugins[] entry
+      // and no bar widget is placed; the widget's relay handles persistence
+      // while it exists, and double-writing would race two merge bases.
+      if (!root.ownSettings || root.barWidgetPlaced) return
       root.persistSettings(values)
+    }
+    function onConfiguredSurfaceChanged() {
+      // Switching back to the panel must not strand an open console: its own
+      // IPC routes disable with the switch, so close it from here.
+      if (OmaPilot.OmaPilotStore.configuredSurface !== "console" && consoleLoader.item)
+        consoleLoader.item.close()
     }
   }
 
@@ -131,8 +157,11 @@ Item {
   // A voice turn with the console open would paint the same answer twice —
   // top and right. The console is the focused surface; when it is up, it is
   // the answer, so the curtain stands down.
+  readonly property bool consoleOpened: consoleLoader.item
+    ? consoleLoader.item.opened === true : false
+
   readonly property bool curtainShown:
-    voiceEngaged && (failed || hasAnswer) && !consoleSurface.opened
+    voiceEngaged && (failed || hasAnswer) && !root.consoleOpened
 
   readonly property string phase: {
     if (!voiceEngaged) return "dormant"
@@ -393,12 +422,19 @@ Item {
     motionEnabled: root.motionEnabled
   }
 
-  OmaPilot.Console {
-    id: consoleSurface
-    backend: OmaPilot.OmaPilotStore
-    targetScreen: root.activeScreen
-    motionEnabled: root.motionEnabled
-    surfaceWidth: OmaPilot.OmaPilotStore.configuredSidebarWidth
+  // Behind a Loader because the console is strictly opt-in: default-config
+  // users should not pay for its object tree on every shell start. It stays
+  // alive through the exit slide after a surface switch, then tears down.
+  Loader {
+    id: consoleLoader
+    active: OmaPilot.OmaPilotStore.configuredSurface === "console"
+      || (item !== null && item.engaged === true)
+    sourceComponent: OmaPilot.Console {
+      backend: OmaPilot.OmaPilotStore
+      targetScreen: root.activeScreen
+      motionEnabled: root.motionEnabled
+      surfaceWidth: OmaPilot.OmaPilotStore.configuredSidebarWidth
+    }
   }
 
   // The console answers the same IPC routes the bar widget consumes; the
@@ -407,16 +443,15 @@ Item {
   Connections {
     target: OmaPilot.OmaPilotStore
     enabled: OmaPilot.OmaPilotStore.configuredSurface === "console"
-    function onIpcOpenRequested() { consoleSurface.open(true) }
-    function onIpcCloseRequested() { consoleSurface.close() }
-    function onIpcToggleRequested() { consoleSurface.toggle() }
-    function onIpcHistoryRequested() { consoleSurface.openHistory() }
-    function onIpcSettingsRequested() { consoleSurface.openSettings() }
-    function onContextAttachmentAdded() { consoleSurface.open(true) }
+    function onIpcOpenRequested() { if (consoleLoader.item) consoleLoader.item.open(true) }
+    function onIpcCloseRequested() { if (consoleLoader.item) consoleLoader.item.close() }
+    function onIpcToggleRequested() { if (consoleLoader.item) consoleLoader.item.toggle() }
+    function onIpcHistoryRequested() { if (consoleLoader.item) consoleLoader.item.openHistory() }
+    function onIpcSettingsRequested() { if (consoleLoader.item) consoleLoader.item.openSettings() }
+    function onContextAttachmentAdded() { if (consoleLoader.item) consoleLoader.item.open(true) }
     function onPendingPermissionChanged() {
-      // A real blocker summons the console with focus: an approval the user
-      // cannot see is a stalled turn with no indication of why.
-      if (OmaPilot.OmaPilotStore.pendingPermission !== null) consoleSurface.open(true)
+      if (OmaPilot.OmaPilotStore.pendingPermission !== null && consoleLoader.item)
+        consoleLoader.item.openApproval()
     }
   }
 
@@ -459,9 +494,10 @@ Item {
 
   function close() {
     capture.close()
+    if (consoleLoader.item) consoleLoader.item.close()
     dismiss()
   }
 
   readonly property bool opened: capture.opened === true || root.voiceEngaged
-    || consoleSurface.opened
+    || root.consoleOpened
 }

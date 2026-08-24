@@ -147,11 +147,18 @@ ShellRoot {
           root.fail("busy escape did not cancel")
         backendStub.state = "composing"
       } else if (root.stage === 4) {
-        // The hard rule: a pending approval turns Escape into the rejection.
+        // An approval pending behind another lane: the ladder unwinds to the
+        // chat lane first, and nothing is rejected sight unseen.
         backendStub.pendingPermission = {
           id: "perm-1", title: "Run a shell command", detail: "true",
           options: [{ id: "reject-once", decision: "reject_once", label: "Reject" }]
         }
+        content.openSettings()
+        content.handleEscape()
+        if (content.viewMode !== "chat" || backendStub.rejectedDecision !== "")
+          root.fail("hidden approval escape rejected or stayed in settings")
+      } else if (root.stage === 5) {
+        // The hard rule: with the approval in front, Escape is the rejection.
         content.handleEscape()
         if (backendStub.rejectedDecision !== "reject_once"
             || root.closeCount !== 1 || root.releaseCount !== 1)

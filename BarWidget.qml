@@ -131,32 +131,33 @@ BarWidget {
   readonly property bool surfaceRoutesHere:
     OmaPilot.OmaPilotStore.configuredSurface === "panel"
 
+  // One guard for the whole route block, so the next route added here cannot
+  // forget it and fire on both surfaces.
   Connections {
     target: OmaPilot.OmaPilotStore
+    enabled: root.surfaceRoutesHere
     function onIpcOpenRequested() {
-      if (!root.surfaceRoutesHere) return
       if (root.routedWidget() === root) root.open()
     }
     function onIpcCloseRequested() {
-      if (!root.surfaceRoutesHere) return
       if (root.routedWidget() === root) root.close()
     }
     function onIpcToggleRequested() {
-      if (!root.surfaceRoutesHere) return
       if (root.routedWidget() === root) root.togglePanel()
     }
     function onIpcHistoryRequested() {
-      if (!root.surfaceRoutesHere) return
       if (root.routedWidget() === root) root.openHistory()
     }
     function onIpcSettingsRequested() {
-      if (!root.surfaceRoutesHere) return
       if (root.routedWidget() === root) root.openSettings()
     }
     function onContextAttachmentAdded() {
-      if (!root.surfaceRoutesHere) return
       if (root.routedWidget() === root) root.open()
     }
+  }
+
+  Connections {
+    target: OmaPilot.OmaPilotStore
     function onSettingsPersistRequested(values) {
       // Deliberately not surface-guarded: the console has no settings
       // injection of its own, so its settings edits persist through the bar
@@ -167,7 +168,10 @@ BarWidget {
 
   Loader {
     id: panelLoader
-    active: true
+    // A console user should not pay for a per-widget Panel tree that can
+    // never open; settings persistence flows through root.persist, not the
+    // loaded item, so nothing else needs it alive.
+    active: root.surfaceRoutesHere
     source: Qt.resolvedUrl("Panel.qml")
     visible: false
     onLoaded: {

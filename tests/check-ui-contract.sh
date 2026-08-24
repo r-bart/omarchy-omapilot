@@ -105,7 +105,11 @@ grep -Fq 'enabled: OmaPilot.OmaPilotStore.configuredSurface === "console"' \
   "$repo_dir/Ambient.qml"
 grep -Fq 'OmaPilot.OmaPilotStore.configuredSurface === "panel"' "$repo_dir/BarWidget.qml"
 # A voice answer never paints twice: the curtain stands down behind the console.
-grep -Fq '&& !consoleSurface.opened' "$repo_dir/Ambient.qml"
+grep -Fq '&& !root.consoleOpened' "$repo_dir/Ambient.qml"
+# The console tree only exists for users who opted in.
+grep -Fq 'active: OmaPilot.OmaPilotStore.configuredSurface === "console"' \
+  "$repo_dir/Ambient.qml"
+grep -Fq 'active: root.surfaceRoutesHere' "$repo_dir/BarWidget.qml"
 # The filament is the state light generalized, never a parallel component.
 grep -Fq 'property bool vertical: false' "$repo_dir/components/StateLightBar.qml"
 grep -Fq 'vertical: true' "$repo_dir/components/ConsoleContent.qml"

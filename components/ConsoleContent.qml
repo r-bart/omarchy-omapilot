@@ -37,7 +37,6 @@ Item {
 
   signal closeRequested()
   signal releaseFocusRequested()
-  signal focusRequested()
 
   // The console speaks the same state language as the panel and the ambient
   // surfaces; the filament is the one element that carries it.
@@ -146,7 +145,15 @@ Item {
   function handleEscape() {
     // Hard rule: a pending approval pins the console. Escape is an answer —
     // the rejection — never a dismissal that leaves the request dangling.
-    if (backend && backend.pendingPermission !== null) {
+    // It only applies while the card is actually in front of the user: from
+    // settings, history, a popup, or a preview, the ladder runs first and
+    // unwinds toward the chat lane where the card lives — rejecting something
+    // the user cannot see would be worse than the dangling request. And when
+    // the harness offered no reject option, the ladder runs too, so Escape
+    // still cancels the turn instead of dying against a missing choice.
+    var approvalInFront = backend && backend.pendingPermission !== null
+      && viewMode === "chat" && previewSource === "" && !composer.popupOpen
+    if (approvalInFront && backend.hasPermissionDecision("reject_once")) {
       backend.respondPermission("reject_once", backend.permissionChoiceId("reject_once"))
       return
     }
@@ -739,7 +746,14 @@ Item {
     z: 100
     color: Qt.rgba(Color.background.r, Color.background.g, Color.background.b, 0.82)
 
-    TapHandler { onTapped: root.previewSource = "" }
+    // MouseAreas, not TapHandlers: two stacked TapHandlers with the default
+    // passive grab both fire for one tap, so a click on the image would also
+    // dismiss the overlay. The card's MouseArea takes the exclusive grab and
+    // genuinely swallows clicks inside it.
+    MouseArea {
+      anchors.fill: parent
+      onClicked: root.previewSource = ""
+    }
 
     BorderSurface {
       anchors.centerIn: parent
@@ -749,7 +763,10 @@ Item {
       borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.normalBorderWidth))
       radius: Style.cornerRadius
 
-      TapHandler { onTapped: function(eventPoint) { eventPoint.accepted = true } }
+      MouseArea {
+        anchors.fill: parent
+        onClicked: function(mouse) { mouse.accepted = true }
+      }
 
       Image {
         anchors.fill: parent

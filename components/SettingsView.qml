@@ -94,6 +94,7 @@ Item {
     || authMethodPicker.popupOpen || authPromptPicker.popupOpen
     || webHandoffProviderPicker.popupOpen || ttsProviderPicker.popupOpen
     || ttsModelPicker.popupOpen || ttsVoicePicker.popupOpen
+    || surfacePicker.popupOpen || sidebarWidthPicker.popupOpen
   readonly property bool modalInteractionActive: popupOpen
     || browserCompanionBusy
     || (selectedTab === "desktop" && browserRemoveConfirmation)
@@ -317,6 +318,8 @@ Item {
     ttsProviderPicker.close()
     ttsModelPicker.close()
     ttsVoicePicker.close()
+    surfacePicker.close()
+    sidebarWidthPicker.close()
     if (restoreFocus !== false)
       Qt.callLater(function() { tabBar.forceActiveFocus() })
   }
@@ -369,6 +372,18 @@ Item {
           fontFamily: root.fontFamily
           motionEnabled: root.motionEnabled
           onSelected: function(id) { root.selectTab(id) }
+          // Keyboard navigation must never select a tab the clip has hidden.
+          onCurrentIndexChanged: tabScroll.ensureCurrentVisible()
+        }
+
+        function ensureCurrentVisible() {
+          if (contentWidth <= width) return
+          var left = tabBar.currentTabX
+          var right = left + tabBar.currentTabWidth
+          if (left < contentX)
+            contentX = Math.max(0, left - Style.spacing.xl)
+          else if (right > contentX + width)
+            contentX = Math.min(contentWidth - width, right - width + Style.spacing.xl)
         }
       }
     }
