@@ -123,8 +123,12 @@ grep -Fq 'OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"' "$repo_dir/
 grep -Fq 'OmaPilot.OmaPilotStore.configuredSurface === "panel"' "$repo_dir/BarWidget.qml"
 # A voice answer never paints twice: the curtain stands down behind the console.
 grep -Fq '&& !root.consoleOpened' "$repo_dir/Ambient.qml"
-# The console tree only exists for users who opted in — to either geometry.
-grep -Fq 'active: root.consoleSurfaceLive || (item !== null && item.engaged === true)' \
+# The console tree only exists for users who opted in — to either geometry — and
+# the loader is driven rather than bound, so deciding whether `item` should exist
+# never reads `item` and no surface change trips a binding loop.
+grep -Fq 'onConsoleSurfaceLiveChanged: if (consoleSurfaceLive) consoleLoader.active = true' \
+  "$repo_dir/Ambient.qml"
+grep -Fq 'if (!consoleLoader.item.engaged) consoleLoader.active = false' \
   "$repo_dir/Ambient.qml"
 grep -Fq 'active: root.surfaceRoutesHere' "$repo_dir/BarWidget.qml"
 # The filament is the state light generalized, never a parallel component.

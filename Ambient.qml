@@ -143,8 +143,12 @@ Item {
       // IPC routes disable with the switch, so close it from here. Docked and
       // fullscreen are the same window, so moving between them is a resize and
       // must not close anything.
-      if (!root.consoleSurfaceLive && consoleLoader.item)
-        consoleLoader.item.close()
+      if (root.consoleSurfaceLive || !consoleLoader.item) return
+      consoleLoader.item.close()
+      // A console that was never mapped has no exit slide to wait for, so its
+      // `engaged` never changes and the teardown below would never be told to
+      // run. Unload it here instead of leaving the tree alive forever.
+      if (!consoleLoader.item.engaged) consoleLoader.active = false
     }
   }
 
@@ -434,15 +438,31 @@ Item {
     OmaPilot.OmaPilotStore.configuredSurface === "console"
       || OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"
 
+  // Driven, not bound. Reading `item` from the expression that decides whether
+  // `item` exists is a binding loop, and Qt says so on every surface change.
+  // Loading is immediate; unloading waits for the exit slide to finish, which
+  // the console reports through `engaged`.
+  onConsoleSurfaceLiveChanged: if (consoleSurfaceLive) consoleLoader.active = true
+
   Loader {
     id: consoleLoader
-    active: root.consoleSurfaceLive || (item !== null && item.engaged === true)
+    active: false
     sourceComponent: OmaPilot.Console {
       backend: OmaPilot.OmaPilotStore
       targetScreen: root.activeScreen
       motionEnabled: root.motionEnabled
       surfaceWidth: OmaPilot.OmaPilotStore.configuredSidebarWidth
       fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"
+    }
+    Component.onCompleted: if (root.consoleSurfaceLive) active = true
+
+    Connections {
+      target: consoleLoader.item
+      function onEngagedChanged() {
+        if (!root.consoleSurfaceLive && consoleLoader.item
+            && !consoleLoader.item.engaged)
+          consoleLoader.active = false
+      }
     }
   }
 
