@@ -17,6 +17,11 @@ Item {
   property color accent: Color.accent
   property color urgent: Color.urgent
   property bool motionEnabled: true
+  // The console reuses this exact light on its left edge. Rather than duplicate
+  // every gradient and animation with swapped axes — which guarantees the two
+  // orientations drift apart — the drawing stays horizontal on one canvas that
+  // rotates into place. `false` renders pixel-identically to before.
+  property bool vertical: false
 
   readonly property color lightColor: StateColor.forPhase(accent, urgent, phase)
   property color displayedColor: lightColor
@@ -46,7 +51,8 @@ Item {
     && (phase === "listening" || phase === "thinking")
   readonly property bool motionRunning: tideAnimation.running || driftAnimation.running
 
-  implicitHeight: Style.space(10)
+  implicitHeight: vertical ? 0 : Style.space(10)
+  implicitWidth: vertical ? Style.space(10) : 0
 
   function withAlpha(value) {
     return Qt.rgba(displayedColor.r, displayedColor.g, displayedColor.b, value)
@@ -114,30 +120,18 @@ Item {
     }
   }
 
-  // A low, continuous rail keeps the state light legible even at the dimmest
-  // point of its breath and when motion is disabled.
-  Rectangle {
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.verticalCenter: parent.verticalCenter
-    height: 1
-    gradient: Gradient {
-      orientation: Gradient.Horizontal
-      GradientStop { position: 0.0; color: root.withAlpha(0.035) }
-      GradientStop { position: 0.18; color: root.withAlpha(0.10) }
-      GradientStop { position: 0.5; color: root.withAlpha(0.27 + root.tide * 0.15) }
-      GradientStop { position: 0.82; color: root.withAlpha(0.10) }
-      GradientStop { position: 1.0; color: root.withAlpha(0.035) }
-    }
-  }
-
-  // The wandering centre is rendered once, then bloomed. Keeping the movement
-  // inside a narrow central band makes it feel atmospheric rather than busy.
   Item {
-    id: glowSource
-    anchors.fill: parent
-    visible: false
+    id: canvas
+    // The sweep, breath, and satellite all move along this canvas's x axis; the
+    // rotation decides whether that axis lies along the screen's width or its
+    // height. Sizes swap so the rotated canvas fills the item exactly.
+    width: root.vertical ? root.height : root.width
+    height: root.vertical ? root.width : root.height
+    anchors.centerIn: parent
+    rotation: root.vertical ? 90 : 0
 
+    // A low, continuous rail keeps the state light legible even at the dimmest
+    // point of its breath and when motion is disabled.
     Rectangle {
       anchors.left: parent.left
       anchors.right: parent.right
@@ -145,67 +139,90 @@ Item {
       height: 1
       gradient: Gradient {
         orientation: Gradient.Horizontal
-        GradientStop { position: 0.0; color: "transparent" }
-        GradientStop { position: root.glowCenter - root.glowSpread; color: root.withAlpha(0.05) }
-        GradientStop { position: root.glowCenter; color: root.withAlpha(0.88 + root.flicker * 0.12) }
-        GradientStop { position: root.glowCenter + root.glowSpread; color: root.withAlpha(0.05) }
-        GradientStop { position: 1.0; color: "transparent" }
+        GradientStop { position: 0.0; color: root.withAlpha(0.035) }
+        GradientStop { position: 0.18; color: root.withAlpha(0.10) }
+        GradientStop { position: 0.5; color: root.withAlpha(0.27 + root.tide * 0.15) }
+        GradientStop { position: 0.82; color: root.withAlpha(0.10) }
+        GradientStop { position: 1.0; color: root.withAlpha(0.035) }
       }
     }
-  }
 
-  MultiEffect {
-    anchors.fill: glowSource
-    source: glowSource
-    autoPaddingEnabled: true
-    blurEnabled: true
-    blur: 0.75
-    blurMax: 18
-    blurMultiplier: 0.85
-    brightness: 0.32 + root.tide * 0.38 + root.flicker * 0.12
-    colorization: 1
-    colorizationColor: root.displayedColor
-    opacity: 0.48 + root.tide * 0.38
-  }
-
-
-  // A smaller satellite bloom slips around the main source. Its irrational
-  // cadence is the bit of controlled irregularity that stops the bar reading
-  // as a loading indicator.
-  Item {
-    id: satelliteSource
-    width: parent.width * ((root.thinking ? 0.055 : 0.08) + root.flicker * 0.035)
-    height: 4
-    x: parent.width * root.satelliteCenter - width / 2
-    anchors.verticalCenter: parent.verticalCenter
-    visible: false
-
-    Rectangle {
+    // The wandering centre is rendered once, then bloomed. Keeping the movement
+    // inside a narrow central band makes it feel atmospheric rather than busy.
+    Item {
+      id: glowSource
       anchors.fill: parent
-      gradient: Gradient {
-        orientation: Gradient.Horizontal
-        GradientStop { position: 0.0; color: "transparent" }
-        GradientStop { position: 0.30; color: root.withAlpha(0.16) }
-        GradientStop { position: 0.50; color: root.withAlpha(0.34 + root.flicker * 0.18) }
-        GradientStop { position: 0.70; color: root.withAlpha(0.16) }
-        GradientStop { position: 1.0; color: "transparent" }
+      visible: false
+
+      Rectangle {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        height: 1
+        gradient: Gradient {
+          orientation: Gradient.Horizontal
+          GradientStop { position: 0.0; color: "transparent" }
+          GradientStop { position: root.glowCenter - root.glowSpread; color: root.withAlpha(0.05) }
+          GradientStop { position: root.glowCenter; color: root.withAlpha(0.88 + root.flicker * 0.12) }
+          GradientStop { position: root.glowCenter + root.glowSpread; color: root.withAlpha(0.05) }
+          GradientStop { position: 1.0; color: "transparent" }
+        }
       }
     }
-  }
 
-  MultiEffect {
-    anchors.fill: satelliteSource
-    source: satelliteSource
-    autoPaddingEnabled: true
-    blurEnabled: true
-    blur: 1
-    blurMax: 24
-    blurMultiplier: 1.6
-    brightness: 0.2 + root.flicker * 0.18
-    colorization: 1
-    colorizationColor: root.displayedColor
-    opacity: root.atmosphereActive ? 0.72 : 0
-    Behavior on opacity { NumberAnimation { duration: 220 } }
+    MultiEffect {
+      anchors.fill: glowSource
+      source: glowSource
+      autoPaddingEnabled: true
+      blurEnabled: true
+      blur: 0.75
+      blurMax: 18
+      blurMultiplier: 0.85
+      brightness: 0.32 + root.tide * 0.38 + root.flicker * 0.12
+      colorization: 1
+      colorizationColor: root.displayedColor
+      opacity: 0.48 + root.tide * 0.38
+    }
+
+
+    // A smaller satellite bloom slips around the main source. Its irrational
+    // cadence is the bit of controlled irregularity that stops the bar reading
+    // as a loading indicator.
+    Item {
+      id: satelliteSource
+      width: parent.width * ((root.thinking ? 0.055 : 0.08) + root.flicker * 0.035)
+      height: 4
+      x: parent.width * root.satelliteCenter - width / 2
+      anchors.verticalCenter: parent.verticalCenter
+      visible: false
+
+      Rectangle {
+        anchors.fill: parent
+        gradient: Gradient {
+          orientation: Gradient.Horizontal
+          GradientStop { position: 0.0; color: "transparent" }
+          GradientStop { position: 0.30; color: root.withAlpha(0.16) }
+          GradientStop { position: 0.50; color: root.withAlpha(0.34 + root.flicker * 0.18) }
+          GradientStop { position: 0.70; color: root.withAlpha(0.16) }
+          GradientStop { position: 1.0; color: "transparent" }
+        }
+      }
+    }
+
+    MultiEffect {
+      anchors.fill: satelliteSource
+      source: satelliteSource
+      autoPaddingEnabled: true
+      blurEnabled: true
+      blur: 1
+      blurMax: 24
+      blurMultiplier: 1.6
+      brightness: 0.2 + root.flicker * 0.18
+      colorization: 1
+      colorizationColor: root.displayedColor
+      opacity: root.atmosphereActive ? 0.72 : 0
+      Behavior on opacity { NumberAnimation { duration: 220 } }
+    }
   }
 
   onPhaseChanged: settleAtmosphere()
