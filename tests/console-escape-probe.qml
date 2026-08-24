@@ -5,6 +5,14 @@ import "components" as OmaPilot
 // Behavioral probe for the console's escape ladder: focus release before
 // close, view dismissal before either, and the hard rule that a pending
 // approval turns Escape into a rejection instead of a dismissal.
+//
+// The ladder is shared by two hosts that differ in one step. A surface that can
+// hold the compositor's keyboard while staying open puts it down first; a real
+// window has no keyboard to hand back — no protocol lets a client unfocus
+// itself — so for that host the step is not skipped, it does not exist.
+// `releasesFocus` is what separates them, and stages 0-5 below cover the host
+// that releases while 6-7 cover the one that does not. Both are run against the
+// same ConsoleContent, because that is the claim: one ladder, one component.
 ShellRoot {
   id: root
   property bool failed: false
@@ -163,6 +171,28 @@ ShellRoot {
         if (backendStub.rejectedDecision !== "reject_once"
             || root.closeCount !== 1 || root.releaseCount !== 1)
           root.fail("pending approval escape did not reject")
+      } else if (root.stage === 6) {
+        // Same content, window host. The idle gesture that released the
+        // keyboard in stage 0 closes instead, and releaseCount must not move:
+        // a window that asked to be unfocused would be asking for something
+        // the protocol cannot give it.
+        backendStub.pendingPermission = null
+        backendStub.rejectedDecision = ""
+        content.releasesFocus = false
+        content.handleEscape()
+        if (root.closeCount !== 2 || root.releaseCount !== 1)
+          root.fail("window-host idle escape did not close")
+      } else if (root.stage === 7) {
+        // The hard rule does not depend on the window type. An approval in
+        // front is still answered rather than dismissed, so the close count
+        // stays where stage 6 left it.
+        backendStub.pendingPermission = {
+          id: "perm-2", title: "Run a shell command", detail: "true",
+          options: [{ id: "reject-once", decision: "reject_once", label: "Reject" }]
+        }
+        content.handleEscape()
+        if (backendStub.rejectedDecision !== "reject_once" || root.closeCount !== 2)
+          root.fail("window-host approval escape did not reject")
       } else {
         if (!root.failed) console.log("OMAPILOT_CONSOLE_ESCAPE_PROBE_OK")
         Qt.quit()

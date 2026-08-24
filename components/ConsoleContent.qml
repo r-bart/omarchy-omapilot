@@ -25,6 +25,13 @@ Item {
   // Whether the surface currently holds the compositor's keyboard. The escape
   // ladder needs it: Escape at rest releases focus before it closes anything.
   property bool focused: false
+  // Whether this host can put the keyboard down at all. A layer-shell surface
+  // can: setting keyboardFocus to None is the one way a client releases focus
+  // on its own. A real window cannot — no Wayland protocol lets a client
+  // unfocus itself — so for that host the rung does not exist and Escape at
+  // rest goes straight to closing. True by default, so every other host keeps
+  // exactly the behaviour it had.
+  property bool releasesFocus: true
   property bool motionEnabled: true
   property color foreground: Color.popups.text
   property color background: Color.popups.background
@@ -159,7 +166,7 @@ Item {
     }
     var action = Presentation.escapeAction(root.viewMode, composer.popupOpen,
       settingsView.popupOpen, root.previewSource !== "",
-      backend ? backend.busy : false, root.focused)
+      backend ? backend.busy : false, root.focused && root.releasesFocus)
     if (action === "close-composer-popup") composer.closePopups()
     else if (action === "close-settings-popup") settingsView.closePopups()
     else if (action === "close-preview") root.previewSource = ""

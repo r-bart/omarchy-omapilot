@@ -180,6 +180,17 @@ grep -Fq 'onFullscreenChanged: applyPlacement()' "$repo_dir/components/Console.q
 # surface cycle advances through. The implementation changes, not the vocabulary.
 grep -Fq 'fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"' \
   "$repo_dir/Ambient.qml"
+
+# The release-focus rung is additive, so every other host keeps its exact prior
+# behavior and Presentation.js keeps its original comparisons untouched. A real
+# window has no keyboard to hand back: no protocol lets a client unfocus itself.
+grep -Fq 'property bool releasesFocus: true' "$repo_dir/components/ConsoleContent.qml"
+grep -Fq 'root.focused && root.releasesFocus' "$repo_dir/components/ConsoleContent.qml"
+grep -Fq 'releasesFocus: false' "$repo_dir/components/Console.qml"
+# The content still does not know what window hosts it. That is what lets all 24
+# of its states render offscreen in the preview harness, and it is the reason the
+# migration touches one file instead of eight hundred lines.
+! grep -qE '^import Quickshell\.(Wayland|Hyprland)' "$repo_dir/components/ConsoleContent.qml"
 # The surface switch lives with the composer, the one piece all three surfaces
 # share, so it is reachable to enter a surface and not only to leave one.
 grep -Fq 'onClicked: {' "$repo_dir/components/Composer.qml"

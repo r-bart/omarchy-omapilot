@@ -223,10 +223,11 @@ Item {
         backend: root.backend
         focused: root.focused
         motionEnabled: root.motionEnabled && surface.visible
-        // No releaseFocusRequested handler: no Wayland protocol lets a client
-        // put the keyboard down, so there is nothing this window could do with
-        // it. Escape at rest is therefore inert until the escape ladder learns
-        // that this host closes instead of releasing.
+        // No keyboard to hand back: no Wayland protocol lets a client unfocus
+        // itself, so the release-focus rung would be a step to nowhere and
+        // Escape at rest would do nothing at all. Without it the ladder ends
+        // where the user expects, in a close.
+        releasesFocus: false
         onCloseRequested: root.close()
       }
     }
