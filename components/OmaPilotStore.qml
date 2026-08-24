@@ -94,6 +94,8 @@ Scope {
   // behavior; the other two are strictly opt-in.
   property string configuredSurface: "panel"
   property int configuredSidebarWidth: 440
+  // Whether the docked console asks the compositor to hold its column open.
+  property bool configuredConsoleReservesSpace: false
   // The console renders quick-action chips itself, so the pieces Panel.qml
   // reads straight from its injected settings need configured mirrors here.
   property string configuredQuickActionsJson: ""
@@ -216,6 +218,7 @@ Scope {
     var rawSidebarWidth = Number(source.sidebarWidth)
     var desiredSidebarWidth = isFinite(rawSidebarWidth) && rawSidebarWidth > 0
       ? Math.min(560, Math.max(360, Math.round(rawSidebarWidth))) : 440
+    var desiredConsoleReservesSpace = source.consoleReservesSpace === true
     var desiredQuickActionsJson = typeof source.quickActionsJson === "string"
       ? source.quickActionsJson : ""
     var desiredShowSummarize = source.showSummarizeAction === true
@@ -234,6 +237,7 @@ Scope {
       || desiredTtsVoice !== ttsVoice
       || desiredSurface !== configuredSurface
       || desiredSidebarWidth !== configuredSidebarWidth
+      || desiredConsoleReservesSpace !== configuredConsoleReservesSpace
       || desiredQuickActionsJson !== configuredQuickActionsJson
       || desiredShowSummarize !== configuredShowSummarizeAction
       || desiredShowWorkInApp !== configuredShowWorkInAppAction
@@ -245,6 +249,7 @@ Scope {
     configuredDangerousAutoApprove = desiredDangerousAutoApprove
     configuredSurface = desiredSurface
     configuredSidebarWidth = desiredSidebarWidth
+    configuredConsoleReservesSpace = desiredConsoleReservesSpace
     configuredQuickActionsJson = desiredQuickActionsJson
     configuredShowSummarizeAction = desiredShowSummarize
     configuredShowWorkInAppAction = desiredShowWorkInApp

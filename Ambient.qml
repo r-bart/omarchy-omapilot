@@ -453,6 +453,7 @@ Item {
       motionEnabled: root.motionEnabled
       surfaceWidth: OmaPilot.OmaPilotStore.configuredSidebarWidth
       fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"
+      reservesSpace: OmaPilot.OmaPilotStore.configuredConsoleReservesSpace
     }
     Component.onCompleted: if (root.consoleSurfaceLive) active = true
 

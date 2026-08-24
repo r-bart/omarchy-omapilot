@@ -1534,6 +1534,22 @@ Item {
             Accessible.name: text
           }
 
+          Toggle {
+            Layout.fillWidth: true
+            visible: root.backend && root.backend.configuredSurface === "console"
+            label: "Hold the column open"
+            description: "Tile windows beside the console instead of behind it, the way the bar holds its own strip. Opening and closing the console reflows the layout."
+            checked: root.backend && root.backend.configuredConsoleReservesSpace
+            enabled: root.backend && !root.backend.busy
+            foreground: root.foreground
+            accent: root.accent
+            fontFamily: root.fontFamily
+            Accessible.name: label
+            onClicked: root.requestSurfacePersist({
+              consoleReservesSpace: !(root.backend
+                && root.backend.configuredConsoleReservesSpace) })
+          }
+
           Dropdown {
             id: sidebarWidthPicker
             Layout.fillWidth: true

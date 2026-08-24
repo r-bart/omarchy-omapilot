@@ -29,6 +29,11 @@ Item {
   // second host could exist; this is that host, and it costs one anchor rather
   // than a second surface to keep in step. Docked stays the default.
   property bool fullscreen: false
+  // Whether the compositor should hold a column open for the console the way it
+  // holds the strip open for the bar, so windows tile beside it instead of
+  // underneath. Off by default: reserving reflows the user's layout every time
+  // the console opens, which is a cost they should choose, not inherit.
+  property bool reservesSpace: false
 
   property bool opened: false
   // Mapped, including the exit slide. Owners that tear the console down (the
@@ -98,7 +103,10 @@ Item {
     // moved by *other* surfaces' exclusive zones, which is what laid it over
     // the bar. Normal leaves the bar's own strip alone and starts underneath it.
     exclusionMode: ExclusionMode.Normal
-    exclusiveZone: 0
+    // Fullscreen is excluded rather than guarded against: a surface that covers
+    // the output has no room to leave for anything to tile into, and asking the
+    // compositor to reserve all of it would leave nowhere for windows to go.
+    exclusiveZone: root.reservesSpace && !root.fullscreen ? implicitWidth : 0
     // Keep the surface mapped while the exit slide plays out.
     visible: root.opened || shellItem.slid > 0.001
 

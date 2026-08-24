@@ -37,13 +37,14 @@ jq -e '
     "dangerousAutoApprove":false,
     "surface":"panel",
     "sidebarWidth":440,
+    "consoleReservesSpace":false,
     "voiceEnabled":false,
     "ttsProvider":"elevenlabs",
     "ttsModel":"",
     "ttsVoice":"",
     "onboardingComplete":false
   }
-  and ([.barWidget.schema[].key] | sort) == (["builtinModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "provider", "surface", "ttsModel", "ttsProvider", "ttsVoice", "voiceEnabled", "webHandoffProvider"] | sort)
+  and ([.barWidget.schema[].key] | sort) == (["builtinModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "consoleReservesSpace", "provider", "surface", "ttsModel", "ttsProvider", "ttsVoice", "voiceEnabled", "webHandoffProvider"] | sort)
   and (.barWidget.schema[] | select(.key == "surface")) == {
     "key":"surface",
     "type":"enum",
@@ -51,6 +52,13 @@ jq -e '
     "options":["panel", "console", "fullscreen"],
     "defaultValue":"panel",
     "description":"Answer from the compact bar panel, from a full-height console docked to the right edge of the focused output, or from that same console filling the screen."
+  }
+  and (.barWidget.schema[] | select(.key == "consoleReservesSpace")) == {
+    "key":"consoleReservesSpace",
+    "type":"boolean",
+    "label":"Hold the column open",
+    "defaultValue":false,
+    "description":"Reserve the docked console width so windows tile beside it instead of behind it. Opening and closing the console reflows the layout."
   }
   and (.barWidget.schema[] | select(.key == "webHandoffProvider")) == {
     "key":"webHandoffProvider",
