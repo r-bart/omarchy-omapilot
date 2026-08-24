@@ -62,6 +62,20 @@ TestCase {
     compare(Presentation.escapeAction("chat", false, false, false, false), "close-panel")
   }
 
+  function test_focusReleasesBeforeTheConsoleCloses() {
+    // The console's extra rung: focused and at rest hands the keyboard back
+    // without closing; every earlier rung outranks it; unfocused still closes.
+    compare(Presentation.escapeAction("chat", false, false, false, false, true), "release-focus")
+    compare(Presentation.escapeAction("chat", false, false, false, true, true), "cancel")
+    compare(Presentation.escapeAction("settings", false, false, false, false, true), "show-chat")
+    compare(Presentation.escapeAction("chat", true, false, false, false, true), "close-composer-popup")
+    compare(Presentation.escapeAction("chat", false, false, true, false, true), "close-preview")
+    compare(Presentation.escapeAction("chat", false, false, false, false, false), "close-panel")
+    // Five-argument callers and non-boolean junk keep the exact old terminal.
+    compare(Presentation.escapeAction("chat", false, false, false, false), "close-panel")
+    compare(Presentation.escapeAction("chat", false, false, false, false, "yes"), "close-panel")
+  }
+
   function test_settingsTabsAreAClosedLaneSet() {
     compare(Presentation.settingsTabIds().join(","), "agent,skills,voice,servers,desktop,actions")
     compare(Presentation.normalizedSettingsTab("desktop"), "desktop")

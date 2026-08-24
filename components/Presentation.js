@@ -64,13 +64,19 @@ function responsePhase(state, hasAnswer) {
   return { label: "", tone: "muted", waiting: false }
 }
 
+// `focused` arrives only from the console, which can hold the compositor's
+// keyboard while staying open: Escape at rest hands the keyboard back before
+// anything closes. Five-argument callers leave it undefined and keep their
+// exact prior behavior. The terminal value stays "close-panel" — it names the
+// ladder's final step, not a surface; each caller maps it to its own close.
 function escapeAction(viewMode, composerPopupOpen, settingsPopupOpen,
-                      previewOpen, busy) {
+                      previewOpen, busy, focused) {
   if (composerPopupOpen) return "close-composer-popup"
   if (settingsPopupOpen) return "close-settings-popup"
   if (previewOpen) return "close-preview"
   if (String(viewMode || "chat") !== "chat") return "show-chat"
   if (busy) return "cancel"
+  if (focused === true) return "release-focus"
   return "close-panel"
 }
 
