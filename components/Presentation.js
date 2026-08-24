@@ -108,3 +108,21 @@ function adjacentSettingsTab(current, delta) {
   if (next >= ids.length) next = ids.length - 1
   return ids[next]
 }
+
+// How the surface cycle button presents itself. It names its destination, not
+// where it already is: an icon for the current surface leaves the user to guess
+// what pressing it does. Glyphs are Nerd Font — md-dock_window,
+// cod-layout_sidebar_right, md-fullscreen — kept beside their labels so the two
+// cannot drift apart. Anything unrecognized describes the panel, which is where
+// Protocol.normalizedSurface sends an unrecognized value anyway.
+function surfaceIcon(surface) {
+  if (surface === "console") return ""
+  if (surface === "fullscreen") return "󰊓"
+  return "󱂬"
+}
+
+function surfaceTooltip(surface) {
+  if (surface === "console") return "Dock to the right edge"
+  if (surface === "fullscreen") return "Fill the screen"
+  return "Shrink to the bar panel"
+}

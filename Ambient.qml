@@ -140,8 +140,10 @@ Item {
     }
     function onConfiguredSurfaceChanged() {
       // Switching back to the panel must not strand an open console: its own
-      // IPC routes disable with the switch, so close it from here.
-      if (OmaPilot.OmaPilotStore.configuredSurface !== "console" && consoleLoader.item)
+      // IPC routes disable with the switch, so close it from here. Docked and
+      // fullscreen are the same window, so moving between them is a resize and
+      // must not close anything.
+      if (!root.consoleSurfaceLive && consoleLoader.item)
         consoleLoader.item.close()
     }
   }
@@ -425,15 +427,22 @@ Item {
   // Behind a Loader because the console is strictly opt-in: default-config
   // users should not pay for its object tree on every shell start. It stays
   // alive through the exit slide after a surface switch, then tears down.
+  // Docked and fullscreen are one surface wearing two geometries, so switching
+  // between them keeps the same window and the same conversation rather than
+  // tearing one down to build the other. Only the panel is a different host.
+  readonly property bool consoleSurfaceLive:
+    OmaPilot.OmaPilotStore.configuredSurface === "console"
+      || OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"
+
   Loader {
     id: consoleLoader
-    active: OmaPilot.OmaPilotStore.configuredSurface === "console"
-      || (item !== null && item.engaged === true)
+    active: root.consoleSurfaceLive || (item !== null && item.engaged === true)
     sourceComponent: OmaPilot.Console {
       backend: OmaPilot.OmaPilotStore
       targetScreen: root.activeScreen
       motionEnabled: root.motionEnabled
       surfaceWidth: OmaPilot.OmaPilotStore.configuredSidebarWidth
+      fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"
     }
   }
 
@@ -442,7 +451,7 @@ Item {
   // inverse condition, so exactly one surface responds to each gesture.
   Connections {
     target: OmaPilot.OmaPilotStore
-    enabled: OmaPilot.OmaPilotStore.configuredSurface === "console"
+    enabled: root.consoleSurfaceLive
     function onIpcOpenRequested() { if (consoleLoader.item) consoleLoader.item.open(true) }
     function onIpcCloseRequested() { if (consoleLoader.item) consoleLoader.item.close() }
     function onIpcToggleRequested() { if (consoleLoader.item) consoleLoader.item.toggle() }

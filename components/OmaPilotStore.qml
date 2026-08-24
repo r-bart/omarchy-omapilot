@@ -89,8 +89,9 @@ Scope {
   property string configuredOpencodeModel: ""
   property bool configuredDangerousAutoApprove: false
   // Which desktop surface answers the open/close/toggle/history/settings
-  // routes: the bar panel popout or the full-height console. "panel" keeps
-  // today's behavior; the console is strictly opt-in.
+  // routes: the bar panel popout, the full-height console docked to an edge, or
+  // the same console content taking the whole screen. "panel" keeps today's
+  // behavior; the other two are strictly opt-in.
   property string configuredSurface: "panel"
   property int configuredSidebarWidth: 440
   // The console renders quick-action chips itself, so the pieces Panel.qml
@@ -169,6 +170,26 @@ Scope {
     settingsPersistRequested(values || {})
   }
 
+  // The surface has three entry points — the settings dropdown, the header's
+  // cycle button, and these for a hotkey. All of them go through the same
+  // persist relay, so no caller can leave the surfaces disagreeing about which
+  // one is live. Both return the surface being switched to, not the current
+  // one: the write is asynchronous and `configuredSurface` only catches up once
+  // the owner has merged and echoed the settings back.
+  function cycleSurface() {
+    var next = Protocol.nextSurface(configuredSurface)
+    requestSettingsPersist({ surface: next })
+    return next
+  }
+
+  // Naming a surface outright, for a hotkey bound to one of them rather than to
+  // the cycle. An unrecognized name lands on the panel instead of nowhere.
+  function selectSurface(value) {
+    var next = Protocol.normalizedSurface(value)
+    requestSettingsPersist({ surface: next })
+    return next
+  }
+
   function routeIpc(method) {
     if (method === "open" || method === "show") ipcOpenRequested()
     else if (method === "close" || method === "hide") ipcCloseRequested()
@@ -191,7 +212,7 @@ Scope {
     var desiredTtsProvider = Protocol.normalizedTtsProvider(source.ttsProvider) || "elevenlabs"
     var desiredTtsModel = String(source.ttsModel || "")
     var desiredTtsVoice = String(source.ttsVoice || "")
-    var desiredSurface = String(source.surface || "") === "console" ? "console" : "panel"
+    var desiredSurface = Protocol.normalizedSurface(source.surface)
     var rawSidebarWidth = Number(source.sidebarWidth)
     var desiredSidebarWidth = isFinite(rawSidebarWidth) && rawSidebarWidth > 0
       ? Math.min(560, Math.max(360, Math.round(rawSidebarWidth))) : 440
@@ -1171,6 +1192,8 @@ Scope {
     function continueInHerdr() { root.continueInHerdr() }
     function history() { root.routeIpc("history") }
     function settings() { root.routeIpc("settings") }
+    function cycleSurface(): string { return root.cycleSurface() }
+    function surface(name: string): string { return root.selectSurface(name) }
     function voiceStart(): string { root.ipcVoiceStartRequested(); return "ok" }
     function voiceStop(): string { root.ipcVoiceStopRequested(); return "ok" }
     function voiceToggle(): string { root.ipcVoiceToggleRequested(); return "ok" }

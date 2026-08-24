@@ -48,9 +48,9 @@ jq -e '
     "key":"surface",
     "type":"enum",
     "label":"Surface",
-    "options":["panel", "console"],
+    "options":["panel", "console", "fullscreen"],
     "defaultValue":"panel",
-    "description":"Answer from the compact bar panel or from a full-height console docked to the right edge of the focused output."
+    "description":"Answer from the compact bar panel, from a full-height console docked to the right edge of the focused output, or from that same console filling the screen."
   }
   and (.barWidget.schema[] | select(.key == "webHandoffProvider")) == {
     "key":"webHandoffProvider",

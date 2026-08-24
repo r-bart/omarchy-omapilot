@@ -499,4 +499,23 @@ TestCase {
     verify(rows[0].resumable)
     verify(rows[0].capability === undefined)
   }
+
+  function test_surfaceCycleGrowsAndWrapsAndRejectsUnknownNames() {
+    // The order runs least-to-most screen taken, so a repeated gesture grows
+    // the surface rather than jumping between two of them.
+    compare(Protocol.surfaceOrder().join(","), "panel,console,fullscreen")
+    compare(Protocol.nextSurface("panel"), "console")
+    compare(Protocol.nextSurface("console"), "fullscreen")
+    compare(Protocol.nextSurface("fullscreen"), "panel")
+
+    // Anything unrecognized is the panel: a config written before the console
+    // existed, or a hand-edited typo, must not strand the user on no surface.
+    compare(Protocol.normalizedSurface("sidebar"), "panel")
+    compare(Protocol.normalizedSurface(""), "panel")
+    compare(Protocol.normalizedSurface(undefined), "panel")
+    compare(Protocol.normalizedSurface("CONSOLE"), "console")
+
+    // And an unrecognized current value still advances, rather than sticking.
+    compare(Protocol.nextSurface("sidebar"), "console")
+  }
 }

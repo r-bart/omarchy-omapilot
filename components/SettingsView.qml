@@ -1508,23 +1508,24 @@ Item {
             showLabel: false
             options: [
               { value: "panel", label: "Bar panel — compact popout" },
-              { value: "console", label: "Console — full-height sidebar" }
+              { value: "console", label: "Console — full-height sidebar" },
+              { value: "fullscreen", label: "Console — full screen" }
             ]
-            value: root.backend && root.backend.configuredSurface === "console"
-              ? "console" : "panel"
+            value: root.backend
+              ? Protocol.normalizedSurface(root.backend.configuredSurface) : "panel"
             enabled: root.backend && !root.backend.busy
             foreground: root.foreground
             background: root.background
             Accessible.name: "Surface"
             onChanged: function(value) {
               root.requestSurfacePersist({
-                surface: String(value) === "console" ? "console" : "panel" })
+                surface: Protocol.normalizedSurface(value) })
             }
           }
 
           Text {
             Layout.fillWidth: true
-            text: "The console keeps the conversation, approvals, history, and these settings on one full-height surface at the right edge. The panel stays available as the compact quick turn."
+            text: "The console keeps the conversation, approvals, history, and these settings on one surface — docked to the right edge, or filling the screen. The panel stays available as the compact quick turn."
             color: root.mutedForeground
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption

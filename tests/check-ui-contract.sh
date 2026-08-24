@@ -97,8 +97,14 @@ grep -Fq 'WlrLayershell.layer: WlrLayer.Overlay' "$repo_dir/components/Console.q
 grep -Fq 'WlrLayershell.namespace: "omapilot-console"' "$repo_dir/components/Console.qml"
 grep -Fq '? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None' \
   "$repo_dir/components/Console.qml"
-grep -Fq 'anchors { right: true; top: true; bottom: true }' \
+# Docked pins three edges; fullscreen adds the fourth and lets the compositor
+# size the surface. One window, two geometries — not two surfaces to keep in step.
+grep -Fq 'anchors { right: true; top: true; bottom: true; left: root.fullscreen }' \
   "$repo_dir/components/Console.qml"
+grep -Fq 'fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"' \
+  "$repo_dir/Ambient.qml"
+# Fullscreen has no edge to fold into, so it must not offer the handle.
+grep -Fq 'visible: !root.fullscreen' "$repo_dir/components/Console.qml"
 # The escape ladder releases focus before it closes, and keeps its terminal name.
 grep -Fq 'if (focused === true) return "release-focus"' \
   "$repo_dir/components/Presentation.js"
@@ -109,14 +115,16 @@ grep -Fq 'backend.respondPermission("reject_once", backend.permissionChoiceId("r
 grep -Fq 'property string configuredSurface: "panel"' \
   "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq '"surface": "panel"' "$repo_dir/manifest.json"
-# Exactly one surface answers each IPC route.
-grep -Fq 'enabled: OmaPilot.OmaPilotStore.configuredSurface === "console"' \
-  "$repo_dir/Ambient.qml"
+# Exactly one host answers each IPC route: the console window for both of its
+# geometries, the bar widget for the panel. The two guards stay complementary.
+grep -Fq 'enabled: root.consoleSurfaceLive' "$repo_dir/Ambient.qml"
+grep -Fq 'OmaPilot.OmaPilotStore.configuredSurface === "console"' "$repo_dir/Ambient.qml"
+grep -Fq 'OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"' "$repo_dir/Ambient.qml"
 grep -Fq 'OmaPilot.OmaPilotStore.configuredSurface === "panel"' "$repo_dir/BarWidget.qml"
 # A voice answer never paints twice: the curtain stands down behind the console.
 grep -Fq '&& !root.consoleOpened' "$repo_dir/Ambient.qml"
-# The console tree only exists for users who opted in.
-grep -Fq 'active: OmaPilot.OmaPilotStore.configuredSurface === "console"' \
+# The console tree only exists for users who opted in — to either geometry.
+grep -Fq 'active: root.consoleSurfaceLive || (item !== null && item.engaged === true)' \
   "$repo_dir/Ambient.qml"
 grep -Fq 'active: root.surfaceRoutesHere' "$repo_dir/BarWidget.qml"
 # The filament is the state light generalized, never a parallel component.

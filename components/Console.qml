@@ -25,6 +25,10 @@ Item {
   property bool motionEnabled: true
   // Value at scale 1; Style.space applies the host's spacing scale below.
   property int surfaceWidth: 440
+  // Same content, whole screen. ConsoleContent was split from this window so a
+  // second host could exist; this is that host, and it costs one anchor rather
+  // than a second surface to keep in step. Docked stays the default.
+  property bool fullscreen: false
 
   property bool opened: false
   // Collapsed is not closed. Closed unmaps the surface and ends the visit;
@@ -62,6 +66,9 @@ Item {
   }
 
   function collapse() {
+    // Fullscreen has no edge to fold into, and a whole-screen surface reduced
+    // to a handle would read as a bug rather than a collapse.
+    if (fullscreen) return
     // Dropping the keyboard is the point: a collapsed console must not hold
     // the compositor's focus while showing nothing to type into.
     invoked = false
@@ -78,6 +85,10 @@ Item {
     if (collapsed) expand()
     else collapse()
   }
+
+  // Switching to fullscreen while folded would map a whole-screen surface with
+  // nothing in it: the handle that would unfold it does not exist there.
+  onFullscreenChanged: if (fullscreen) collapsed = false
 
   function toggle() {
     if (opened) close()
@@ -106,7 +117,10 @@ Item {
     id: surface
     screen: root.targetScreen
     color: "transparent"
-    anchors { right: true; top: true; bottom: true }
+    // Anchoring left as well is the whole of the fullscreen mode: with both
+    // sides pinned the compositor sizes the surface and implicitWidth stops
+    // being consulted, so the docked width needs no special case.
+    anchors { right: true; top: true; bottom: true; left: root.fullscreen }
     // Collapsing narrows the surface itself rather than sliding the content
     // out of a full-width window: the layer's input region is its size, so a
     // full-width collapsed console would keep swallowing clicks meant for the
@@ -188,7 +202,12 @@ Item {
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        width: Style.space(root.surfaceWidth)
+        // Docked, the handle owns a column of its own rather than sitting on
+        // top of the filament: the configured width is the surface, and the
+        // content takes what the handle leaves.
+        width: root.fullscreen
+          ? parent.width
+          : Style.space(root.surfaceWidth) - Style.space(root.handleWidth)
         backend: root.backend
         focused: root.invoked && !root.collapsed
         // Keyed to the mapped surface, not `opened`, so the filament does not
@@ -209,6 +228,7 @@ Item {
       // arriving: whatever else goes wrong, the pointer can always reach it.
       Rectangle {
         id: handle
+        visible: !root.fullscreen
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom

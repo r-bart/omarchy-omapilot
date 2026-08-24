@@ -784,6 +784,26 @@ function normalizedWebHandoffProvider(value) {
   return ["duckduckgo", "google", "chatgpt", "claude", "grok"].indexOf(provider) >= 0 ? provider : ""
 }
 
+// The surfaces the conversation can be shown on, ordered by how much of the
+// screen they take. Anything unrecognized — a config from before the console
+// existed, a hand-edited typo — reads as the panel, which is the default.
+function surfaceOrder() {
+  return ["panel", "console", "fullscreen"]
+}
+
+function normalizedSurface(value) {
+  var surface = String(value || "").toLowerCase()
+  return surfaceOrder().indexOf(surface) >= 0 ? surface : "panel"
+}
+
+// One gesture, always forward, always landing somewhere valid: an unrecognized
+// current value normalizes to the panel first and so advances to the console
+// rather than getting stuck.
+function nextSurface(value) {
+  var order = surfaceOrder()
+  return order[(order.indexOf(normalizedSurface(value)) + 1) % order.length]
+}
+
 function webHandoffProviderOptions() {
   return ["duckduckgo", "google", "chatgpt", "claude", "grok"].map(function(value) {
     return { value: value, label: webHandoffProviderLabel(value) }
