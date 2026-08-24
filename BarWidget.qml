@@ -28,11 +28,19 @@ BarWidget {
 
   function injectPanel() {
     var target = panelLoader.item
-    if (!target) return
-    if ("bar" in target) target.bar = root.bar
-    if ("settings" in target) target.settings = root.settings
-    if ("anchorItem" in target) target.anchorItem = root.inlineActive ? inlineComposer : button
-    if ("hostWidget" in target) target.hostWidget = root
+    if (target) {
+      if ("bar" in target) target.bar = root.bar
+      if ("settings" in target) target.settings = root.settings
+      if ("anchorItem" in target) target.anchorItem = root.inlineActive ? inlineComposer : button
+      if ("hostWidget" in target) target.hostWidget = root
+    }
+    // Configuring the store is not part of injecting the panel, and must not
+    // depend on one being loaded. This widget owns the settings entry on both
+    // surfaces, so with the console live and `panelLoader` inactive this is the
+    // only path a console-side settings edit has back into the store. Behind
+    // the item guard, those edits reached shell.json and stopped there — the
+    // running store kept the old values until the next shell restart, and every
+    // control bound to a `configured*` mirror snapped back after being changed.
     OmaPilot.OmaPilotStore.configure(root.settings)
   }
 
