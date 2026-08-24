@@ -11,6 +11,14 @@ import "components/StatePhrases.js" as StatePhrases
 ShellRoot {
   id: root
   readonly property string previewState: Quickshell.env("OMAPILOT_PREVIEW_STATE") || "empty"
+  // Console states render ConsoleContent at the sidebar's own geometry.
+  readonly property bool consoleState: previewState.indexOf("console-") === 0
+  // Geometry overrides so one harness can render the same state at the wide
+  // card size and at a narrow vertical width without editing the file.
+  readonly property int previewWidth: Number(Quickshell.env("OMAPILOT_PREVIEW_WIDTH"))
+    || (consoleState ? 440 : 860)
+  readonly property int previewHeight: Number(Quickshell.env("OMAPILOT_PREVIEW_HEIGHT"))
+    || (consoleState ? 900 : 0)
   readonly property bool holdOpen: Quickshell.env("OMAPILOT_PREVIEW_HOLD") === "1"
   readonly property int captureDelay: {
     const requested = Number(Quickshell.env("OMAPILOT_PREVIEW_DELAY"))
@@ -29,9 +37,11 @@ ShellRoot {
     property bool contextCaptureAvailable: true
     property bool desktopContextActive: false
     property string state: root.previewState === "waiting" ? "preparing"
-      : (root.previewState === "streaming" ? "streaming"
-        : (root.previewState === "error" || root.previewState === "error-details"
-          ? "error" : "composing"))
+      : (root.previewState === "streaming" || root.previewState === "console-streaming"
+          || root.previewState === "console-permission" ? "streaming"
+        : (root.previewState === "console-answer" ? "complete"
+          : (root.previewState === "error" || root.previewState === "error-details"
+            ? "error" : "composing")))
     property string provider: "builtin"
     property string model: "openai-codex::gpt-5.4"
     property string transcript: ""
@@ -42,14 +52,48 @@ ShellRoot {
       || root.previewState === "streaming"
       || root.previewState === "error"
       || root.previewState === "error-details"
+      || root.previewState === "console-streaming"
+      || root.previewState === "console-answer"
+      || root.previewState === "console-permission"
       ? "Find the current status and summarize what matters." : ""
+    property string answerMarkdown: root.previewState === "console-answer"
+      ? "The **disk pressure** comes from three journal directories:\n\n"
+        + "- `/var/log/journal` — 3.9 GB\n- `~/.cache/yay` — 2.2 GB\n"
+        + "- `~/.local/share/Trash` — 1.4 GB\n\n"
+        + "Running `journalctl --vacuum-size=500M` reclaims the largest share "
+        + "without touching anything you have not already read." : ""
+    property var images: []
+    property string currentChatId: root.previewState === "console-answer" ? "chat-preview" : ""
+    property var history: [
+      { id: "chat-1", title: "Summarize the current window", provider: "builtin",
+        model: "gpt-5.4", timestamp: "Today 14:03" },
+      { id: "chat-2", title: "Draft a reply to this thread", provider: "codex",
+        model: "gpt-5.4", timestamp: "Today 11:40" }
+    ]
+    property string configuredSurface: "console"
+    property int configuredSidebarWidth: 440
+    property bool configuredDangerousAutoApprove: false
+    property string configuredQuickActionsJson: ""
+    property bool configuredShowSummarizeAction: true
+    property bool configuredShowWorkInAppAction: true
     property var errorDetails: ({
       title: "Request failed",
       message: "The harness stopped before completing the response.",
       code: "provider_failed",
       retryable: true
     })
-    property var pendingPermission: null
+    property var pendingPermission: root.previewState === "console-permission" ? ({
+      id: "perm-1",
+      title: "Run a shell command",
+      detail: "journalctl --vacuum-size=500M\n\nRequested by the builtin harness"
+        + " with nonce 4f21c9. The command frees journal space and cannot touch"
+        + " user files.",
+      options: [
+        { id: "allow-once", decision: "allow_once", label: "Allow once" },
+        { id: "allow-session", decision: "allow_session", label: "Allow this session" },
+        { id: "reject-once", decision: "reject_once", label: "Reject" }
+      ]
+    }) : null
     property var providers: [
       { value: "builtin", label: "Built-in (OmaPilot)", policy: { tools: "device-approval" } }
     ]
@@ -167,18 +211,34 @@ ShellRoot {
     function setCapabilityEnabled(id, enabled) {}
     function setCapabilityFilesRoot(path) {}
     function requestCapabilities() {}
+    function respondPermission(decision, choiceId) {}
+    function hasPermissionDecision(decision) { return true }
+    function permissionChoiceId(decision) { return "reject-once" }
+    function permissionOptionsWithoutDenyOnce() {
+      return pendingPermission ? pendingPermission.options.filter(function(option) {
+        return option.decision !== "reject_once"
+      }) : []
+    }
+    function requestSettingsPersist(values) {}
+    function requestHistory() {}
+    function loadChat(chat) {}
+    function deleteHistory(chatId) {}
+    function clearHistory() {}
+    function newChat() {}
+    function continueInHerdr() {}
   }
 
   Window {
     id: previewWindow
-    width: 860
-    height: root.previewState === "settings" || root.previewState === "skills-settings"
+    width: root.previewWidth
+    height: root.previewHeight > 0 ? root.previewHeight
+      : (root.previewState === "settings" || root.previewState === "skills-settings"
       || root.previewState === "voice-settings" || root.previewState === "desktop-settings"
       || root.previewState === "dangerous-settings"
       || root.previewState === "actions-settings" || root.previewState === "history" ? 760
       : (root.previewState === "error-details" ? 520
         : (root.previewState === "context" ? 430
-          : (root.previewState === "setup-voice" || root.previewState === "setup-hotkeys" ? 420 : 320)))
+          : (root.previewState === "setup-voice" || root.previewState === "setup-hotkeys" ? 420 : 320))))
     visible: true
     color: "transparent"
     flags: Qt.FramelessWindowHint
@@ -392,6 +452,20 @@ ShellRoot {
         }
       }
 
+      OmaPilot.ConsoleContent {
+        id: consoleContent
+        visible: root.consoleState
+        anchors.fill: parent
+        backend: backend
+        focused: true
+        viewMode: root.previewState === "console-history" ? "history"
+          : (root.previewState === "console-settings" ? "settings" : "chat")
+        foreground: Color.popups.text
+        background: Color.popups.background
+        accent: Color.accent
+        fontFamily: Style.font.family
+      }
+
       OmaPilot.ErrorDetailsView {
         id: errorDetailsView
         visible: root.previewState === "error-details"
@@ -429,7 +503,9 @@ ShellRoot {
         && responsePreview.implicitHeight <= 0
       var invalidErrorDetails = root.previewState === "error-details"
         && errorDetailsView.implicitHeight <= 0
-      if (invalidMain || invalidSettings || invalidHistory || invalidResponse || invalidErrorDetails) {
+      var invalidConsole = root.consoleState && consoleContent.width <= 0
+      if (invalidMain || invalidSettings || invalidHistory || invalidResponse
+          || invalidErrorDetails || invalidConsole) {
         console.error("omapilot visual preview failed: invalid component geometry")
         Qt.quit()
         return

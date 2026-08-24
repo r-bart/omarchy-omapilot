@@ -17,6 +17,8 @@ qml_files=(
   "$repo_dir/ContextCaptureOverlay.qml"
   "$repo_dir/Panel.qml"
   "$repo_dir/components/Composer.qml"
+  "$repo_dir/components/Console.qml"
+  "$repo_dir/components/ConsoleContent.qml"
   "$repo_dir/components/ContextAttachmentPreview.qml"
   "$repo_dir/components/ErrorDetailsView.qml"
   "$repo_dir/components/ErrorNotice.qml"
@@ -78,6 +80,35 @@ if grep -Fq 'command: [root.hotkeyInstallerPath, "--once"' \
   printf 'Hotkey installation must require an explicit settings action\n' >&2
   exit 1
 fi
+
+# Console surface: geometry and layer decisions that must not regress silently.
+grep -Fq 'exclusionMode: ExclusionMode.Ignore' "$repo_dir/components/Console.qml"
+grep -Fq 'exclusiveZone: 0' "$repo_dir/components/Console.qml"
+grep -Fq 'WlrLayershell.layer: WlrLayer.Overlay' "$repo_dir/components/Console.qml"
+grep -Fq 'WlrLayershell.namespace: "omapilot-console"' "$repo_dir/components/Console.qml"
+grep -Fq '? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None' \
+  "$repo_dir/components/Console.qml"
+grep -Fq 'anchors { right: true; top: true; bottom: true }' \
+  "$repo_dir/components/Console.qml"
+# The escape ladder releases focus before it closes, and keeps its terminal name.
+grep -Fq 'if (focused === true) return "release-focus"' \
+  "$repo_dir/components/Presentation.js"
+# A pending approval pins the console: Escape answers it, never dismisses it.
+grep -Fq 'backend.respondPermission("reject_once", backend.permissionChoiceId("reject_once"))' \
+  "$repo_dir/components/ConsoleContent.qml"
+# The default surface stays the panel; the console is strictly opt-in.
+grep -Fq 'property string configuredSurface: "panel"' \
+  "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq '"surface": "panel"' "$repo_dir/manifest.json"
+# Exactly one surface answers each IPC route.
+grep -Fq 'enabled: OmaPilot.OmaPilotStore.configuredSurface === "console"' \
+  "$repo_dir/Ambient.qml"
+grep -Fq 'OmaPilot.OmaPilotStore.configuredSurface === "panel"' "$repo_dir/BarWidget.qml"
+# A voice answer never paints twice: the curtain stands down behind the console.
+grep -Fq '&& !consoleSurface.opened' "$repo_dir/Ambient.qml"
+# The filament is the state light generalized, never a parallel component.
+grep -Fq 'property bool vertical: false' "$repo_dir/components/StateLightBar.qml"
+grep -Fq 'vertical: true' "$repo_dir/components/ConsoleContent.qml"
 grep -Fq -- '-- BEGIN OmaPilot managed hotkeys' \
   "$repo_dir/scripts/install-hotkeys.sh"
 grep -Fq 'property string configuredProvider: "builtin"' \
@@ -762,7 +793,9 @@ if grep -Eq "visual preview failed|Failed to load|Type .* unavailable|Cannot ass
 fi
 
 for preview_state in settings skills-settings voice-settings desktop-settings actions-settings \
-    setup-voice setup-hotkeys history waiting streaming error error-details context; do
+    setup-voice setup-hotkeys history waiting streaming error error-details context \
+    console-empty console-streaming console-answer console-permission \
+    console-history console-settings; do
   preview_output="$repo_dir/screenshots/implementation-omapilot-$preview_state.png"
   OMAPILOT_PREVIEW_STATE="$preview_state" OMAPILOT_PREVIEW_PATH="$preview_output" \
     QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \
