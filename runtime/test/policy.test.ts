@@ -298,7 +298,11 @@ describe("provider security profiles", () => {
     const opencode = providers.find((provider) => provider.id === "opencode");
     expect(opencode).toBeDefined();
     const config = JSON.parse(opencode?.agent.env.OPENCODE_CONFIG_CONTENT ?? "{}");
-    expect(config).toMatchObject({ default_agent: "build", skills: { urls: [] }, mcp: { "fixture-user-mcp": false } });
+    expect(config).toMatchObject({
+      default_agent: "build",
+      skills: { urls: [] },
+      mcp: { "fixture-user-mcp": { enabled: false } }
+    });
   });
 
   it("never substitutes ACP when the selected built-in harness is disabled", async () => {
