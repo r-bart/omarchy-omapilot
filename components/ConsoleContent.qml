@@ -192,10 +192,24 @@ Item {
     motionEnabled: root.motionEnabled
   }
 
+  // Docked, the console is as wide as it will ever be and the content simply
+  // fills it. Filling a 2560px screen instead gives lines nobody can track from
+  // one end to the next, a composer pinned to a far corner, and a conversation
+  // stranded against one edge. Past this measure the column stops growing and
+  // centres: the same layout, not a stretched one. Below it — every docked
+  // width, 360 through 560 — the min() is inert and nothing changes.
+  readonly property int contentInset: Style.space(18)
+  readonly property int maxContentWidth: Style.space(920)
+  readonly property int contentWidth: Math.min(
+    Math.max(width - contentInset * 2, 0), maxContentWidth)
+  // Only the docked column is tight enough to need the meta stacked.
+  readonly property bool tightMeta: contentWidth < Style.space(560)
+
   ColumnLayout {
-    anchors.fill: parent
-    anchors.leftMargin: Style.space(18)
-    anchors.rightMargin: Style.space(18)
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    width: root.contentWidth
     anchors.topMargin: Style.space(14)
     anchors.bottomMargin: Style.space(14)
     spacing: Style.spacing.lg
@@ -203,7 +217,7 @@ Item {
     OmaPilot.OmaPilotHeader {
       Layout.fillWidth: true
       backend: root.backend
-      stackedMeta: true
+      stackedMeta: root.tightMeta
       surfaceCycleVisible: true
       dangerousAutoApprove: root.dangerousAutoApprove
       motionEnabled: root.motionEnabled

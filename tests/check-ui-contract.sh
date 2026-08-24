@@ -105,6 +105,12 @@ grep -Fq 'fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"'
   "$repo_dir/Ambient.qml"
 # Fullscreen has no edge to fold into, so it must not offer the handle.
 grep -Fq 'visible: !root.fullscreen' "$repo_dir/components/Console.qml"
+# The content column stops growing past a readable measure and centres instead.
+# min() keeps every docked width inert, so the docked render is unchanged.
+grep -Fq 'readonly property int contentWidth: Math.min(' \
+  "$repo_dir/components/ConsoleContent.qml"
+grep -Fq 'anchors.horizontalCenter: parent.horizontalCenter' \
+  "$repo_dir/components/ConsoleContent.qml"
 # The escape ladder releases focus before it closes, and keeps its terminal name.
 grep -Fq 'if (focused === true) return "release-focus"' \
   "$repo_dir/components/Presentation.js"
@@ -841,6 +847,23 @@ for preview_state in settings skills-settings voice-settings desktop-settings ac
   if grep -Eq "visual preview failed|Failed to load|Type .* unavailable|Cannot assign|TypeError" \
       "$preview_root/$preview_state-output.log" || [[ ! -s "$preview_output" ]]; then
     cat "$preview_root/$preview_state-output.log"
+    exit 1
+  fi
+done
+
+# The same content at the fullscreen surface's real geometry. Rendered separately
+# because it is the same states at a different size, and because a sidebar layout
+# stretched to 2560px renders without a single error while being unreadable —
+# only looking at it catches that, so the states have to exist to be looked at.
+for preview_state in console-answer console-permission console-settings; do
+  preview_output="$repo_dir/screenshots/implementation-omapilot-fullscreen-${preview_state#console-}.png"
+  OMAPILOT_PREVIEW_STATE="$preview_state" OMAPILOT_PREVIEW_PATH="$preview_output" \
+    OMAPILOT_PREVIEW_WIDTH=2560 OMAPILOT_PREVIEW_HEIGHT=1405 \
+    QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \
+    --path "$preview_root" --no-color >"$preview_root/fullscreen-$preview_state.log" 2>&1
+  if grep -Eq "visual preview failed|Failed to load|Type .* unavailable|Cannot assign|TypeError" \
+      "$preview_root/fullscreen-$preview_state.log" || [[ ! -s "$preview_output" ]]; then
+    cat "$preview_root/fullscreen-$preview_state.log"
     exit 1
   fi
 done
