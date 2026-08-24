@@ -112,6 +112,12 @@ Item {
     function onIpcNewVoiceChatRequested() { root.newVoiceChat() }
     function onIpcVoiceCancelRequested() { root.voiceCancel() }
     function onIpcAmbientDismissRequested() { root.dismiss() }
+    function onSettingsPersistRequested(values) {
+      // Only claim settings authority once we actually own a plugins[] entry;
+      // while the bar widget exists, its relay handles persistence.
+      if (!root.ownSettings) return
+      root.persistSettings(values)
+    }
   }
 
   // Presentation and conversation lifetime are deliberately separate. A failed
@@ -122,8 +128,11 @@ Item {
   property bool voiceEngaged: false
   property bool voiceSessionActive: false
 
+  // A voice turn with the console open would paint the same answer twice —
+  // top and right. The console is the focused surface; when it is up, it is
+  // the answer, so the curtain stands down.
   readonly property bool curtainShown:
-    voiceEngaged && (failed || hasAnswer)
+    voiceEngaged && (failed || hasAnswer) && !consoleSurface.opened
 
   readonly property string phase: {
     if (!voiceEngaged) return "dormant"
@@ -384,6 +393,33 @@ Item {
     motionEnabled: root.motionEnabled
   }
 
+  OmaPilot.Console {
+    id: consoleSurface
+    backend: OmaPilot.OmaPilotStore
+    targetScreen: root.activeScreen
+    motionEnabled: root.motionEnabled
+    surfaceWidth: OmaPilot.OmaPilotStore.configuredSidebarWidth
+  }
+
+  // The console answers the same IPC routes the bar widget consumes; the
+  // configured surface decides which one acts. BarWidget guards with the
+  // inverse condition, so exactly one surface responds to each gesture.
+  Connections {
+    target: OmaPilot.OmaPilotStore
+    enabled: OmaPilot.OmaPilotStore.configuredSurface === "console"
+    function onIpcOpenRequested() { consoleSurface.open(true) }
+    function onIpcCloseRequested() { consoleSurface.close() }
+    function onIpcToggleRequested() { consoleSurface.toggle() }
+    function onIpcHistoryRequested() { consoleSurface.openHistory() }
+    function onIpcSettingsRequested() { consoleSurface.openSettings() }
+    function onContextAttachmentAdded() { consoleSurface.open(true) }
+    function onPendingPermissionChanged() {
+      // A real blocker summons the console with focus: an approval the user
+      // cannot see is a stalled turn with no indication of why.
+      if (OmaPilot.OmaPilotStore.pendingPermission !== null) consoleSurface.open(true)
+    }
+  }
+
   OmaPilot.AnswerCurtain {
     shown: root.curtainShown
     question: OmaPilot.OmaPilotStore.question
@@ -427,4 +463,5 @@ Item {
   }
 
   readonly property bool opened: capture.opened === true || root.voiceEngaged
+    || consoleSurface.opened
 }

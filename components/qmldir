@@ -1,6 +1,8 @@
 singleton OmaPilotStore 1.0 OmaPilotStore.qml
 singleton DesktopContext 1.0 DesktopContext.qml
 Composer 1.0 Composer.qml
+Console 1.0 Console.qml
+ConsoleContent 1.0 ConsoleContent.qml
 ContextAttachmentPreview 1.0 ContextAttachmentPreview.qml
 ErrorDetailsView 1.0 ErrorDetailsView.qml
 ErrorNotice 1.0 ErrorNotice.qml

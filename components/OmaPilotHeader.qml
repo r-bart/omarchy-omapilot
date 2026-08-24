@@ -9,6 +9,10 @@ Item {
   id: root
 
   required property var backend
+  // At the console's 404px the approval notice starves the harness name to an
+  // ellipsis — the part most worth reading. Stacked, each line gets the full
+  // width. `false` keeps the panel's single meta row unchanged.
+  property bool stackedMeta: false
   property bool dangerousAutoApprove: false
   property bool motionEnabled: true
   property color foreground: Color.popups.text
@@ -73,9 +77,13 @@ Item {
       }
     }
 
-    RowLayout {
+    // A grid with a conditional column count is one layout for both shapes:
+    // two columns is exactly the old row, one column stacks the same children.
+    GridLayout {
       Layout.fillWidth: true
-      spacing: Style.spacing.md
+      columns: root.stackedMeta ? 1 : 2
+      columnSpacing: Style.spacing.md
+      rowSpacing: Style.spacing.xs
 
       Text {
         Layout.fillWidth: true
@@ -92,6 +100,7 @@ Item {
       }
 
       Text {
+        Layout.fillWidth: root.stackedMeta
         text: "\uebc1  " + Presentation.permissionNotice(root.dangerousAutoApprove)
         color: root.dangerousAutoApprove
           ? Color.urgent : Qt.darker(root.foreground, 1.45)
