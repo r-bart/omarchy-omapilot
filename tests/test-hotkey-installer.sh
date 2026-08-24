@@ -72,6 +72,19 @@ test "$(grep -Fc -- '-- BEGIN OmaPilot managed hotkeys' "$bindings")" -eq 1
 "$installed_installer" --remove
 clean_bindings="$test_root/clean-bindings.lua"
 cp -- "$bindings" "$clean_bindings"
+
+cat >>"$bindings" <<'LUA'
+o.bind("SUPER + SHIFT + A", "My existing voice chat", "my-voice-chat")
+o.bind("SUPER + ALT + H", "My existing handoff", "my-handoff")
+LUA
+all_collisions_checksum=$(sha256sum "$bindings")
+if "$installed_installer" 2>/dev/null; then
+  printf 'expected all-collisions installation to fail without completing setup\n' >&2
+  exit 1
+fi
+test "$(sha256sum "$bindings")" = "$all_collisions_checksum"
+assert_absent '-- BEGIN OmaPilot managed hotkeys' "$bindings"
+
 for mode in --remove --force; do
   cp -- "$clean_bindings" "$bindings"
   printf '%s\n' \
