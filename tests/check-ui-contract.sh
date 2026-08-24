@@ -168,6 +168,14 @@ grep -Fq 'onReservesSpaceChanged: applyPlacement()' "$repo_dir/components/Consol
 grep -Fq '!root.reservesSpace)' "$repo_dir/components/Console.qml"
 grep -Fq '"consoleReservesSpace": false' "$repo_dir/manifest.json"
 
+# Maximized, never fullscreen. Real fullscreen covers the bar, and the bar holds
+# the icon that dismisses the console: a state that hides its own exit.
+grep -Fq 'maximized: root.fullscreen' "$repo_dir/components/Console.qml"
+! grep -qE '^[[:space:]]*fullscreen:[[:space:]]*(true|root\.fullscreen)' \
+  "$repo_dir/components/Console.qml"
+# Leaving maximized hands the window back to the compositor, not to us, so the
+# column has to be asked for again.
+grep -Fq 'onFullscreenChanged: applyPlacement()' "$repo_dir/components/Console.qml"
 # The stored value keeps its name: it is the word the user sees and the one the
 # surface cycle advances through. The implementation changes, not the vocabulary.
 grep -Fq 'fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"' \

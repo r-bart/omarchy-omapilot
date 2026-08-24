@@ -152,6 +152,10 @@ Item {
   onEngagedChanged: if (engaged) applyPlacement()
   onSurfaceWidthChanged: applyPlacement()
   onReservesSpaceChanged: applyPlacement()
+  // Coming back from the whole screen is the fourth moment, and it is the same
+  // moment: the column has to be asked for again because leaving maximized
+  // returns the window to wherever the compositor last had it, not to us.
+  onFullscreenChanged: applyPlacement()
 
   // One tick is enough for the compositor to see the surface go away and come
   // back; anything shorter and Qt coalesces the two into no change at all.
@@ -177,6 +181,11 @@ Item {
     // this is the same floor, so a drag cannot squash the console below the
     // narrowest width the settings will offer.
     minimumSize: Qt.size(Style.space(360), Style.space(280))
+    // Maximized, never fullscreen. Real fullscreen covers the bar, and the bar
+    // holds the icon that dismisses the console: a state that hides its own
+    // exit. Maximized fills the usable screen and leaves the bar clickable,
+    // which is what "whole screen" was always asking for.
+    maximized: root.fullscreen
     visible: root.opened && !root.remapping
     // No slide of our own any more. Omarchy pins layersIn/layersOut to a global
     // fade, which is why the layer-shell console animated its own x; a toplevel

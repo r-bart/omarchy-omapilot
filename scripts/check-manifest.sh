@@ -51,7 +51,7 @@ jq -e '
     "label":"Surface",
     "options":["panel", "console", "fullscreen"],
     "defaultValue":"panel",
-    "description":"Answer from the compact bar panel, from a full-height console docked to the right edge of the focused output, or from that same console filling the screen."
+    "description":"Answer from the compact bar panel, from a full-height console docked to the right edge of the focused output, or from that same console maximized over the usable screen."
   }
   and (.barWidget.schema[] | select(.key == "consoleReservesSpace")) == {
     "key":"consoleReservesSpace",
