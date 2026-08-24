@@ -35,13 +35,23 @@ jq -e '
     "desktopContext":"On",
     "webHandoffProvider":"duckduckgo",
     "dangerousAutoApprove":false,
+    "surface":"panel",
+    "sidebarWidth":440,
     "voiceEnabled":false,
     "ttsProvider":"elevenlabs",
     "ttsModel":"",
     "ttsVoice":"",
     "onboardingComplete":false
   }
-  and ([.barWidget.schema[].key] | sort) == (["builtinModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "provider", "ttsModel", "ttsProvider", "ttsVoice", "voiceEnabled", "webHandoffProvider"] | sort)
+  and ([.barWidget.schema[].key] | sort) == (["builtinModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "provider", "surface", "ttsModel", "ttsProvider", "ttsVoice", "voiceEnabled", "webHandoffProvider"] | sort)
+  and (.barWidget.schema[] | select(.key == "surface")) == {
+    "key":"surface",
+    "type":"enum",
+    "label":"Surface",
+    "options":["panel", "console"],
+    "defaultValue":"panel",
+    "description":"Answer from the compact bar panel or from a full-height console docked to the right edge of the focused output."
+  }
   and (.barWidget.schema[] | select(.key == "webHandoffProvider")) == {
     "key":"webHandoffProvider",
     "type":"enum",

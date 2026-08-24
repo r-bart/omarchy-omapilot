@@ -88,6 +88,16 @@ Scope {
   property string configuredCodexModel: ""
   property string configuredOpencodeModel: ""
   property bool configuredDangerousAutoApprove: false
+  // Which desktop surface answers the open/close/toggle/history/settings
+  // routes: the bar panel popout or the full-height console. "panel" keeps
+  // today's behavior; the console is strictly opt-in.
+  property string configuredSurface: "panel"
+  property int configuredSidebarWidth: 440
+  // The console renders quick-action chips itself, so the pieces Panel.qml
+  // reads straight from its injected settings need configured mirrors here.
+  property string configuredQuickActionsJson: ""
+  property bool configuredShowSummarizeAction: false
+  property bool configuredShowWorkInAppAction: false
   property bool desktopContextEnabled: true
   property string webHandoffProvider: "duckduckgo"
   property var capabilities: []
@@ -149,6 +159,15 @@ Scope {
   signal ttsSpoken()
   signal hotkeyInstalled()
   signal contextAttachmentAdded()
+  // Settings authority stays with whichever host owns the settings entry — the
+  // bar widget today, the overlay once a plugins[] entry exists. Surfaces that
+  // receive no settings injection (the console) persist through this relay
+  // instead of guessing where the entry lives.
+  signal settingsPersistRequested(var values)
+
+  function requestSettingsPersist(values) {
+    settingsPersistRequested(values || {})
+  }
 
   function routeIpc(method) {
     if (method === "open" || method === "show") ipcOpenRequested()
@@ -172,6 +191,14 @@ Scope {
     var desiredTtsProvider = Protocol.normalizedTtsProvider(source.ttsProvider) || "elevenlabs"
     var desiredTtsModel = String(source.ttsModel || "")
     var desiredTtsVoice = String(source.ttsVoice || "")
+    var desiredSurface = String(source.surface || "") === "console" ? "console" : "panel"
+    var rawSidebarWidth = Number(source.sidebarWidth)
+    var desiredSidebarWidth = isFinite(rawSidebarWidth) && rawSidebarWidth > 0
+      ? Math.min(560, Math.max(360, Math.round(rawSidebarWidth))) : 440
+    var desiredQuickActionsJson = typeof source.quickActionsJson === "string"
+      ? source.quickActionsJson : ""
+    var desiredShowSummarize = source.showSummarizeAction === true
+    var desiredShowWorkInApp = source.showWorkInAppAction === true
     var harnessChanged = desiredProvider !== configuredProvider
     var changed = harnessChanged
       || desiredBuiltinModel !== configuredBuiltinModel
@@ -184,12 +211,22 @@ Scope {
       || desiredTtsProvider !== ttsProvider
       || desiredTtsModel !== ttsModel
       || desiredTtsVoice !== ttsVoice
+      || desiredSurface !== configuredSurface
+      || desiredSidebarWidth !== configuredSidebarWidth
+      || desiredQuickActionsJson !== configuredQuickActionsJson
+      || desiredShowSummarize !== configuredShowSummarizeAction
+      || desiredShowWorkInApp !== configuredShowWorkInAppAction
     if (!changed) return
     configuredProvider = desiredProvider
     configuredBuiltinModel = desiredBuiltinModel
     configuredCodexModel = desiredCodexModel
     configuredOpencodeModel = desiredOpencodeModel
     configuredDangerousAutoApprove = desiredDangerousAutoApprove
+    configuredSurface = desiredSurface
+    configuredSidebarWidth = desiredSidebarWidth
+    configuredQuickActionsJson = desiredQuickActionsJson
+    configuredShowSummarizeAction = desiredShowSummarize
+    configuredShowWorkInAppAction = desiredShowWorkInApp
     desktopContextEnabled = desiredDesktopContext
     webHandoffProvider = desiredWebHandoffProvider
     voiceEnabled = desiredVoiceEnabled

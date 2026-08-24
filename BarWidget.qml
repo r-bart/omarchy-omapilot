@@ -100,6 +100,13 @@ BarWidget {
   }
 
   function activate() {
+    // With the console configured, the bar button becomes the console toggle,
+    // routed over the store like the compositor hotkeys — the console lives in
+    // the overlay tree and this widget cannot reach it directly.
+    if (!root.surfaceRoutesHere) {
+      OmaPilot.OmaPilotStore.ipcToggleRequested()
+      return
+    }
     if (root.opened) {
       root.close()
       return
@@ -119,25 +126,42 @@ BarWidget {
   onInlineActiveChanged: injectPanel()
   onCanInlineChanged: if (!canInline) inlineExpanded = false
 
+  // When the configured surface is the console these routes belong to
+  // Ambient.qml, which connects the same signals with the inverse guard.
+  readonly property bool surfaceRoutesHere:
+    OmaPilot.OmaPilotStore.configuredSurface === "panel"
+
   Connections {
     target: OmaPilot.OmaPilotStore
     function onIpcOpenRequested() {
+      if (!root.surfaceRoutesHere) return
       if (root.routedWidget() === root) root.open()
     }
     function onIpcCloseRequested() {
+      if (!root.surfaceRoutesHere) return
       if (root.routedWidget() === root) root.close()
     }
     function onIpcToggleRequested() {
+      if (!root.surfaceRoutesHere) return
       if (root.routedWidget() === root) root.togglePanel()
     }
     function onIpcHistoryRequested() {
+      if (!root.surfaceRoutesHere) return
       if (root.routedWidget() === root) root.openHistory()
     }
     function onIpcSettingsRequested() {
+      if (!root.surfaceRoutesHere) return
       if (root.routedWidget() === root) root.openSettings()
     }
     function onContextAttachmentAdded() {
+      if (!root.surfaceRoutesHere) return
       if (root.routedWidget() === root) root.open()
+    }
+    function onSettingsPersistRequested(values) {
+      // Deliberately not surface-guarded: the console has no settings
+      // injection of its own, so its settings edits persist through the bar
+      // widget precisely while this widget owns the settings entry.
+      if (root.routedWidget() === root) root.persist(values)
     }
   }
 
@@ -174,7 +198,8 @@ BarWidget {
     onPressed: function(b) {
       if (b === Qt.RightButton) {
         root.inlineExpanded = false
-        if (panelLoader.item) panelLoader.item.openHistory()
+        if (!root.surfaceRoutesHere) OmaPilot.OmaPilotStore.ipcHistoryRequested()
+        else if (panelLoader.item) panelLoader.item.openHistory()
       } else root.activate()
     }
   }

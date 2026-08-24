@@ -29,6 +29,8 @@
       "desktopContext": "On",
       "webHandoffProvider": "duckduckgo",
       "dangerousAutoApprove": false,
+      "surface": "panel",
+      "sidebarWidth": 440,
       "voiceEnabled": false,
       "ttsProvider": "elevenlabs",
       "ttsModel": "",
@@ -80,6 +82,14 @@
         "options": ["duckduckgo", "google", "chatgpt", "claude", "grok"],
         "defaultValue": "duckduckgo",
         "description": "Choose where OmaPilot opens current-information questions. AI sites also receive a paste-ready copy; answers stay in the browser."
+      },
+      {
+        "key": "surface",
+        "type": "enum",
+        "label": "Surface",
+        "options": ["panel", "console"],
+        "defaultValue": "panel",
+        "description": "Answer from the compact bar panel or from a full-height console docked to the right edge of the focused output."
       },
       {
         "key": "dangerousAutoApprove",

@@ -132,6 +132,15 @@ Item {
   signal ttsKeyTestRequested(string provider, string apiKey)
   signal dismissed()
 
+  // The surface group persists through the store's relay instead of the host
+  // signal chain: this view is hosted by both the panel and the console, and
+  // only the settings-authority owner knows where the entry lives. Every other
+  // group predates the relay and keeps its signal path.
+  function requestSurfacePersist(values) {
+    if (root.backend && typeof root.backend.requestSettingsPersist === "function")
+      root.backend.requestSettingsPersist(values)
+  }
+
   function resetServerForm() {
     serverFormError = ""
     serverFormExpanded = false
@@ -336,16 +345,31 @@ Item {
         onClicked: root.dismissed()
       }
 
-      SettingsTabs {
-        id: tabBar
+      // The tab row measures ~294px at scale 1 and fits the panel with room to
+      // spare, but the console's 404px minus the back button can pinch it, and
+      // large font scales pinch it anywhere. The Flickable only engages when
+      // the labels genuinely do not fit; otherwise it is inert.
+      Flickable {
+        id: tabScroll
         Layout.fillWidth: true
         Layout.alignment: Qt.AlignTop
-        current: root.selectedTab
-        foreground: root.foreground
-        accent: root.accent
-        fontFamily: root.fontFamily
-        motionEnabled: root.motionEnabled
-        onSelected: function(id) { root.selectTab(id) }
+        implicitHeight: tabBar.implicitHeight
+        contentWidth: tabBar.width
+        contentHeight: tabBar.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentWidth > width
+
+        SettingsTabs {
+          id: tabBar
+          width: Math.max(implicitWidth, tabScroll.width)
+          current: root.selectedTab
+          foreground: root.foreground
+          accent: root.accent
+          fontFamily: root.fontFamily
+          motionEnabled: root.motionEnabled
+          onSelected: function(id) { root.selectTab(id) }
+        }
       }
     }
 
@@ -1452,6 +1476,68 @@ Item {
             fontFamily: root.fontFamily
             Accessible.name: label
             onClicked: root.desktopContextRequested(!root.desktopContextEnabled)
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Surface"
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+          }
+
+          Dropdown {
+            id: surfacePicker
+            Layout.fillWidth: true
+            showLabel: false
+            options: [
+              { value: "panel", label: "Bar panel — compact popout" },
+              { value: "console", label: "Console — full-height sidebar" }
+            ]
+            value: root.backend && root.backend.configuredSurface === "console"
+              ? "console" : "panel"
+            enabled: root.backend && !root.backend.busy
+            foreground: root.foreground
+            background: root.background
+            Accessible.name: "Surface"
+            onChanged: function(value) {
+              root.requestSurfacePersist({
+                surface: String(value) === "console" ? "console" : "panel" })
+            }
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "The console keeps the conversation, approvals, history, and these settings on one full-height surface at the right edge. The panel stays available as the compact quick turn."
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.Wrap
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
+          }
+
+          Dropdown {
+            id: sidebarWidthPicker
+            Layout.fillWidth: true
+            visible: root.backend && root.backend.configuredSurface === "console"
+            showLabel: false
+            options: [
+              { value: "360", label: "Console width · 360" },
+              { value: "400", label: "Console width · 400" },
+              { value: "440", label: "Console width · 440" },
+              { value: "500", label: "Console width · 500" },
+              { value: "560", label: "Console width · 560" }
+            ]
+            value: root.backend ? String(root.backend.configuredSidebarWidth) : "440"
+            enabled: root.backend && !root.backend.busy
+            foreground: root.foreground
+            background: root.background
+            Accessible.name: "Console width"
+            onChanged: function(value) {
+              root.requestSurfacePersist({ sidebarWidth: Number(value) || 440 })
+            }
           }
 
           Text {
