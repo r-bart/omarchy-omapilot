@@ -261,8 +261,10 @@ grep -Fq 'current ? root.accent' "$repo_dir/components/Composer.qml"
 grep -Fq 'current ? root.accent' "$repo_dir/components/OmaPilotHeader.qml"
 # Every control in the header sits in one cluster against the right edge;
 # spread across the row they read as decoration between the title and the gear.
-grep -Fq 'Layout.alignment: Qt.AlignRight | Qt.AlignVCenter' \
-  "$repo_dir/components/OmaPilotHeader.qml"
+# An explicit spacer, because a nested layout only stretches when one of its own
+# children does: the title column stopped taking the slack the moment the
+# tagline went hidden, and the cluster bunched up against the title.
+grep -Fq 'Item { Layout.fillWidth: true }' "$repo_dir/components/OmaPilotHeader.qml"
 # History gets a button beside the gear. It is the other lane you enter and
 # leave, and it had only a keyboard hint and a line of small print.
 grep -Fq 'signal historyRequested()' "$repo_dir/components/OmaPilotHeader.qml"

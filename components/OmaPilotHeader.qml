@@ -50,7 +50,6 @@ Item {
       }
 
       ColumnLayout {
-        Layout.fillWidth: true
         spacing: 0
 
         Text {
@@ -76,6 +75,12 @@ Item {
           elide: Text.ElideRight
         }
       }
+
+      // An explicit spacer, not `Layout.fillWidth` on the title column. A
+      // nested layout only stretches if one of its own children stretches, so
+      // the column stopped taking the slack the moment the tagline went hidden
+      // and the whole cluster bunched up against the title.
+      Item { Layout.fillWidth: true }
 
       // Everything that is a control, in one cluster hard against the right
       // edge: the three surfaces first, then the two lanes. Spread across the
