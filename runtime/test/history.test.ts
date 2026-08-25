@@ -34,12 +34,23 @@ describe("history store", () => {
     expect(MAX_CHATS).toBeGreaterThanOrEqual(200);
   });
 
-  it("refuses a cap that would evict everything", async () => {
+  // Eviction is silent and permanent, so every way of asking for a nonsense
+  // cap has to land somewhere survivable. NaN is the one that mattered:
+  // Math.max(1, Math.floor(NaN)) is NaN, slice(0, NaN) is empty, and the guard
+  // against deleting everything deleted everything.
+  it.each([
+    ["zero", 0, 1],
+    ["negative", -5, 1],
+    ["fractional", 1.9, 1],
+    ["NaN", Number.NaN, 2],
+    ["Infinity", Number.POSITIVE_INFINITY, 2]
+  ])("survives a %s cap", async (_name, cap, expected) => {
     const root = await mkdtemp(join(tmpdir(), "omapilot-history-floor-")); roots.push(root);
     const paths = omapilotPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
-    const store = new HistoryStore(paths, 0);
+    const store = new HistoryStore(paths, cap);
     await store.save(record(1));
-    expect(await store.list()).toHaveLength(1);
+    await store.save(record(2));
+    expect(await store.list()).toHaveLength(expected);
   });
 
   it("deletes one record and clears all state", async () => {

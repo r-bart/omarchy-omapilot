@@ -34,7 +34,12 @@ export class HistoryStore {
    */
   constructor(paths: OmaPilotPaths = omapilotPaths(), maxChats: number = MAX_CHATS) {
     this.#paths = paths;
-    this.#maxChats = Math.max(1, Math.floor(maxChats));
+    // The floor of 1 was meant to stop a cap of 0 evicting the whole history,
+    // and it did not: `Math.max(1, Math.floor(NaN))` is NaN, `slice(0, NaN)`
+    // is empty, and the guard against deleting everything deleted everything.
+    // A guard whose failure mode is the thing it guards against is worse than
+    // no guard, because it reads as safe.
+    this.#maxChats = Number.isFinite(maxChats) ? Math.max(1, Math.floor(maxChats)) : MAX_CHATS;
   }
 
   async list(): Promise<ChatRecord[]> {
