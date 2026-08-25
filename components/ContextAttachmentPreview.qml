@@ -61,8 +61,11 @@ BorderSurface {
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.margins: Style.spacing.xxs
-        width: kindLabel.implicitWidth + Style.spacing.sm
-        height: kindLabel.implicitHeight + Style.spacing.xxs
+        // A pill wants its padding on both sides. `sm` and `xxs` were the
+        // whole horizontal and vertical allowance, so 2px a side stood in for
+        // padding on a shape whose radius is half its height.
+        width: kindLabel.implicitWidth + Style.spacing.md * 2
+        height: kindLabel.implicitHeight + Style.spacing.xxs * 2
         radius: height / 2
         color: Color.popups.background
         opacity: 0.9
@@ -75,6 +78,9 @@ BorderSurface {
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
           font.bold: true
+          // Capitals set at default tracking clump. Same 0.7 the setup
+          // guide's progress label already uses for the same reason.
+          font.letterSpacing: 0.7
         }
       }
     }
