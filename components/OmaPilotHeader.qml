@@ -28,6 +28,7 @@ Item {
   signal settingsRequested()
   signal surfaceRequested(string name)
   signal historyRequested()
+  signal newChatRequested()
   signal harnessChanged(string value)
   signal modelPicked(string value)
 
@@ -116,9 +117,24 @@ Item {
         }
       }
 
-      // The two lanes you enter and leave. Settings has always had a button
-      // here; history had only a keyboard hint and a line of small print, which
-      // is a strange asymmetry for the lane that holds every past conversation.
+      // Starting over, reading what came before, and changing how it works —
+      // in that order, because that is the order of how often they are wanted.
+      // "New chat" was a text button down in the answer plate, which put it
+      // among the actions of one turn when it ends the whole conversation.
+      PanelActionButton {
+        iconText: "󰝒"
+        tooltipText: "New chat · Super+Alt+N"
+        foreground: root.foreground
+        size: Style.space(34)
+        bordered: true
+        focusable: true
+        // Starting a new conversation mid-answer would leave the turn running
+        // with nowhere to land, the same line the surface switch holds.
+        enabled: root.backend && !root.backend.busy
+        Accessible.name: "New chat"
+        onClicked: root.newChatRequested()
+      }
+
       PanelActionButton {
         iconText: "󰋚"
         tooltipText: "History"

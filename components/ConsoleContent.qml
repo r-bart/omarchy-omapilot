@@ -235,6 +235,7 @@ Item {
         values[String(root.backend.provider) + "Model"] = value
         root.requestPersist(values)
       }
+      onNewChatRequested: root.backend.newChat()
       onHistoryRequested: root.viewMode === "history" ? root.showChat() : root.openHistory()
       onSurfaceRequested: function(name) {
         if (root.backend && typeof root.backend.selectSurface === "function")
@@ -481,16 +482,6 @@ Item {
                   enabled: root.backend && root.backend.answerMarkdown !== ""
                   Accessible.name: tooltipText
                   onClicked: root.backend.copyText(root.backend.answerMarkdown)
-                }
-
-                Button {
-                  text: "New chat"
-                  tooltipText: "New chat · Super+Alt+N"
-                  foreground: Qt.darker(root.foreground, 1.4)
-                  background: root.background
-                  bordered: false
-                  focusable: true
-                  onClicked: root.backend.newChat()
                 }
 
                 Item { Layout.fillWidth: true }

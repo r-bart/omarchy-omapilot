@@ -271,6 +271,13 @@ grep -Fq 'Item { Layout.fillWidth: true }' "$repo_dir/components/OmaPilotHeader.
 # leave, and it had only a keyboard hint and a line of small print.
 grep -Fq 'signal historyRequested()' "$repo_dir/components/OmaPilotHeader.qml"
 grep -Fq 'onHistoryRequested:' "$repo_dir/components/ConsoleContent.qml"
+# Starting over belongs with the other two, not among the actions of one turn:
+# "New chat" ends the whole conversation, and it sat in the answer plate beside
+# copy and retry, which are things you do to a single answer.
+grep -Fq 'signal newChatRequested()' "$repo_dir/components/OmaPilotHeader.qml"
+grep -Fq 'onNewChatRequested: root.backend.newChat()' \
+  "$repo_dir/components/ConsoleContent.qml"
+! grep -Fq 'text: "New chat"' "$repo_dir/components/ConsoleContent.qml"
 # Harness and model are a choice, not a label, so they are pickers in the footer
 # rather than static text in the header. Naming them in both places would be the
 # same identity said twice, which is what the header line was already doing.
