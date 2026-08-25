@@ -353,6 +353,11 @@ for literal in \
   grep -Fq "$literal" "$repo_dir/components/ConsoleContent.qml"
   grep -Fq "$literal" "$repo_dir/components/ConsoleTurn.qml"
 done
+# The armed delete tells you the way out. Colour and a border say the state
+# changed; neither says what to do about it, and this control has no visible
+# label to turn into a question the way "Clear all" does.
+grep -Fq 'confirming ? "Click again to delete" : "Delete chat"' \
+  "$repo_dir/components/HistoryView.qml"
 # Provenance per turn, not per conversation: a thread can change harness or
 # model partway through and the record carries what answered each turn.
 grep -Fq 'Protocol.providerShortLabel(provider)' "$repo_dir/components/ConsoleTurn.qml"

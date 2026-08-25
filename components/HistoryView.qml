@@ -270,7 +270,14 @@ Item {
 
               Layout.alignment: Qt.AlignVCenter
               iconText: "󰆴"
-              tooltipText: confirming ? "Delete chat?" : "Delete chat"
+              // An instruction, not a question. Turning urgent and drawing a
+              // border says the state changed; neither says what to do about
+              // it. "Clear all" can afford a question because its label is
+              // visible text that becomes "Clear all?" — this control has no
+              // label at all, so the tooltip is the only thing that can speak,
+              // and it should spend those words telling you the way out rather
+              // than restating what the colour already said.
+              tooltipText: confirming ? "Click again to delete" : "Delete chat"
               // Armed, the button borrows the urgent role and puts a border
               // round itself. Colour alone would be the whole signal otherwise,
               // and colour alone is not a signal for everyone.
