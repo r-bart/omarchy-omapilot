@@ -1093,8 +1093,44 @@ function normalizedHistory(input) {
       model: String(row.model || ""),
       timestamp: String(row.createdAt || row.timestamp || ""),
       images: Array.isArray(row.images) ? row.images : [],
-      resumable: row.resumable === true || (row.session && row.session.resumable === true)
+      resumable: row.resumable === true || (row.session && row.session.resumable === true),
+      // The thread key, kept rather than flattened away. Every turn is its own
+      // record; what makes a run of them one conversation is sharing an acpId,
+      // and without it the console can only ever show the turn in front of it.
+      acpId: String((row.session && row.session.acpId) || row.acpId || "")
     })
   }
   return result
+}
+
+// The turns before this one in the same conversation, oldest first.
+//
+// History arrives newest-first and flat: thirty records across every session
+// the user has had. A conversation is the run of them that shares an acpId, so
+// that is the grouping — and a record without one is a conversation of one,
+// which is the honest answer rather than a guess. Harnesses that do not resume
+// natively have no acpId at all, and lumping their turns together by adjacency
+// would invent a thread that the broker cannot reconstruct.
+//
+// The current turn is excluded: it is painted live from `question` and
+// `answerMarkdown`, and it is already in history the moment it completes.
+function threadBefore(history, chatId) {
+  var source = Array.isArray(history) ? history : []
+  var current = String(chatId || "")
+  var at = -1
+  for (var i = 0; i < source.length; i++) {
+    if (String(source[i].id) === current) { at = i; break }
+  }
+  if (at < 0) return []
+  var key = String(source[at].acpId || "")
+  if (key === "") return []
+  // History is newest-first, so everything before this turn is everything
+  // after it in the list. Strictly earlier and not "the rest of the thread":
+  // in practice the live turn is the newest of its conversation, but a caller
+  // asking about an older one is asking what led up to it.
+  var thread = []
+  for (var j = at + 1; j < source.length; j++) {
+    if (String(source[j].acpId || "") === key) thread.push(source[j])
+  }
+  return thread.reverse()
 }

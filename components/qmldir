@@ -4,6 +4,7 @@ singleton ConsolePlacement 1.0 ConsolePlacement.qml
 Composer 1.0 Composer.qml
 Console 1.0 Console.qml
 ConsoleContent 1.0 ConsoleContent.qml
+ConsoleTurn 1.0 ConsoleTurn.qml
 ContextAttachmentPreview 1.0 ContextAttachmentPreview.qml
 ErrorDetailsView 1.0 ErrorDetailsView.qml
 ErrorNotice 1.0 ErrorNotice.qml

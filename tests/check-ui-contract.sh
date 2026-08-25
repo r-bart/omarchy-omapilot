@@ -20,6 +20,7 @@ qml_files=(
   "$repo_dir/components/Console.qml"
   "$repo_dir/components/ConsoleContent.qml"
   "$repo_dir/components/ConsolePlacement.qml"
+  "$repo_dir/components/ConsoleTurn.qml"
   "$repo_dir/components/ContextAttachmentPreview.qml"
   "$repo_dir/components/ErrorDetailsView.qml"
   "$repo_dir/components/ErrorNotice.qml"
@@ -294,6 +295,29 @@ grep -Fq 'readonly property int edgeInset: outerGap + borderSize' \
 grep -Fq 'if (provider === "builtin") return "Built-in"' \
   "$repo_dir/components/Protocol.js"
 ! grep -q 'surfaceCycle' "$repo_dir/components/OmaPilotHeader.qml"
+# The console shows the conversation, not one turn of it. That is what a column
+# ten times the height of the bar panel is for; before this it showed exactly
+# what the panel showed. Every turn is its own record, so the thread is the run
+# of them sharing an acpId — grouping by adjacency would invent a conversation
+# the broker cannot reconstruct.
+grep -Fq 'function threadBefore(history, chatId)' "$repo_dir/components/Protocol.js"
+grep -Fq 'acpId: String((row.session && row.session.acpId) || row.acpId || "")' \
+  "$repo_dir/components/Protocol.js"
+grep -Fq 'Protocol.threadBefore(root.backend.history, root.backend.currentChatId)' \
+  "$repo_dir/components/ConsoleContent.qml"
+grep -Fq 'ConsoleTurn 1.0 ConsoleTurn.qml' "$repo_dir/components/qmldir"
+# The live turn is painted above by the same shapes and is not repeated in the
+# thread: it lands in history the moment it completes, and showing it twice
+# would make finishing a turn look like it happened again.
+grep -Fq 'if (String(source[j].acpId || "") === key) thread.push(source[j])' \
+  "$repo_dir/components/Protocol.js"
+# A finished turn can be read and copied; retrying and cancelling belong to the
+# one that is still running.
+! grep -q 'onRetryRequested\|backend.cancel()' "$repo_dir/components/ConsoleTurn.qml"
+# The panel and the curtain stay single-turn. They are the glance surfaces; the
+# console is the deliberate one, and that distinction is design/ambient-ux.md.
+! grep -q 'threadBefore' "$repo_dir/Panel.qml" "$repo_dir/components/AnswerCurtain.qml"
+
 # The content column stops growing past a readable measure and centres instead.
 # min() keeps every docked width inert, so the docked render is unchanged.
 grep -Fq 'readonly property int contentWidth: Math.min(' \

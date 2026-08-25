@@ -5,6 +5,55 @@ import "../components/Protocol.js" as Protocol
 TestCase {
   name: "OmaPilotProtocol"
 
+  function test_aThreadIsTheRunOfTurnsSharingASession() {
+    // History arrives newest-first and flat: thirty records across every
+    // session the user has had. A conversation is the run of them that shares
+    // an acpId.
+    var history = Protocol.normalizedHistory([
+      { id: "c3", question: "y luego?", answer: "tres", session: { acpId: "A" } },
+      { id: "b1", question: "otra cosa", answer: "aparte", session: { acpId: "B" } },
+      { id: "c2", question: "sigue", answer: "dos", session: { acpId: "A" } },
+      { id: "c1", question: "empieza", answer: "uno", session: { acpId: "A" } }
+    ])
+    compare(history[0].acpId, "A")
+    var thread = Protocol.threadBefore(history, "c3")
+    // Oldest first, because that is reading order, and without the current
+    // turn, which is painted live and lands in history the moment it finishes.
+    compare(thread.length, 2)
+    compare(thread[0].id, "c1")
+    compare(thread[1].id, "c2")
+    // From the middle of the thread, only what came before it.
+    compare(Protocol.threadBefore(history, "c1").length, 0)
+    compare(JSON.stringify(Protocol.threadBefore(history, "c2").map(function(t) { return t.id })),
+            '["c1"]')
+    // Another session's turns never leak in.
+    compare(Protocol.threadBefore(history, "b1").length, 0)
+  }
+
+  function test_aTurnWithoutASessionIsAConversationOfOne() {
+    // Harnesses that do not resume natively carry no acpId. Grouping those by
+    // adjacency would invent a thread the broker cannot reconstruct.
+    var history = Protocol.normalizedHistory([
+      { id: "n2", question: "dos", answer: "b", provider: "codex" },
+      { id: "n1", question: "uno", answer: "a", provider: "codex" }
+    ])
+    compare(history[0].acpId, "")
+    compare(Protocol.threadBefore(history, "n2").length, 0)
+    compare(Protocol.threadBefore(history, "n1").length, 0)
+  }
+
+  function test_threadBeforeSurvivesNonsense() {
+    compare(Protocol.threadBefore(null, "c1").length, 0)
+    compare(Protocol.threadBefore([], "c1").length, 0)
+    compare(Protocol.threadBefore(undefined, undefined).length, 0)
+    var history = Protocol.normalizedHistory([
+      { id: "c1", question: "hola", session: { acpId: "A" } }
+    ])
+    // A chat id that is not in history yet: the first turn of a conversation
+    // has nothing before it, and neither does one from a session long evicted.
+    compare(Protocol.threadBefore(history, "desconocido").length, 0)
+  }
+
   function test_parseLineRejectsInvalidInput() {
     compare(Protocol.parseLine("not json"), null)
     compare(Protocol.parseLine("[]"), null)

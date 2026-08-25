@@ -297,6 +297,40 @@ Item {
           y: Math.max(0, turnScroll.height - implicitHeight)
           spacing: Style.space(18)
 
+          // The conversation so far. Every turn is its own record and what
+          // makes a run of them one conversation is sharing an acpId, so the
+          // thread is grouped on that and never on adjacency — thirty records
+          // across every session the user has had are otherwise flat.
+          //
+          // The live turn below is not repeated here: it is painted from
+          // `question` and `answerMarkdown`, and it lands in history the moment
+          // it completes. Painting the finished turns above it rather than in a
+          // region of their own is what stops "answering" and "in the history"
+          // being a visible jump.
+          Repeater {
+            model: root.backend
+              ? Protocol.threadBefore(root.backend.history, root.backend.currentChatId) : []
+
+            delegate: OmaPilot.ConsoleTurn {
+              // Declared, not inherited: a delegate in its own file only gets
+              // the model role if it asks for it, and without this the turn
+              // arrives undefined and renders as an empty bubble.
+              required property var modelData
+
+              width: turnColumn.width
+              backend: root.backend
+              turn: modelData
+              foreground: root.foreground
+              background: root.background
+              accent: root.accent
+              fontFamily: root.fontFamily
+              onPreviewRequested: function(source, alt) {
+                root.previewSource = source
+                root.previewAlt = alt
+              }
+            }
+          }
+
           // The user's turn: an accent bubble with a tail toward the composer
           // it came from. Alpha over the theme roles, never a new grey.
           Item {
