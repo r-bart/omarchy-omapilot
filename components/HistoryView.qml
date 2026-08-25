@@ -19,6 +19,13 @@ Item {
   // never at the same time as the clear-all confirmation.
   property string confirmingDeleteId: ""
   readonly property bool modalInteractionActive: confirmingClear || confirmingDeleteId !== ""
+  // When the open question was asked, so that it cannot be answered by the
+  // second half of the gesture that asked it. A double-click is one gesture:
+  // the first click armed and the second, inside the platform's double-click
+  // interval, confirmed — before the colour had finished changing. The same
+  // window covers a stutter on a touchpad. A click that lands after the
+  // interval is a click on a control that had time to turn urgent.
+  property real armedAt: 0
 
   signal chatSelected(var chat)
   signal deleteRequested(string chatId)
@@ -26,15 +33,30 @@ Item {
   signal closeRequested()
 
   // This view is hidden, never destroyed — `visible: viewMode === "history"`
-  // in both surfaces. So going Back, opening a chat, or closing the panel left
-  // an armed confirmation sitting here, and returning to history found a row
-  // already armed from minutes ago: the next single click deleted instead of
-  // asking. A question nobody is looking at is a question nobody asked.
+  // in the panel. So going Back or opening a chat left an armed confirmation
+  // sitting here, and returning to history found a row already armed from
+  // minutes ago: the next single click deleted instead of asking. A question
+  // nobody is looking at is a question nobody asked.
   //
   // Clears the clear-all arm too, which had the same hole and more to lose.
-  onVisibleChanged: if (!visible) {
+  onVisibleChanged: if (!visible) root.withdrawConfirmations()
+
+  // Called by the panel as well when it closes: this view's visibility is
+  // bound to the view mode, not to the panel, so closing the panel while in
+  // history does not hide it. Reopening asked the broker for the list again
+  // and the answer withdrew the question, but not before the armed row had
+  // shown itself urgent for however long the broker took.
+  function withdrawConfirmations() {
     root.confirmingClear = false
     root.confirmingDeleteId = ""
+  }
+
+  function arm() {
+    root.armedAt = Date.now()
+  }
+
+  function settled() {
+    return Date.now() - root.armedAt >= Application.styleHints.mouseDoubleClickInterval
   }
 
   // The list can change under an open question: a completed answer is
@@ -43,10 +65,7 @@ Item {
   // row may have moved, the id may no longer be there — so the question is
   // withdrawn, both kinds. A fresh press asks it again against what is on
   // screen now.
-  onHistoryChanged: {
-    root.confirmingClear = false
-    root.confirmingDeleteId = ""
-  }
+  onHistoryChanged: root.withdrawConfirmations()
 
   // Deleting one chat unlinks its record, its images and its Pi session, with
   // no undo — the same irreversibility that made "Clear all" ask twice. It
@@ -58,17 +77,40 @@ Item {
   // actions in this view are answered the same way and neither steals focus.
   function requestDelete(chatId) {
     if (root.confirmingDeleteId === chatId) {
+      // Inside the double-click interval the second click is the same
+      // gesture as the first; it is ignored and the question stays open. The
+      // keyboard pays the same toll — two Deletes inside the interval arm and
+      // wait — which is the price of one rule for every way in.
+      if (!root.settled()) return
       root.confirmingDeleteId = ""
       root.deleteRequested(chatId)
       return
     }
     root.confirmingClear = false
     root.confirmingDeleteId = chatId
+    root.arm()
   }
 
   function forceInitialFocus() {
     if (list.visible && list.count > 0) list.forceActiveFocus()
     else closeHistory.forceActiveFocus()
+  }
+
+  // Two presses means two presses, on the controls as well as on the list. A
+  // focused control answers Return, Enter and Space itself, and Qt emits
+  // those specific signals before the generic press and accepts them by
+  // default, so nothing above the control gets to see a repeat. Held past
+  // the repeat delay, the first press armed and the first repeat confirmed.
+  // `Keys.forwardTo` hands the event here first: a repeat of an activation
+  // key is swallowed, every other key goes on as before — Delete and the
+  // arrows still reach the list.
+  Item {
+    id: repeatGuard
+    Keys.onPressed: function(event) {
+      if (event.isAutoRepeat && (event.key === Qt.Key_Return
+          || event.key === Qt.Key_Enter || event.key === Qt.Key_Space))
+        event.accepted = true
+    }
   }
 
   ColumnLayout {
@@ -126,17 +168,20 @@ Item {
         }
 
         TapHandler { onTapped: clearHistory.activate() }
+        Keys.forwardTo: [repeatGuard]
         Keys.onReturnPressed: clearHistory.activate()
         Keys.onEnterPressed: clearHistory.activate()
         Keys.onSpacePressed: clearHistory.activate()
 
         function activate() {
           if (root.confirmingClear) {
+            if (!root.settled()) return
             root.clearRequested()
             root.confirmingClear = false
           } else {
             root.confirmingDeleteId = ""
             root.confirmingClear = true
+            root.arm()
           }
         }
       }
@@ -327,6 +372,7 @@ Item {
               focusable: enabled
               opacity: enabled ? 1 : 0
               Accessible.name: confirming ? "Confirm deleting this chat" : tooltipText
+              Keys.forwardTo: [repeatGuard]
               onClicked: root.requestDelete(String(row.modelData.id))
               Behavior on opacity {
                 enabled: root.motionEnabled

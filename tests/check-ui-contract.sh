@@ -353,11 +353,21 @@ grep -Fq 'root.deleteRequested(root.confirmingDeleteId)' \
 grep -Fq 'confirmingDeleteId: root.confirmingDeleteId' "$repo_dir/components/HistoryView.qml"
 # An open question is withdrawn when the list it was asked about changes, and
 # when the viewport moves and may carry the armed row out of sight.
-grep -Fq 'onHistoryChanged: {' "$repo_dir/components/HistoryView.qml"
+grep -Fq 'onHistoryChanged: root.withdrawConfirmations()' "$repo_dir/components/HistoryView.qml"
 grep -Fq 'onContentYChanged: root.confirmingDeleteId = ""' "$repo_dir/components/HistoryView.qml"
+# One gesture cannot ask and answer: a double-click's second half lands inside
+# the platform interval and is ignored, and a held activation key's repeats
+# are swallowed before the focused control can see them. Arming from the
+# keyboard brings the row into view first, and closing the panel withdraws.
+grep -Fq 'if (!root.settled()) return' "$repo_dir/components/HistoryView.qml"
+grep -Fq 'Application.styleHints.mouseDoubleClickInterval' "$repo_dir/components/HistoryView.qml"
+grep -Fq 'Keys.forwardTo: [repeatGuard]' "$repo_dir/components/HistoryView.qml"
+grep -Fq 'root.list.positionViewAtIndex(root.list.currentIndex, ListView.Contain)' \
+  "$repo_dir/components/internal/HistoryListKeyboardHandler.qml"
+grep -Fq 'historyView.withdrawConfirmations()' "$repo_dir/Panel.qml"
 # This view is hidden, never destroyed, so an armed confirmation would sit here
 # across a trip to the chat and back and answer itself on the next single click.
-grep -Fq 'onVisibleChanged: if (!visible) {' "$repo_dir/components/HistoryView.qml"
+grep -Fq 'onVisibleChanged: if (!visible) root.withdrawConfirmations()' "$repo_dir/components/HistoryView.qml"
 # Two presses means two presses: a held Delete must not confirm through its own
 # auto-repeat.
 grep -Fq 'if (event.isAutoRepeat) {' \

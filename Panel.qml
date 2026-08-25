@@ -270,6 +270,7 @@ Panel {
       } else Qt.callLater(function() { composer.forceInputFocus() })
     } else {
       OmaPilot.OmaPilotStore.clearDesktopContextLatch()
+      historyView.withdrawConfirmations()
     }
   }
 

@@ -66,6 +66,13 @@ Item {
         root.chatSelected(root.history[root.list.currentIndex])
       event.accepted = true
     } else if (event.key === Qt.Key_Delete && root.list.currentIndex >= 0) {
+      // The arrows move the cursor without moving the view, so the current
+      // row can sit below the fold. Arming it there would put the urgent
+      // button nowhere on screen, and the second press would delete a chat
+      // whose question was never seen. Bring the row in before asking. This
+      // moves the viewport, which withdraws any earlier question, and only
+      // then is the new one asked.
+      root.list.positionViewAtIndex(root.list.currentIndex, ListView.Contain)
       root.deleteRequested(String(root.history[root.list.currentIndex].id))
       event.accepted = true
     } else if (event.key === Qt.Key_Escape) {

@@ -237,6 +237,29 @@ Item {
       compare(root.cancelledCount, 0)
     }
 
+    // The arrows move the cursor without moving the view, so the current row
+    // can sit below the fold. Arming it there would put the urgent button
+    // nowhere on screen and the second press would delete a chat whose
+    // question was never seen. Arming brings the row into the viewport first.
+    function test_deleteBringsAnOffscreenCurrentRowIntoView() {
+      var many = []
+      for (var i = 1; i <= 30; i++) many.push({ id: "chat-" + i, title: "Chat " + i })
+      root.historyItems = many
+      root.height = 100
+      wait(0)
+      compare(historyList.contentY, 0)
+      historyList.currentIndex = 20
+      verify(historyList.currentItem.y >= historyList.contentY + historyList.height)
+      keyClick(Qt.Key_Delete)
+      compare(root.deletedCount, 1)
+      compare(root.deletedChatId, "chat-21")
+      verify(historyList.contentY > 0)
+      verify(historyList.currentItem.y >= historyList.contentY)
+      verify(historyList.currentItem.y + historyList.currentItem.height
+        <= historyList.contentY + historyList.height)
+      root.height = 420
+    }
+
     // A modified Delete is inert armed as well as idle, so a stray
     // Ctrl+Delete cannot answer a question the user has not read.
     function test_armedDeleteIgnoresModifiedKeys() {
