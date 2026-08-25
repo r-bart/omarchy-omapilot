@@ -865,7 +865,11 @@ grep -Fq 'function closeForPopoutSwitch()' "$repo_dir/BarWidget.qml"
 grep -Fq 'if (next !== configuredSurface) surfaceHandoffPending = true' \
   "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'function takeSurfaceHandoff()' "$repo_dir/components/OmaPilotStore.qml"
-grep -Fq 'OmaPilot.OmaPilotStore.takeSurfaceHandoff()' "$repo_dir/Ambient.qml"
+# Consumed on both transitions. Console and fullscreen are one live surface
+# wearing two geometries, so moving between them never changes
+# `consoleSurfaceLive` — measured: the intent sat armed and the next switch
+# opened a surface the user had closed in between.
+test "$(grep -Fc 'OmaPilot.OmaPilotStore.takeSurfaceHandoff()' "$repo_dir/Ambient.qml")" -eq 2
 grep -Fq 'OmaPilot.OmaPilotStore.takeSurfaceHandoff()' "$repo_dir/BarWidget.qml"
 # One-shot and set nowhere else, so a shell restart reading the same value off
 # disk does not pop a surface open at login.

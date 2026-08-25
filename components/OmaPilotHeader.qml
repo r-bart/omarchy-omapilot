@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
-import QtQuick.Controls
 import qs.Ui
 import "Presentation.js" as Presentation
 import "Protocol.js" as Protocol

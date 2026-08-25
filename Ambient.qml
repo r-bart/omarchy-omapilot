@@ -143,7 +143,16 @@ Item {
       // IPC routes disable with the switch, so close it from here. Docked and
       // fullscreen are the same window, so moving between them is a resize and
       // must not close anything.
-      if (root.consoleSurfaceLive || !consoleLoader.item) return
+      if (root.consoleSurfaceLive) {
+        // Console and fullscreen are one live surface wearing two geometries,
+        // so moving between them never changes `consoleSurfaceLive` and the
+        // handoff would never be consumed here. MEASURED: it sat armed, and the
+        // next switch opened a surface the user had closed in between.
+        if (OmaPilot.OmaPilotStore.takeSurfaceHandoff())
+          Qt.callLater(function() { if (consoleLoader.item) consoleLoader.item.open(true) })
+        return
+      }
+      if (!consoleLoader.item) return
       consoleLoader.item.close()
       // Closing a window unmaps it in the same tick, so the teardown may
       // already be pending — reading through the item unguarded is a TypeError
