@@ -145,10 +145,13 @@ Item {
       // must not close anything.
       if (root.consoleSurfaceLive || !consoleLoader.item) return
       consoleLoader.item.close()
-      // A console that was never mapped has no exit slide to wait for, so its
-      // `engaged` never changes and the teardown below would never be told to
-      // run. Unload it here instead of leaving the tree alive forever.
-      if (!consoleLoader.item.engaged) consoleLoader.active = false
+      // Closing a window unmaps it in the same tick, so the teardown below has
+      // usually already run and destroyed the item — reading through it
+      // unguarded is a TypeError on every switch back to the panel. What is
+      // left for this line is the console that was never mapped: `engaged` was
+      // false all along, nothing changed, and nothing told the loader to
+      // unload. Without it that tree stays alive forever.
+      if (consoleLoader.item && !consoleLoader.item.engaged) consoleLoader.active = false
     }
   }
 

@@ -225,7 +225,10 @@ grep -Fq '&& !root.consoleOpened' "$repo_dir/Ambient.qml"
 # never reads `item` and no surface change trips a binding loop.
 grep -Fq 'onConsoleSurfaceLiveChanged: if (consoleSurfaceLive) consoleLoader.active = true' \
   "$repo_dir/Ambient.qml"
-grep -Fq 'if (!consoleLoader.item.engaged) consoleLoader.active = false' \
+# Closing a window unmaps it in the same tick, so the engaged handler has
+# usually already destroyed the item by the time this line runs. The guard is
+# not defensive habit: without it every switch back to the panel is a TypeError.
+grep -Fq 'if (consoleLoader.item && !consoleLoader.item.engaged) consoleLoader.active = false' \
   "$repo_dir/Ambient.qml"
 grep -Fq 'active: root.surfaceRoutesHere' "$repo_dir/BarWidget.qml"
 # The filament is the state light generalized, never a parallel component.
