@@ -6,6 +6,10 @@ Item {
   required property var list
   property var history: []
   property bool confirmingClear: false
+  // A per-chat delete is armed on the current row. Unlike the clear-all
+  // confirmation, which is answered on its own control, this one is answered
+  // here: a second Delete confirms, and anything else backs out.
+  property bool confirmingDelete: false
 
   signal chatSelected(var chat)
   signal deleteRequested(string chatId)
@@ -22,6 +26,16 @@ Item {
       || event.key === Qt.Key_Delete || event.key === Qt.Key_Escape
     if (root.confirmingClear && action) {
       if (event.key === Qt.Key_Escape) root.confirmationCancelled()
+      event.accepted = true
+    } else if (root.confirmingDelete && action) {
+      // One keystroke, one effect: Delete answers the question, everything
+      // else withdraws it and stops there. Moving off the row with the arrows
+      // would disarm anyway — doing it here as well means the keypress that
+      // disarms never also selects or closes, so nothing happens by accident
+      // while a destructive question is on screen.
+      if (event.key === Qt.Key_Delete && root.list.currentIndex >= 0)
+        root.deleteRequested(String(root.history[root.list.currentIndex].id))
+      else root.confirmationCancelled()
       event.accepted = true
     } else if (event.key === Qt.Key_Down || event.key === Qt.Key_J) {
       root.list.currentIndex = Math.min(

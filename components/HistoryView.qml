@@ -15,12 +15,33 @@ Item {
   property string fontFamily: Style.font.family
   property bool motionEnabled: true
   property bool confirmingClear: false
-  readonly property bool modalInteractionActive: confirmingClear
+  // The id of the chat whose delete is armed, "" for none. One at a time, and
+  // never at the same time as the clear-all confirmation.
+  property string confirmingDeleteId: ""
+  readonly property bool modalInteractionActive: confirmingClear || confirmingDeleteId !== ""
 
   signal chatSelected(var chat)
   signal deleteRequested(string chatId)
   signal clearRequested()
   signal closeRequested()
+
+  // Deleting one chat unlinks its record, its images and its Pi session, with
+  // no undo — the same irreversibility that made "Clear all" ask twice. It
+  // asked, and this did not, which is the worse half of an inconsistency: the
+  // cheap action was guarded and the one sitting under the pointer, on a row
+  // that arms itself on hover, was not.
+  //
+  // Same two-step as clear-all rather than a dialog, so both destructive
+  // actions in this view are answered the same way and neither steals focus.
+  function requestDelete(chatId) {
+    if (root.confirmingDeleteId === chatId) {
+      root.confirmingDeleteId = ""
+      root.deleteRequested(chatId)
+      return
+    }
+    root.confirmingClear = false
+    root.confirmingDeleteId = chatId
+  }
 
   function forceInitialFocus() {
     if (list.visible && list.count > 0) list.forceActiveFocus()
@@ -90,7 +111,10 @@ Item {
           if (root.confirmingClear) {
             root.clearRequested()
             root.confirmingClear = false
-          } else root.confirmingClear = true
+          } else {
+            root.confirmingDeleteId = ""
+            root.confirmingClear = true
+          }
         }
       }
     }
@@ -131,6 +155,12 @@ Item {
         activeFocusOnTab: true
         currentIndex: count > 0 ? 0 : -1
 
+        // An armed delete belongs to the row it is armed on. Leaving that row —
+        // by arrow key, or by hovering another, which moves the cursor here too
+        // — disarms it, so the confirmation can never outlive the sight of what
+        // it would delete.
+        onCurrentIndexChanged: root.confirmingDeleteId = ""
+
         Keys.onPressed: function(event) { historyKeyboard.handleKey(event) }
 
         OmaPilotInternal.HistoryListKeyboardHandler {
@@ -138,10 +168,17 @@ Item {
           list: list
           history: root.history
           confirmingClear: root.confirmingClear
+          confirmingDelete: root.confirmingDeleteId !== ""
           onChatSelected: function(chat) { root.chatSelected(chat) }
-          onDeleteRequested: function(chatId) { root.deleteRequested(chatId) }
+          // Routed through the same two-step the button uses, so Delete arms on
+          // the first press and deletes on the second whichever way it came.
+          onDeleteRequested: function(chatId) { root.requestDelete(chatId) }
           onCloseRequested: root.closeRequested()
           onConfirmationCancelled: {
+            if (root.confirmingDeleteId !== "") {
+              root.confirmingDeleteId = ""
+              return
+            }
             root.confirmingClear = false
             clearHistory.forceActiveFocus()
           }
@@ -224,20 +261,27 @@ Item {
             }
 
             PanelActionButton {
+              readonly property bool confirming:
+                root.confirmingDeleteId === String(row.modelData.id)
+
               Layout.alignment: Qt.AlignVCenter
               iconText: "󰆴"
-              tooltipText: "Delete chat"
-              foreground: root.foreground
+              tooltipText: confirming ? "Delete chat?" : "Delete chat"
+              // Armed, the button borrows the urgent role and puts a border
+              // round itself. Colour alone would be the whole signal otherwise,
+              // and colour alone is not a signal for everyone.
+              foreground: confirming ? Color.urgent : root.foreground
               hoverColor: Color.urgent
+              bordered: confirming
               // Opacity 0 still receives taps, so non-current rows would delete
               // from empty space on pointers that never hover. Disable the
               // control until the row is current, hovered, or this button is
               // focused. List Delete remains the keyboard path.
-              enabled: row.hot || activeFocus
+              enabled: row.hot || activeFocus || confirming
               focusable: enabled
               opacity: enabled ? 1 : 0
-              Accessible.name: tooltipText
-              onClicked: root.deleteRequested(String(modelData.id))
+              Accessible.name: confirming ? "Confirm deleting this chat" : tooltipText
+              onClicked: root.requestDelete(String(row.modelData.id))
               Behavior on opacity {
                 enabled: root.motionEnabled
                 NumberAnimation { duration: 120 }
