@@ -25,6 +25,18 @@ Item {
   signal clearRequested()
   signal closeRequested()
 
+  // This view is hidden, never destroyed — `visible: viewMode === "history"`
+  // in both surfaces. So going Back, opening a chat, or closing the panel left
+  // an armed confirmation sitting here, and returning to history found a row
+  // already armed from minutes ago: the next single click deleted instead of
+  // asking. A question nobody is looking at is a question nobody asked.
+  //
+  // Clears the clear-all arm too, which had the same hole and more to lose.
+  onVisibleChanged: if (!visible) {
+    root.confirmingClear = false
+    root.confirmingDeleteId = ""
+  }
+
   // Deleting one chat unlinks its record, its images and its Pi session, with
   // no undo — the same irreversibility that made "Clear all" ask twice. It
   // asked, and this did not, which is the worse half of an inconsistency: the

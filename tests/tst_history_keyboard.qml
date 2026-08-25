@@ -194,6 +194,24 @@ Item {
       }
     }
 
+    // Two presses means two presses. Held past the repeat delay, the first
+    // physical press arms and the first auto-repeat used to arrive armed and
+    // confirm — one finger on one key deleting a chat through a confirmation
+    // built to stop that.
+    function test_armedDeleteIgnoresAutoRepeat() {
+      root.confirmingDelete = true
+      var event = {
+        key: Qt.Key_Delete, modifiers: Qt.NoModifier,
+        isAutoRepeat: true, accepted: false
+      }
+      historyKeyboard.handleKey(event)
+      verify(event.accepted)
+      compare(root.deletedCount, 0)
+      // And it does not withdraw either: a held key must leave the question
+      // exactly as it found it, so releasing and pressing again still answers.
+      compare(root.cancelledCount, 0)
+    }
+
     // A modified Delete is inert armed as well as idle, so a stray
     // Ctrl+Delete cannot answer a question the user has not read.
     function test_armedDeleteIgnoresModifiedKeys() {

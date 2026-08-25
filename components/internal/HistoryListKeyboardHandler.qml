@@ -28,6 +28,16 @@ Item {
       if (event.key === Qt.Key_Escape) root.confirmationCancelled()
       event.accepted = true
     } else if (root.confirmingDelete && action) {
+      // Two presses means two presses. Held past the repeat delay, the first
+      // physical press armed the row and the first auto-repeat arrived here
+      // and confirmed it — one finger on one key deleting a chat through a
+      // confirmation designed to stop exactly that. Repeats are swallowed
+      // while armed, so the answer has to come from a key that was released
+      // and pressed again.
+      if (event.isAutoRepeat) {
+        event.accepted = true
+        return
+      }
       // One keystroke, one effect: Delete answers the question, everything
       // else withdraws it and stops there. Moving off the row with the arrows
       // would disarm anyway — doing it here as well means the keypress that
