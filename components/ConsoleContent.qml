@@ -133,6 +133,16 @@ Item {
     showChat(false)
   }
 
+  // Starting a new conversation is also going to it. Clearing the chat while
+  // the user is looking at history or settings left them there, staring at the
+  // lane they were in with nothing to say they had been heard — the new chat
+  // was behind them, empty, with the caret nowhere.
+  function startNewChat() {
+    if (!backend || typeof backend.newChat !== "function") return
+    backend.newChat()
+    showChat()
+  }
+
   // Settings changes must persist identically whether this view is hosted by
   // the panel (bar.layout entry) or by the console (no settings injection at
   // all). The store relays to whichever owner holds settings authority, which
@@ -235,7 +245,7 @@ Item {
         values[String(root.backend.provider) + "Model"] = value
         root.requestPersist(values)
       }
-      onNewChatRequested: root.backend.newChat()
+      onNewChatRequested: root.startNewChat()
       onHistoryRequested: root.viewMode === "history" ? root.showChat() : root.openHistory()
       onSurfaceRequested: function(name) {
         if (root.backend && typeof root.backend.selectSurface === "function")

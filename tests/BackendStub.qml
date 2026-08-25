@@ -72,6 +72,7 @@ QtObject {
   property int latchCount: 0
   property int unlatchCount: 0
   property int cancelCount: 0
+  property int newChatCount: 0
   property string rejectedDecision: ""
 
   signal focusComposerRequested()
@@ -83,7 +84,7 @@ QtObject {
   function retryBroker() {}
   function copyText(text) {}
   function activateLink(url) {}
-  function newChat() {}
+  function newChat() { newChatCount++ }
   function continueInHerdr() {}
   function requestHistory() {}
   function requestCustomProviders() {}

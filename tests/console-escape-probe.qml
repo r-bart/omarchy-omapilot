@@ -90,6 +90,20 @@ ShellRoot {
         content.handleEscape()
         if (root.closeCount !== 3)
           root.fail("escape after the approval did not close")
+      } else if (root.stage === 7) {
+        // Starting a new conversation is also going to it. From history the
+        // button used to clear the chat and leave the user where they were,
+        // looking at the lane they came from with the new chat behind it.
+        content.openHistory()
+        content.startNewChat()
+        if (content.viewMode !== "chat" || backendStub.newChatCount !== 1)
+          root.fail("new chat from history did not open the new chat")
+      } else if (root.stage === 8) {
+        // The same from settings, which is the other lane you can be reading.
+        content.openSettings()
+        content.startNewChat()
+        if (content.viewMode !== "chat" || backendStub.newChatCount !== 2)
+          root.fail("new chat from settings did not open the new chat")
       } else {
         if (!root.failed) console.log("OMAPILOT_CONSOLE_ESCAPE_PROBE_OK")
         Qt.quit()

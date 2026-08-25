@@ -275,8 +275,11 @@ grep -Fq 'onHistoryRequested:' "$repo_dir/components/ConsoleContent.qml"
 # "New chat" ends the whole conversation, and it sat in the answer plate beside
 # copy and retry, which are things you do to a single answer.
 grep -Fq 'signal newChatRequested()' "$repo_dir/components/OmaPilotHeader.qml"
-grep -Fq 'onNewChatRequested: root.backend.newChat()' \
-  "$repo_dir/components/ConsoleContent.qml"
+# Starting a new conversation is also going to it: clearing the chat from
+# history or settings used to leave the user in the lane they were reading,
+# with the new chat behind them and the caret nowhere.
+grep -Fq 'onNewChatRequested: root.startNewChat()' "$repo_dir/components/ConsoleContent.qml"
+grep -Fq 'function startNewChat()' "$repo_dir/components/ConsoleContent.qml"
 ! grep -Fq 'text: "New chat"' "$repo_dir/components/ConsoleContent.qml"
 # Harness and model are a choice, not a label, so they are pickers in the footer
 # rather than static text in the header. Naming them in both places would be the
