@@ -145,13 +145,12 @@ Item {
       // must not close anything.
       if (root.consoleSurfaceLive || !consoleLoader.item) return
       consoleLoader.item.close()
-      // Closing a window unmaps it in the same tick, so the teardown below has
-      // usually already run and destroyed the item — reading through it
-      // unguarded is a TypeError on every switch back to the panel. What is
-      // left for this line is the console that was never mapped: `engaged` was
-      // false all along, nothing changed, and nothing told the loader to
-      // unload. Without it that tree stays alive forever.
-      if (consoleLoader.item && !consoleLoader.item.engaged) consoleLoader.active = false
+      // Closing a window unmaps it in the same tick, so the teardown may
+      // already be pending — reading through the item unguarded is a TypeError
+      // on every switch back to the panel. What is left for this line is the
+      // console that was never mapped: `engaged` was false all along, nothing
+      // changed, and nothing would otherwise tell the loader to unload.
+      if (consoleLoader.item && !consoleLoader.item.engaged) consoleTeardown.restart()
     }
   }
 
@@ -447,6 +446,22 @@ Item {
   // the console reports through `engaged`.
   onConsoleSurfaceLiveChanged: if (consoleSurfaceLive) consoleLoader.active = true
 
+  // Unloading destroys the window, and destroying a window mid-exit takes its
+  // close animation with it. Switching back to the panel used to do exactly
+  // that in the same tick as the close, which is why the console vanished
+  // there and slid away everywhere else. It is already hidden by then, so a
+  // few hundred milliseconds of it still existing costs nothing and is the
+  // whole difference between a surface leaving and a surface disappearing.
+  Timer {
+    id: consoleTeardown
+    interval: 320
+    repeat: false
+    onTriggered: {
+      if (root.consoleSurfaceLive || !consoleLoader.item) return
+      if (!consoleLoader.item.engaged) consoleLoader.active = false
+    }
+  }
+
   Loader {
     id: consoleLoader
     active: false
@@ -465,7 +480,7 @@ Item {
       function onEngagedChanged() {
         if (!root.consoleSurfaceLive && consoleLoader.item
             && !consoleLoader.item.engaged)
-          consoleLoader.active = false
+          consoleTeardown.restart()
       }
     }
   }
