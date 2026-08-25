@@ -282,9 +282,19 @@ Item {
 
         function followContentIfNeeded() {
           if (!followLatest) return
-          Qt.callLater(function() {
-            if (turnScroll.followLatest) turnScroll.contentY = turnScroll.maximumContentY()
-          })
+          followContent.restart()
+        }
+
+        // A Timer, not `Qt.callLater`: this tree is unloaded at runtime when
+        // the surface changes, and a callLater outlives the object whose
+        // closure it captured — it lands on a Flickable whose meta-object is
+        // already gone and throws. The timer is a child here, so it dies with
+        // the viewport it was going to scroll.
+        Timer {
+          id: followContent
+          interval: 0
+          onTriggered: if (turnScroll.followLatest)
+            turnScroll.contentY = turnScroll.maximumContentY()
         }
 
         function resetForNewTurn() {

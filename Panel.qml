@@ -658,21 +658,48 @@ Panel {
                   followLatest = true
                   followMotionEnabled = false
                   contentY = 0
-                  Qt.callLater(function() { answerScroll.followMotionEnabled = true })
+                  restoreFollowMotion.restart()
                 }
 
                 function showFromStart() {
                   followLatest = false
                   followMotionEnabled = false
                   contentY = 0
-                  Qt.callLater(function() { answerScroll.followMotionEnabled = true })
+                  restoreFollowMotion.restart()
                 }
 
                 function followContentIfNeeded() {
                   if (!followLatest) return
-                  Qt.callLater(function() {
-                    if (answerScroll.followLatest) answerScroll.contentY = answerScroll.maximumContentY()
-                  })
+                  followContent.restart()
+                }
+
+                // Deferred through Timers rather than `Qt.callLater`, because a
+                // callLater outlives the object whose closure it captured. The
+                // panel tree is destroyed at runtime on every surface switch,
+                // and a pending call landing afterwards ran against a Flickable
+                // whose meta-object was already gone:
+                //
+                //   TypeError: Property 'maximumContentY' of object
+                //   QQuickFlickable is not a function
+                //
+                // — two of those in the shell log for every panel destruction,
+                // alongside "attempted to evaluate a function in an invalid
+                // context". A Timer is a child of this Flickable, so it dies
+                // with it and the deferred work simply never runs, which is
+                // exactly the right answer for a viewport nobody will see
+                // again. Both also collapse repeats the way callLater did:
+                // `restart()` on a pending timer just moves the deadline.
+                Timer {
+                  id: followContent
+                  interval: 0
+                  onTriggered: if (answerScroll.followLatest)
+                    answerScroll.contentY = answerScroll.maximumContentY()
+                }
+
+                Timer {
+                  id: restoreFollowMotion
+                  interval: 0
+                  onTriggered: answerScroll.followMotionEnabled = true
                 }
 
                 onContentHeightChanged: followContentIfNeeded()
