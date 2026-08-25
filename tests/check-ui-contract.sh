@@ -49,6 +49,7 @@ qml_files=(
   "$repo_dir/components/Placement.js"
   "$repo_dir/components/Presentation.js"
   "$repo_dir/components/QuickActions.js"
+  "$repo_dir/tests/composer-growth-probe.qml"
   "$repo_dir/tests/motion-preview.qml"
   "$repo_dir/tests/state-motion-preview.qml"
   "$repo_dir/tests/voice-node-preview.qml"
@@ -997,6 +998,21 @@ if grep -Eq "omapilot console escape probe failed|Failed to load|Type .* unavail
     "$smoke_root/console-escape.log" \
     || ! grep -Fq 'OMAPILOT_CONSOLE_ESCAPE_PROBE_OK' "$smoke_root/console-escape.log"; then
   cat "$smoke_root/console-escape.log"
+  exit 1
+fi
+
+# The prompt row stops growing. Two drafts that both clear the cap have to
+# produce the same height — a pixel count would only pin today's spacing scale.
+cp "$repo_dir/tests/composer-growth-probe.qml" "$smoke_root/shell.qml"
+if ! QT_QPA_PLATFORM=offscreen timeout 10s quickshell --no-duplicate \
+    --path "$smoke_root" --no-color >"$smoke_root/composer-growth.log" 2>&1; then
+  cat "$smoke_root/composer-growth.log"
+  exit 1
+fi
+if grep -Eq "omapilot composer growth probe failed|Failed to load|Type .* unavailable|Cannot assign|TypeError|ReferenceError" \
+    "$smoke_root/composer-growth.log" \
+    || ! grep -Fq 'OMAPILOT_COMPOSER_GROWTH_PROBE_OK' "$smoke_root/composer-growth.log"; then
+  cat "$smoke_root/composer-growth.log"
   exit 1
 fi
 

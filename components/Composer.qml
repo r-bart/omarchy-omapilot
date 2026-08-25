@@ -225,52 +225,88 @@ Item {
     Item {
       id: promptRow
       Layout.fillWidth: true
-      Layout.preferredHeight: Math.max(Style.space(34), promptInput.implicitHeight + Style.spacing.md)
+      // Grows with the draft, then stops. Unbounded, a pasted block took the
+      // height it wanted: the composer sits under a `fillHeight` conversation,
+      // so sixty lines of paste squeezed the answer above it to nothing and
+      // then pushed itself off the bottom of the window. Nine lines is where
+      // it stops growing and starts scrolling.
+      readonly property int maxPromptHeight: Style.space(180)
+      Layout.preferredHeight: Math.max(Style.space(34),
+        Math.min(promptInput.implicitHeight + Style.spacing.md, maxPromptHeight))
       visible: !root.backend || root.backend.pendingPermission === null
 
-      TextArea {
-        id: promptInput
+      // A plain Flickable holding the editor, and not `TextArea.flickable`.
+      // The attached form reparents the editor and drives its geometry from
+      // the Flickable, which leaves `implicitHeight` no longer tracking the
+      // text — measured: the row stayed at its 34px floor through a
+      // 200-line draft, so the cap above would have had nothing to cap. Here
+      // the editor keeps its own implicit height and the Flickable follows it.
+      Flickable {
+        id: promptScroll
         anchors {
           left: parent.left; right: promptTools.left; top: parent.top; bottom: parent.bottom
           rightMargin: Style.spacing.md
         }
-        enabled: root.backend && !root.backend.continuationBlocked
-          && root.backend.state !== "streaming" && root.backend.state !== "preparing"
-        text: root.draftText
-        placeholderText: root.backend && root.backend.initialized
-          ? "Ask, or describe what to do"
-          : "Starting OmaPilot\u2026"
-        // 1.7 measured 4.12:1 against the popup background on the shipped
-        // theme — under the 4.5:1 floor, and this is 16px text, not large.
-        // 1.6 clears it at 4.57:1 and is still plainly a placeholder.
-        placeholderTextColor: Qt.darker(root.foreground, 1.6)
-        color: root.foreground
-        selectionColor: Style.selectionFillFor(root.foreground, root.accent)
-        selectedTextColor: root.foreground
-        font.family: root.fontFamily
-        // Deliberately larger than body: the request is the most important
-        // text in the panel, and the old body-size input buried it.
-        font.pixelSize: Style.font.heading
-        wrapMode: TextEdit.Wrap
-        background: null
-        leftPadding: 0
-        topPadding: 0
-        bottomPadding: 0
-        Accessible.name: "OmaPilot request"
-        onTextEdited: root.draftText = text
+        clip: true
+        contentWidth: width
+        contentHeight: promptInput.implicitHeight
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
 
-        Keys.onPressed: function(event) {
-          if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-              && !(event.modifiers & Qt.ShiftModifier)) {
-            root.submit()
-            event.accepted = true
-          } else if (event.key === Qt.Key_H && (event.modifiers & Qt.ControlModifier)) {
-            root.historyRequested()
-            event.accepted = true
-          } else if (event.key === Qt.Key_Escape) {
-            if (root.backend && root.backend.busy) root.backend.cancel()
-            else root.escapeRequested()
-            event.accepted = true
+        // Clipping without this would let the caret walk off the bottom and
+        // keep typing into a line nobody can see.
+        function ensureCursorVisible(r) {
+          if (contentY >= r.y) contentY = r.y
+          else if (contentY + height <= r.y + r.height)
+            contentY = r.y + r.height - height
+        }
+
+        TextArea {
+          id: promptInput
+          width: promptScroll.width
+          // At least the viewport, so a click in the empty space under a
+          // short draft still lands in the editor rather than on nothing.
+          height: Math.max(implicitHeight, promptScroll.height)
+          onCursorRectangleChanged: promptScroll.ensureCursorVisible(cursorRectangle)
+          enabled: root.backend && !root.backend.continuationBlocked
+            && root.backend.state !== "streaming" && root.backend.state !== "preparing"
+          text: root.draftText
+          placeholderText: root.backend && root.backend.initialized
+            ? "Ask, or describe what to do"
+            : "Starting OmaPilot\u2026"
+          // 1.7 measured 4.12:1 against the popup background on the shipped
+          // theme — under the 4.5:1 floor, and this is 16px text, not large.
+          // 1.6 clears it at 4.57:1 and is still plainly a placeholder.
+          placeholderTextColor: Qt.darker(root.foreground, 1.6)
+          color: root.foreground
+          selectionColor: Style.selectionFillFor(root.foreground, root.accent)
+          selectedTextColor: root.foreground
+          font.family: root.fontFamily
+          // Deliberately larger than body: the request is the most important
+          // text in the panel, and the old body-size input buried it.
+          font.pixelSize: Style.font.heading
+          wrapMode: TextEdit.Wrap
+          background: null
+          leftPadding: 0
+          rightPadding: 0
+          topPadding: 0
+          bottomPadding: 0
+          Accessible.name: "OmaPilot request"
+          onTextEdited: root.draftText = text
+
+          Keys.onPressed: function(event) {
+            if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                && !(event.modifiers & Qt.ShiftModifier)) {
+              root.submit()
+              event.accepted = true
+            } else if (event.key === Qt.Key_H && (event.modifiers & Qt.ControlModifier)) {
+              root.historyRequested()
+              event.accepted = true
+            } else if (event.key === Qt.Key_Escape) {
+              if (root.backend && root.backend.busy) root.backend.cancel()
+              else root.escapeRequested()
+              event.accepted = true
+            }
           }
         }
       }
