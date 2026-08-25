@@ -176,6 +176,12 @@ QtObject {
       } else {
         if (state.pinned !== true) root.dispatch("window.pin()", "pin active")
         box = shape.box || root.columnBox(shape.width)
+        // Nothing to say if the window is already wearing it. A compositor
+        // rule can map the console straight into its column, and re-sending
+        // the same geometry on top of that is at best a wasted round trip and
+        // at worst a move animation the user watches for no reason.
+        if (box && Placement.matches(state, { maximized: false, floating: true, box: box }))
+          box = null
         if (box) {
           // MEASURED, and it cost the first live run: the table is keyed, not
           // positional. `{ x = 587, y = 1405 }` resizes; `{587,1405}` is
@@ -190,7 +196,14 @@ QtObject {
       }
     }
 
-    root.expect(title, { maximized: shape.maximized, floating: shape.floating, box: box })
+    root.expect(title, {
+      maximized: shape.maximized,
+      floating: shape.floating,
+      // Even when nothing was dispatched: the point of looking afterwards is
+      // that the window ends up right, not that a request went out.
+      box: shape.floating && !shape.maximized
+        ? (shape.box || root.columnBox(shape.width)) : null
+    })
   }
 
   // ---------------------------------------------------------------- verifying
