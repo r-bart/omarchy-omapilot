@@ -221,7 +221,13 @@ Item {
       colorization: 1
       colorizationColor: root.displayedColor
       opacity: root.atmosphereActive ? 0.72 : 0
-      Behavior on opacity { NumberAnimation { duration: 220 } }
+      // The one Behavior in the plugin that was not gated. `atmosphereActive`
+      // tracks `motionEnabled`, so turning motion off animated the glow away
+      // over 220ms instead of it simply not being there.
+      Behavior on opacity {
+        enabled: root.motionEnabled
+        NumberAnimation { duration: 220 }
+      }
     }
   }
 
