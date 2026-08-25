@@ -223,7 +223,12 @@ Item {
       background: root.background
       accent: root.accent
       fontFamily: root.fontFamily
+      currentSurface: root.backend ? root.backend.configuredSurface : "console"
       onSettingsRequested: root.viewMode === "settings" ? root.showChat() : root.openSettings()
+      onSurfaceRequested: function(name) {
+        if (root.backend && typeof root.backend.selectSurface === "function")
+          root.backend.selectSurface(name)
+      }
     }
 
     Rectangle {
@@ -687,6 +692,9 @@ Item {
       id: composer
       Layout.fillWidth: true
       visible: root.viewMode === "chat"
+      // The header above carries the surface switch here. The bar panel has no
+      // header, so there it stays in the composer's own action row.
+      showSurfaceSwitch: false
       backend: root.backend
       foreground: root.foreground
       background: root.background

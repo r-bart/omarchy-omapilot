@@ -18,6 +18,9 @@ Item {
   property color accent: Color.accent
   property string fontFamily: Style.font.family
 
+  // The bar panel has no header to put the surface switch in, so it keeps it
+  // here. The console turns this off and shows the same row beside its gear.
+  property bool showSurfaceSwitch: true
   readonly property string currentSurface: root.backend
     ? Protocol.normalizedSurface(root.backend.configuredSurface) : "panel"
 
@@ -292,7 +295,7 @@ Item {
         // surface stays on show and marked — a row that changed width as you
         // switched would be a row you had to re-find every time.
         Repeater {
-          model: Protocol.surfaceOrder()
+          model: root.showSurfaceSwitch ? Protocol.surfaceOrder() : []
 
           PanelActionButton {
             readonly property string surfaceName: String(modelData)
@@ -300,9 +303,10 @@ Item {
 
             iconText: Presentation.surfaceIcon(surfaceName)
             tooltipText: Presentation.surfaceTooltip(surfaceName)
-            foreground: root.foreground
+            // Same marking the console header uses, so the control reads as
+            // one control that lives in two places rather than two controls.
+            foreground: current ? root.accent : root.foreground
             focusable: true
-            bordered: current
             // Moving surfaces mid-turn would tear the answer out from under the
             // user; the settings dropdown holds the same line.
             enabled: root.backend && !root.backend.busy

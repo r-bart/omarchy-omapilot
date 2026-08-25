@@ -243,13 +243,32 @@ grep -Fq 'onClicked: {' "$repo_dir/components/Composer.qml"
 # icon of the *next* surface, so the one the user wanted was one click away or
 # two and never named — reaching the bar panel from the console meant passing
 # through fullscreen to find out where it was.
-grep -Fq 'model: Protocol.surfaceOrder()' "$repo_dir/components/Composer.qml"
 grep -Fq 'Presentation.surfaceIcon(surfaceName)' "$repo_dir/components/Composer.qml"
 grep -Fq 'root.backend.selectSurface(surfaceName)' "$repo_dir/components/Composer.qml"
-# The current one stays on show and marked: a row that changed width as you
-# switched would be a row you had to re-find every time.
-grep -Fq 'bordered: current' "$repo_dir/components/Composer.qml"
 ! grep -Fq 'cycleSurface()' "$repo_dir/components/Composer.qml"
+# The switch lives in each surface's own chrome: the console has a header with
+# room beside the gear, the bar panel has no header at all. That asymmetry is
+# the reason the switch left the header in the first place, so the composer copy
+# stays and the console turns it off rather than the header being the only home.
+grep -Fq 'showSurfaceSwitch: false' "$repo_dir/components/ConsoleContent.qml"
+grep -Fq 'model: root.showSurfaceSwitch ? Protocol.surfaceOrder() : []' \
+  "$repo_dir/components/Composer.qml"
+grep -Fq 'model: Protocol.surfaceOrder()' "$repo_dir/components/OmaPilotHeader.qml"
+grep -Fq 'signal surfaceRequested(string name)' "$repo_dir/components/OmaPilotHeader.qml"
+grep -Fq 'root.backend.selectSurface(name)' "$repo_dir/components/ConsoleContent.qml"
+# One control in two places, so it is marked the same way in both.
+grep -Fq 'current ? root.accent' "$repo_dir/components/Composer.qml"
+grep -Fq 'current ? root.accent' "$repo_dir/components/OmaPilotHeader.qml"
+# The header carries the product name two lines above, so it does not name the
+# built-in harness underneath it as well.
+grep -Fq 'Protocol.harnessMeta(root.backend.provider, root.backend.model)' \
+  "$repo_dir/components/OmaPilotHeader.qml"
+! grep -Fq 'Protocol.providerLabel(root.backend.provider)' \
+  "$repo_dir/components/OmaPilotHeader.qml"
+# The settings dropdown still names it in full: there it sits beside Codex and
+# OpenCode and the distinction is the whole point of the row.
+grep -Fq 'if (provider === "builtin") return "Built-in (OmaPilot)"' \
+  "$repo_dir/components/Protocol.js"
 ! grep -q 'surfaceCycle' "$repo_dir/components/OmaPilotHeader.qml"
 # The content column stops growing past a readable measure and centres instead.
 # min() keeps every docked width inert, so the docked render is unchanged.
