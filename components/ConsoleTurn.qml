@@ -57,7 +57,15 @@ Item {
         Text {
           id: bubbleText
           anchors.fill: parent
-          anchors.margins: Style.space(10)
+          // 14/14 and 10/10, matching the live bubble below exactly — the
+          // width above reserves space(28) horizontally, so a flat margin of
+          // 10 spent only 20 of it and left the remaining 8 stacked on the
+          // right. Two bubbles in the same column, one padded evenly and the
+          // one above it leaning left.
+          anchors.leftMargin: Style.space(14)
+          anchors.rightMargin: Style.space(14)
+          anchors.topMargin: Style.space(10)
+          anchors.bottomMargin: Style.space(10)
           text: String(root.turn.question || "")
           color: root.foreground
           font.family: root.fontFamily
