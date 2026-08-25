@@ -98,9 +98,17 @@ Item {
   }
 
   function close() {
+    // `opened` first, then the remap flag, or clearing the flag would map the
+    // window again for an instant on its way out.
     opened = false
+    // A remap in flight would otherwise swallow this close: the window is
+    // already hidden, so nothing downstream would be told it had gone.
+    focusCheck.stop()
+    remapTimer.stop()
+    remapping = false
     if (backend && typeof backend.clearDesktopContextLatch === "function")
       backend.clearDesktopContextLatch()
+    resetLanes.restart()
   }
 
   // Three states, not two. A window can be visible without holding the
@@ -186,6 +194,19 @@ Item {
     onTriggered: root.remapping = false
   }
 
+  // The lanes go back to chat once the window is gone rather than while it is
+  // going: the compositor animates the last frame it was handed, and a reset
+  // drawn into that frame is a glitch on the way out. Keyed to the close and
+  // not to the visibility, because a remap hides the window too and means the
+  // opposite — measured: closing mid-remap skipped the reset entirely and the
+  // console reopened in whatever lane it had been left in.
+  Timer {
+    id: resetLanes
+    interval: 120
+    repeat: false
+    onTriggered: if (!root.opened) content.reset()
+  }
+
   FloatingWindow {
     id: surface
     title: root.windowTitle
@@ -216,10 +237,6 @@ Item {
     // fade, which is why the layer-shell console animated its own x; a toplevel
     // gets windowsIn/windowsOut instead, the animation the user already has for
     // every other window.
-    //
-    // The remap guard is what separates a close from the focus fallback: both
-    // unmap the window, only one of them means the conversation is done with.
-    onVisibleChanged: if (!visible && !root.remapping) content.reset()
 
     // The X, or Super+W, or any other way the compositor closes a window. This
     // is a close, not a hide: the desktop-context latch freezes the active

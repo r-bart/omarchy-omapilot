@@ -143,10 +143,12 @@ grep -Fq 'Hyprland.refreshToplevels()' "$repo_dir/components/ConsolePlacement.qm
 grep -Fq 'ConsolePlacement.activate(root.windowTitle)' "$repo_dir/components/Console.qml"
 grep -Fq 'if (!root.opened || root.focused) return' "$repo_dir/components/Console.qml"
 ! grep -Fq 'if (ConsolePlacement.activate(' "$repo_dir/components/Console.qml"
-# A remap is not a close. Both unmap the window; only one of them means the
-# conversation is done with, and only one may reset the lanes.
-grep -Fq 'onVisibleChanged: if (!visible && !root.remapping) content.reset()' \
+# A remap hides the window and means the opposite of a close, so the lane reset
+# hangs off the close itself. Measured: closing mid-remap skipped it entirely
+# and the console reopened in whatever lane it had been left in.
+grep -Fq 'onTriggered: if (!root.opened) content.reset()' \
   "$repo_dir/components/Console.qml"
+! grep -Fq 'onVisibleChanged: if (!visible' "$repo_dir/components/Console.qml"
 
 # The dispatch acts on the active window, so it may only run once the active
 # window is known to be ours. Placing someone else's window is worse than
