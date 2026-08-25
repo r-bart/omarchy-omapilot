@@ -264,6 +264,15 @@ grep -Fq 'model: root.showSurfaceSwitch ? Protocol.surfaceOrder() : []' \
 grep -Fq 'model: Protocol.surfaceOrder()' "$repo_dir/components/OmaPilotHeader.qml"
 grep -Fq 'signal surfaceRequested(string name)' "$repo_dir/components/OmaPilotHeader.qml"
 grep -Fq 'root.backend.selectSurface(name)' "$repo_dir/components/ConsoleContent.qml"
+# The reading measure. The shell font is monospace, so the column holds
+# width / (0.6 * Style.font.body) characters, and cap and font scale together:
+# 560 is 78 characters at any base-size, against 128 for the 920 it replaced.
+# `tightMeta` compares against the cap rather than repeating it, because the
+# two being equal is what keeps the header on one row at fullscreen.
+grep -Fq 'readonly property int maxContentWidth: Style.space(560)' \
+  "$repo_dir/components/ConsoleContent.qml"
+grep -Fq 'readonly property bool tightMeta: contentWidth < maxContentWidth' \
+  "$repo_dir/components/ConsoleContent.qml"
 # One control in two places, so it is marked the same way in both.
 grep -Fq 'current ? root.accent' "$repo_dir/components/Composer.qml"
 grep -Fq 'current ? root.accent' "$repo_dir/components/OmaPilotHeader.qml"

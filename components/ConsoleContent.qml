@@ -205,14 +205,30 @@ Item {
   // fills it. Filling a 2560px screen instead gives lines nobody can track from
   // one end to the next, a composer pinned to a far corner, and a conversation
   // stranded against one edge. Past this measure the column stops growing and
-  // centres: the same layout, not a stretched one. Below it — every docked
-  // width, 360 through 560 — the min() is inert and nothing changes.
+  // centres: the same layout, not a stretched one.
+  //
+  // The measure is arithmetic, not taste. The shell font is monospace, so a
+  // character is exactly 0.6em: at `Style.font.body` the column holds
+  // `width / (0.6 * body)` characters, and because the cap and the font scale
+  // together through the same `fontScale`, that count is the same at every
+  // `base-size`. Docked at the 587px the compositor gives this screen, the
+  // column is 56 characters — comfortable. The old 920 cap made fullscreen
+  // 128, which is not a line anyone reads twice.
+  //
+  // 560 puts fullscreen at 78: a shade over the 75 the reading rules ask for,
+  // and stopping there is deliberate. Below `Style.space(560)` the header can
+  // no longer keep harness, model, posture and hints on one row, so a tighter
+  // measure would buy a few characters and cost the header its shape on the
+  // widest surface there is.
   readonly property int contentInset: Style.space(18)
-  readonly property int maxContentWidth: Style.space(920)
+  readonly property int maxContentWidth: Style.space(560)
   readonly property int contentWidth: Math.min(
     Math.max(width - contentInset * 2, 0), maxContentWidth)
-  // Only the docked column is tight enough to need the meta stacked.
-  readonly property bool tightMeta: contentWidth < Style.space(560)
+  // The column is stacked exactly when it could not reach its own maximum —
+  // which is to say, when the surface is too narrow to give it. Written
+  // against `maxContentWidth` rather than repeating the number, because the
+  // two being equal is load-bearing and two literals drift.
+  readonly property bool tightMeta: contentWidth < maxContentWidth
 
   ColumnLayout {
     anchors.top: parent.top
