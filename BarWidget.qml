@@ -139,18 +139,21 @@ BarWidget {
   readonly property bool surfaceRoutesHere:
     OmaPilot.OmaPilotStore.configuredSurface === "panel"
 
-  // The other half of the surface handoff. Unguarded on purpose: by the time
-  // this fires the panel is no longer the routed surface, so the block below
-  // is already disabled — and this is exactly the moment the panel has to hand
-  // over. Leaving it out meant switching to the console closed the panel and
-  // showed nothing, and the console needed a second press to appear.
+  // The other half of the surface handoff, and unguarded on purpose: it has to
+  // run both when the panel stops being the routed surface and when it becomes
+  // one, and the block below is disabled in the first of those.
   Connections {
     target: OmaPilot.OmaPilotStore
     function onConfiguredSurfaceChanged() {
-      if (root.surfaceRoutesHere) return
-      var wasOpen = root.opened
-      root.closeForPopoutSwitch()
-      if (wasOpen) Qt.callLater(function() { OmaPilot.OmaPilotStore.ipcOpenRequested() })
+      if (!root.surfaceRoutesHere) {
+        root.closeForPopoutSwitch()
+        return
+      }
+      // Asking for this surface is asking to see it. The intent is carried on
+      // the store rather than read from "was the old one open", because by now
+      // the popout has dismissed itself and the answer would always be no.
+      if (OmaPilot.OmaPilotStore.takeSurfaceHandoff())
+        Qt.callLater(function() { if (root.routedWidget() === root) root.open() })
     }
   }
 

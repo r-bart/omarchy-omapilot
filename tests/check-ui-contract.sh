@@ -359,8 +359,8 @@ grep -Fq '&& !root.consoleOpened' "$repo_dir/Ambient.qml"
 # The console tree only exists for users who opted in — to either geometry — and
 # the loader is driven rather than bound, so deciding whether `item` should exist
 # never reads `item` and no surface change trips a binding loop.
-grep -Fq 'onConsoleSurfaceLiveChanged: if (consoleSurfaceLive) consoleLoader.active = true' \
-  "$repo_dir/Ambient.qml"
+grep -Fq 'if (!consoleSurfaceLive) return' "$repo_dir/Ambient.qml"
+grep -Fq 'consoleLoader.active = true' "$repo_dir/Ambient.qml"
 # Closing a window unmaps it in the same tick, so the engaged handler has
 # usually already destroyed the item by the time this line runs. The guard is
 # not defensive habit: without it every switch back to the panel is a TypeError.
@@ -856,10 +856,17 @@ grep -Fq 'readonly property bool opened:' "$repo_dir/BarWidget.qml"
 # appeared, and the bar icon had to be pressed a second time to see what had
 # just been asked for — in both directions.
 grep -Fq 'function closeForPopoutSwitch()' "$repo_dir/BarWidget.qml"
-grep -Fq 'if (wasOpen) Qt.callLater(function() { OmaPilot.OmaPilotStore.ipcOpenRequested() })' \
-  "$repo_dir/BarWidget.qml"
-grep -Fq 'if (wasOpen) Qt.callLater(function() { OmaPilot.OmaPilotStore.ipcOpenRequested() })' \
-  "$repo_dir/Ambient.qml"
+# The intent is captured when the surface is asked for, not read back when the
+# setting lands: the bar panel is a popout and has dismissed itself by then, so
+# "was the old one open" is always no and the console never appeared.
+grep -Fq 'surfaceHandoffPending = true' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'function takeSurfaceHandoff()' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'OmaPilot.OmaPilotStore.takeSurfaceHandoff()' "$repo_dir/Ambient.qml"
+grep -Fq 'OmaPilot.OmaPilotStore.takeSurfaceHandoff()' "$repo_dir/BarWidget.qml"
+# One-shot and set nowhere else, so a shell restart reading the same value off
+# disk does not pop a surface open at login.
+! grep -Fq 'surfaceHandoffPending = true' "$repo_dir/Ambient.qml"
+! grep -Fq 'surfaceHandoffPending = true' "$repo_dir/BarWidget.qml"
 test "$(grep -Fc 'IpcHandler {' "$repo_dir/components/OmaPilotStore.qml")" -eq 1
 if grep -Fq 'IpcHandler {' "$repo_dir/BarWidget.qml" \
     || grep -Fq 'IpcHandler {' "$repo_dir/Ambient.qml"; then

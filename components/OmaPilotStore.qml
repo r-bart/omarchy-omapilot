@@ -178,18 +178,37 @@ Scope {
   // one is live. Both return the surface being switched to, not the current
   // one: the write is asynchronous and `configuredSurface` only catches up once
   // the owner has merged and echoed the settings back.
-  function cycleSurface() {
-    var next = Protocol.nextSurface(configuredSurface)
+  // Naming a surface outright, for a hotkey bound to one of them rather than to
+  // the cycle. An unrecognized name lands on the panel instead of nowhere.
+  //
+  // Asking for a surface is asking to see it, so the request carries that
+  // across. Reading "was the old one open" when the setting lands is too late:
+  // the bar panel is a popout and has already dismissed itself by then, which
+  // is why switching back to the console left nothing on screen and needed a
+  // second press.
+  function selectSurface(value) {
+    var next = Protocol.normalizedSurface(value)
+    surfaceHandoffPending = true
     requestSettingsPersist({ surface: next })
     return next
   }
 
-  // Naming a surface outright, for a hotkey bound to one of them rather than to
-  // the cycle. An unrecognized name lands on the panel instead of nowhere.
-  function selectSurface(value) {
-    var next = Protocol.normalizedSurface(value)
+  function cycleSurface() {
+    var next = Protocol.nextSurface(configuredSurface)
+    surfaceHandoffPending = true
     requestSettingsPersist({ surface: next })
     return next
+  }
+
+  // One-shot, consumed by whichever surface becomes the live one. Nothing else
+  // sets it, so a shell restart reading the same value from disk does not pop a
+  // surface open at login.
+  property bool surfaceHandoffPending: false
+
+  function takeSurfaceHandoff() {
+    if (!surfaceHandoffPending) return false
+    surfaceHandoffPending = false
+    return true
   }
 
   function routeIpc(method) {

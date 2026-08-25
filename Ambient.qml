@@ -144,11 +144,6 @@ Item {
       // fullscreen are the same window, so moving between them is a resize and
       // must not close anything.
       if (root.consoleSurfaceLive || !consoleLoader.item) return
-      // Switching surface is a move, not a dismissal. The user pressed a button
-      // that says "show me this in the bar panel" — closing the console and
-      // stopping there left them looking at nothing, having to press the bar
-      // icon a second time to see what they had just asked for.
-      var wasOpen = consoleLoader.item.opened === true
       consoleLoader.item.close()
       // Closing a window unmaps it in the same tick, so the teardown may
       // already be pending — reading through the item unguarded is a TypeError
@@ -156,9 +151,6 @@ Item {
       // console that was never mapped: `engaged` was false all along, nothing
       // changed, and nothing would otherwise tell the loader to unload.
       if (consoleLoader.item && !consoleLoader.item.engaged) consoleTeardown.restart()
-      // Deferred so the incoming surface's own guards have settled: its route
-      // block only enables once `configuredSurface` has propagated.
-      if (wasOpen) Qt.callLater(function() { OmaPilot.OmaPilotStore.ipcOpenRequested() })
     }
   }
 
@@ -452,7 +444,15 @@ Item {
   // `item` exists is a binding loop, and Qt says so on every surface change.
   // Loading is immediate; unloading waits for the exit slide to finish, which
   // the console reports through `engaged`.
-  onConsoleSurfaceLiveChanged: if (consoleSurfaceLive) consoleLoader.active = true
+  onConsoleSurfaceLiveChanged: {
+    if (!consoleSurfaceLive) return
+    consoleLoader.active = true
+    // Switching surface is a move, not a dismissal: whoever asked for this one
+    // wants to see it. Deferred a tick because the loader has only just been
+    // told to exist.
+    if (OmaPilot.OmaPilotStore.takeSurfaceHandoff())
+      Qt.callLater(function() { if (consoleLoader.item) consoleLoader.item.open(true) })
+  }
 
   // Unloading destroys the window, and destroying a window mid-exit takes its
   // close animation with it. Switching back to the panel used to do exactly
