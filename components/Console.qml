@@ -79,18 +79,22 @@ Item {
 
   // Take the keyboard back for a window the user can already see.
   //
-  // MEASURED (A1): activating our own toplevel by title moves the compositor's
-  // focus with no remap and no blink. When that is unavailable — no Hyprland,
-  // or we are not in the toplevel model yet — remap instead: a window hidden
-  // and shown again comes back focused, also measured. The ladder ends
+  // Activating our own toplevel is a request, not a command, and MEASURED it is
+  // not always granted: the same call moved focus three times out of three one
+  // night and was silently ignored the next morning, from an unchanged probe on
+  // an unchanged compositor. So its return value only says the request went
+  // out, and the only proof of focus is the focus itself.
+  //
+  // Hence the check rather than a branch: ask, look, and if the keyboard did
+  // not arrive, remap. A window hidden and shown again comes back focused —
+  // measured, and reliable every time it has been tried. The ladder ends
   // somewhere guaranteed, so this has no failure branch.
   //
   // Not `focus()`: QQuickItem already has a final property by that name, and
   // shadowing it is a warning today and a silent misbinding tomorrow.
   function takeFocus() {
-    if (ConsolePlacement.activate(root.windowTitle)) return
-    remapping = true
-    remapTimer.restart()
+    ConsolePlacement.activate(root.windowTitle)
+    focusCheck.restart()
   }
 
   function close() {
@@ -157,11 +161,27 @@ Item {
   // returns the window to wherever the compositor last had it, not to us.
   onFullscreenChanged: applyPlacement()
 
-  // One tick is enough for the compositor to see the surface go away and come
-  // back; anything shorter and Qt coalesces the two into no change at all.
+  // Did the compositor grant the activation? Long enough for the focus event
+  // to have arrived and come back through Qt, short enough that the fallback
+  // still reads as one gesture rather than two.
+  Timer {
+    id: focusCheck
+    interval: 150
+    repeat: false
+    onTriggered: {
+      if (!root.opened || root.focused) return
+      root.remapping = true
+      remapTimer.restart()
+    }
+  }
+
+  // MEASURED: one millisecond is not enough. Qt coalesces the two changes and
+  // the surface never leaves the screen, so nothing remaps and no focus comes
+  // back. This is a frame or two, which is below the threshold of a blink and
+  // above the threshold of the compositor noticing.
   Timer {
     id: remapTimer
-    interval: 1
+    interval: 80
     repeat: false
     onTriggered: root.remapping = false
   }

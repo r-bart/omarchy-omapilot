@@ -134,10 +134,15 @@ grep -Fq 'readonly property bool available' "$repo_dir/components/ConsolePlaceme
 # The toplevel model is populated lazily and starts empty, so a lookup that runs
 # before the first refresh finds nothing and says nothing about why.
 grep -Fq 'Hyprland.refreshToplevels()' "$repo_dir/components/ConsolePlacement.qml"
-# Focusing has a floor. If activation fails or Hyprland is absent, remap: a
-# window that is hidden and shown again comes back focused — measured. The
-# ladder ends somewhere guaranteed, so focus() has no failure branch.
-grep -Fq 'if (ConsolePlacement.activate(' "$repo_dir/components/Console.qml"
+# Focusing has a floor, and the floor is checked rather than assumed. Measured:
+# activating our own toplevel moved focus three times out of three one night and
+# was silently ignored the next morning, unchanged probe, unchanged compositor.
+# The request's return value says only that it went out, so the console looks at
+# whether the keyboard actually arrived and remaps if it did not — a window
+# hidden and shown again comes back focused, every time it has been tried.
+grep -Fq 'ConsolePlacement.activate(root.windowTitle)' "$repo_dir/components/Console.qml"
+grep -Fq 'if (!root.opened || root.focused) return' "$repo_dir/components/Console.qml"
+! grep -Fq 'if (ConsolePlacement.activate(' "$repo_dir/components/Console.qml"
 # A remap is not a close. Both unmap the window; only one of them means the
 # conversation is done with, and only one may reset the lanes.
 grep -Fq 'onVisibleChanged: if (!visible && !root.remapping) content.reset()' \
