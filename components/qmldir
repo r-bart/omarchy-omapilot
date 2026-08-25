@@ -6,6 +6,7 @@ Console 1.0 Console.qml
 ConsoleContent 1.0 ConsoleContent.qml
 ConsoleTurn 1.0 ConsoleTurn.qml
 ContextAttachmentPreview 1.0 ContextAttachmentPreview.qml
+CopyButton 1.0 CopyButton.qml
 ErrorDetailsView 1.0 ErrorDetailsView.qml
 ErrorNotice 1.0 ErrorNotice.qml
 HistoryView 1.0 HistoryView.qml

@@ -22,6 +22,7 @@ qml_files=(
   "$repo_dir/components/ConsolePlacement.qml"
   "$repo_dir/components/ConsoleTurn.qml"
   "$repo_dir/components/ContextAttachmentPreview.qml"
+  "$repo_dir/components/CopyButton.qml"
   "$repo_dir/components/ErrorDetailsView.qml"
   "$repo_dir/components/ErrorNotice.qml"
   "$repo_dir/components/HistoryView.qml"

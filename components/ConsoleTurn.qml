@@ -95,15 +95,15 @@ Item {
 
       Item { Layout.fillWidth: true }
 
-      PanelActionButton {
-        iconText: "󰆏"
-        tooltipText: "Copy answer"
-        foreground: Qt.darker(root.foreground, 1.5)
+      OmaPilot.CopyButton {
+        idleTooltip: "Copy answer"
+        doneTooltip: "Answer copied"
+        sourceText: String(root.turn.answer || "")
+        idleForeground: Qt.darker(root.foreground, 1.5)
+        doneForeground: root.accent
         size: Style.space(26)
-        focusable: true
         visible: String(root.turn.answer || "") !== ""
-        Accessible.name: tooltipText
-        onClicked: root.backend.copyText(String(root.turn.answer || ""))
+        onCopyRequested: function(text) { root.backend.copyText(text) }
       }
     }
 
