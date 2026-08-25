@@ -419,6 +419,76 @@ describe("Herdr handoff serialization", () => {
 });
 
 describe("voice provider status", () => {
+  it("publishes only the newest concurrent voice status", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-voice-revision-")); roots.push(root);
+    const env = { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: join(root, "config") };
+    const events: BrokerEvent[] = [];
+    const probes: Array<(available: boolean) => void> = [];
+    const voice = new VoiceService(
+      env,
+      {
+        dictationAvailable: () => Promise.resolve(false),
+        kokoroAvailable: () => new Promise<boolean>((resolveProbe) => { probes.push(resolveProbe); })
+      }
+    );
+    const broker = new OmaPilotBroker(events.push.bind(events), { voice, env });
+
+    const older = broker.handle({ type: "voice_status" });
+    await vi.waitFor(() => expect(probes).toHaveLength(1));
+    const newer = broker.handle({ type: "voice_status" });
+    await vi.waitFor(() => expect(probes).toHaveLength(2));
+    probes[1]?.(true);
+    await newer;
+    probes[0]?.(false);
+    await older;
+
+    const statuses = events.filter((event) => event.type === "voice");
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]?.type === "voice" ? statuses[0].tts[0]?.available : false).toBe(true);
+  });
+
+  it("lets a key mutation supersede an older pending voice status", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-voice-key-revision-")); roots.push(root);
+    const env = { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: join(root, "config") };
+    const events: BrokerEvent[] = [];
+    const probes: Array<(available: boolean) => void> = [];
+    const voice = new VoiceService(
+      env,
+      {
+        dictationAvailable: () => Promise.resolve(false),
+        kokoroAvailable: () => new Promise<boolean>((resolveProbe) => { probes.push(resolveProbe); }),
+        fetch: (input) => Promise.resolve(new Response(JSON.stringify(
+          (typeof input === "string" ? input : input instanceof URL ? input.href : input.url).includes("/v2/voices")
+            ? { voices: [] }
+            : []
+        ), { status: 200 }))
+      }
+    );
+    const broker = new OmaPilotBroker(events.push.bind(events), { voice, env });
+
+    const older = broker.handle({ type: "voice_status" });
+    await vi.waitFor(() => expect(probes).toHaveLength(1));
+    const saving = broker.handle({
+      type: "tts_key_set", provider: "elevenlabs", apiKey: "eleven-race-test-key"
+    });
+    await vi.waitFor(() => expect(probes).toHaveLength(2));
+    probes[0]?.(false);
+    await older;
+    expect(events.filter((event) => event.type === "voice")).toHaveLength(0);
+    probes[1]?.(false);
+    await saving;
+
+    const statuses = events.filter((event) => event.type === "voice");
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]).toMatchObject({
+      type: "voice",
+      source: "key_set",
+      tts: expect.arrayContaining([
+        expect.objectContaining({ id: "elevenlabs", available: true, configured: true })
+      ])
+    });
+  });
+
   it("emits a voice catalog without secrets and acknowledges a tested key", async () => {
     const root = await mkdtemp(join(tmpdir(), "omapilot-voice-")); roots.push(root);
     const config = join(root, ".config/omapilot");

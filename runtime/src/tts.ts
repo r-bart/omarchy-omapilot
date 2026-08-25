@@ -275,11 +275,14 @@ export class VoiceService {
   }
 
   async status(): Promise<VoiceStatus> {
-    const [dictation, kokoro, auth] = await Promise.all([
+    const [dictation, kokoro] = await Promise.all([
       this.#dictationStatus(),
-      this.#kokoroStatus(),
-      Promise.resolve(this.#auth())
+      this.#kokoroStatus()
     ]);
+    // Local imports can be slow on a cold start. Read credentials only after
+    // those probes finish so a concurrent key update cannot publish a stale
+    // cloud-provider snapshot when this older request eventually completes.
+    const auth = this.#auth();
     const elevenlabs = await this.#cloudStatus("elevenlabs", storedKey(auth, "elevenlabs"));
     const openai = await this.#cloudStatus("openai", storedKey(auth, "openai"));
     return { dictation, tts: [kokoro, elevenlabs, openai] };

@@ -76,6 +76,7 @@ export class OmaPilotBroker {
   #browserCompanionSetupBusy = false;
   #browserCompanionSetupPhase: "installing" | "removing" | undefined;
   #browserCompanionStatusRevision = 0;
+  #voiceStatusRevision = 0;
   #ttsSpeakId: string | undefined;
 
   constructor(
@@ -627,12 +628,16 @@ export class OmaPilotBroker {
   }
 
   async #emitVoiceStatus(): Promise<void> {
+    const revision = ++this.#voiceStatusRevision;
     try {
       const status = await this.#voice.status();
-      this.#emit({ type: "voice", dictation: status.dictation, tts: status.tts });
+      if (revision !== this.#voiceStatusRevision) return;
+      this.#emit({ type: "voice", source: "status", dictation: status.dictation, tts: status.tts });
     } catch {
+      if (revision !== this.#voiceStatusRevision) return;
       this.#emit({
         type: "voice",
+        source: "status",
         dictation: { available: false, message: "Voice status could not be loaded." },
         tts: []
       });
@@ -641,29 +646,37 @@ export class OmaPilotBroker {
 
   async #ttsKeySet(provider: string, apiKey: string): Promise<void> {
     if (!isCloudTtsProviderId(provider)) return;
+    ++this.#voiceStatusRevision;
     try {
       const status = await this.#voice.setKey(provider, apiKey);
-      this.#emit({ type: "voice", dictation: status.dictation, tts: status.tts });
+      // A completed mutation is the newest authoritative snapshot. Advance
+      // again to suppress status probes that began while validation ran.
+      ++this.#voiceStatusRevision;
+      this.#emit({ type: "voice", source: "key_set", dictation: status.dictation, tts: status.tts });
     } catch (error) {
       this.#emit({
         type: "tts_test_failed",
         provider,
         message: error instanceof VoiceError ? error.message : "The API key could not be saved"
       });
+      await this.#emitVoiceStatus();
     }
   }
 
   async #ttsKeyClear(provider: string): Promise<void> {
     if (!isCloudTtsProviderId(provider)) return;
+    ++this.#voiceStatusRevision;
     try {
       const status = await this.#voice.clearKey(provider);
-      this.#emit({ type: "voice", dictation: status.dictation, tts: status.tts });
+      ++this.#voiceStatusRevision;
+      this.#emit({ type: "voice", source: "key_clear", dictation: status.dictation, tts: status.tts });
     } catch (error) {
       this.#emit({
         type: "tts_test_failed",
         provider,
         message: error instanceof VoiceError ? error.message : "The API key could not be removed"
       });
+      await this.#emitVoiceStatus();
     }
   }
 
