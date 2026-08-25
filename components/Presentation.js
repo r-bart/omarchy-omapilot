@@ -70,13 +70,12 @@ function responsePhase(state, hasAnswer) {
 // exact prior behavior. The terminal value stays "close-panel" — it names the
 // ladder's final step, not a surface; each caller maps it to its own close.
 function escapeAction(viewMode, composerPopupOpen, settingsPopupOpen,
-                      previewOpen, busy, focused) {
+                      previewOpen, busy) {
   if (composerPopupOpen) return "close-composer-popup"
   if (settingsPopupOpen) return "close-settings-popup"
   if (previewOpen) return "close-preview"
   if (String(viewMode || "chat") !== "chat") return "show-chat"
   if (busy) return "cancel"
-  if (focused === true) return "release-focus"
   return "close-panel"
 }
 

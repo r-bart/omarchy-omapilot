@@ -193,12 +193,17 @@ grep -Fq 'onFullscreenChanged: applyPlacement()' "$repo_dir/components/Console.q
 grep -Fq 'fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"' \
   "$repo_dir/Ambient.qml"
 
-# The release-focus rung is additive, so every other host keeps its exact prior
-# behavior and Presentation.js keeps its original comparisons untouched. A real
-# window has no keyboard to hand back: no protocol lets a client unfocus itself.
-grep -Fq 'property bool releasesFocus: true' "$repo_dir/components/ConsoleContent.qml"
-grep -Fq 'root.focused && root.releasesFocus' "$repo_dir/components/ConsoleContent.qml"
-grep -Fq 'releasesFocus: false' "$repo_dir/components/Console.qml"
+# The ladder has no focus rung and no host that could use one. Releasing the
+# keyboard was something only a layer-shell surface could do; both hosts are
+# ordinary windows now, and no protocol lets a window unfocus itself. Leaving
+# the rung in place would be a branch no caller can reach and a test asserting
+# behaviour that cannot happen.
+! grep -q 'releasesFocus' "$repo_dir/components/ConsoleContent.qml" \
+  "$repo_dir/components/Console.qml"
+! grep -q 'releaseFocusRequested' "$repo_dir/components/ConsoleContent.qml"
+! grep -q 'release-focus' "$repo_dir/components/Presentation.js" \
+  "$repo_dir/components/ConsoleContent.qml"
+grep -Fq 'previewOpen, busy) {' "$repo_dir/components/Presentation.js"
 # The content still does not know what window hosts it. That is what lets all 24
 # of its states render offscreen in the preview harness, and it is the reason the
 # migration touches one file instead of eight hundred lines.
@@ -214,9 +219,9 @@ grep -Fq 'readonly property int contentWidth: Math.min(' \
   "$repo_dir/components/ConsoleContent.qml"
 grep -Fq 'anchors.horizontalCenter: parent.horizontalCenter' \
   "$repo_dir/components/ConsoleContent.qml"
-# The escape ladder releases focus before it closes, and keeps its terminal name.
-grep -Fq 'if (focused === true) return "release-focus"' \
-  "$repo_dir/components/Presentation.js"
+# The ladder keeps its terminal name: "close-panel" names the final step, not a
+# surface, and each host maps it to its own close.
+grep -Fq 'return "close-panel"' "$repo_dir/components/Presentation.js"
 # A pending approval pins the console: Escape answers it, never dismisses it.
 grep -Fq 'backend.respondPermission("reject_once", backend.permissionChoiceId("reject_once"))' \
   "$repo_dir/components/ConsoleContent.qml"

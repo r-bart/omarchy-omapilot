@@ -22,16 +22,10 @@ Item {
   id: root
 
   required property var backend
-  // Whether the surface currently holds the compositor's keyboard. The escape
-  // ladder needs it: Escape at rest releases focus before it closes anything.
+  // Whether the surface currently holds the compositor's keyboard. Without it
+  // there is no keyboard to bind Escape to, and nowhere for a restored caret to
+  // go — it gates the shortcut and the lane changes, not the ladder itself.
   property bool focused: false
-  // Whether this host can put the keyboard down at all. A layer-shell surface
-  // can: setting keyboardFocus to None is the one way a client releases focus
-  // on its own. A real window cannot — no Wayland protocol lets a client
-  // unfocus itself — so for that host the rung does not exist and Escape at
-  // rest goes straight to closing. True by default, so every other host keeps
-  // exactly the behaviour it had.
-  property bool releasesFocus: true
   property bool motionEnabled: true
   property color foreground: Color.popups.text
   property color background: Color.popups.background
@@ -43,7 +37,6 @@ Item {
   property string previewAlt: ""
 
   signal closeRequested()
-  signal releaseFocusRequested()
 
   // The console speaks the same state language as the panel and the ambient
   // surfaces; the filament is the one element that carries it.
@@ -166,13 +159,12 @@ Item {
     }
     var action = Presentation.escapeAction(root.viewMode, composer.popupOpen,
       settingsView.popupOpen, root.previewSource !== "",
-      backend ? backend.busy : false, root.focused && root.releasesFocus)
+      backend ? backend.busy : false)
     if (action === "close-composer-popup") composer.closePopups()
     else if (action === "close-settings-popup") settingsView.closePopups()
     else if (action === "close-preview") root.previewSource = ""
     else if (action === "show-chat") root.showChat()
     else if (action === "cancel") backend.cancel()
-    else if (action === "release-focus") root.releaseFocusRequested()
     // "close-panel" names the ladder's terminal step, not the surface; the
     // console maps it to its own close the way Panel.qml maps it to its own.
     else root.closeRequested()

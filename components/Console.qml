@@ -255,11 +255,6 @@ Item {
         backend: root.backend
         focused: root.focused
         motionEnabled: root.motionEnabled && surface.visible
-        // No keyboard to hand back: no Wayland protocol lets a client unfocus
-        // itself, so the release-focus rung would be a step to nowhere and
-        // Escape at rest would do nothing at all. Without it the ladder ends
-        // where the user expects, in a close.
-        releasesFocus: false
         onCloseRequested: root.close()
       }
     }
