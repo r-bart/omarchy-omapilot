@@ -336,9 +336,26 @@ grep -Fq 'ConsoleTurn 1.0 ConsoleTurn.qml' "$repo_dir/components/qmldir"
 # would make finishing a turn look like it happened again.
 grep -Fq 'if (String(source[j].acpId || "") === key) thread.push(source[j])' \
   "$repo_dir/components/Protocol.js"
-# A finished turn can be read and copied; retrying and cancelling belong to the
-# one that is still running.
-! grep -q 'onRetryRequested\|backend.cancel()' "$repo_dir/components/ConsoleTurn.qml"
+# A finished turn can be read and copied; retrying, cancelling and the Herdr
+# handoff belong to the one that is still running.
+! grep -q 'onRetryRequested\|backend.cancel()\|continueInHerdr' \
+  "$repo_dir/components/ConsoleTurn.qml"
+# Every answer wears the same plate, live or finished, and the two must not
+# drift into two sets of numbers — a reader should not be able to tell which
+# answer is which by its shape. Same tint, same radius, same border, same
+# padding, asserted in both files rather than trusted to stay in step.
+for literal in \
+  'radius: Style.space(10)' \
+  'color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.035)' \
+  'border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)' \
+  'implicitHeight: plateColumn.implicitHeight + Style.space(30)' \
+  'anchors.topMargin: Style.space(15)'; do
+  grep -Fq "$literal" "$repo_dir/components/ConsoleContent.qml"
+  grep -Fq "$literal" "$repo_dir/components/ConsoleTurn.qml"
+done
+# Provenance per turn, not per conversation: a thread can change harness or
+# model partway through and the record carries what answered each turn.
+grep -Fq 'Protocol.providerShortLabel(provider)' "$repo_dir/components/ConsoleTurn.qml"
 # The panel and the curtain stay single-turn. They are the glance surfaces; the
 # console is the deliberate one, and that distinction is design/ambient-ux.md.
 ! grep -q 'threadBefore' "$repo_dir/Panel.qml" "$repo_dir/components/AnswerCurtain.qml"
@@ -1155,7 +1172,7 @@ fi
 
 for preview_state in settings skills-settings voice-settings desktop-settings actions-settings \
     setup-voice setup-hotkeys history waiting streaming error error-details context \
-    console-empty console-streaming console-answer console-permission \
+    console-empty console-streaming console-answer console-thread console-permission \
     console-history console-settings; do
   preview_output="$repo_dir/screenshots/implementation-omapilot-$preview_state.png"
   OMAPILOT_PREVIEW_STATE="$preview_state" OMAPILOT_PREVIEW_PATH="$preview_output" \
@@ -1172,7 +1189,7 @@ done
 # because it is the same states at a different size, and because a sidebar layout
 # stretched to 2560px renders without a single error while being unreadable —
 # only looking at it catches that, so the states have to exist to be looked at.
-for preview_state in console-answer console-permission console-settings; do
+for preview_state in console-answer console-thread console-permission console-settings; do
   preview_output="$repo_dir/screenshots/implementation-omapilot-fullscreen-${preview_state#console-}.png"
   OMAPILOT_PREVIEW_STATE="$preview_state" OMAPILOT_PREVIEW_PATH="$preview_output" \
     OMAPILOT_PREVIEW_WIDTH=2560 OMAPILOT_PREVIEW_HEIGHT=1405 \

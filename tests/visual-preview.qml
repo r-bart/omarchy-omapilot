@@ -39,7 +39,8 @@ ShellRoot {
     property string state: root.previewState === "waiting" ? "preparing"
       : (root.previewState === "streaming" || root.previewState === "console-streaming"
           || root.previewState === "console-permission" ? "streaming"
-        : (root.previewState === "console-answer" ? "complete"
+        : (root.previewState === "console-answer"
+            || root.previewState === "console-thread" ? "complete"
           : (root.previewState === "error" || root.previewState === "error-details"
             ? "error" : "composing")))
     property string provider: "builtin"
@@ -55,20 +56,45 @@ ShellRoot {
       || root.previewState === "console-streaming"
       || root.previewState === "console-answer"
       || root.previewState === "console-permission"
+      || root.previewState === "console-thread"
       ? "Find the current status and summarize what matters." : ""
     property string answerMarkdown: root.previewState === "console-answer"
+      || root.previewState === "console-thread"
       ? "The **disk pressure** comes from three journal directories:\n\n"
         + "- `/var/log/journal` — 3.9 GB\n- `~/.cache/yay` — 2.2 GB\n"
         + "- `~/.local/share/Trash` — 1.4 GB\n\n"
         + "Running `journalctl --vacuum-size=500M` reclaims the largest share "
         + "without touching anything you have not already read." : ""
     property var images: []
-    property string currentChatId: root.previewState === "console-answer" ? "chat-preview" : ""
+    property string currentChatId: root.previewState === "console-answer" ? "chat-preview"
+      : (root.previewState === "console-thread" ? "chat-live" : "")
+    // Newest first, the order the store keeps. `console-thread` points
+    // `currentChatId` at the newest of a shared `acpId`, which is what
+    // `Protocol.threadBefore` walks back from — without an `acpId` there is no
+    // thread and `console-answer` keeps rendering a single turn, unchanged.
+    //
+    // The harness changes partway down on purpose: per-turn provenance is only
+    // worth painting if a thread can disagree with itself, and a preview where
+    // every turn says the same thing would not show whether it works.
     property var history: [
-      { id: "chat-1", title: "Summarize the current window", provider: "builtin",
-        model: "gpt-5.4", timestamp: "Today 14:03" },
-      { id: "chat-2", title: "Draft a reply to this thread", provider: "codex",
-        model: "gpt-5.4", timestamp: "Today 11:40" }
+      { id: "chat-live", acpId: "thread-1", title: "Reclaim the disk",
+        provider: "builtin", model: "openai-codex::gpt-5.4",
+        question: "Find the current status and summarize what matters.",
+        answer: "", images: [], timestamp: "Today 14:06" },
+      { id: "chat-2", acpId: "thread-1", title: "Draft a reply to this thread",
+        provider: "codex", model: "gpt-5.4",
+        question: "And which of those is safe to delete without asking me again?",
+        answer: "Only `~/.local/share/Trash` — it is already a deletion you asked "
+          + "for once.\n\nThe journal is a system log and `yay`'s cache is what makes "
+          + "a rebuild fast, so both are worth a prompt.",
+        images: [], timestamp: "Today 14:04" },
+      { id: "chat-1", acpId: "thread-1", title: "Summarize the current window",
+        provider: "builtin", model: "openai-codex::gpt-5.4",
+        question: "What is taking up space on this machine?",
+        answer: "Three directories account for most of it:\n\n"
+          + "- `/var/log/journal` — 3.9 GB\n- `~/.cache/yay` — 2.2 GB\n"
+          + "- `~/.local/share/Trash` — 1.4 GB",
+        images: [], timestamp: "Today 14:03" }
     ]
     property string configuredSurface: "console"
     property int configuredSidebarWidth: 440
