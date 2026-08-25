@@ -100,6 +100,34 @@ BarWidget {
   function closeForPopoutSwitch() {
     inlineExpanded = false
     if (panelLoader.item) panelLoader.item.closeForPopoutSwitch()
+    releaseBarPopout()
+  }
+
+  // The bar coordinates one popout at a time and underlines whichever module
+  // holds the claim with a 2px accent rule. A KeyboardPanel hands the claim
+  // back from its own close, which is enough for every first-party module
+  // because none of them is ever destroyed while the shell runs.
+  //
+  // This one is. `panelLoader` unloads the whole panel tree the moment another
+  // surface takes the routes, and the loader wins that race: the line above
+  // finds `panelLoader.item` already null, so nothing closes and nothing
+  // releases. `bar.activePopout` kept pointing at this widget — which is very
+  // much alive — so the bar went on believing the panel was open and left the
+  // mark underlined until some other module happened to open a popout of its
+  // own. For anyone living in the console, never.
+  //
+  // Measured, and this is what decided where the release goes: a
+  // `Component.onDestruction` inside Panel.qml does not run on this path. The
+  // same teardown leaves delayed calls failing with "attempted to evaluate a
+  // function in an invalid context", so the dying tree cannot be asked to give
+  // anything back. This widget outlives it, so the release belongs here.
+  //
+  // Safe in the other caller too: `Bar.requestPopout` calls
+  // `closeForPopoutSwitch` on the outgoing owner *before* assigning the new
+  // one, so clearing the claim here is overwritten a line later.
+  function releaseBarPopout() {
+    if (bar && typeof bar.releasePopout === "function" && bar.activePopout === root)
+      bar.releasePopout(root)
   }
 
   function restoreFocus() {

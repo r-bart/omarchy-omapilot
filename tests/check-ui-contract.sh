@@ -373,6 +373,16 @@ grep -Fq 'if (consoleLoader.item && !consoleLoader.item.engaged) consoleTeardown
 # as the close, which is why the console vanished there and slid away elsewhere.
 grep -Fq 'id: consoleTeardown' "$repo_dir/Ambient.qml"
 grep -Fq 'active: root.surfaceRoutesHere' "$repo_dir/BarWidget.qml"
+# That loader unloads the panel tree while it may still be open, and a
+# KeyboardPanel only returns the bar's one-popout-at-a-time claim from its own
+# close. Without the release on the way out, the bar keeps the accent underline
+# lit under an icon whose panel no longer exists, for the rest of the session.
+# It has to happen in the widget: measured, a Component.onDestruction inside
+# the panel tree does not run on this teardown.
+grep -Fq 'bar.activePopout === root' "$repo_dir/BarWidget.qml"
+grep -Fq 'bar.releasePopout(root)' "$repo_dir/BarWidget.qml"
+grep -Fq 'releaseBarPopout()' "$repo_dir/BarWidget.qml"
+! grep -Fq 'Component.onDestruction' "$repo_dir/Panel.qml"
 # The filament is the state light generalized, never a parallel component.
 grep -Fq 'property bool vertical: false' "$repo_dir/components/StateLightBar.qml"
 grep -Fq 'vertical: true' "$repo_dir/components/ConsoleContent.qml"
