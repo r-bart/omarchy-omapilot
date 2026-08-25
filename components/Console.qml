@@ -106,6 +106,7 @@ Item {
     focusCheck.stop()
     remapTimer.stop()
     remapping = false
+    pendingShape = null
     if (backend && typeof backend.clearDesktopContextLatch === "function")
       backend.clearDesktopContextLatch()
     resetLanes.restart()
@@ -155,13 +156,38 @@ Item {
   // the way a window keeps it: not floating. Tiled, the layout puts the user's
   // windows beside the console instead of behind it, and opening or closing it
   // reflows them.
+  // What the compositor still owes us, or null.
+  //
+  // A shape is queued rather than sent when we do not hold the keyboard, because
+  // every dispatch acts on the active window — asking would mean taking it, and
+  // yanking the keyboard because a setting changed while the user was working
+  // somewhere else is worse than a console that squares itself up a moment
+  // later. It is sent the next time the console has focus, which is the next
+  // time the user is looking at it anyway.
+  property var pendingShape: null
+
   function applyPlacement() {
     if (!engaged) return
-    ConsolePlacement.placeConsole(root.windowTitle, Style.space(root.surfaceWidth),
-                                  !root.reservesSpace, root.fullscreen)
+    pendingShape = ConsolePlacement.columnShape(Style.space(root.surfaceWidth),
+                                                !root.reservesSpace, root.fullscreen)
+    flushShape()
   }
 
-  onEngagedChanged: if (engaged) applyPlacement()
+  function flushShape() {
+    if (!pendingShape || !engaged || !focused) return
+    var shape = pendingShape
+    pendingShape = null
+    ConsolePlacement.place(root.windowTitle, shape)
+  }
+
+  onEngagedChanged: {
+    if (!engaged) return
+    // A remap already carries the shape it has to put back; only a real map
+    // has to go and ask the settings for one.
+    if (!pendingShape) applyPlacement()
+    flushShape()
+  }
+  onFocusedChanged: if (focused) flushShape()
   onSurfaceWidthChanged: applyPlacement()
   onReservesSpaceChanged: applyPlacement()
   // Coming back from the whole screen is the fourth moment, and it is the same
@@ -174,10 +200,16 @@ Item {
   // still reads as one gesture rather than two.
   Timer {
     id: focusCheck
-    interval: 150
+    interval: ConsolePlacement.focusGraceDelay
     repeat: false
     onTriggered: {
       if (!root.opened || root.focused) return
+      // MEASURED: to the compositor a remap is a brand-new window. It comes
+      // back tiled at a default size, losing the column and any drag the user
+      // had done by hand. So the shape is carried across rather than
+      // recomputed — recomputing would quietly overwrite geometry that, until
+      // the next of the three moments, belongs to the user.
+      root.pendingShape = ConsolePlacement.snapshot(root.windowTitle)
       root.remapping = true
       remapTimer.restart()
     }
@@ -189,7 +221,7 @@ Item {
   // above the threshold of the compositor noticing.
   Timer {
     id: remapTimer
-    interval: 80
+    interval: ConsolePlacement.remapDelay
     repeat: false
     onTriggered: root.remapping = false
   }
@@ -198,8 +230,8 @@ Item {
   // going: the compositor animates the last frame it was handed, and a reset
   // drawn into that frame is a glitch on the way out. Keyed to the close and
   // not to the visibility, because a remap hides the window too and means the
-  // opposite — measured: closing mid-remap skipped the reset entirely and the
-  // console reopened in whatever lane it had been left in.
+  // opposite — measured: closing mid-remap used to skip the reset entirely and
+  // the console reopened in whatever lane it had been left in.
   Timer {
     id: resetLanes
     interval: 120

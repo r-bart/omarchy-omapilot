@@ -143,6 +143,13 @@ grep -Fq 'Hyprland.refreshToplevels()' "$repo_dir/components/ConsolePlacement.qm
 grep -Fq 'ConsolePlacement.activate(root.windowTitle)' "$repo_dir/components/Console.qml"
 grep -Fq 'if (!root.opened || root.focused) return' "$repo_dir/components/Console.qml"
 ! grep -Fq 'if (ConsolePlacement.activate(' "$repo_dir/components/Console.qml"
+# To the compositor a remap is a brand-new window: it comes back tiled at a
+# default size. Measured. The shape is carried across rather than recomputed,
+# because recomputing overwrites a drag that until the next of the three
+# moments belongs to the user.
+grep -Fq 'root.pendingShape = ConsolePlacement.snapshot(root.windowTitle)' \
+  "$repo_dir/components/Console.qml"
+grep -Fq 'function snapshot(' "$repo_dir/components/ConsolePlacement.qml"
 # A remap hides the window and means the opposite of a close, so the lane reset
 # hangs off the close itself. Measured: closing mid-remap skipped it entirely
 # and the console reopened in whatever lane it had been left in.
@@ -153,7 +160,7 @@ grep -Fq 'onTriggered: if (!root.opened) content.reset()' \
 # The dispatch acts on the active window, so it may only run once the active
 # window is known to be ours. Placing someone else's window is worse than
 # leaving ours where the compositor put it.
-grep -Fq 'function placeConsole(' "$repo_dir/components/ConsolePlacement.qml"
+grep -Fq 'function place(' "$repo_dir/components/ConsolePlacement.qml"
 grep -Fq 'Hyprland.activeToplevel' "$repo_dir/components/ConsolePlacement.qml"
 # Measured, at the cost of a whole round of tests: in this Hyprland a dispatch
 # in the classic syntax does not fail, it does nothing. Nothing checks a return
@@ -163,16 +170,35 @@ grep -Fq 'Hyprland.activeToplevel' "$repo_dir/components/ConsolePlacement.qml"
 grep -Fq 'Hyprland.usingLua' "$repo_dir/components/ConsolePlacement.qml"
 # float and pin are toggles. Sending them without reading the current state is
 # how a second placement undoes the first.
-grep -Fq 'if (state.floating !== floating)' "$repo_dir/components/ConsolePlacement.qml"
+grep -Fq 'if (state.floating !== shape.floating)' "$repo_dir/components/ConsolePlacement.qml"
 # Placed at three moments and no others, so a window the user dragged stays
 # where they put it until the next of the three.
-grep -Fq 'onEngagedChanged: if (engaged) applyPlacement()' "$repo_dir/components/Console.qml"
+grep -Fq 'if (!pendingShape) applyPlacement()' "$repo_dir/components/Console.qml"
 grep -Fq 'onSurfaceWidthChanged: applyPlacement()' "$repo_dir/components/Console.qml"
 grep -Fq 'onReservesSpaceChanged: applyPlacement()' "$repo_dir/components/Console.qml"
 # Holding the column open is now "do not float": tiled, the compositor puts the
 # user's windows beside the console instead of behind it. Same promise the
 # exclusive zone made, same cost, kept the way a window can keep it.
 grep -Fq '!root.reservesSpace, root.fullscreen)' "$repo_dir/components/Console.qml"
+# Placing means focusing first, because a dispatch acts on the active window.
+# So a placement that would have to take the keyboard waits until the console
+# has it: a setting changed from elsewhere must not yank the user out of what
+# they were doing.
+grep -Fq 'if (!pendingShape || !engaged || !focused) return' \
+  "$repo_dir/components/Console.qml"
+grep -Fq 'onFocusedChanged: if (focused) flushShape()' "$repo_dir/components/Console.qml"
+! grep -Fq 'root.activate(root.pendingTitle)' "$repo_dir/components/ConsolePlacement.qml"
+# A dispatch reports nothing, so the only way to know is to look afterwards.
+# One retry, then say so: a console silently the wrong shape is the hardest
+# kind of bug to be told about.
+grep -Fq 'function checkPlacement(' "$repo_dir/components/ConsolePlacement.qml"
+grep -Fq 'console.warn(' "$repo_dir/components/ConsolePlacement.qml"
+# The column is measured against the bar's reserved strip, so a stale monitor
+# is a stale strip.
+grep -Fq 'Hyprland.refreshMonitors()' "$repo_dir/components/ConsolePlacement.qml"
+# The three delays are related and named where the relation is written down.
+grep -Fq 'interval: ConsolePlacement.focusGraceDelay' "$repo_dir/components/Console.qml"
+grep -Fq 'interval: ConsolePlacement.remapDelay' "$repo_dir/components/Console.qml"
 grep -Fq '"consoleReservesSpace": false' "$repo_dir/manifest.json"
 
 # Maximized, never fullscreen. Real fullscreen covers the bar, and the bar holds
