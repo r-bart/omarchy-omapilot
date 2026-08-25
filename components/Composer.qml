@@ -235,12 +235,15 @@ Item {
         Math.min(promptInput.implicitHeight + Style.spacing.md, maxPromptHeight))
       visible: !root.backend || root.backend.pendingPermission === null
 
-      // A plain Flickable holding the editor, and not `TextArea.flickable`.
-      // The attached form reparents the editor and drives its geometry from
-      // the Flickable, which leaves `implicitHeight` no longer tracking the
-      // text — measured: the row stayed at its 34px floor through a
-      // 200-line draft, so the cap above would have had nothing to cap. Here
-      // the editor keeps its own implicit height and the Flickable follows it.
+      // Past the cap the editor scrolls inside the row. `TextArea.flickable`
+      // is the form QtQuick.Controls provides for exactly this, and it owns
+      // the two parts worth not hand-rolling: keeping the caret in view, and
+      // arbitrating a press-drag between selecting text and panning. The
+      // editor keeps its own implicit height under it, which is what the cap
+      // above reads.
+      //
+      // `interactive` is bound rather than left on, so a drag inside a draft
+      // that fits cannot be taken for a flick when there is nothing to scroll.
       Flickable {
         id: promptScroll
         anchors {
@@ -248,26 +251,11 @@ Item {
           rightMargin: Style.spacing.md
         }
         clip: true
-        contentWidth: width
-        contentHeight: promptInput.implicitHeight
         boundsBehavior: Flickable.StopAtBounds
         interactive: contentHeight > height
 
-        // Clipping without this would let the caret walk off the bottom and
-        // keep typing into a line nobody can see.
-        function ensureCursorVisible(r) {
-          if (contentY >= r.y) contentY = r.y
-          else if (contentY + height <= r.y + r.height)
-            contentY = r.y + r.height - height
-        }
-
-        TextArea {
+        TextArea.flickable: TextArea {
           id: promptInput
-          width: promptScroll.width
-          // At least the viewport, so a click in the empty space under a
-          // short draft still lands in the editor rather than on nothing.
-          height: Math.max(implicitHeight, promptScroll.height)
-          onCursorRectangleChanged: promptScroll.ensureCursorVisible(cursorRectangle)
           enabled: root.backend && !root.backend.continuationBlocked
             && root.backend.state !== "streaming" && root.backend.state !== "preparing"
           text: root.draftText
@@ -290,7 +278,6 @@ Item {
           wrapMode: TextEdit.Wrap
           background: null
           leftPadding: 0
-          rightPadding: 0
           topPadding: 0
           bottomPadding: 0
           Accessible.name: "OmaPilot request"
