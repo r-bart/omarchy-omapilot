@@ -336,6 +336,16 @@ grep -Fq 'text: "Browser context"' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'onDesktopContextRequested:' "$repo_dir/Panel.qml"
 grep -Fq 'text: "History"' "$repo_dir/components/HistoryView.qml"
 grep -Fq 'ActivityFilament {' "$repo_dir/components/HistoryView.qml"
+# Deleting one chat is irreversible and asks first, the same two steps
+# "Clear all" takes. Armed, it borrows the urgent role and draws a border,
+# because colour alone is not a signal for everyone, and the tooltip tells you
+# the way out rather than restating what the colour said.
+grep -Fq 'root.confirmingDeleteId = ""' "$repo_dir/components/HistoryView.qml"
+grep -Fq 'bordered: confirming' "$repo_dir/components/HistoryView.qml"
+grep -Fq 'confirming ? "Click again to delete" : "Delete chat"' \
+  "$repo_dir/components/HistoryView.qml"
+grep -Fq 'property bool confirmingDelete: false' \
+  "$repo_dir/components/internal/HistoryListKeyboardHandler.qml"
 grep -Fq 'text: root.browserCompanion.relayInstalled === true ? "Repair browser setup" : "Enable browser context"' \
   "$repo_dir/components/SettingsView.qml"
 grep -Fq 'onBrowserCompanionInstallRequested:' "$repo_dir/Panel.qml"
