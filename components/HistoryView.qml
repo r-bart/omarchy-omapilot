@@ -136,7 +136,11 @@ Item {
         visible: root.history.length === 0
         anchors.centerIn: parent
         width: parent.width - Style.spacing.xxl * 2
-        text: "No saved chats yet.\nThe latest 30 completed answers appear here."
+        // No number here on purpose: the cap lives in the broker, this view
+        // has no way to read it, and a literal copied across that boundary is
+        // wrong the first time either side changes. It said 30 while the
+        // broker kept 30, and would have gone on saying 30 afterwards.
+        text: "No saved chats yet.\nCompleted answers are kept here."
         color: Qt.darker(root.foreground, 1.55)
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption

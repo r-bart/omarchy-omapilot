@@ -5,13 +5,36 @@ import type { ChatRecord, ChatView, StoredImage } from "./types.js";
 import { pruneImageCache } from "./images.js";
 import { omapilotPaths, type OmaPilotPaths } from "./paths.js";
 
-const MAX_CHATS = 30;
+/**
+ * How many chats survive. This is not a listing limit: `#evictRecords` runs on
+ * every save and unlinks everything past it — the record, its images, and its
+ * Pi session if no other chat still refers to it. Nothing warns first and
+ * nothing can be recovered.
+ *
+ * It was 30, which is a few days for anyone who actually uses the thing, and
+ * losing a conversation you meant to come back to is a worse failure than
+ * keeping a file you did not need. 200 is months of the same use and still
+ * bounded, so the directory cannot grow without end.
+ *
+ * The cost is honest and worth naming: `listAll` reads and parses every record
+ * on every save, so this number is also the size of that scan. Records are
+ * small — a question, an answer, image references — and 200 of them is a few
+ * megabytes read on an operation that already fsyncs, which is why the ceiling
+ * is here and not much higher.
+ */
+export const MAX_CHATS = 200;
 
 export class HistoryStore {
   readonly #paths: OmaPilotPaths;
+  readonly #maxChats: number;
 
-  constructor(paths: OmaPilotPaths = omapilotPaths()) {
+  /**
+   * `maxChats` exists so eviction can be exercised without writing hundreds of
+   * files to watch five of them disappear. Production never passes it.
+   */
+  constructor(paths: OmaPilotPaths = omapilotPaths(), maxChats: number = MAX_CHATS) {
     this.#paths = paths;
+    this.#maxChats = Math.max(1, Math.floor(maxChats));
   }
 
   async list(): Promise<ChatRecord[]> {
@@ -26,7 +49,7 @@ export class HistoryStore {
         // Ignore an unreadable record without exposing its content.
       }
     }
-    return records.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, MAX_CHATS);
+    return records.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, this.#maxChats);
   }
 
   async get(id: string): Promise<ChatRecord | undefined> {
@@ -80,7 +103,7 @@ export class HistoryStore {
 
   async #evictRecords(): Promise<ChatRecord[]> {
     const records = await this.listAll();
-    const evicted = records.slice(MAX_CHATS);
+    const evicted = records.slice(this.#maxChats);
     const deleted = await Promise.all(evicted.map((chat) => this.delete(chat.id)));
     return deleted.filter((chat): chat is ChatRecord => chat !== undefined);
   }

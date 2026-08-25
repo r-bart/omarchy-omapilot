@@ -51,8 +51,10 @@ describe("broker lifecycle cleanup", () => {
     expect(cleaned.sort()).toEqual(["provider-session-1", "provider-session-2"]);
   });
 
-  it("cleans the provider session evicted by the 30-chat cap", async () => {
-    const fixture = await setup();
+  it("cleans the provider session evicted by the chat cap", async () => {
+    // A small cap: what is under test is that eviction reaches the session
+    // cleaner, not how many chats the store keeps by default.
+    const fixture = await setup(30);
     for (let index = 0; index < 30; index += 1) await fixture.history.save(record(index));
     const cleaned: string[] = [];
     const broker = new OmaPilotBroker(fixture.events.push.bind(fixture.events), {
@@ -485,7 +487,7 @@ describe("voice provider status", () => {
   });
 });
 
-async function setup(): Promise<{
+async function setup(maxChats?: number): Promise<{
   paths: ReturnType<typeof omapilotPaths>;
   history: HistoryStore;
   events: BrokerEvent[];
@@ -496,7 +498,7 @@ async function setup(): Promise<{
   const paths = omapilotPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
   return {
     paths,
-    history: new HistoryStore(paths),
+    history: new HistoryStore(paths, maxChats),
     events: [],
     env: {
       ...process.env,

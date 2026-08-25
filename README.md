@@ -1,6 +1,6 @@
 # OmaPilot for Omarchy
 
-OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget and contextual-capture overlay for asking questions and working on your desktop through an authenticated AI harness. It can summarize the active window, research current information, clip a window or exact region, work through bounded app connectors, remember the latest 30 completed chats, and hand a conversation to Herdr when you want to keep going.
+OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget and contextual-capture overlay for asking questions and working on your desktop through an authenticated AI harness. It can summarize the active window, research current information, clip a window or exact region, work through bounded app connectors, remember your recent completed chats, and hand a conversation to Herdr when you want to keep going.
 
 The repository carries the `0.2.0` marketplace candidate under the permanent
 plugin ID `io.github.spencerbull.omapilot`. Its plugin, IPC, package, runtime,
@@ -351,7 +351,7 @@ observational data and do not expand tool authority.
 
 ## Storage and privacy
 
-OmaPilot persists only completed chats, capped at the newest 30. A chat contains the question, rendered answer source, timestamp, provider/model metadata, content references, and a resumable session identity when the harness supplies one. Draft text, authentication output, tokens, environment variables, and provider credentials are not persisted.
+OmaPilot persists only completed chats, capped at the newest 200. A chat contains the question, rendered answer source, timestamp, provider/model metadata, content references, and a resumable session identity when the harness supplies one. Draft text, authentication output, tokens, environment variables, and provider credentials are not persisted.
 
 Quick-action labels, prompts, and order are stored with the existing inline
 Omarchy widget settings. OmaPilot validates that list on every read, drops
