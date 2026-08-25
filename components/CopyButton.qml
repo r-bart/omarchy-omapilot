@@ -13,6 +13,11 @@ import qs.Ui
 // So the glyph becomes a tick in the accent for a beat and then goes back. The
 // button keeps its box and its size across the swap, because a confirmation
 // that moves the row it lives in is a worse answer than none.
+//
+// The tick is optimistic: the copy goes to the broker over the same one-way
+// command channel as everything else and there is no acknowledgement to wait
+// for. There is nothing to be pessimistic with — the alternative is the
+// silence this replaces.
 PanelActionButton {
   id: root
 
@@ -35,11 +40,24 @@ PanelActionButton {
   tooltipText: copied ? doneTooltip : idleTooltip
   foreground: copied ? doneForeground : idleForeground
   focusable: true
+  // The kit's own button types announce a name and no role, so a screen
+  // reader gets the label without being told it can be pressed. Three places
+  // in the plugin already say the role by hand; a component whose whole job is
+  // to be a button should be the fourth.
+  Accessible.role: Accessible.Button
   Accessible.name: tooltipText
 
-  onClicked: {
-    root.copyRequested(root.sourceText)
-    resetTimer.restart()
+  // Connected rather than handled with `onClicked:` here. A signal handler
+  // written in the component body is the same slot a caller writes at the use
+  // site, so one `onClicked:` from outside would silently take the place of
+  // this one and the tick would stop appearing with nothing to show for it.
+  // A connection sits beside a caller's handler instead of replacing it.
+  Connections {
+    target: root
+    function onClicked() {
+      root.copyRequested(root.sourceText)
+      resetTimer.restart()
+    }
   }
 
   // Long enough to be read after the eye comes back to the button, short
