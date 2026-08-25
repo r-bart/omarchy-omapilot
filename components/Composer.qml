@@ -18,8 +18,8 @@ Item {
   property color accent: Color.accent
   property string fontFamily: Style.font.family
 
-  readonly property string nextSurface: root.backend
-    ? Protocol.nextSurface(root.backend.configuredSurface) : "panel"
+  readonly property string currentSurface: root.backend
+    ? Protocol.normalizedSurface(root.backend.configuredSurface) : "panel"
 
   signal providerChanged(string provider)
   signal modelChanged(string provider, string model)
@@ -283,18 +283,34 @@ Item {
         // the header it existed only inside the console — reachable to leave a
         // surface, never to enter one, which left the bar panel with no way in
         // short of a dropdown five tabs deep in settings.
-        PanelActionButton {
-          iconText: Presentation.surfaceIcon(root.nextSurface)
-          tooltipText: Presentation.surfaceTooltip(root.nextSurface)
-          foreground: root.foreground
-          focusable: true
-          // Moving surfaces mid-turn would tear the answer out from under the
-          // user; the settings dropdown holds the same line.
-          enabled: root.backend && !root.backend.busy
-          Accessible.name: tooltipText
-          onClicked: {
-            if (root.backend && typeof root.backend.cycleSurface === "function")
-              root.backend.cycleSurface()
+        //
+        // All three, always, rather than one button that cycles. Cycling showed
+        // the icon of the *next* surface, so the one you wanted was one click
+        // away or two and never named: going back to the bar panel from the
+        // console meant passing through fullscreen to discover where it was.
+        // Two extra glyphs buy every destination in one click, and the current
+        // surface stays on show and marked — a row that changed width as you
+        // switched would be a row you had to re-find every time.
+        Repeater {
+          model: Protocol.surfaceOrder()
+
+          PanelActionButton {
+            readonly property string surfaceName: String(modelData)
+            readonly property bool current: root.currentSurface === surfaceName
+
+            iconText: Presentation.surfaceIcon(surfaceName)
+            tooltipText: Presentation.surfaceTooltip(surfaceName)
+            foreground: root.foreground
+            focusable: true
+            bordered: current
+            // Moving surfaces mid-turn would tear the answer out from under the
+            // user; the settings dropdown holds the same line.
+            enabled: root.backend && !root.backend.busy
+            Accessible.name: current ? tooltipText + " (current)" : tooltipText
+            onClicked: {
+              if (root.backend && typeof root.backend.selectSurface === "function")
+                root.backend.selectSurface(surfaceName)
+            }
           }
         }
 

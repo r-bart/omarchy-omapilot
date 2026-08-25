@@ -239,7 +239,17 @@ grep -Fq 'previewOpen, busy) {' "$repo_dir/components/Presentation.js"
 # The surface switch lives with the composer, the one piece all three surfaces
 # share, so it is reachable to enter a surface and not only to leave one.
 grep -Fq 'onClicked: {' "$repo_dir/components/Composer.qml"
-grep -Fq 'Presentation.surfaceIcon(root.nextSurface)' "$repo_dir/components/Composer.qml"
+# All three surfaces are offered at once. A single cycling button showed the
+# icon of the *next* surface, so the one the user wanted was one click away or
+# two and never named — reaching the bar panel from the console meant passing
+# through fullscreen to find out where it was.
+grep -Fq 'model: Protocol.surfaceOrder()' "$repo_dir/components/Composer.qml"
+grep -Fq 'Presentation.surfaceIcon(surfaceName)' "$repo_dir/components/Composer.qml"
+grep -Fq 'root.backend.selectSurface(surfaceName)' "$repo_dir/components/Composer.qml"
+# The current one stays on show and marked: a row that changed width as you
+# switched would be a row you had to re-find every time.
+grep -Fq 'bordered: current' "$repo_dir/components/Composer.qml"
+! grep -Fq 'cycleSurface()' "$repo_dir/components/Composer.qml"
 ! grep -q 'surfaceCycle' "$repo_dir/components/OmaPilotHeader.qml"
 # The content column stops growing past a readable measure and centres instead.
 # min() keeps every docked width inert, so the docked render is unchanged.
