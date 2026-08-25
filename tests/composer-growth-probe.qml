@@ -23,7 +23,18 @@ import "components" as OmaPilot
 // height climbed to 4800px while the row it lives in stayed at its floor
 // forever, so the probe passed the cap without the cap doing anything. The
 // offscreen platform gives a real window and no Wayland surface, which is the
-// same trade the console window probe makes.
+// same trade the console window probe makes. **This probe must run offscreen**:
+// under the Wayland platform the window below is a real one on the user's
+// screen.
+//
+// One thing it cannot reach, said plainly rather than pretended: real
+// keystrokes. Delivering those needs QtTest, and QtTest cannot host this
+// component at all — the composer imports `Quickshell.Io`, whose plugin is
+// linked into the `quickshell` binary itself, so `qmltestrunner` reports the
+// type unavailable. What the probe asserts instead is the precondition every
+// key binding rests on: that the editor still holds focus after being
+// reparented into the Flickable. Given focus, delivery is Qt's contract and
+// not ours.
 ShellRoot {
   id: root
 
@@ -106,6 +117,40 @@ ShellRoot {
           root.fail("the composer did not shrink back after the draft was"
             + " cleared: started at " + root.emptyHeight + ", ended at "
             + composer.implicitHeight)
+        // The cap moved the editor inside a Flickable, which reparents it.
+        // Focus is the thing that reparenting costs, and every key binding on
+        // this surface — Enter, Shift+Enter, Escape, Ctrl+H — is delivered by
+        // Qt to whichever item holds it. So focus is the half of the keyboard
+        // contract this harness can reach, and it is asserted rather than
+        // assumed.
+        composer.forceInputFocus()
+      } else if (root.stage === 6) {
+        if (!composer.inputActive)
+          root.fail("the editor did not take focus after being reparented")
+        // And again with a draft past the cap, where the editor is taller
+        // than the box it now lives in.
+        composer.draftText = root.lines(200)
+        composer.forceInputFocus()
+      } else if (root.stage === 7) {
+        if (!composer.inputActive)
+          root.fail("the editor lost focus once its draft outgrew the row")
+        // setDraft is the path the voice transcript and the quick actions
+        // take: it fills the editor and puts the caret at the end.
+        composer.setDraft("what is on port 8080")
+      } else if (root.stage === 8) {
+        if (composer.draftText !== "what is on port 8080")
+          root.fail("setDraft did not reach the editor: " + composer.draftText)
+        if (!composer.inputActive)
+          root.fail("setDraft left the editor without focus")
+        composer.submit()
+      } else if (root.stage === 9) {
+        if (backendStub.submitCount !== 1)
+          root.fail("submit did not reach the backend")
+        if (backendStub.lastSubmitted !== "what is on port 8080")
+          root.fail("submit sent the wrong text: " + backendStub.lastSubmitted)
+        // Consumed, not left behind for the next question to inherit.
+        if (composer.draftText !== "")
+          root.fail("the draft survived its own submission")
       } else {
         if (!root.failed) console.log("OMAPILOT_COMPOSER_GROWTH_PROBE_OK")
         Qt.quit()

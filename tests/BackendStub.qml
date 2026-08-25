@@ -72,12 +72,14 @@ QtObject {
   property int latchCount: 0
   property int unlatchCount: 0
   property int cancelCount: 0
+  property int submitCount: 0
+  property string lastSubmitted: ""
   property int newChatCount: 0
   property string rejectedDecision: ""
 
   signal focusComposerRequested()
 
-  function submit(text) { return true }
+  function submit(text) { submitCount++; lastSubmitted = String(text || ""); return true }
   function cancel() { cancelCount++ }
   function startDictation() {}
   function stopDictation() {}
