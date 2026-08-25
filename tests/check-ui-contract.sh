@@ -851,7 +851,15 @@ grep -Fq 'visible: root.viewMode === "error"' "$repo_dir/Panel.qml"
 grep -Fq 'errorDetails = Protocol.normalizedError(event, statusMessage)' \
   "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'readonly property bool opened:' "$repo_dir/BarWidget.qml"
+# Switching surface is a move, not a dismissal: the outgoing surface hands the
+# open state to the incoming one. Without it the console closed and nothing
+# appeared, and the bar icon had to be pressed a second time to see what had
+# just been asked for — in both directions.
 grep -Fq 'function closeForPopoutSwitch()' "$repo_dir/BarWidget.qml"
+grep -Fq 'if (wasOpen) Qt.callLater(function() { OmaPilot.OmaPilotStore.ipcOpenRequested() })' \
+  "$repo_dir/BarWidget.qml"
+grep -Fq 'if (wasOpen) Qt.callLater(function() { OmaPilot.OmaPilotStore.ipcOpenRequested() })' \
+  "$repo_dir/Ambient.qml"
 test "$(grep -Fc 'IpcHandler {' "$repo_dir/components/OmaPilotStore.qml")" -eq 1
 if grep -Fq 'IpcHandler {' "$repo_dir/BarWidget.qml" \
     || grep -Fq 'IpcHandler {' "$repo_dir/Ambient.qml"; then
