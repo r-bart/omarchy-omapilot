@@ -344,8 +344,17 @@ grep -Fq 'root.confirmingDeleteId = ""' "$repo_dir/components/HistoryView.qml"
 grep -Fq 'bordered: confirming' "$repo_dir/components/HistoryView.qml"
 grep -Fq 'confirming ? "Click again to delete" : "Delete chat"' \
   "$repo_dir/components/HistoryView.qml"
-grep -Fq 'property bool confirmingDelete: false' \
+# The keyboard confirms the chat that was armed, by id, never the row under
+# the cursor: the list can change between the two presses.
+grep -Fq 'property string confirmingDeleteId: ""' \
   "$repo_dir/components/internal/HistoryListKeyboardHandler.qml"
+grep -Fq 'root.deleteRequested(root.confirmingDeleteId)' \
+  "$repo_dir/components/internal/HistoryListKeyboardHandler.qml"
+grep -Fq 'confirmingDeleteId: root.confirmingDeleteId' "$repo_dir/components/HistoryView.qml"
+# An open question is withdrawn when the list it was asked about changes, and
+# when the viewport moves and may carry the armed row out of sight.
+grep -Fq 'onHistoryChanged: {' "$repo_dir/components/HistoryView.qml"
+grep -Fq 'onContentYChanged: root.confirmingDeleteId = ""' "$repo_dir/components/HistoryView.qml"
 # This view is hidden, never destroyed, so an armed confirmation would sit here
 # across a trip to the chat and back and answer itself on the next single click.
 grep -Fq 'onVisibleChanged: if (!visible) {' "$repo_dir/components/HistoryView.qml"

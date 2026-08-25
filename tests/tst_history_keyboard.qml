@@ -8,7 +8,7 @@ Item {
   height: 420
 
   property bool confirmingClear: false
-  property bool confirmingDelete: false
+  property string confirmingDeleteId: ""
   property var historyItems: [
     { id: "chat-1", title: "First" },
     { id: "chat-2", title: "Second" },
@@ -35,7 +35,7 @@ Item {
       list: historyList
       history: root.historyItems
       confirmingClear: root.confirmingClear
-      confirmingDelete: root.confirmingDelete
+      confirmingDeleteId: root.confirmingDeleteId
       onChatSelected: function(chat) {
         root.selectedCount += 1
         root.selectedChatId = String(chat.id || "")
@@ -57,8 +57,13 @@ Item {
     when: windowShown
 
     function init() {
+      root.historyItems = [
+        { id: "chat-1", title: "First" },
+        { id: "chat-2", title: "Second" },
+        { id: "chat-3", title: "Third" }
+      ]
       root.confirmingClear = false
-      root.confirmingDelete = false
+      root.confirmingDeleteId = ""
       root.selectedCount = 0
       root.selectedChatId = ""
       root.deletedCount = 0
@@ -158,15 +163,35 @@ Item {
     // Deleting one chat is irreversible — the record, its images and its Pi
     // session all go — so Delete arms first and deletes second, the same two
     // steps "Clear all" has always taken. The view owns the arming; what the
-    // handler owes is that a second Delete gets through, and that no other key
-    // does anything except withdraw the question.
-    //
-    // Said plainly: only the second of these two discriminates. Deleting the
-    // armed row passes with the armed branch removed as well, because Delete
-    // then falls through to the idle path and emits the same signal. It is a
-    // regression guard, not evidence.
+    // handler owes is that a second Delete gets through, that it confirms the
+    // chat that was armed, and that no other key does anything except
+    // withdraw the question.
     function test_armedDeleteConfirmsOnSecondDelete() {
-      root.confirmingDelete = true
+      root.confirmingDeleteId = "chat-1"
+      keyClick(Qt.Key_Delete)
+      compare(root.deletedCount, 1)
+      compare(root.deletedChatId, "chat-1")
+      compare(root.cancelledCount, 0)
+    }
+
+    // What is confirmed is what was armed, not whatever sits under the cursor
+    // by the time the second press lands. The list can change between the two
+    // presses — a completed answer is prepended while history is open — and
+    // the same index is then a different chat. Read back through the index,
+    // the second press named a chat nobody had armed.
+    //
+    // The view disarms on that change as well; this pins the handler's half,
+    // which is that the id it emits is the id it was given.
+    function test_armedDeleteConfirmsTheArmedChatNotTheCurrentRow() {
+      root.confirmingDeleteId = "chat-1"
+      root.historyItems = [
+        { id: "chat-0", title: "Prepended" },
+        { id: "chat-1", title: "First" },
+        { id: "chat-2", title: "Second" },
+        { id: "chat-3", title: "Third" }
+      ]
+      wait(0)
+      compare(historyList.currentIndex, 0)
       keyClick(Qt.Key_Delete)
       compare(root.deletedCount, 1)
       compare(root.deletedChatId, "chat-1")
@@ -179,7 +204,7 @@ Item {
         Qt.Key_Return, Qt.Key_Enter
       ]
       for (var i = 0; i < withdrawing.length; i++) {
-        root.confirmingDelete = true
+        root.confirmingDeleteId = "chat-2"
         historyList.currentIndex = 1
         var event = { key: withdrawing[i], modifiers: Qt.NoModifier, accepted: false }
         historyKeyboard.handleKey(event)
@@ -199,7 +224,7 @@ Item {
     // confirm — one finger on one key deleting a chat through a confirmation
     // built to stop that.
     function test_armedDeleteIgnoresAutoRepeat() {
-      root.confirmingDelete = true
+      root.confirmingDeleteId = "chat-1"
       var event = {
         key: Qt.Key_Delete, modifiers: Qt.NoModifier,
         isAutoRepeat: true, accepted: false
@@ -215,7 +240,7 @@ Item {
     // A modified Delete is inert armed as well as idle, so a stray
     // Ctrl+Delete cannot answer a question the user has not read.
     function test_armedDeleteIgnoresModifiedKeys() {
-      root.confirmingDelete = true
+      root.confirmingDeleteId = "chat-1"
       var event = { key: Qt.Key_Delete, modifiers: Qt.ControlModifier, accepted: false }
       historyKeyboard.handleKey(event)
       verify(!event.accepted)

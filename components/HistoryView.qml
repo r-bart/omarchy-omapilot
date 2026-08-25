@@ -37,6 +37,17 @@ Item {
     root.confirmingDeleteId = ""
   }
 
+  // The list can change under an open question: a completed answer is
+  // prepended while history is open, and the store hands this view a new
+  // array. Whatever was armed was armed against the list that is gone — the
+  // row may have moved, the id may no longer be there — so the question is
+  // withdrawn, both kinds. A fresh press asks it again against what is on
+  // screen now.
+  onHistoryChanged: {
+    root.confirmingClear = false
+    root.confirmingDeleteId = ""
+  }
+
   // Deleting one chat unlinks its record, its images and its Pi session, with
   // no undo — the same irreversibility that made "Clear all" ask twice. It
   // asked, and this did not, which is the worse half of an inconsistency: the
@@ -176,6 +187,15 @@ Item {
         // — disarms it, so the confirmation can never outlive the sight of what
         // it would delete.
         onCurrentIndexChanged: root.confirmingDeleteId = ""
+        // Scrolling leaves the row too, without moving the cursor: a wheel or
+        // a drag can carry the armed row out of the viewport, its delegate
+        // with it, and leave an open question with no urgent button anywhere
+        // on screen to show for it. Any movement of the viewport withdraws
+        // the question. It cannot undo an arm that was just made: with no
+        // highlight item this view never scrolls on its own to follow the
+        // cursor, so the viewport moves only when a wheel, a drag or a resize
+        // moves it — never as a side effect of arming or of becoming current.
+        onContentYChanged: root.confirmingDeleteId = ""
 
         Keys.onPressed: function(event) { historyKeyboard.handleKey(event) }
 
@@ -184,10 +204,13 @@ Item {
           list: list
           history: root.history
           confirmingClear: root.confirmingClear
-          confirmingDelete: root.confirmingDeleteId !== ""
+          confirmingDeleteId: root.confirmingDeleteId
           onChatSelected: function(chat) { root.chatSelected(chat) }
           // Routed through the same two-step the button uses, so Delete arms on
           // the first press and deletes on the second whichever way it came.
+          // The second press carries the armed id back, so the two-step
+          // confirms the chat that was armed and never the row under the
+          // cursor.
           onDeleteRequested: function(chatId) { root.requestDelete(chatId) }
           onCloseRequested: root.closeRequested()
           onConfirmationCancelled: {
