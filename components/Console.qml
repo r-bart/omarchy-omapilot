@@ -67,13 +67,14 @@ Item {
   function open(withFocus) {
     if (!opened && backend && typeof backend.latchDesktopContext === "function")
       backend.latchDesktopContext()
-    var wasOpen = opened
     opened = true
-    // Mapping is what takes the compositor's keyboard — measured, and true of
-    // any toplevel. Opening onto an already-mapped window takes nothing, so
-    // that case has to ask.
     if (withFocus === false) return
-    if (wasOpen && !focused) takeFocus()
+    // Mapping usually takes the compositor's keyboard, and "usually" is not a
+    // guarantee we can build on — MEASURED: three opens in a row where the
+    // window mapped and the keyboard stayed where it was, which also left the
+    // console sitting unplaced in whatever slot the tiling gave it. The ladder
+    // asks, looks, and falls back, so it costs nothing when focus does arrive.
+    takeFocus()
     Qt.callLater(function() { content.forceComposerFocus() })
   }
 
@@ -209,7 +210,13 @@ Item {
       // had done by hand. So the shape is carried across rather than
       // recomputed — recomputing would quietly overwrite geometry that, until
       // the next of the three moments, belongs to the user.
-      root.pendingShape = ConsolePlacement.snapshot(root.windowTitle)
+      //
+      // Unless something is already owed. A shape still pending has not been
+      // applied yet, so the window is not wearing it: photographing it here
+      // would capture the slot the tiling happened to give us and put *that*
+      // back, which is how an unplaced console stays unplaced forever.
+      if (!root.pendingShape)
+        root.pendingShape = ConsolePlacement.snapshot(root.windowTitle)
       root.remapping = true
       remapTimer.restart()
     }

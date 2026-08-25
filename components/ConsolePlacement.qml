@@ -33,7 +33,7 @@ QtObject {
   //                          focus that never arrived
   //   remap   < focusGrace   the blink finishes inside one gesture
   //   verify  > confirm      the dispatches have to have been sent first
-  readonly property int confirmDelay: 120
+  readonly property int confirmDelay: 40
   readonly property int focusGraceDelay: 150
   readonly property int remapDelay: 80
   readonly property int verifyDelay: 220
