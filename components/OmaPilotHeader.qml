@@ -61,6 +61,12 @@ Item {
         }
 
         Text {
+          // The first thing to go when the row is tight. Three surface buttons
+          // and a gear plus this sentence do not fit the docked column, and at
+          // 587px it was eliding to "Ready to help with this de…" — a decorative
+          // line, half-said, crowding out the controls. The same flag that
+          // stacks the meta below decides it.
+          visible: !root.stackedMeta
           Layout.fillWidth: true
           text: "Ready to help with this desktop"
           color: Qt.darker(root.foreground, 1.45)
