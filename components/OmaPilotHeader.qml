@@ -13,6 +13,19 @@ Item {
   // ellipsis — the part most worth reading. Stacked, each line gets the full
   // width. `false` keeps the panel's single meta row unchanged.
   property bool stackedMeta: false
+  // …and the caller's answer is a floor, not the whole of it. `stackedMeta`
+  // says "this surface is tight", which also hides the tagline; whether the
+  // pickers and the notice actually fit on one line is something only their
+  // own content knows, and the model id is as long as whichever harness is
+  // configured. Capping the answer column put fullscreen in the band where
+  // the row is too narrow to hold both and too wide to have been declared
+  // tight, and the notice came back elided — so the row measures itself.
+  //
+  // Measured against `root.width`, which the parent layout hands down from a
+  // fixed content width, and never against the grid's own width: reading a
+  // width that the column count changes is how a layout starts oscillating.
+  readonly property bool metaStacked: root.stackedMeta
+    || root.width < metaPickers.implicitWidth + metaNotice.implicitWidth + Style.spacing.md
   property bool dangerousAutoApprove: false
   // Which surface is showing, so the row below can mark it. The header only
   // exists in the console, which is why the panel keeps its own copy of this
@@ -171,11 +184,12 @@ Item {
     // width the pickers and the approval notice do not share a line.
     GridLayout {
       Layout.fillWidth: true
-      columns: root.stackedMeta ? 1 : 2
+      columns: root.metaStacked ? 1 : 2
       columnSpacing: Style.spacing.md
       rowSpacing: Style.spacing.xs
 
       RowLayout {
+        id: metaPickers
         Layout.fillWidth: true
         spacing: Style.spacing.xs
 
@@ -215,6 +229,7 @@ Item {
       }
 
       Text {
+        id: metaNotice
         Layout.fillWidth: true
         text: "\uebc1  " + Presentation.permissionNotice(root.dangerousAutoApprove)
         color: root.dangerousAutoApprove
