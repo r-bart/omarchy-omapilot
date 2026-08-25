@@ -217,7 +217,11 @@ grep -Fq 'window.fullscreen_state({ internal = 1, client = 1 })' \
 ! grep -Fq 'internal = 2' "$repo_dir/components/ConsolePlacement.qml"
 # Leaving maximized hands the window back to the compositor, not to us, so the
 # column has to be asked for again.
-grep -Fq 'onFullscreenChanged: applyPlacement()' "$repo_dir/components/Console.qml"
+# Changing surface is the request itself, so it may take the keyboard — over
+# IPC it arrives with the console unfocused, and deferring it means pressing a
+# hotkey and watching nothing happen. A width or tiling change is a consequence
+# of something done elsewhere and still waits.
+grep -Fq 'if (engaged && !focused) takeFocus()' "$repo_dir/components/Console.qml"
 # The stored value keeps its name: it is the word the user sees and the one the
 # surface cycle advances through. The implementation changes, not the vocabulary.
 grep -Fq 'fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"' \

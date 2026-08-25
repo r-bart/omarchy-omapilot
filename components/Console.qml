@@ -194,7 +194,17 @@ Item {
   // Coming back from the whole screen is the fourth moment, and it is the same
   // moment: the column has to be asked for again because leaving maximized
   // returns the window to wherever the compositor last had it, not to us.
-  onFullscreenChanged: applyPlacement()
+  //
+  // And unlike the others it may take the keyboard. A width or a tiling change
+  // is a consequence of something the user did elsewhere, so it waits until
+  // they are looking at the console; changing surface IS the request, and over
+  // IPC — a hotkey, another surface's switch — it arrives with the console
+  // unfocused. Deferring that means pressing the key and watching nothing
+  // happen until you click the window.
+  onFullscreenChanged: {
+    applyPlacement()
+    if (engaged && !focused) takeFocus()
+  }
 
   // Did the compositor grant the activation? Long enough for the focus event
   // to have arrived and come back through Qt, short enough that the fallback
