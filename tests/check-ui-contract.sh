@@ -859,14 +859,18 @@ grep -Fq 'function closeForPopoutSwitch()' "$repo_dir/BarWidget.qml"
 # The intent is captured when the surface is asked for, not read back when the
 # setting lands: the bar panel is a popout and has dismissed itself by then, so
 # "was the old one open" is always no and the console never appeared.
-grep -Fq 'surfaceHandoffPending = true' "$repo_dir/components/OmaPilotStore.qml"
+# Armed only when the surface actually moves: asking for the one you are on
+# would otherwise leave the intent pending and open a surface later that the
+# user had deliberately closed.
+grep -Fq 'if (next !== configuredSurface) surfaceHandoffPending = true' \
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'function takeSurfaceHandoff()' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'OmaPilot.OmaPilotStore.takeSurfaceHandoff()' "$repo_dir/Ambient.qml"
 grep -Fq 'OmaPilot.OmaPilotStore.takeSurfaceHandoff()' "$repo_dir/BarWidget.qml"
 # One-shot and set nowhere else, so a shell restart reading the same value off
 # disk does not pop a surface open at login.
-! grep -Fq 'surfaceHandoffPending = true' "$repo_dir/Ambient.qml"
-! grep -Fq 'surfaceHandoffPending = true' "$repo_dir/BarWidget.qml"
+! grep -Fq 'surfaceHandoffPending' "$repo_dir/Ambient.qml"
+! grep -Fq 'surfaceHandoffPending' "$repo_dir/BarWidget.qml"
 test "$(grep -Fc 'IpcHandler {' "$repo_dir/components/OmaPilotStore.qml")" -eq 1
 if grep -Fq 'IpcHandler {' "$repo_dir/BarWidget.qml" \
     || grep -Fq 'IpcHandler {' "$repo_dir/Ambient.qml"; then

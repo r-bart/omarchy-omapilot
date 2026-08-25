@@ -188,14 +188,17 @@ Scope {
   // second press.
   function selectSurface(value) {
     var next = Protocol.normalizedSurface(value)
-    surfaceHandoffPending = true
+    // Only when it actually moves. Asking for the surface you are already on
+    // would otherwise leave the intent armed for whatever switch came next,
+    // and open a surface the user had deliberately closed.
+    if (next !== configuredSurface) surfaceHandoffPending = true
     requestSettingsPersist({ surface: next })
     return next
   }
 
   function cycleSurface() {
     var next = Protocol.nextSurface(configuredSurface)
-    surfaceHandoffPending = true
+    if (next !== configuredSurface) surfaceHandoffPending = true
     requestSettingsPersist({ surface: next })
     return next
   }
