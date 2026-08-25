@@ -828,7 +828,11 @@ function harnessOptions() {
 
 function providerLabel(value) {
   var provider = normalizedProvider(value)
-  if (provider === "builtin") return "Built-in (OmaPilot)"
+  // Not "Built-in (OmaPilot)": everywhere this label is shown, the product
+  // name is already on the screen — the console header above it, the settings
+  // page it sits in. What the row is choosing between is built-in, Codex and
+  // OpenCode, and that is what it should read.
+  if (provider === "builtin") return "Built-in"
   if (provider === "codex") return "Codex"
   if (provider === "opencode") return "OpenCode"
   return String(value || "")

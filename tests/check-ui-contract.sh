@@ -276,9 +276,10 @@ grep -Fq 'options: Protocol.harnessOptions()' "$repo_dir/components/ConsoleConte
 grep -Fq 'Accessible.name: "AI model"' "$repo_dir/components/ConsoleContent.qml"
 ! grep -Fq 'providerLabel' "$repo_dir/components/OmaPilotHeader.qml"
 ! grep -Fq 'root.backend.model' "$repo_dir/components/OmaPilotHeader.qml"
-# The settings dropdown still names the harness in full: there it sits beside
-# Codex and OpenCode and the distinction is the whole point of the row.
-grep -Fq 'if (provider === "builtin") return "Built-in (OmaPilot)"' \
+# The harness label does not carry the product name. Every place it is shown
+# already says OmaPilot; what the row chooses between is built-in, Codex and
+# OpenCode.
+grep -Fq 'if (provider === "builtin") return "Built-in"' \
   "$repo_dir/components/Protocol.js"
 ! grep -q 'surfaceCycle' "$repo_dir/components/OmaPilotHeader.qml"
 # The content column stops growing past a readable measure and centres instead.

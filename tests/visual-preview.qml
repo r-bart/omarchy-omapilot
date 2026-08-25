@@ -95,7 +95,7 @@ ShellRoot {
       ]
     }) : null
     property var providers: [
-      { value: "builtin", label: "Built-in (OmaPilot)", policy: { tools: "device-approval" } }
+      { value: "builtin", label: "Built-in", policy: { tools: "device-approval" } }
     ]
     property var modelOptions: [{ value: "openai-codex::gpt-5.4", label: "GPT-5.4 (openai-codex)" }]
     property var providerPolicy: ({ tools: "device-approval", web: "approved-command", hostReads: true })

@@ -191,7 +191,7 @@ TestCase {
     var options = Protocol.harnessOptions()
     compare(options.length, 3)
     compare(options[0].value, "builtin")
-    compare(options[0].label, "Built-in (OmaPilot)")
+    compare(options[0].label, "Built-in")
     compare(options[1].value, "codex")
     compare(options[2].value, "opencode")
     // Claude is no longer a selectable harness.
