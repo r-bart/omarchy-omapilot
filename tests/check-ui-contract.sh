@@ -44,6 +44,7 @@ qml_files=(
   "$repo_dir/components/OmaPilotStore.qml"
   "$repo_dir/components/DesktopContext.qml"
   "$repo_dir/components/Protocol.js"
+  "$repo_dir/components/Placement.js"
   "$repo_dir/components/Presentation.js"
   "$repo_dir/components/QuickActions.js"
   "$repo_dir/tests/motion-preview.qml"
@@ -849,6 +850,11 @@ QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -import "$omarchy_shell"
 
 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
+  -input "$repo_dir/tests/tst_placement.qml" \
+  -import "$repo_dir" \
+  -import "$omarchy_shell"
+
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -input "$repo_dir/tests/tst_presentation.qml" \
   -import "$repo_dir" \
   -import "$omarchy_shell"
@@ -914,6 +920,7 @@ if grep -Eq "omapilot server save probe failed|Failed to load|Type .* unavailabl
   exit 1
 fi
 
+cp "$repo_dir/tests/BackendStub.qml" "$smoke_root/"
 cp "$repo_dir/tests/console-escape-probe.qml" "$smoke_root/shell.qml"
 if ! QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \
     --path "$smoke_root" --no-color >"$smoke_root/console-escape.log" 2>&1; then
@@ -924,6 +931,24 @@ if grep -Eq "omapilot console escape probe failed|Failed to load|Type .* unavail
     "$smoke_root/console-escape.log" \
     || ! grep -Fq 'OMAPILOT_CONSOLE_ESCAPE_PROBE_OK' "$smoke_root/console-escape.log"; then
   cat "$smoke_root/console-escape.log"
+  exit 1
+fi
+
+# The console window with no compositor to talk to: D11, the decision that had
+# been read and never executed. Unsetting the signature is what makes
+# ConsolePlacement report itself unavailable, which is the whole point — on a
+# machine with Hyprland running, this would quietly test the happy path instead.
+cp "$repo_dir/tests/console-window-probe.qml" "$smoke_root/shell.qml"
+if ! env -u HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORM=offscreen timeout 15s \
+    quickshell --no-duplicate --path "$smoke_root" --no-color \
+    >"$smoke_root/console-window.log" 2>&1; then
+  cat "$smoke_root/console-window.log"
+  exit 1
+fi
+if grep -Eq "omapilot console window probe failed|Failed to load|Type .* unavailable|Cannot assign|TypeError|ReferenceError" \
+    "$smoke_root/console-window.log" \
+    || ! grep -Fq 'OMAPILOT_CONSOLE_WINDOW_PROBE_OK' "$smoke_root/console-window.log"; then
+  cat "$smoke_root/console-window.log"
   exit 1
 fi
 

@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell.Hyprland
 import Quickshell.Io
+import "Placement.js" as Placement
 
 // Everything that couples the console to Hyprland, and nothing else.
 //
@@ -86,35 +87,13 @@ QtObject {
     return true
   }
 
-  // MEASURED: `Array.isArray` is FALSE for the arrays inside `lastIpcObject`.
-  // They index and stringify like arrays, so the mistake survives every casual
-  // check — it cost a snapshot that silently returned null and a verifier that
-  // reported a perfect placement as a failure. Length is the honest test.
-  function numbers(value, count) {
-    if (!value || typeof value.length !== "number" || value.length < count) return null
-    var out = []
-    for (var i = 0; i < count; i++) {
-      var n = Number(value[i])
-      if (!isFinite(n)) return null
-      out.push(Math.round(n))
-    }
-    return out
-  }
-
   // ------------------------------------------------------------------- shapes
   //
-  // A shape is what the console wants to look like: floating in its column,
-  // tiled among the user's windows, or maximized over the usable screen. `box`
-  // is an explicit geometry when there is one to preserve, and null when the
-  // column should be recomputed from the current monitor.
+  // The arithmetic lives in Placement.js, where it can be tested without a
+  // compositor. What is left here is the part that needs one.
 
   function columnShape(width, floating, maximized) {
-    return {
-      width: Math.round(width),
-      floating: floating !== false,
-      maximized: maximized === true,
-      box: null
-    }
+    return Placement.columnShape(width, floating, maximized)
   }
 
   // The shape a window currently has, as the compositor sees it.
@@ -125,17 +104,7 @@ QtObject {
   // refocus from quietly overwriting geometry that belongs to the user.
   function snapshot(title) {
     var entry = root.ownToplevel(title)
-    if (!entry) return null
-    var state = entry.lastIpcObject || {}
-    var at = root.numbers(state.at, 2)
-    var size = root.numbers(state.size, 2)
-    if (!at || !size) return null
-    return {
-      width: size[0],
-      floating: state.floating === true,
-      maximized: Number(state.fullscreen || 0) === 1,
-      box: { x: at[0], y: at[1], width: size[0], height: size[1] }
-    }
+    return entry ? Placement.snapshotFrom(entry.lastIpcObject || {}) : null
   }
 
   // ------------------------------------------------------------------ placing
@@ -212,10 +181,10 @@ QtObject {
           // positional. `{ x = 587, y = 1405 }` resizes; `{587,1405}` is
           // accepted and does nothing, which is this compositor's whole failure
           // mode in one line.
-          root.dispatch("window.resize({ x = " + box.width + ", y = " + box.height + " })",
+          root.dispatch("window.resize(" + Placement.luaPoint(box.width, box.height) + ")",
                         "resizewindowpixel exact " + box.width + " " + box.height
                           + ",activewindow")
-          root.dispatch("window.move({ x = " + box.x + ", y = " + box.y + " })",
+          root.dispatch("window.move(" + Placement.luaPoint(box.x, box.y) + ")",
                         "movewindowpixel exact " + box.x + " " + box.y + ",activewindow")
         }
       }
@@ -259,7 +228,7 @@ QtObject {
     var entry = root.ownToplevel(title)
     if (!entry) return
     var state = entry.lastIpcObject || {}
-    if (root.matches(state, want)) return
+    if (Placement.matches(state, want)) return
 
     if (root.attempts < 1) {
       root.attempts += 1
@@ -280,23 +249,6 @@ QtObject {
       + " size=" + JSON.stringify(state.size) + " at=" + JSON.stringify(state.at) + ")")
   }
 
-  function matches(state, want) {
-    if (want.maximized) return Number(state.fullscreen || 0) === 1
-    if (Number(state.fullscreen || 0) !== 0) return false
-    if ((state.floating === true) !== want.floating) return false
-    if (!want.floating) return true
-    if (state.pinned !== true) return false
-    if (!want.box) return true
-    var at = root.numbers(state.at, 2)
-    var size = root.numbers(state.size, 2)
-    if (!at || !size) return false
-    // Two pixels of slack: the dispatches are exact, but borders and gaps are
-    // the compositor's to add and not worth a retry over.
-    return Math.abs(size[0] - want.box.width) <= 2
-      && Math.abs(size[1] - want.box.height) <= 2
-      && Math.abs(at[0] - want.box.x) <= 2
-      && Math.abs(at[1] - want.box.y) <= 2
-  }
 
   // ------------------------------------------------------------- the outer gap
   //
@@ -319,8 +271,8 @@ QtObject {
     command: ["hyprctl", "-j", "getoption", "general:gaps_out"]
     stdout: StdioCollector {
       onStreamFinished: {
-        var top = root.firstCssGap(text)
-        if (top >= 0) root.outerGap = top
+        var gap = Placement.cssGap(text)
+        if (gap >= 0) root.outerGap = gap
         borderReader.running = true
       }
     }
@@ -331,27 +283,11 @@ QtObject {
     command: ["hyprctl", "-j", "getoption", "general:border_size"]
     stdout: StdioCollector {
       onStreamFinished: {
-        try {
-          var value = Number(JSON.parse(text).int)
-          if (isFinite(value) && value >= 0) root.borderSize = value
-        } catch (error) {
-          // Keep the default. A console a couple of pixels out is not worth a
-          // failure path of its own.
-        }
+        // Keep the default on anything unreadable: a console a couple of pixels
+        // out is not worth a failure path of its own.
+        var value = Placement.intOption(text)
+        if (value >= 0) root.borderSize = value
       }
-    }
-  }
-
-  // `gaps_out` comes back as CSS shorthand — "10" or "10 20" or four values —
-  // and only the first one is ever different from the rest in practice. The
-  // column is inset equally, so the first is the one that matters.
-  function firstCssGap(payload) {
-    try {
-      var parts = String(JSON.parse(payload).css || "").trim().split(/\s+/)
-      var value = Number(parts[0])
-      return isFinite(value) && value >= 0 ? value : -1
-    } catch (error) {
-      return -1
     }
   }
 
@@ -360,24 +296,13 @@ QtObject {
   // same gap the compositor gives every tiled window.
   function columnBox(width) {
     var monitor = Hyprland.focusedMonitor
-    if (!monitor || width <= 0) return null
-    // Hyprland reports monitor size in device pixels and everything else in
-    // logical ones. Verified at scale 1; the division is what makes the other
-    // scales arithmetic rather than a special case.
-    var scale = monitor.scale > 0 ? monitor.scale : 1
-    var logicalWidth = Math.round(monitor.width / scale)
-    var logicalHeight = Math.round(monitor.height / scale)
-    var reserved = root.numbers((monitor.lastIpcObject || {}).reserved, 4) || [0, 0, 0, 0]
-    var top = reserved[1]
-    var bottom = reserved[3]
-    var inset = root.edgeInset
-    return {
-      width: width,
-      height: Math.max(1, logicalHeight - top - bottom - inset * 2),
-      x: monitor.x + logicalWidth - width - inset,
-      y: monitor.y + top + inset
-    }
+    if (!monitor) return null
+    return Placement.columnBox({
+      x: monitor.x, y: monitor.y, width: monitor.width, height: monitor.height,
+      scale: monitor.scale, reserved: (monitor.lastIpcObject || {}).reserved
+    }, width, root.edgeInset)
   }
+
 
   // MEASURED, and it cost a whole round of tests: this Hyprland reads its
   // config in Lua, and a dispatch in the classic syntax does not fail there —
