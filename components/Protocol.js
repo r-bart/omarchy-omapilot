@@ -834,19 +834,6 @@ function providerLabel(value) {
   return String(value || "")
 }
 
-// What the console header says under the title. It already carries the product
-// name two lines above, so naming the built-in harness there says it twice —
-// and the model id already spells out which provider is answering. Every other
-// harness is worth naming: it is the difference between OmaPilot answering and
-// Codex answering.
-function harnessMeta(value, model) {
-  var provider = normalizedProvider(value)
-  var name = provider === "builtin" ? "" : providerLabel(provider)
-  var text = String(model || "")
-  if (name === "") return text
-  return text === "" ? name : name + " · " + text
-}
-
 function providerShortLabel(value) {
   var provider = normalizedProvider(value)
   if (provider === "builtin") return "OmaPilot"

@@ -26,6 +26,7 @@ Item {
 
   signal settingsRequested()
   signal surfaceRequested(string name)
+  signal historyRequested()
 
   implicitHeight: headerContent.implicitHeight
 
@@ -76,30 +77,49 @@ Item {
         }
       }
 
-      // The three surfaces, beside the gear rather than down in the composer's
-      // action row. This is the console's own chrome and it has the room; the
-      // composer row had five glyphs and the switch was competing with the
-      // microphone for a glance.
-      Repeater {
-        model: Protocol.surfaceOrder()
+      // Everything that is a control, in one cluster hard against the right
+      // edge: the three surfaces first, then the two lanes. Spread across the
+      // header they read as decoration between the title and the gear.
+      Row {
+        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+        spacing: Style.spacing.xs
 
-        PanelActionButton {
-          readonly property string surfaceName: String(modelData)
-          readonly property bool current: root.currentSurface === surfaceName
+        Repeater {
+          model: Protocol.surfaceOrder()
 
-          iconText: Presentation.surfaceIcon(surfaceName)
-          tooltipText: Presentation.surfaceTooltip(surfaceName)
-          // The accent marks the current one. A border would, too, but the gear
-          // beside it is already bordered and two borders read as one control.
-          foreground: current ? root.accent : Qt.darker(root.foreground, 1.4)
-          size: Style.space(34)
-          focusable: true
-          // Moving surfaces mid-turn would tear the answer out from under the
-          // user; the settings dropdown holds the same line.
-          enabled: root.backend && !root.backend.busy
-          Accessible.name: current ? tooltipText + " (current)" : tooltipText
-          onClicked: root.surfaceRequested(surfaceName)
+          PanelActionButton {
+            readonly property string surfaceName: String(modelData)
+            readonly property bool current: root.currentSurface === surfaceName
+
+            iconText: Presentation.surfaceIcon(surfaceName)
+            tooltipText: Presentation.surfaceTooltip(surfaceName)
+            // The accent marks the current one. A border would, too, but the
+            // gear beside it is already bordered and two borders read as one
+            // control.
+            foreground: current ? root.accent : Qt.darker(root.foreground, 1.4)
+            size: Style.space(34)
+            focusable: true
+            // Moving surfaces mid-turn would tear the answer out from under the
+            // user; the settings dropdown holds the same line.
+            enabled: root.backend && !root.backend.busy
+            Accessible.name: current ? tooltipText + " (current)" : tooltipText
+            onClicked: root.surfaceRequested(surfaceName)
+          }
         }
+      }
+
+      // The two lanes you enter and leave. Settings has always had a button
+      // here; history had only a keyboard hint and a line of small print, which
+      // is a strange asymmetry for the lane that holds every past conversation.
+      PanelActionButton {
+        iconText: "󰋚"
+        tooltipText: "History"
+        foreground: root.foreground
+        size: Style.space(34)
+        bordered: true
+        focusable: true
+        Accessible.name: tooltipText
+        onClicked: root.historyRequested()
       }
 
       PanelActionButton {
@@ -114,37 +134,20 @@ Item {
       }
     }
 
-    // A grid with a conditional column count is one layout for both shapes:
-    // two columns is exactly the old row, one column stacks the same children.
-    GridLayout {
+    // Identity used to sit here as static text. It is a choice, not a label —
+    // which harness and which model answer the next question — so it lives in
+    // the console footer as two pickers, and this row keeps the one thing that
+    // is genuinely just a statement.
+    Text {
       Layout.fillWidth: true
-      columns: root.stackedMeta ? 1 : 2
-      columnSpacing: Style.spacing.md
-      rowSpacing: Style.spacing.xs
-
-      Text {
-        Layout.fillWidth: true
-        text: root.backend
-          ? Protocol.harnessMeta(root.backend.provider, root.backend.model) : ""
-        color: Qt.darker(root.foreground, 1.55)
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        elide: Text.ElideRight
-        Accessible.role: Accessible.StaticText
-        Accessible.name: text
-      }
-
-      Text {
-        Layout.fillWidth: root.stackedMeta
-        text: "\uebc1  " + Presentation.permissionNotice(root.dangerousAutoApprove)
-        color: root.dangerousAutoApprove
-          ? Color.urgent : Qt.darker(root.foreground, 1.45)
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        elide: Text.ElideRight
-        Accessible.role: Accessible.StaticText
-        Accessible.name: Presentation.permissionNotice(root.dangerousAutoApprove)
-      }
+      text: "\uebc1  " + Presentation.permissionNotice(root.dangerousAutoApprove)
+      color: root.dangerousAutoApprove
+        ? Color.urgent : Qt.darker(root.foreground, 1.45)
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      elide: Text.ElideRight
+      Accessible.role: Accessible.StaticText
+      Accessible.name: Presentation.permissionNotice(root.dangerousAutoApprove)
     }
   }
 }

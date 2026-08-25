@@ -225,6 +225,7 @@ Item {
       fontFamily: root.fontFamily
       currentSurface: root.backend ? root.backend.configuredSurface : "console"
       onSettingsRequested: root.viewMode === "settings" ? root.showChat() : root.openSettings()
+      onHistoryRequested: root.viewMode === "history" ? root.showChat() : root.openHistory()
       onSurfaceRequested: function(name) {
         if (root.backend && typeof root.backend.selectSurface === "function")
           root.backend.selectSurface(name)
@@ -718,42 +719,109 @@ Item {
       onActionRequested: function(actionId, prompt) { composer.setDraft(prompt) }
     }
 
-    // One quiet row teaches the lanes that have no buttons. Provider identity
-    // already lives in the header's meta row, so it is not repeated here.
-    RowLayout {
+    // The footer: who answers on the left, how to get around on the right.
+    //
+    // Harness and model were static text in the header, which described a
+    // choice as though it were a label. They are the two decisions that change
+    // what the next answer is, and burying them five tabs deep in settings made
+    // them feel permanent. Here they are one click from the prompt.
+    //
+    // Two columns when there is room, stacked when there is not: at the docked
+    // width the pickers and the hints do not fit on one line, and squeezing
+    // them elides the model name to nothing — the exact failure the header
+    // already had.
+    GridLayout {
       Layout.fillWidth: true
       visible: root.viewMode === "chat"
-      spacing: Style.spacing.md
+      columns: root.tightMeta ? 1 : 2
+      columnSpacing: Style.spacing.md
+      rowSpacing: Style.spacing.xs
 
-      Item { Layout.fillWidth: true }
+      RowLayout {
+        Layout.fillWidth: true
+        spacing: Style.spacing.xs
 
-      Repeater {
-        model: [
-          { label: "Super+Alt+P settings", lane: "settings" },
-          { label: "Ctrl+H history", lane: "history" }
-        ]
-
-        delegate: Text {
-          id: hintLabel
-          required property var modelData
-          required property int index
-          text: (index > 0 ? "·  " : "") + modelData.label
-          color: hint.hovered ? root.accent : Qt.darker(root.foreground, 1.5)
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-          Accessible.role: Accessible.Button
-          Accessible.name: "Open " + modelData.lane
-
-          HoverHandler {
-            id: hint
-            cursorShape: Qt.PointingHandCursor
+        Dropdown {
+          id: harnessPicker
+          Layout.fillWidth: true
+          Layout.maximumWidth: Style.space(190)
+          showLabel: false
+          rowHeight: Style.space(26)
+          options: Protocol.harnessOptions()
+          value: root.backend ? root.backend.provider : ""
+          // Mid-turn the harness cannot change without tearing the answer out
+          // from under the user, and the store already refuses a submit whose
+          // thread belongs to another harness — this only has to not offer it.
+          enabled: root.backend && !root.backend.busy
+          foreground: Qt.darker(root.foreground, 1.3)
+          background: root.background
+          fontFamily: root.fontFamily
+          Accessible.name: "Agent harness"
+          onChanged: function(value) {
+            if (String(value || "") !== "") root.requestPersist({ provider: String(value) })
           }
+        }
 
-          TapHandler {
-            onTapped: {
-              if (root.viewMode === hintLabel.modelData.lane) root.showChat()
-              else if (hintLabel.modelData.lane === "settings") root.openSettings()
-              else root.openHistory()
+        Dropdown {
+          id: modelPickerFooter
+          Layout.fillWidth: true
+          Layout.maximumWidth: Style.space(260)
+          showLabel: false
+          rowHeight: Style.space(26)
+          options: root.backend && root.backend.modelOptions.length > 0
+            ? root.backend.modelOptions : [{ value: "", label: "Harness default" }]
+          value: root.backend ? root.backend.model : ""
+          enabled: root.backend && !root.backend.busy
+          foreground: Qt.darker(root.foreground, 1.3)
+          background: root.background
+          fontFamily: root.fontFamily
+          Accessible.name: "AI model"
+          onChanged: function(value) {
+            if (!root.backend) return
+            root.backend.model = value
+            var values = {}
+            values[String(root.backend.provider) + "Model"] = value
+            root.requestPersist(values)
+          }
+        }
+      }
+
+      // One quiet row teaches the shortcuts. The lanes have buttons in the header
+      // now; this is what tells you the keys.
+      RowLayout {
+        Layout.fillWidth: true
+        spacing: Style.spacing.md
+
+        Item { Layout.fillWidth: true }
+
+        Repeater {
+          model: [
+            { label: "Super+Alt+P settings", lane: "settings" },
+            { label: "Ctrl+H history", lane: "history" }
+          ]
+
+          delegate: Text {
+            id: hintLabel
+            required property var modelData
+            required property int index
+            text: (index > 0 ? "·  " : "") + modelData.label
+            color: hint.hovered ? root.accent : Qt.darker(root.foreground, 1.5)
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            Accessible.role: Accessible.Button
+            Accessible.name: "Open " + modelData.lane
+
+            HoverHandler {
+              id: hint
+              cursorShape: Qt.PointingHandCursor
+            }
+
+            TapHandler {
+              onTapped: {
+                if (root.viewMode === hintLabel.modelData.lane) root.showChat()
+                else if (hintLabel.modelData.lane === "settings") root.openSettings()
+                else root.openHistory()
+              }
             }
           }
         }

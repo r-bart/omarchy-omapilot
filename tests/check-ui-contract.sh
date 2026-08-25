@@ -259,14 +259,23 @@ grep -Fq 'root.backend.selectSurface(name)' "$repo_dir/components/ConsoleContent
 # One control in two places, so it is marked the same way in both.
 grep -Fq 'current ? root.accent' "$repo_dir/components/Composer.qml"
 grep -Fq 'current ? root.accent' "$repo_dir/components/OmaPilotHeader.qml"
-# The header carries the product name two lines above, so it does not name the
-# built-in harness underneath it as well.
-grep -Fq 'Protocol.harnessMeta(root.backend.provider, root.backend.model)' \
+# Every control in the header sits in one cluster against the right edge;
+# spread across the row they read as decoration between the title and the gear.
+grep -Fq 'Layout.alignment: Qt.AlignRight | Qt.AlignVCenter' \
   "$repo_dir/components/OmaPilotHeader.qml"
-! grep -Fq 'Protocol.providerLabel(root.backend.provider)' \
-  "$repo_dir/components/OmaPilotHeader.qml"
-# The settings dropdown still names it in full: there it sits beside Codex and
-# OpenCode and the distinction is the whole point of the row.
+# History gets a button beside the gear. It is the other lane you enter and
+# leave, and it had only a keyboard hint and a line of small print.
+grep -Fq 'signal historyRequested()' "$repo_dir/components/OmaPilotHeader.qml"
+grep -Fq 'onHistoryRequested:' "$repo_dir/components/ConsoleContent.qml"
+# Harness and model are a choice, not a label, so they are pickers in the footer
+# rather than static text in the header. Naming them in both places would be the
+# same identity said twice, which is what the header line was already doing.
+grep -Fq 'options: Protocol.harnessOptions()' "$repo_dir/components/ConsoleContent.qml"
+grep -Fq 'Accessible.name: "AI model"' "$repo_dir/components/ConsoleContent.qml"
+! grep -Fq 'providerLabel' "$repo_dir/components/OmaPilotHeader.qml"
+! grep -Fq 'root.backend.model' "$repo_dir/components/OmaPilotHeader.qml"
+# The settings dropdown still names the harness in full: there it sits beside
+# Codex and OpenCode and the distinction is the whole point of the row.
 grep -Fq 'if (provider === "builtin") return "Built-in (OmaPilot)"' \
   "$repo_dir/components/Protocol.js"
 ! grep -q 'surfaceCycle' "$repo_dir/components/OmaPilotHeader.qml"
