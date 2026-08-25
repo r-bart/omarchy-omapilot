@@ -744,7 +744,9 @@ Item {
         Dropdown {
           id: harnessPicker
           Layout.fillWidth: true
-          Layout.maximumWidth: Style.space(190)
+          // Harness names are one word; model ids are not. The row splits in
+          // their favour so the model stops eliding to "(open…".
+          Layout.maximumWidth: Style.space(130)
           showLabel: false
           rowHeight: Style.space(26)
           options: Protocol.harnessOptions()
@@ -765,7 +767,6 @@ Item {
         Dropdown {
           id: modelPickerFooter
           Layout.fillWidth: true
-          Layout.maximumWidth: Style.space(260)
           showLabel: false
           rowHeight: Style.space(26)
           options: root.backend && root.backend.modelOptions.length > 0
