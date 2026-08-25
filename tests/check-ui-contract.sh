@@ -146,7 +146,7 @@ grep -Fq 'onVisibleChanged: if (!visible && !root.remapping) content.reset()' \
 # The dispatch acts on the active window, so it may only run once the active
 # window is known to be ours. Placing someone else's window is worse than
 # leaving ours where the compositor put it.
-grep -Fq 'function placeColumn(' "$repo_dir/components/ConsolePlacement.qml"
+grep -Fq 'function placeConsole(' "$repo_dir/components/ConsolePlacement.qml"
 grep -Fq 'Hyprland.activeToplevel' "$repo_dir/components/ConsolePlacement.qml"
 # Measured, at the cost of a whole round of tests: in this Hyprland a dispatch
 # in the classic syntax does not fail, it does nothing. Nothing checks a return
@@ -165,7 +165,7 @@ grep -Fq 'onReservesSpaceChanged: applyPlacement()' "$repo_dir/components/Consol
 # Holding the column open is now "do not float": tiled, the compositor puts the
 # user's windows beside the console instead of behind it. Same promise the
 # exclusive zone made, same cost, kept the way a window can keep it.
-grep -Fq '!root.reservesSpace)' "$repo_dir/components/Console.qml"
+grep -Fq '!root.reservesSpace, root.fullscreen)' "$repo_dir/components/Console.qml"
 grep -Fq '"consoleReservesSpace": false' "$repo_dir/manifest.json"
 
 # Maximized, never fullscreen. Real fullscreen covers the bar, and the bar holds
@@ -173,6 +173,13 @@ grep -Fq '"consoleReservesSpace": false' "$repo_dir/manifest.json"
 grep -Fq 'maximized: root.fullscreen' "$repo_dir/components/Console.qml"
 ! grep -qE '^[[:space:]]*fullscreen:[[:space:]]*(true|root\.fullscreen)' \
   "$repo_dir/components/Console.qml"
+# Measured live: Hyprland ignores a client's own xdg maximize request, so the
+# window property alone leaves the console exactly where it was. It stays as the
+# portable half, and the compositor is asked for the state that stops at the
+# usable area — 1, maximized, not 2, which would cover the bar.
+grep -Fq 'window.fullscreen_state({ internal = 1, client = 1 })' \
+  "$repo_dir/components/ConsolePlacement.qml"
+! grep -Fq 'internal = 2' "$repo_dir/components/ConsolePlacement.qml"
 # Leaving maximized hands the window back to the compositor, not to us, so the
 # column has to be asked for again.
 grep -Fq 'onFullscreenChanged: applyPlacement()' "$repo_dir/components/Console.qml"

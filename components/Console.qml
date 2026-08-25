@@ -144,9 +144,9 @@ Item {
   // windows beside the console instead of behind it, and opening or closing it
   // reflows them.
   function applyPlacement() {
-    if (!engaged || fullscreen) return
-    ConsolePlacement.placeColumn(root.windowTitle, Style.space(root.surfaceWidth),
-                                 !root.reservesSpace)
+    if (!engaged) return
+    ConsolePlacement.placeConsole(root.windowTitle, Style.space(root.surfaceWidth),
+                                  !root.reservesSpace, root.fullscreen)
   }
 
   onEngagedChanged: if (engaged) applyPlacement()
@@ -185,6 +185,11 @@ Item {
     // holds the icon that dismisses the console: a state that hides its own
     // exit. Maximized fills the usable screen and leaves the bar clickable,
     // which is what "whole screen" was always asking for.
+    //
+    // MEASURED: Hyprland ignores this — a client's own xdg maximize request
+    // does nothing here, and ConsolePlacement asks the compositor instead. It
+    // stays because it is the portable half of the same request, and it is the
+    // only half a compositor without a dispatcher to talk to would honour.
     maximized: root.fullscreen
     visible: root.opened && !root.remapping
     // No slide of our own any more. Omarchy pins layersIn/layersOut to a global
@@ -211,10 +216,17 @@ Item {
       // and lifted to `root.focused` above.
       readonly property bool windowActive: Window.active
 
+      // Opaque, where the layer-shell surface painted itself at 0.97. A layer
+      // surface is exempt from window opacity rules; a toplevel is not, and
+      // Omarchy tags every window for one. Our own alpha was there to stand in
+      // for a rule that did not reach us, and it now stacks with the rule that
+      // does — measured as barely a value per channel, but it is still a layer
+      // shell assumption carried into a window. The compositor owns the
+      // translucency, which means the user's own looknfeel setting governs it
+      // and the console reads like every other window on their desktop.
       Rectangle {
         anchors.fill: parent
-        color: Qt.rgba(Color.popups.background.r, Color.popups.background.g,
-                       Color.popups.background.b, 0.97)
+        color: Color.popups.background
       }
 
       OmaPilot.ConsoleContent {

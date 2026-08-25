@@ -80,6 +80,7 @@ QtObject {
   property string pendingTitle: ""
   property int pendingWidth: 0
   property bool pendingFloating: false
+  property bool pendingMaximized: false
 
   property Timer confirmTimer: Timer {
     interval: 120
@@ -87,14 +88,15 @@ QtObject {
     onTriggered: root.applyPending()
   }
 
-  // Ask for the console to become a column pinned to the right edge, under
-  // whatever the bar reserves. `floating` false is the other half of the same
-  // request: leave it tiled, so the user's windows sit beside it.
-  function placeColumn(title, width, floating) {
+  // Ask for the shape the console wants: a column pinned to the right edge and
+  // under whatever the bar reserves, or tiled so the user's windows sit beside
+  // it, or maximized over the usable screen.
+  function placeConsole(title, width, floating, maximized) {
     if (!root.available) return
     root.pendingTitle = String(title || "")
     root.pendingWidth = Math.round(width)
     root.pendingFloating = floating !== false
+    root.pendingMaximized = maximized === true
     root.activate(root.pendingTitle)
     root.refresh()
     confirmTimer.restart()
@@ -104,6 +106,7 @@ QtObject {
     var title = root.pendingTitle
     var width = root.pendingWidth
     var floating = root.pendingFloating
+    var maximized = root.pendingMaximized
     root.pendingTitle = ""
 
     if (title === "") return
@@ -114,6 +117,27 @@ QtObject {
     // always had under other names, so they are only safe to send against a
     // known current state. That state is why the refresh above matters.
     var state = active.lastIpcObject || {}
+
+    // MEASURED, live: Hyprland ignores a client's own xdg maximize request, so
+    // the window property alone leaves the console exactly where it was. The
+    // compositor's own state is 0 none / 1 maximized / 2 fullscreen, and 1 is
+    // the one that stops at the usable area and leaves the bar clickable.
+    var current = Number(state.fullscreen || 0)
+    if (maximized) {
+      // MEASURED: a pinned window will not maximize. Hyprland gates that on
+      // binds:allow_pin_fullscreen, off by default and not ours to turn on;
+      // without unpinning first the request half-lands — the client state
+      // changes, the window does not move, and nothing reports a failure.
+      if (state.pinned === true) root.dispatch("window.pin()", "pin active")
+      if (current !== 1)
+        root.dispatch("window.fullscreen_state({ internal = 1, client = 1 })",
+                      "fullscreenstate 1 1")
+      return
+    }
+    if (current !== 0)
+      root.dispatch("window.fullscreen_state({ internal = 0, client = 0 })",
+                    "fullscreenstate 0 0")
+
     if (state.floating !== floating) root.dispatch("window.float()", "togglefloating active")
     if (!floating) {
       // Tiled: the layout owns the geometry, and a pinned tiled window is a
@@ -125,9 +149,12 @@ QtObject {
 
     var box = root.columnBox(width)
     if (!box) return
-    root.dispatch("window.resize({" + box.width + "," + box.height + "})",
+    // MEASURED, and it cost the first live run: the table is keyed, not
+    // positional. `{ x = 587, y = 1405 }` resizes; `{587,1405}` is accepted and
+    // does nothing, which is this compositor's whole failure mode in one line.
+    root.dispatch("window.resize({ x = " + box.width + ", y = " + box.height + " })",
                   "resizewindowpixel exact " + box.width + " " + box.height + ",activewindow")
-    root.dispatch("window.move({" + box.x + "," + box.y + "})",
+    root.dispatch("window.move({ x = " + box.x + ", y = " + box.y + " })",
                   "movewindowpixel exact " + box.x + " " + box.y + ",activewindow")
   }
 
