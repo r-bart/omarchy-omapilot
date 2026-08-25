@@ -15,6 +15,9 @@ if [ "$1" = "--pure" ] && [ "$2" = "debug" ] && [ "$3" = "config" ]; then
   node -e '
     const content = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT || "{}");
     const permission = JSON.parse(process.env.OPENCODE_PERMISSION || "{}");
+    if (Object.values(content.mcp || {}).some((value) =>
+      typeof value !== "object" || value === null || Array.isArray(value) || value.enabled !== false
+    )) process.exit(1);
     const mcp = { "fixture-user-mcp": { type: "local", command: ["false"] }, ...(content.mcp || {}) };
     process.stdout.write(JSON.stringify({
       permission,
