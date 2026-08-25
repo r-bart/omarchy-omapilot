@@ -2,6 +2,7 @@ pragma Singleton
 
 import QtQuick
 import Quickshell.Hyprland
+import Quickshell.Io
 
 // Everything that couples the console to Hyprland, and nothing else.
 //
@@ -297,8 +298,66 @@ QtObject {
       && Math.abs(at[1] - want.box.y) <= 2
   }
 
+  // ------------------------------------------------------------- the outer gap
+  //
+  // A window's border is drawn OUTSIDE the box hyprctl reports, so a column
+  // placed flush against the bar's reserved strip has its top border underneath
+  // the bar — measured, and visible. Tiled windows do not have that problem
+  // because the compositor insets them by gaps_out plus the border, and matching
+  // that is also what makes the console line up with everything else on screen
+  // instead of sitting one gap proud of it.
+  //
+  // Neither number is on the Hyprland IPC object, so they are read once. If the
+  // read fails the defaults are Hyprland's own, and the console is a few pixels
+  // off rather than broken.
+  property int outerGap: 10
+  property int borderSize: 2
+  readonly property int edgeInset: outerGap + borderSize
+
+  property Process gapReader: Process {
+    running: false
+    command: ["hyprctl", "-j", "getoption", "general:gaps_out"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var top = root.firstCssGap(text)
+        if (top >= 0) root.outerGap = top
+        borderReader.running = true
+      }
+    }
+  }
+
+  property Process borderReader: Process {
+    running: false
+    command: ["hyprctl", "-j", "getoption", "general:border_size"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        try {
+          var value = Number(JSON.parse(text).int)
+          if (isFinite(value) && value >= 0) root.borderSize = value
+        } catch (error) {
+          // Keep the default. A console a couple of pixels out is not worth a
+          // failure path of its own.
+        }
+      }
+    }
+  }
+
+  // `gaps_out` comes back as CSS shorthand — "10" or "10 20" or four values —
+  // and only the first one is ever different from the rest in practice. The
+  // column is inset equally, so the first is the one that matters.
+  function firstCssGap(payload) {
+    try {
+      var parts = String(JSON.parse(payload).css || "").trim().split(/\s+/)
+      var value = Number(parts[0])
+      return isFinite(value) && value >= 0 ? value : -1
+    } catch (error) {
+      return -1
+    }
+  }
+
   // The right-hand column of the monitor that currently holds our window,
-  // inside whatever the bar and anything else have reserved.
+  // inside whatever the bar and anything else have reserved, and inset by the
+  // same gap the compositor gives every tiled window.
   function columnBox(width) {
     var monitor = Hyprland.focusedMonitor
     if (!monitor || width <= 0) return null
@@ -311,11 +370,12 @@ QtObject {
     var reserved = root.numbers((monitor.lastIpcObject || {}).reserved, 4) || [0, 0, 0, 0]
     var top = reserved[1]
     var bottom = reserved[3]
+    var inset = root.edgeInset
     return {
       width: width,
-      height: Math.max(1, logicalHeight - top - bottom),
-      x: monitor.x + logicalWidth - width,
-      y: monitor.y + top
+      height: Math.max(1, logicalHeight - top - bottom - inset * 2),
+      x: monitor.x + logicalWidth - width - inset,
+      y: monitor.y + top + inset
     }
   }
 
@@ -328,5 +388,8 @@ QtObject {
     Hyprland.dispatch(Hyprland.usingLua ? "hl.dsp." + lua : classic)
   }
 
-  Component.onCompleted: root.refresh()
+  Component.onCompleted: {
+    root.refresh()
+    if (root.available) gapReader.running = true
+  }
 }

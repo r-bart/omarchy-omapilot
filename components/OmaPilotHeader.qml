@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import QtQuick.Controls
 import qs.Ui
 import "Presentation.js" as Presentation
 import "Protocol.js" as Protocol
@@ -27,6 +28,8 @@ Item {
   signal settingsRequested()
   signal surfaceRequested(string name)
   signal historyRequested()
+  signal harnessChanged(string value)
+  signal modelPicked(string value)
 
   implicitHeight: headerContent.implicitHeight
 
@@ -139,20 +142,74 @@ Item {
       }
     }
 
-    // Identity used to sit here as static text. It is a choice, not a label —
-    // which harness and which model answer the next question — so it lives in
-    // the console footer as two pickers, and this row keeps the one thing that
-    // is genuinely just a statement.
-    Text {
+    // Identity sat here as static text, which described a choice as though it
+    // were a label: which harness and which model answer the next question are
+    // the two decisions that change the answer, and reaching them meant five
+    // tabs deep in settings.
+    //
+    // Under the title rather than down in the footer, and that is not taste.
+    // Omarchy's Dropdown only ever opens downwards and clips to its window, so
+    // a picker in the last 250px of the console shows a list with its bottom
+    // cut off — measured. Up here the whole console is below it.
+    //
+    // Two columns when there is room, stacked when there is not: at the docked
+    // width the pickers and the approval notice do not share a line.
+    GridLayout {
       Layout.fillWidth: true
-      text: "\uebc1  " + Presentation.permissionNotice(root.dangerousAutoApprove)
-      color: root.dangerousAutoApprove
-        ? Color.urgent : Qt.darker(root.foreground, 1.45)
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      elide: Text.ElideRight
-      Accessible.role: Accessible.StaticText
-      Accessible.name: Presentation.permissionNotice(root.dangerousAutoApprove)
+      columns: root.stackedMeta ? 1 : 2
+      columnSpacing: Style.spacing.md
+      rowSpacing: Style.spacing.xs
+
+      RowLayout {
+        Layout.fillWidth: true
+        spacing: Style.spacing.xs
+
+        Dropdown {
+          // Harness names are one word; model ids are not. The row splits in
+          // their favour so the model stops eliding to "(open…".
+          Layout.maximumWidth: Style.space(130)
+          showLabel: false
+          rowHeight: Style.space(26)
+          options: Protocol.harnessOptions()
+          value: root.backend ? root.backend.provider : ""
+          // Mid-turn the harness cannot change without tearing the answer out
+          // from under the user, and the store already refuses a submit whose
+          // thread belongs to another harness — this only has to not offer it.
+          enabled: root.backend && !root.backend.busy
+          foreground: Qt.darker(root.foreground, 1.3)
+          background: root.background
+          fontFamily: root.fontFamily
+          Accessible.name: "Agent harness"
+          onChanged: function(value) { root.harnessChanged(value) }
+        }
+
+        Dropdown {
+          Layout.fillWidth: true
+          showLabel: false
+          rowHeight: Style.space(26)
+          options: root.backend && root.backend.modelOptions.length > 0
+            ? root.backend.modelOptions : [{ value: "", label: "Harness default" }]
+          value: root.backend ? root.backend.model : ""
+          enabled: root.backend && !root.backend.busy
+          foreground: Qt.darker(root.foreground, 1.3)
+          background: root.background
+          fontFamily: root.fontFamily
+          Accessible.name: "AI model"
+          onChanged: function(value) { root.modelPicked(value) }
+        }
+      }
+
+      Text {
+        Layout.fillWidth: true
+        text: "\uebc1  " + Presentation.permissionNotice(root.dangerousAutoApprove)
+        color: root.dangerousAutoApprove
+          ? Color.urgent : Qt.darker(root.foreground, 1.45)
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        elide: Text.ElideRight
+        Accessible.role: Accessible.StaticText
+        Accessible.name: Presentation.permissionNotice(root.dangerousAutoApprove)
+      }
     }
   }
 }

@@ -272,8 +272,19 @@ grep -Fq 'onHistoryRequested:' "$repo_dir/components/ConsoleContent.qml"
 # Harness and model are a choice, not a label, so they are pickers in the footer
 # rather than static text in the header. Naming them in both places would be the
 # same identity said twice, which is what the header line was already doing.
-grep -Fq 'options: Protocol.harnessOptions()' "$repo_dir/components/ConsoleContent.qml"
-grep -Fq 'Accessible.name: "AI model"' "$repo_dir/components/ConsoleContent.qml"
+# Under the title, not in the footer, and that is not taste: Omarchy's Dropdown
+# only opens downwards and clips to its window, so a picker in the last 250px of
+# the console shows a list with its bottom cut off.
+grep -Fq 'options: Protocol.harnessOptions()' "$repo_dir/components/OmaPilotHeader.qml"
+grep -Fq 'Accessible.name: "AI model"' "$repo_dir/components/OmaPilotHeader.qml"
+grep -Fq 'onHarnessChanged:' "$repo_dir/components/ConsoleContent.qml"
+grep -Fq 'onModelPicked:' "$repo_dir/components/ConsoleContent.qml"
+# A window's border is drawn outside the box hyprctl reports, so a column flush
+# against the bar's reserved strip has its top border underneath the bar. The
+# same inset every tiled window gets is what stops that, and it lines the
+# console up with the rest of the screen.
+grep -Fq 'readonly property int edgeInset: outerGap + borderSize' \
+  "$repo_dir/components/ConsolePlacement.qml"
 ! grep -Fq 'providerLabel' "$repo_dir/components/OmaPilotHeader.qml"
 ! grep -Fq 'root.backend.model' "$repo_dir/components/OmaPilotHeader.qml"
 # The harness label does not carry the product name. Every place it is shown
