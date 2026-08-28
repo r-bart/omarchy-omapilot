@@ -176,6 +176,11 @@ Scope {
     || browserCompanionStatus.phase === "removing"
   readonly property bool hotkeyBusy: hotkeyInstaller.running
   readonly property bool textActionActive: selectionText !== "" && selectionTarget !== ""
+  // One rule for "the text-action controls can be pressed": the harness is not
+  // answering and no replacement is being typed. It was written inline in the
+  // chooser and beside both Regenerate buttons, which is three places to keep
+  // saying the same thing and the way they stop agreeing.
+  readonly property bool textActionReady: !busy && !selectionReplacing
   readonly property string textActionLanguage:
     TextActions.effectiveLanguage(configuredTextActionLanguage, Qt.locale().name)
   readonly property string textActionDefault: TextActions.defaultAction(configuredTextActionLast)
@@ -463,6 +468,8 @@ Scope {
       { language: textActionLanguage, instruction: ask })
     if (prompt === "") return false
     var wasChoosing = selectionChoosing
+    var previousAction = selectionAction
+    var previousInstruction = selectionInstruction
     selectionChoosing = false
     selectionAction = id
     selectionInstruction = ask
@@ -471,7 +478,11 @@ Scope {
     var sent = submit(prompt, TextActions.questionLabel(id, ask, textActionLanguage))
     selectionSubmitting = false
     if (!sent) {
+      // Everything this wrote has to come back, not only the flag: the action
+      // it names outlives the turn and the attachment path reads it.
       selectionChoosing = wasChoosing
+      selectionAction = previousAction
+      selectionInstruction = previousInstruction
       note("OmaPilot is not ready yet")
       return false
     }
@@ -485,8 +496,11 @@ Scope {
   // A fresh turn, with the same source text and the same target window. Going
   // through newChat() would drop both, since abandoning the action is exactly
   // what a new chat means everywhere else.
+  // Repeating needs something to repeat. Over the chooser this used to reset
+  // the chat, drop the chooser, and leave the selection latched with no chips,
+  // no answer and nothing that could act on it.
   function regenerateTextAction() {
-    if (!textActionActive || busy) return
+    if (!textActionActive || busy || selectionChoosing) return
     var target = selectionTarget
     var text = selectionText
     var action = selectionAction
@@ -526,6 +540,7 @@ Scope {
       replacing: selectionReplacing,
       busy: busy,
       action: selectionAction,
+      choosing: selectionChoosing,
       selection: selectionText,
       answer: answerMarkdown
     })
@@ -554,15 +569,20 @@ Scope {
   // `shownText` is what the user sees and what the chat record keeps, for the
   // callers whose prompt is not what the user asked. Everyone else passes one
   // string and nothing changes.
+  // What the user typed into the composer, which is the only field that turns
+  // into the fourth action. Every other caller of submit is asking its own
+  // question — the voice lane above all — and having that wrapped around
+  // whatever happened to be selected is not a text action, it is a hijack.
+  function submitFromComposer(text) {
+    if (!selectionChoosing) return submit(text)
+    var typed = String(text || "").trim()
+    // runTextAction clears the flag before it calls submit, so this cannot
+    // come back around.
+    return typed === "" ? runTextAction(textActionDefault, "")
+      : runTextAction("custom", typed)
+  }
+
   function submit(text, shownText) {
-    // While the user is choosing, the composer is the free prompt and a bare
-    // Enter is whichever preset they last used. runTextAction clears the flag
-    // before it calls back in, so this cannot recurse.
-    if (selectionChoosing) {
-      var typed = String(text || "").trim()
-      return typed === "" ? runTextAction(textActionDefault, "")
-        : runTextAction("custom", typed)
-    }
     var prompt = String(text || "").trim()
     if (!prompt || !canSubmit) return false
     // Asking something else is leaving the selection behind. Without this the
@@ -589,7 +609,7 @@ Scope {
     // captured context along would answer a different question from the one
     // the chip names.
     var attachmentSelections = []
-    if (selectionAction === "")
+    if (!textActionActive)
       for (var attachmentIndex = 0; attachmentIndex < contextAttachments.length; attachmentIndex++) {
         var attachment = contextAttachments[attachmentIndex]
         attachmentSelections.push({ id: attachment.id, representationIds: attachment.selectedRepresentationIds })
@@ -1420,6 +1440,8 @@ Scope {
       selectionPending = false
       if (event.available !== true) {
         selectionTarget = ""
+        selectionAction = ""
+        selectionInstruction = ""
         var unavailableReason = String(event.reason || "empty")
         notice = Protocol.selectionUnavailableMessage(unavailableReason)
         selectionUnavailable(unavailableReason)
@@ -1428,6 +1450,8 @@ Scope {
       selectionText = Protocol.safeSelectionText(event.text, 8000)
       if (selectionText === "") {
         selectionTarget = ""
+        selectionAction = ""
+        selectionInstruction = ""
         notice = Protocol.selectionUnavailableMessage("empty")
         selectionUnavailable("empty")
         return
@@ -1438,6 +1462,11 @@ Scope {
       return
     }
     if (type === "selection_replaced") {
+      // The action this answers may already be gone: pressing the hotkey again
+      // while a paste is in flight abandons it and latches another. Ending an
+      // action here unconditionally wiped that newer one and left a chooser
+      // with no target, whose chips and composer both silently did nothing.
+      if (!selectionReplacing) return
       selectionReplacing = false
       if (event.replaced === true) {
         endTextAction()

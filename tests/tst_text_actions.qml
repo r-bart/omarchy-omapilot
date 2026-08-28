@@ -287,6 +287,34 @@ TestCase {
       action: "custom", selection: selection, answer: expansion }), "busy")
   }
 
+  function test_nothingIsReplaceableUntilAnActionHasActuallyRun() {
+    // The bug this pins: with a selection latched and the chooser still up,
+    // whatever is on screen answers an older question. Offering it as a
+    // replacement for the text the user just highlighted is one click away and
+    // types the wrong thing into their document.
+    var live = { active: true, replacing: false, busy: false, action: "fix",
+      selection: "teh cat sat", answer: "The cat sat." }
+    compare(TextActions.replaceDecision(live), "send")
+
+    function withField(name, value) {
+      var copy = {}
+      for (var key in live) copy[key] = live[key]
+      copy[name] = value
+      return copy
+    }
+    compare(TextActions.replaceDecision(withField("choosing", true)), "choosing")
+    // It outranks every other reason to refuse, because the answer on screen
+    // has nothing to do with the selection whatever else is true of it.
+    var choosing = withField("choosing", true)
+    choosing.action = ""
+    choosing.answer = "4"
+    choosing.selection = "a paragraph the user just selected"
+    compare(TextActions.replaceDecision(choosing), "choosing")
+    // And it is only a refusal while it is true.
+    compare(TextActions.replaceDecision(withField("choosing", false)), "send")
+    compare(TextActions.replaceDecision(withField("choosing", undefined)), "send")
+  }
+
   function test_enterRunsTheLastPresetAndNeverAFreePrompt() {
     compare(TextActions.defaultAction("rewrite"), "rewrite")
     compare(TextActions.defaultAction("translate"), "translate")

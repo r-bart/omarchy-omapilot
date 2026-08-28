@@ -27,7 +27,7 @@ Item {
   readonly property bool choosing: backend && backend.selectionChoosing === true
   readonly property string defaultAction: backend ? String(backend.textActionDefault || "fix") : "fix"
   readonly property string language: backend ? String(backend.textActionLanguage || "English") : "English"
-  readonly property bool ready: backend && !backend.busy && !backend.selectionReplacing
+  readonly property bool ready: backend && backend.textActionReady === true
 
   visible: choosing
   implicitHeight: choosing ? column.implicitHeight : 0

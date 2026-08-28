@@ -262,6 +262,11 @@ function dismissesTextAction(surfaceHandoffPending) {
 function replaceDecision(context) {
   var source = context || {}
   if (source.active !== true) return "no_action"
+  // A selection is latched and no action has run on it yet, so whatever is on
+  // screen answers an older question. Typing that over the text the user just
+  // highlighted is the worst thing this feature can do, and it is one click
+  // away for as long as the chooser stands.
+  if (source.choosing === true) return "choosing"
   if (source.replacing === true || source.busy === true) return "busy"
   var replacement = replacementFromAnswer(source.answer)
   if (replacement === "") return "empty"

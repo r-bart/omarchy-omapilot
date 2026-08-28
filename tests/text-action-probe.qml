@@ -204,6 +204,128 @@ ShellRoot {
           root.fail("a start during a read wiped the live action")
         s.endTextAction()
         root.drain()
+      } else if (root.stage === 9) {
+        // An answer to something else is on screen when the hotkey fires. The
+        // chooser is up, so nothing has been asked about this selection yet,
+        // and Replace must not offer the old answer for the new text.
+        s.endTextAction()
+        s.question = "what is 2+2"
+        s.answerMarkdown = "4"
+        s.state = "complete"
+        root.latch("")
+        root.deliverSelection("a paragraph the user just selected")
+        if (!s.selectionChoosing) root.fail("the chooser did not open over a stale answer")
+        s.replaceSelectionWithAnswer()
+        if (root.commandsOfType(root.drain(), "selection_replace").length !== 0)
+          root.fail("Replace typed a stale answer over the new selection")
+        if (s.notice === "") root.fail("the refusal said nothing to the user")
+      } else if (root.stage === 10) {
+        // Regenerate is for an action that has run. Pressed over the chooser
+        // it used to blank the chat and strand the selection with no chips.
+        var choosingText = s.selectionText
+        s.regenerateTextAction()
+        if (!s.selectionChoosing || s.selectionText !== choosingText)
+          root.fail("Regenerate over the chooser destroyed it")
+        if (root.commandsOfType(root.drain(), "submit").length !== 0)
+          root.fail("Regenerate asked something with no action to repeat")
+      } else if (root.stage === 11) {
+        // A replacement answered after the user moved on belongs to an action
+        // that no longer exists, and must not end the one now on screen.
+        s.endTextAction()
+        root.latch("fix")
+        root.deliverSelection("first paragraph")
+        root.drain()
+        s.answerMarkdown = "First paragraph."
+        s.state = "complete"
+        s.replaceSelectionWithAnswer()
+        if (!s.selectionReplacing) root.fail("the replacement was not sent")
+        root.drain()
+        root.latch("")
+        root.deliverSelection("second paragraph")
+        if (!s.selectionChoosing) root.fail("the second action did not open the chooser")
+        s.applyEvent({ type: "selection_replaced", replaced: true })
+        if (!s.selectionChoosing || s.selectionText !== "second paragraph"
+            || s.selectionTarget === "")
+          root.fail("a late replacement wiped the action the user was looking at")
+        if (!s.textActionActive) root.fail("the second action lost its target")
+        s.endTextAction()
+        root.drain()
+      } else if (root.stage === 12) {
+        // A read that comes back empty must leave nothing behind. The action
+        // it names outlived it and silently disarmed the attachment path.
+        root.latch("fix")
+        s.applyEvent({ type: "selection", available: false, reason: "empty" })
+        if (s.selectionAction !== "")
+          root.fail("an empty read left the action set to " + s.selectionAction)
+        // The id has to be a real uuid or the protocol drops it for its own
+        // reasons and this would pass while proving nothing.
+        s.contextAttachments = [{
+          id: "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+          selectedRepresentationIds: ["text"]
+        }]
+        if (!s.submit("what is on my screen?")) root.fail("an ordinary question could not be asked")
+        var withContext = root.commandsOfType(root.drain(), "submit")
+        if (withContext.length !== 1) root.fail("expected one submit")
+        else if (!withContext[0].contextAttachments
+            || withContext[0].contextAttachments.length !== 1)
+          root.fail("the captured context was dropped from an ordinary question")
+        // The question above is still in flight and the store will refuse a
+        // second one, so the turn is reset before the other half.
+        s.resetChat()
+        root.drain()
+
+        // And the mirror: the chip names the selected text, so a text action
+        // must not carry the capture along and answer a different question.
+        s.contextAttachments = [{
+          id: "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+          selectedRepresentationIds: ["text"]
+        }]
+        root.latch("")
+        root.deliverSelection("a paragraph the user just selected")
+        if (!s.runTextAction("fix", "")) root.fail("fix did not run")
+        var textActionSubmit = root.commandsOfType(root.drain(), "submit")
+        if (textActionSubmit.length !== 1) root.fail("expected one submit for the text action")
+        else if (textActionSubmit[0].contextAttachments !== undefined)
+          root.fail("a text action carried the captured context along")
+        s.resetChat()
+        root.drain()
+      } else if (root.stage === 13) {
+        // The composer is what turns typed text into a free prompt. Every
+        // other caller of submit — the voice lane above all — is asking its
+        // own question and must not have it wrapped around the selection.
+        root.latch("")
+        root.deliverSelection("a paragraph the user just selected")
+        if (!s.submit("what time is it in Tokyo?"))
+          root.fail("a spoken question could not be asked")
+        var spoken = root.commandsOfType(root.drain(), "submit")
+        if (spoken.length !== 1) root.fail("expected one submit for the spoken question")
+        else if (String(spoken[0].question).indexOf("OMAPILOT TEXT ACTION") >= 0)
+          root.fail("a question from another lane was applied to the selection")
+        s.endTextAction()
+        root.drain()
+      } else if (root.stage === 14) {
+        // A send the harness refuses has to leave the chooser exactly as it
+        // was. It used to write the action it was about to run before knowing
+        // the send would happen, and that field is the one the attachment
+        // path reads long afterwards.
+        //
+        // The stage before left a question in flight, and a store that is busy
+        // refuses for its own reason; reset so the refusal under test is the
+        // one being asked for.
+        s.resetChat()
+        root.latch("")
+        root.deliverSelection("a paragraph the user just selected")
+        s.continuationBlocked = true
+        if (s.runTextAction("rewrite", "")) root.fail("a refused send reported success")
+        s.continuationBlocked = false
+        if (!s.selectionChoosing) root.fail("a refused send took the chooser away")
+        if (s.selectionAction !== "" || s.selectionInstruction !== "")
+          root.fail("a refused send left '" + s.selectionAction + "' written")
+        if (s.notice === "") root.fail("the refusal said nothing to the user")
+        // And the chooser still works afterwards.
+        if (!s.runTextAction("fix", "")) root.fail("the chooser was dead after a refusal")
+        s.endTextAction()
+        root.drain()
       } else {
         if (!root.failed) console.log("OMAPILOT_TEXT_ACTION_PROBE_OK")
         Qt.quit()

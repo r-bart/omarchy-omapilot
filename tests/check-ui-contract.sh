@@ -476,6 +476,31 @@ test "$(grep -Fc 'Run the same action on the same selection again' \
   "$repo_dir/Panel.qml" "$repo_dir/components/ConsoleContent.qml" | grep -c ':1$')" -eq 2
 # Where Translate sends text is the user's, and empty means their locale.
 grep -Fq 'Accessible.name: "Translate to"' "$repo_dir/components/SettingsView.qml"
+# Replace and Regenerate belong to an action that has run. While the chooser
+# stands, whatever is on screen answers an older question, and offering it for
+# the text just highlighted types the wrong thing into someone's document.
+grep -Fq 'if (source.choosing === true) return "choosing"' "$repo_dir/components/TextActions.js"
+grep -Fq 'choosing: selectionChoosing' "$repo_dir/components/OmaPilotStore.qml"
+test "$(grep -Fc '&& !OmaPilot.OmaPilotStore.selectionChoosing' "$repo_dir/Panel.qml")" -eq 3
+test "$(grep -Fc '&& !root.backend.selectionChoosing' "$repo_dir/components/ConsoleContent.qml")" -eq 3
+grep -Fq 'if (!textActionActive || busy || selectionChoosing) return' \
+  "$repo_dir/components/OmaPilotStore.qml"
+# One rule for whether the text-action controls can be pressed, in one place.
+grep -Fq 'readonly property bool textActionReady: !busy && !selectionReplacing' \
+  "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'backend.textActionReady === true' "$repo_dir/components/TextActionChooser.qml"
+test "$(grep -Fc 'OmaPilot.OmaPilotStore.textActionReady' "$repo_dir/Panel.qml")" -eq 2
+test "$(grep -Fc 'root.backend.textActionReady' "$repo_dir/components/ConsoleContent.qml")" -eq 2
+# A replacement answered after the user moved on belongs to an action that no
+# longer exists and must not end the one now on screen.
+grep -Fq 'if (!selectionReplacing) return' "$repo_dir/components/OmaPilotStore.qml"
+# Only the composer turns typed text into the fourth action. Every other caller
+# of submit — the voice lane above all — is asking its own question.
+grep -Fq 'function submitFromComposer(text)' "$repo_dir/components/OmaPilotStore.qml"
+if grep -Fq 'if (selectionChoosing) {' "$repo_dir/components/OmaPilotStore.qml"; then
+  printf 'submit must not decide for itself that it is a free prompt\n' >&2
+  exit 1
+fi
 grep -Fq 'textActionLanguage: String(text || "")' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'property string webHandoffProvider: "duckduckgo"' \
   "$repo_dir/components/OmaPilotStore.qml"
@@ -743,7 +768,11 @@ awk '
   inside && /root\.controller\.hide\(\)/ { if (!cleared) exit 1; found = 1; exit }
   END { if (!found) exit 1 }
 ' "$repo_dir/Panel.qml"
-grep -Fq 'backend.submit(draftText)' \
+# The composer sends the draft it holds, and it sends it through the one entry
+# point that knows a typed sentence can be a text action. It used to call
+# submit directly, which made every other caller of submit — the voice lane
+# above all — into a free prompt applied to whatever was selected.
+grep -Fq 'backend.submitFromComposer(draftText)' \
   "$repo_dir/components/Composer.qml"
 grep -Fq 'var autoApprove = configuredDangerousAutoApprove' \
   "$repo_dir/components/OmaPilotStore.qml"

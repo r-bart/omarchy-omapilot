@@ -852,8 +852,8 @@ Panel {
                 text: "Replace"
                 tooltipText: "Type this over the text you selected"
                 visible: OmaPilot.OmaPilotStore.textActionActive
-                enabled: !OmaPilot.OmaPilotStore.busy
-                  && !OmaPilot.OmaPilotStore.selectionReplacing
+                  && !OmaPilot.OmaPilotStore.selectionChoosing
+                enabled: OmaPilot.OmaPilotStore.textActionReady
                   && OmaPilot.OmaPilotStore.answerMarkdown !== ""
                 foreground: root.foreground
                 background: root.surface
@@ -867,8 +867,8 @@ Panel {
                 text: "Regenerate"
                 tooltipText: "Run the same action on the same selection again"
                 visible: OmaPilot.OmaPilotStore.textActionActive
-                enabled: !OmaPilot.OmaPilotStore.busy
-                  && !OmaPilot.OmaPilotStore.selectionReplacing
+                  && !OmaPilot.OmaPilotStore.selectionChoosing
+                enabled: OmaPilot.OmaPilotStore.textActionReady
                 foreground: Qt.darker(root.foreground, 1.4)
                 background: root.surface
                 bordered: false

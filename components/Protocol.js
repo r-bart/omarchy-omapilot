@@ -280,6 +280,7 @@ function selectionFailureMessage(reason) {
   if (value === "not_a_replacement") return "This answer reads like an explanation, not a replacement; copy it instead"
   if (value === "busy") return "Wait for the answer to finish"
   if (value === "no_action") return "There is no text action to replace"
+  if (value === "choosing") return "Choose what to do with the selected text first"
   return "Could not replace the text"
 }
 

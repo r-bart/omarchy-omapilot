@@ -32,6 +32,7 @@ QtObject {
   property bool textActionActive: false
   property bool selectionReplacing: false
   property bool selectionChoosing: false
+  readonly property bool textActionReady: !busy && !selectionReplacing
   property string selectionText: ""
   property string selectionAction: ""
   property string selectionInstruction: ""
@@ -119,6 +120,7 @@ QtObject {
   function permissionChoiceId(decision) { return "reject-once" }
   function permissionOptionsWithoutDenyOnce() { return [] }
   function replaceSelectionWithAnswer() { replaceCount++ }
+  function submitFromComposer(text) { return submit(text) }
   function runTextAction(action, instruction) {
     runTextActionCount++
     selectionAction = String(action || "")

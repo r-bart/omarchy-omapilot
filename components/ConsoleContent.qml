@@ -528,8 +528,8 @@ Item {
                   text: "Replace"
                   tooltipText: "Type this over the text you selected"
                   visible: root.backend && root.backend.textActionActive
-                  enabled: root.backend && !root.backend.busy
-                    && !root.backend.selectionReplacing
+                    && !root.backend.selectionChoosing
+                  enabled: root.backend && root.backend.textActionReady
                     && root.backend.answerMarkdown !== ""
                   foreground: root.foreground
                   background: root.background
@@ -543,8 +543,8 @@ Item {
                   text: "Regenerate"
                   tooltipText: "Run the same action on the same selection again"
                   visible: root.backend && root.backend.textActionActive
-                  enabled: root.backend && !root.backend.busy
-                    && !root.backend.selectionReplacing
+                    && !root.backend.selectionChoosing
+                  enabled: root.backend && root.backend.textActionReady
                   foreground: Qt.darker(root.foreground, 1.4)
                   background: root.background
                   bordered: false

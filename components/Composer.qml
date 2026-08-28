@@ -51,7 +51,7 @@ Item {
   implicitHeight: inlineMode ? Style.bar.sizeHorizontal : panelComposer.implicitHeight
 
   function submit() {
-    if (!backend || !backend.submit(draftText)) return
+    if (!backend || !backend.submitFromComposer(draftText)) return
     draftText = ""
     submitted()
   }
