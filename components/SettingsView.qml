@@ -1575,6 +1575,46 @@ Item {
 
           Text {
             Layout.fillWidth: true
+            text: "Text actions"
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+          }
+
+          // One language, not a picker. Any other language is already one
+          // sentence away — select the text, press the hotkey, and type it —
+          // and the Dropdown here only opens downward, which is the wrong
+          // shape for a list of languages this far down the panel.
+          TextField {
+            id: textActionLanguageInput
+            Layout.fillWidth: true
+            maximumLength: 40
+            text: root.backend ? String(root.backend.configuredTextActionLanguage || "") : ""
+            placeholderText: root.backend
+              ? "Following your system locale · " + String(root.backend.textActionLanguage || "English")
+              : "English"
+            foreground: root.foreground
+            accent: root.accent
+            Accessible.name: "Translate to"
+            onEditingFinished: root.requestSurfacePersist({
+              textActionLanguage: String(text || "").replace(/^\s+|\s+$/g, "")
+            })
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "The language the Translate action sends text to. Leave it empty to follow your system locale. Any other language is one prompt away: select text, press the hotkey, and type it."
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.Wrap
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
+          }
+
+          Text {
+            Layout.fillWidth: true
             text: "Global hotkeys"
             color: root.mutedForeground
             font.family: root.fontFamily

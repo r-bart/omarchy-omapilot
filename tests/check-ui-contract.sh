@@ -474,6 +474,9 @@ grep -Fq '&& !root.backend.selectionChoosing' "$repo_dir/components/ConsoleConte
 # Regenerate runs whatever ran, not the proofread, and both surfaces say so.
 test "$(grep -Fc 'Run the same action on the same selection again' \
   "$repo_dir/Panel.qml" "$repo_dir/components/ConsoleContent.qml" | grep -c ':1$')" -eq 2
+# Where Translate sends text is the user's, and empty means their locale.
+grep -Fq 'Accessible.name: "Translate to"' "$repo_dir/components/SettingsView.qml"
+grep -Fq 'textActionLanguage: String(text || "")' "$repo_dir/components/SettingsView.qml"
 grep -Fq 'property string webHandoffProvider: "duckduckgo"' \
   "$repo_dir/components/OmaPilotStore.qml"
 # The submit call now carries the shown question after the handoff provider,
