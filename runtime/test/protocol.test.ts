@@ -135,7 +135,7 @@ describe("NDJSON protocol", () => {
     await until(() => events.some((event) => event.type === "ready"));
     const ready = readySchema.parse(events.find((event) => event.type === "ready"));
     expect(ready.protocolVersion).toBe(2);
-    expect(ready.features).toEqual(["desktop-context", "context-attachments", "voice", "capability-packs"]);
+    expect(ready.features).toEqual(["desktop-context", "context-attachments", "voice", "capability-packs", "selection"]);
     expect(ready.providers.find((provider) => provider.id === "codex")?.models).toContainEqual({ id: "test/default", name: "Default" });
     expect(ready.providers.map(({ id, policy }) => ({ id, policy }))).toEqual([
       { id: "codex", policy: { tools: "device-approval", web: "approved-command", hostReads: true } }
@@ -482,7 +482,7 @@ describe("NDJSON protocol", () => {
 const readySchema = z.object({
   type: z.literal("ready"),
   protocolVersion: z.literal(2),
-  features: z.tuple([z.literal("desktop-context"), z.literal("context-attachments"), z.literal("voice"), z.literal("capability-packs")]),
+  features: z.tuple([z.literal("desktop-context"), z.literal("context-attachments"), z.literal("voice"), z.literal("capability-packs"), z.literal("selection")]),
   providers: z.array(z.object({
     id: z.string(),
     models: z.array(z.object({ id: z.string(), name: z.string() })),
