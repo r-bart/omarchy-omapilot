@@ -513,11 +513,9 @@ Item {
     function onIpcToggleRequested() { if (consoleLoader.item) consoleLoader.item.toggle() }
     function onIpcHistoryRequested() { if (consoleLoader.item) consoleLoader.item.openHistory() }
     function onIpcSettingsRequested() { if (consoleLoader.item) consoleLoader.item.openSettings() }
-    // Same ordering the panel needs: latch the window that owns the selection
-    // before this surface is shown, or the replacement is typed into OmaPilot
-    // instead of the document.
+    // The store has already latched the source window and started the read;
+    // this surface only has to show itself, in the chat lane.
     function onIpcSelectionRequested() {
-      OmaPilot.OmaPilotStore.beginTextAction()
       if (consoleLoader.item) consoleLoader.item.openTextAction()
     }
     function onContextAttachmentAdded() { if (consoleLoader.item) consoleLoader.item.open(true) }
