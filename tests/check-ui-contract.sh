@@ -100,7 +100,11 @@ grep -Fq 'property bool desktopContextEnabled: true' \
   "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'property string webHandoffProvider: "duckduckgo"' \
   "$repo_dir/components/OmaPilotStore.qml"
-grep -Fq 'webHandoffProvider))' "$repo_dir/components/OmaPilotStore.qml"
+# The submit call now carries the shown question after the handoff provider,
+# so a text action can send the harness its envelope while the panel and the
+# chat record keep the text the user selected.
+grep -Fq 'webHandoffProvider, shown))' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'function submit(text, shownText)' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'DesktopContext.snapshot()' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'Protocol.hasFeature(event.features, "desktop-context")' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'import Quickshell.Hyprland' "$repo_dir/components/DesktopContext.qml"
@@ -616,6 +620,10 @@ QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -input "$repo_dir/tests/tst_quick_actions.qml" \
   -import "$repo_dir" \
   -import "$omarchy_shell"
+
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
+  -input "$repo_dir/tests/tst_text_actions.qml" \
+  -import "$repo_dir" || fail "text action tests failed"
 
 smoke_root="$(mktemp -d)"
 cp "$repo_dir/tests/smoke.qml" "$smoke_root/shell.qml"

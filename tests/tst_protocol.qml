@@ -236,6 +236,53 @@ TestCase {
     compare(Protocol.normalizedPermission({ id: "permission-1", requestId: "turn-1", kind: "local_action" }, "turn-1"), null)
   }
 
+  function test_everyTextActionReasonSaysSomethingDifferentToDo() {
+    // Each reason is a different next step for the user, so none of them may
+    // collapse into the same sentence.
+    var reasons = ["unsupported", "own_surface", "target", "failed", "empty"]
+    var seen = ({})
+    for (var i = 0; i < reasons.length; i++) {
+      var message = Protocol.selectionUnavailableMessage(reasons[i])
+      verify(message !== "")
+      verify(!seen[message])
+      seen[message] = true
+    }
+    // Being on OmaPilot's own surface is the wrong window, not a missing one.
+    verify(Protocol.selectionUnavailableMessage("own_surface")
+      !== Protocol.selectionUnavailableMessage("target"))
+    verify(Protocol.selectionUnavailableMessage("") !== "")
+    verify(Protocol.selectionUnavailableMessage(null) !== "")
+
+    var failures = ["unsupported", "invalid_target", "focus_failed", "empty"]
+    var seenFailures = ({})
+    for (var j = 0; j < failures.length; j++) {
+      var failure = Protocol.selectionFailureMessage(failures[j])
+      verify(failure !== "")
+      verify(!seenFailures[failure])
+      seenFailures[failure] = true
+    }
+    verify(Protocol.selectionFailureMessage("nonsense") !== "")
+  }
+
+  function test_submitCarriesAShownQuestionOnlyWhenItDiffers() {
+    // A text action sends the harness an envelope of instructions but must
+    // show the user the text they selected, not the instructions.
+    var envelope = "OMAPILOT TEXT ACTION\nBEGIN SELECTED TEXT\nteh cat\nEND SELECTED TEXT"
+    var payload = Protocol.submitCommand(
+      "turn", envelope, "builtin", "", null, false, [], "", "", "teh cat")
+    compare(payload.question, envelope)
+    compare(payload.displayQuestion, "teh cat")
+
+    // An ordinary question sends one string, so nothing else changes shape.
+    verify(Protocol.submitCommand("turn", "Explain", "builtin").displayQuestion === undefined)
+    verify(Protocol.submitCommand(
+      "turn", "Explain", "builtin", "", null, false, [], "", "", "Explain").displayQuestion === undefined)
+    verify(Protocol.submitCommand(
+      "turn", "Explain", "builtin", "", null, false, [], "", "", "  ").displayQuestion === undefined)
+    verify(Protocol.submitCommand(
+      "turn", "Explain", "builtin", "", null, false, [], "", "", null).displayQuestion === undefined)
+  }
+
   function test_defaultSubmitOmitsEmptyModel() {
     var payload = Protocol.submitCommand("1", "Hello", "codex", "")
     compare(payload.type, "submit")

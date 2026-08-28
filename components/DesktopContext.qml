@@ -63,6 +63,29 @@ QtObject {
     })
   }
 
+// True when the focused window is OmaPilot's own surface. Pressing the
+  // hotkey from there is not a failure to find a window; it is the wrong
+  // window, and saying so is the difference between a dead end and an
+  // instruction.
+  function activeIsOwnSurface() {
+    return isShellToplevel(Hyprland.activeToplevel)
+  }
+
+  // The window a replacement must be typed back into, with the identity needed
+  // to refuse a credential window. This is a compositor handle: it stays in
+  // memory for one action and is never attached to a prompt, because desktop
+  // context deliberately carries no window handles.
+  function replaceTarget() {
+    var toplevel = isShellToplevel(Hyprland.activeToplevel) ? null : Hyprland.activeToplevel
+    if (!toplevel) return ({ address: "", appId: "", title: "" })
+    var ipc = toplevel.lastIpcObject || {}
+    return ({
+      address: Protocol.windowAddress(ipc.address),
+      appId: appIdFor(toplevel),
+      title: String(toplevel.title || ipc.title || "")
+    })
+  }
+
   function captureTarget() {
     var toplevel = isShellToplevel(Hyprland.activeToplevel) ? null : Hyprland.activeToplevel
     if (!toplevel) return null

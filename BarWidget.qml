@@ -139,6 +139,14 @@ BarWidget {
     function onContextAttachmentAdded() {
       if (root.routedWidget() === root) root.open()
     }
+    // Latch the window that owns the selection before the panel is shown.
+    // Opening first would make OmaPilot's own surface the active window, and
+    // the replacement would be typed into the panel instead of the document.
+    function onIpcSelectionRequested() {
+      if (root.routedWidget() !== root) return
+      OmaPilot.OmaPilotStore.beginTextAction()
+      root.open()
+    }
   }
 
   Loader {
