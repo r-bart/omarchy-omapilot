@@ -57,6 +57,7 @@ Item {
   readonly property bool browserCompanionBusy: backend ? backend.browserCompanionBusy === true : false
   readonly property bool hotkeyBusy: backend ? backend.hotkeyBusy === true : false
   readonly property string hotkeyMessage: backend ? String(backend.hotkeyMessage || "") : ""
+  readonly property var installedHotkeys: backend && backend.installedHotkeys ? backend.installedHotkeys : []
   property bool browserRemoveConfirmation: false
   property bool browserSetupExpanded: false
   // Add-an-endpoint form state. Nothing here is persisted until the broker
@@ -1472,6 +1473,61 @@ Item {
             wrapMode: Text.Wrap
             Accessible.role: Accessible.StaticText
             Accessible.name: text
+          }
+
+          // Read from the bindings file, not from anything OmaPilot stores.
+          // Nothing here edits a chord: that file is the user's, and a second
+          // owner is how the two end up disagreeing while Hyprland obeys only
+          // the file. What this can do is answer "which chords do I have",
+          // which nothing else does — including for a chord the installer
+          // skipped over a collision and reported only on standard error.
+          ColumnLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: Style.spacing.sm
+            spacing: Style.spacing.xs
+            visible: root.installedHotkeys.length > 0
+
+            Repeater {
+              model: root.installedHotkeys
+
+              RowLayout {
+                Layout.fillWidth: true
+                spacing: Style.spacing.md
+
+                Text {
+                  text: modelData.chord
+                  color: root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  font.bold: true
+                  Accessible.role: Accessible.StaticText
+                  Accessible.name: text
+                }
+
+                Text {
+                  Layout.fillWidth: true
+                  text: modelData.description
+                  color: root.mutedForeground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  elide: Text.ElideRight
+                  Accessible.role: Accessible.StaticText
+                  Accessible.name: text
+                }
+              }
+            }
+
+            Text {
+              Layout.fillWidth: true
+              Layout.topMargin: Style.spacing.xs
+              text: "Change a chord by editing that file. A shortcut you do not see here was never installed, or its chord was already taken."
+              color: root.mutedForeground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.Wrap
+              Accessible.role: Accessible.StaticText
+              Accessible.name: text
+            }
           }
 
           RowLayout {

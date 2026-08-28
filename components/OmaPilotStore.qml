@@ -6,6 +6,7 @@ import Quickshell.Io
 import "Protocol.js" as Protocol
 import "SessionLifecycle.js" as SessionLifecycle
 import "TextActions.js" as TextActions
+import "Hotkeys.js" as Hotkeys
 
 // One process and one ephemeral UI model for every screen. The broker is the
 // only durable authority; this singleton merely normalizes its NDJSON stream
@@ -55,6 +56,12 @@ Scope {
   property string hotkeyAction: ""
   property string hotkeyMessage: ""
   property string hotkeyProcessError: ""
+  // The chords currently bound to OmaPilot, read from the user's own
+  // Hyprland bindings. Shown, never written: the installer owns one marked
+  // block in that file and nothing else may claim a keybinding it does not
+  // control. A chord skipped over a collision is simply absent here, which
+  // is more than the user can see today.
+  property var installedHotkeys: []
   property var voiceStatus: Protocol.emptyVoiceStatus()
   property var ttsTest: null
   property bool ttsTestPending: false
@@ -1281,6 +1288,25 @@ if (type === "selection") {
   // toastRequested has no consumer in this shell. Rather than leave every
   // caller shouting into nothing, the store hears its own signal.
   onToastRequested: function(message) { root.note(message) }
+
+// The IpcHandler target below is the same string, spelled out there because
+  // the UI contract pins that literal.
+  readonly property string pluginIdentity: "io.github.spencerbull.omapilot"
+
+  readonly property string hyprlandBindingsPath:
+    (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config"))
+      + "/hypr/bindings.lua"
+
+  FileView {
+    id: hyprlandBindings
+    path: root.hyprlandBindingsPath
+    // The installer rewrites this file, so the list has to follow it rather
+    // than be a snapshot from startup.
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.installedHotkeys = Hotkeys.installedChords(text(), root.pluginIdentity)
+    onFileChanged: reload()
+  }
 
   IpcHandler {
     target: "io.github.spencerbull.omapilot"
