@@ -1134,6 +1134,41 @@ if grep -Eq "omapilot console window probe failed|Failed to load|Type .* unavail
   exit 1
 fi
 
+# A text action end to end, through the real store: a protocol event in, the
+# chooser standing with nothing sent, the chip the user pressed leaving as a
+# prompt, and Replace aimed at the window the action was latched to. The broker
+# path points at nothing so every command lands in queuedCommands, which is what
+# lets this read back what would have gone over the wire.
+cp "$repo_dir/tests/text-action-probe.qml" "$smoke_root/shell.qml"
+if ! OMAPILOT_BROKER_PATH=/nonexistent/omapilot-broker QT_QPA_PLATFORM=offscreen \
+    timeout 15s quickshell --no-duplicate --path "$smoke_root" --no-color \
+    >"$smoke_root/text-action.log" 2>&1; then
+  cat "$smoke_root/text-action.log"
+  exit 1
+fi
+if grep -Eq "omapilot text action probe failed|Failed to load|Type .* unavailable|Cannot assign|TypeError|ReferenceError" \
+    "$smoke_root/text-action.log" \
+    || ! grep -Fq 'OMAPILOT_TEXT_ACTION_PROBE_OK' "$smoke_root/text-action.log"; then
+  cat "$smoke_root/text-action.log"
+  exit 1
+fi
+
+# The chooser as a surface renders it, against real buttons and the real
+# theme. qmltestrunner cannot load anything importing qs.Ui, so this is where
+# the six-line quote, the primary chip and the console's empty state are held.
+cp "$repo_dir/tests/text-action-surface-probe.qml" "$smoke_root/shell.qml"
+if ! QT_QPA_PLATFORM=offscreen timeout 15s quickshell --no-duplicate \
+    --path "$smoke_root" --no-color >"$smoke_root/text-action-surface.log" 2>&1; then
+  cat "$smoke_root/text-action-surface.log"
+  exit 1
+fi
+if grep -Eq "omapilot text action surface probe failed|Failed to load|Type .* unavailable|Cannot assign|TypeError|ReferenceError" \
+    "$smoke_root/text-action-surface.log" \
+    || ! grep -Fq 'OMAPILOT_TEXT_ACTION_SURFACE_PROBE_OK' "$smoke_root/text-action-surface.log"; then
+  cat "$smoke_root/text-action-surface.log"
+  exit 1
+fi
+
 cp "$repo_dir/tests/response-activity-border-probe.qml" "$smoke_root/shell.qml"
 if ! QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \
     --path "$smoke_root" --no-color >"$smoke_root/motion.log" 2>&1; then
