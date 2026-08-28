@@ -153,6 +153,7 @@ chords=(
   "SUPER + ALT + X"
   "SUPER + ALT + N"
   "SUPER + ALT + H"
+  "SUPER + ALT + T"
 )
 descriptions=(
   "Talk to OmaPilot"
@@ -160,6 +161,7 @@ descriptions=(
   "Cancel OmaPilot voice mode"
   "New OmaPilot chat"
   "Continue OmaPilot chat in Herdr"
+  "Fix the selected text with OmaPilot"
 )
 commands=(
   "omarchy-shell -q io.github.spencerbull.omapilot voiceToggle"
@@ -167,6 +169,7 @@ commands=(
   "omarchy-shell -q io.github.spencerbull.omapilot voiceCancel"
   "omarchy-shell -q io.github.spencerbull.omapilot newChat"
   "omarchy-shell -q io.github.spencerbull.omapilot continueInHerdr"
+  "omarchy-shell -q io.github.spencerbull.omapilot fixSelection"
 )
 
 block_file=$(mktemp "$state_dir/hotkeys.XXXXXX")
