@@ -131,9 +131,13 @@ Item {
       Layout.fillHeight: true
       enabled: root.backend && !root.backend.busy && !root.backend.continuationBlocked
       text: root.draftText
-      placeholderText: root.backend && root.backend.initialized
-        ? "What do you want to do?"
-        : "Starting…"
+      // While a selection is waiting to be told what to do, this field is the
+      // fourth action rather than a new question.
+      placeholderText: root.backend && root.backend.selectionChoosing === true
+        ? "What should I do with this text?"
+        : root.backend && root.backend.initialized
+          ? "What do you want to do?"
+          : "Starting…"
       foreground: root.foreground
       horizontalPadding: Style.spacing.md
       verticalPadding: Style.spacing.xxs
@@ -259,9 +263,11 @@ Item {
           enabled: root.backend && !root.backend.continuationBlocked
             && root.backend.state !== "streaming" && root.backend.state !== "preparing"
           text: root.draftText
-          placeholderText: root.backend && root.backend.initialized
-            ? "Ask, or describe what to do"
-            : "Starting OmaPilot\u2026"
+          placeholderText: root.backend && root.backend.selectionChoosing === true
+            ? "What should I do with this text?"
+            : root.backend && root.backend.initialized
+              ? "Ask, or describe what to do"
+              : "Starting OmaPilot\u2026"
           // 1.7 measured 4.12:1 against the popup background on the shipped
           // theme — under the 4.5:1 floor, and the heading token this renders
           // at is well short of the size that earns the 3:1 large-text

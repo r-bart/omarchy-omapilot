@@ -31,6 +31,13 @@ QtObject {
   property string webHandoffProvider: "duckduckgo"
   property bool textActionActive: false
   property bool selectionReplacing: false
+  property bool selectionChoosing: false
+  property string selectionText: ""
+  property string selectionAction: ""
+  property string selectionInstruction: ""
+  property string textActionLanguage: "English"
+  property string textActionDefault: "fix"
+  property int runTextActionCount: 0
   property string notice: ""
   property var installedHotkeys: []
   property string ttsProvider: "elevenlabs"
@@ -112,6 +119,13 @@ QtObject {
   function permissionChoiceId(decision) { return "reject-once" }
   function permissionOptionsWithoutDenyOnce() { return [] }
   function replaceSelectionWithAnswer() { replaceCount++ }
+  function runTextAction(action, instruction) {
+    runTextActionCount++
+    selectionAction = String(action || "")
+    selectionInstruction = String(instruction || "")
+    selectionChoosing = false
+    return true
+  }
   function dismissTextAction() { dismissCount++ }
   function regenerateTextAction() { regenerateCount++ }
 }

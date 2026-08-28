@@ -17,6 +17,7 @@ QuickActions 1.0 QuickActions.qml
 QuickActionEditor 1.0 QuickActionEditor.qml
 ResponseActivityBorder 1.0 ResponseActivityBorder.qml
 SettingsView 1.0 SettingsView.qml
+TextActionChooser 1.0 TextActionChooser.qml
 SettingsTabs 1.0 SettingsTabs.qml
 VoiceNode 1.0 VoiceNode.qml
 AnswerCurtain 1.0 AnswerCurtain.qml

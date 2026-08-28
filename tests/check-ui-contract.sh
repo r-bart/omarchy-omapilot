@@ -35,6 +35,7 @@ qml_files=(
   "$repo_dir/components/SettingsTabs.qml"
   "$repo_dir/components/SetupGuide.qml"
   "$repo_dir/components/StateLightBar.qml"
+  "$repo_dir/components/TextActionChooser.qml"
   "$repo_dir/components/ThinkingScanner.qml"
   "$repo_dir/components/VoiceNode.qml"
   "$repo_dir/components/VoiceWave.qml"
@@ -453,6 +454,17 @@ grep -Fq 'action: selectionAction' "$repo_dir/components/OmaPilotStore.qml"
 # stays behind the same Replace button aimed at text selected minutes ago.
 grep -Fq 'if (!selectionSubmitting && textActionActive) endTextAction()' \
   "$repo_dir/components/OmaPilotStore.qml"
+# The quote is a reminder of what is about to be worked on, not a viewer: the
+# selection can be eight thousand characters. And it is not editable, because a
+# replacement is typed over the text still sitting in the other window, which an
+# edited copy here would no longer match.
+grep -Fq 'maximumLineCount: 6' "$repo_dir/components/TextActionChooser.qml"
+if grep -Eq 'TextInput|TextEdit|TextField|TextArea' "$repo_dir/components/TextActionChooser.qml"; then
+  printf 'The quoted selection must not be editable\n' >&2
+  exit 1
+fi
+# The composer is the fourth action while a selection waits, in both fields.
+test "$(grep -Fc 'What should I do with this text?' "$repo_dir/components/Composer.qml")" -eq 2
 grep -Fq 'property string webHandoffProvider: "duckduckgo"' \
   "$repo_dir/components/OmaPilotStore.qml"
 # The submit call now carries the shown question after the handoff provider,
