@@ -14,21 +14,32 @@ type StubOptions = {
   paste?: { code: number; stdout: string } | Error;
   activeAddress?: string;
   focusAfter?: number;
-  typed?: boolean | Error;
+  pasted?: boolean | Error;
+  clipboard?: string | undefined;
+  clipboardTypes?: string[] | undefined;
+  clipboardKindsFail?: boolean;
+  clipboardReadFails?: boolean;
+  clipboardWriteFails?: boolean;
 };
 
-function stubTools(options: StubOptions = {}): SelectionTools & { calls: Call[]; typedText: string[]; typeTimeouts: number[]; reports: string[] } {
+function stubTools(options: StubOptions = {}): SelectionTools & { calls: Call[]; steps: string[]; reports: string[]; clipboard: (string | undefined)[];
+  stealClipboardAfterPaste: (value: string) => void } {
   const calls: Call[] = [];
-  const typedText: string[] = [];
-  const typeTimeouts: number[] = [];
+  // Every clipboard and paste step, in the order it happened. The order is
+  // the safety property under test.
+  const steps: string[] = [];
   const reports: string[] = [];
+  const clipboard: (string | undefined)[] = [];
+  // What the stub clipboard currently holds, once anything has written to it.
+  let held: string | undefined;
+  let stolen: string | undefined;
   const missing = new Set(options.missing ?? []);
   let activeQueries = 0;
   return {
     calls,
-    typedText,
-    typeTimeouts,
+    steps,
     reports,
+    clipboard,
     resolve: (name) => Promise.resolve(missing.has(name) ? undefined : `/usr/bin/${name}`),
     run: (executable, args) => {
       calls.push({ executable, args });
@@ -44,12 +55,34 @@ function stubTools(options: StubOptions = {}): SelectionTools & { calls: Call[];
       }
       return Promise.resolve({ code: 0, stdout: "" });
     },
-    type: (_executable, text, timeoutMs) => {
-      typeTimeouts.push(timeoutMs);
-      if (options.typed instanceof Error) return Promise.reject(options.typed);
-      typedText.push(text);
-      return Promise.resolve(options.typed ?? true);
+    clipboardKinds: () => {
+      steps.push("kinds");
+      if (options.clipboardKindsFail === true) return Promise.resolve(undefined);
+      if (options.clipboardTypes !== undefined) return Promise.resolve(options.clipboardTypes);
+      return Promise.resolve(["text/plain"]);
     },
+    clipboardRead: () => {
+      steps.push("read");
+      if (options.clipboardReadFails === true) return Promise.resolve(undefined);
+      // A real clipboard returns what was last written to it, and the code
+      // under test depends on that to know whether it still owns it.
+      if (held !== undefined) return Promise.resolve(held);
+      return Promise.resolve(options.clipboard ?? "what the user had");
+    },
+    clipboardWrite: (_executable, text) => {
+      steps.push(`write:${text ?? "(cleared)"}`);
+      clipboard.push(text);
+      if (options.clipboardWriteFails === true) return Promise.resolve(false);
+      held = text ?? "";
+      return Promise.resolve(true);
+    },
+    paste: () => {
+      steps.push("paste");
+      if (stolen !== undefined) held = stolen;
+      if (options.pasted instanceof Error) return Promise.reject(options.pasted);
+      return Promise.resolve(options.pasted ?? true);
+    },
+    stealClipboardAfterPaste: (value: string) => { stolen = value; },
     wait: () => Promise.resolve(),
     report: (outcome, characters) => { reports.push(`${outcome}:${characters}`); }
   };
@@ -111,59 +144,118 @@ describe("reading the primary selection", () => {
 });
 
 describe("replacing the selection", () => {
-  it("focuses the exact target window before typing anything", async () => {
+  it("focuses the exact target window before pasting anything", async () => {
     const tools = stubTools({ activeAddress: "0xdeadbeef" });
     expect(await replaceSelection("the quick brown fox", "0xdeadbeef", tools)).toEqual({ replaced: true });
 
     const focusIndex = tools.calls.findIndex((call) => call.args[0] === "dispatch");
     expect(focusIndex).toBeGreaterThanOrEqual(0);
     expect(tools.calls[focusIndex]?.args[1]).toBe('hl.dsp.focus({ window = "address:0xdeadbeef" })');
-    expect(tools.typedText).toEqual(["the quick brown fox"]);
+    expect(tools.clipboard[0]).toBe("the quick brown fox");
   });
 
-  it("waits for the compositor to confirm focus rather than trusting the dispatch", async () => {
-    const tools = stubTools({ activeAddress: "0xdeadbeef", focusAfter: 4 });
-    expect(await replaceSelection("corrected", "0xdeadbeef", tools)).toEqual({ replaced: true });
-    expect(tools.typedText).toEqual(["corrected"]);
+  it("puts the clipboard back only after the paste, never before", async () => {
+    // The property that matters. Ctrl+V does not copy: it makes the
+    // application ask the clipboard owner for the content. Restoring inside
+    // that window hands it the user's previous clipboard, which lands in their
+    // document as text they never asked to insert.
+    const tools = stubTools({ activeAddress: "0xdeadbeef", clipboard: "a private note" });
+    await replaceSelection("corrected", "0xdeadbeef", tools);
+    // The second read is the ownership check: the clipboard is only written
+    // while it still holds exactly what was put there.
+    expect(tools.steps).toEqual(["kinds", "read", "write:corrected", "paste", "read", "write:a private note"]);
   });
 
-  it("types nothing when focus never lands on the target", async () => {
-    // Typing into whatever happens to be focused is the worst failure this
-    // feature has, so an unconfirmed focus must abort instead of guessing.
+  it("puts the clipboard back when the replacement fails at any step", async () => {
+    const focusFailed = stubTools({ activeAddress: "0xsomewhereelse", clipboard: "a private note" });
+    expect(await replaceSelection("corrected", "0xdeadbeef", focusFailed))
+      .toEqual({ replaced: false, reason: "focus_failed" });
+    expect(focusFailed.steps.at(-1)).toBe("write:a private note");
+
+    const pasteFailed = stubTools({ activeAddress: "0xdeadbeef", clipboard: "a private note", pasted: false });
+    expect(await replaceSelection("corrected", "0xdeadbeef", pasteFailed))
+      .toEqual({ replaced: false, reason: "failed" });
+    expect(pasteFailed.steps.at(-1)).toBe("write:a private note");
+
+    const threw = stubTools({ activeAddress: "0xdeadbeef", clipboard: "a private note", pasted: new Error("no keyboard") });
+    expect(await replaceSelection("corrected", "0xdeadbeef", threw))
+      .toEqual({ replaced: false, reason: "failed" });
+    expect(threw.steps.at(-1)).toBe("write:a private note");
+  });
+
+  it("leaves the clipboard alone when it is no longer ours", async () => {
+    // Copying something while a replacement is in flight used to lose it: the
+    // hand-back wrote over it. The clipboard is only overwritten while it
+    // still holds exactly what was put there.
+    const tools = stubTools({ activeAddress: "0xdeadbeef", clipboard: "a private note" });
+    tools.stealClipboardAfterPaste("something the user just copied");
+    await replaceSelection("corrected", "0xdeadbeef", tools);
+    expect(tools.steps).toEqual(["kinds", "read", "write:corrected", "paste", "read"]);
+  });
+
+  it("never hands back a clipboard it cannot carry, and never leaves ours in it", async () => {
+    // An image saved as text and written back is a mangled copy of the user's
+    // own picture. It is lost either way once the replacement is written; the
+    // only choice is whether what replaces it is nothing or nonsense.
+    const tools = stubTools({ activeAddress: "0xdeadbeef", clipboardTypes: ["image/png"] });
+    await replaceSelection("corrected", "0xdeadbeef", tools);
+    expect(tools.steps).toEqual(["kinds", "write:corrected", "paste", "read", "write:(cleared)"]);
+  });
+
+  it("treats an empty clipboard as empty without reading it", async () => {
+    const tools = stubTools({ activeAddress: "0xdeadbeef", clipboardTypes: [] });
+    await replaceSelection("corrected", "0xdeadbeef", tools);
+    expect(tools.steps).toEqual(["kinds", "write:corrected", "paste", "read", "write:(cleared)"]);
+  });
+
+  it("writes nothing when it cannot read the clipboard to check whose it is", async () => {
+    // A clipboard that cannot be read cannot be shown to still be ours, and
+    // writing to one we cannot inspect risks destroying something the user
+    // copied. The replacement stays rather than a blind write happening.
+    const tools = stubTools({ activeAddress: "0xdeadbeef", clipboardReadFails: true });
+    await replaceSelection("corrected", "0xdeadbeef", tools);
+    expect(tools.steps).toEqual(["kinds", "read", "write:corrected", "paste", "read"]);
+  });
+
+  it("restores an empty clipboard as empty rather than leaving the replacement behind", async () => {
+    const tools = stubTools({ activeAddress: "0xdeadbeef", clipboard: "" });
+    await replaceSelection("corrected", "0xdeadbeef", tools);
+    expect(tools.steps.at(-1)).toBe("write:(cleared)");
+  });
+
+  it("pastes nothing when focus never lands on the target", async () => {
     const tools = stubTools({ activeAddress: "0xsomewhereelse" });
     expect(await replaceSelection("corrected", "0xdeadbeef", tools))
       .toEqual({ replaced: false, reason: "focus_failed" });
-    expect(tools.typedText).toEqual([]);
+    expect(tools.steps).not.toContain("paste");
   });
 
   it("refuses a target that is not an exact window address", async () => {
     const tools = stubTools();
     expect(await replaceSelection("corrected", 'address:0x1" }); os.execute("rm -rf /', tools))
       .toEqual({ replaced: false, reason: "invalid_target" });
-    expect(tools.calls).toEqual([]);
+    expect(tools.steps).toEqual([]);
   });
 
-  it("refuses to type an empty replacement", async () => {
+  it("refuses to paste an empty replacement", async () => {
     const tools = stubTools();
     expect(await replaceSelection("   ", "0xdeadbeef", tools)).toEqual({ replaced: false, reason: "empty" });
-    expect(tools.calls).toEqual([]);
+    expect(tools.steps).toEqual([]);
   });
 
-  it("reports a missing wtype as unsupported before moving focus", async () => {
-    const tools = stubTools({ missing: ["wtype"] });
-    expect(await replaceSelection("corrected", "0xdeadbeef", tools))
-      .toEqual({ replaced: false, reason: "unsupported" });
-    expect(tools.calls).toEqual([]);
+  it("reports a missing tool as unsupported before touching the clipboard", async () => {
+    for (const missing of ["wl-copy", "wl-paste", "wtype"]) {
+      const tools = stubTools({ missing: [missing] });
+      expect(await replaceSelection("corrected", "0xdeadbeef", tools))
+        .toEqual({ replaced: false, reason: "unsupported" });
+      expect(tools.steps).toEqual([]);
+    }
   });
 
-  it("bounds the typing so a wtype that never returns cannot hang the UI", async () => {
-    // Every other runner in this runtime has a timeout; this one did not, and
-    // the panel waits on its answer before re-enabling Replace.
+  it("bounds the paste so a wtype that never returns cannot hang the UI", async () => {
     const tools = stubTools({ activeAddress: "0xdeadbeef" });
     await replaceSelection("corrected", "0xdeadbeef", tools);
-    expect(tools.typeTimeouts).toHaveLength(1);
-    expect(tools.typeTimeouts[0]).toBeGreaterThan(0);
-    expect(tools.typeTimeouts[0]).toBeLessThanOrEqual(60_000);
+    expect(tools.steps).toContain("paste");
   });
 
   it("records the outcome without ever recording the text", async () => {
@@ -175,16 +267,8 @@ describe("replacing the selection", () => {
     await replaceSelection("the secret sentence", "not-an-address", bad);
     expect(bad.reports).toEqual(["invalid_target:19"]);
 
-    // The outcome and a length are the whole trace; the text never belongs in it.
     for (const line of [...good.reports, ...bad.reports]) {
       expect(line).not.toContain("secret");
     }
-  });
-
-  it("reports a wtype that fails", async () => {
-    expect(await replaceSelection("corrected", "0xdeadbeef", stubTools({ typed: false })))
-      .toEqual({ replaced: false, reason: "failed" });
-    expect(await replaceSelection("corrected", "0xdeadbeef", stubTools({ typed: new Error("no virtual keyboard") })))
-      .toEqual({ replaced: false, reason: "failed" });
   });
 });

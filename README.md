@@ -366,10 +366,28 @@ text to work on and which window owns it. With nothing selected, the panel says
 so and does nothing else.
 
 OmaPilot reads the **primary** selection — the one filled by selecting text with
-the pointer — using `wl-paste --primary`. It does not read, write, or restore the
-regular clipboard, so a text action leaves the user's copy history untouched.
-The read is single-shot and happens only when the hotkey fires. Nothing is
-watched between actions.
+the pointer — using `wl-paste --primary`. The read is single-shot and happens
+only when the hotkey fires. Nothing is watched between actions.
+
+Replacing does use the regular clipboard, and puts back what was there. The
+correction is placed on the clipboard, pasted with a single `Ctrl+V`, and the
+previous contents are restored once the paste has been read — in that order,
+always, including when the replacement fails. The order is the safety property:
+`Ctrl+V` does not copy, it makes the application ask the clipboard owner for the
+content, and writing inside that window would hand it whatever replaced ours,
+pasting text the user never asked to insert.
+
+A clipboard holding something this cannot carry — an image, say — is not saved
+and not written back as text: it would come back as a mangled copy of the
+picture. It is lost either way once the replacement is written, and an empty
+clipboard is the better of the two.
+
+The only clipboard OmaPilot overwrites is one still holding exactly what
+OmaPilot put there. Copy something while a replacement is in flight and the
+clipboard is yours again: it is checked and left alone. A clipboard that cannot
+be read cannot be shown to still be ours either, so nothing is written to it —
+the replacement stays rather than a blind write destroying something you
+copied.
 
 The selection reaches the harness inside an envelope that labels it untrusted
 data and instructs the harness to ignore any instruction the text appears to
@@ -380,11 +398,11 @@ OmaPilot refuses to work on text from a password or credential window, matching
 the window names the capture path already refuses. The refusal happens before
 the selection is read.
 
-Replacing types the answer with `wtype`, which needs the compositor's
+Replacing sends one `Ctrl+V` through `wtype`, which needs the compositor's
 virtual-keyboard protocol. Before a key is synthesized, OmaPilot dispatches focus
 to the exact window address it latched when the hotkey fired and waits for the
 compositor to confirm that window is active; an unconfirmed focus aborts the
-replacement rather than typing into whatever is focused instead. Typing is
+replacement rather than pasting into whatever is focused instead. The paste is
 bounded by a timeout, so a compositor that never grants the virtual keyboard
 leaves the buttons usable instead of waiting forever. That address is a
 compositor handle held in memory for the length of one action, never attached to
@@ -403,6 +421,18 @@ truncated to fit — half a replacement typed over a paragraph is worse than non
 Each replacement writes its outcome — and only its outcome, never the text — to
 the broker's standard error, so a failure that reaches no one on screen is still
 traceable afterwards.
+
+An earlier version typed the replacement one character at a time and lost
+characters doing it: four from a 166-character replacement with capitals, one
+without, at the same index every run, unchanged at 6, 14 and 30 milliseconds
+between keystrokes. Not the length — 240 characters typed clean. Not the number
+of distinct characters — 62 typed clean. A paste is one key event and the
+application reads the string whole; the same replacement arrived intact.
+
+Wayland does have a way to insert text without synthesizing keys at all,
+`input_method_v2`, and OmaPilot deliberately does not use it: that means
+becoming the system input method, and a plugin must not evict the one the user
+already runs.
 
 A terminal is the one place this cannot work: there the selection belongs to the
 emulator rather than to the application, so there is nothing for typing to
