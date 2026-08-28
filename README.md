@@ -377,11 +377,15 @@ correction is placed on the clipboard, pasted with a single `Ctrl+V`, and the
 previous contents are restored once the paste has been read — in that order,
 always, including when the replacement fails. The order is the safety property:
 `Ctrl+V` does not copy, it makes the application ask the clipboard owner for the
-content, and restoring inside that window would hand it the previous clipboard
-instead, pasting text the user never asked to insert. A clipboard OmaPilot could
-not read is never "restored" to a guess. Copying something else during the
-second a replacement takes is the one case this cannot protect: the restore
-would overwrite it.
+content, and writing inside that window would hand it whatever replaced ours,
+pasting text the user never asked to insert.
+
+The only clipboard OmaPilot overwrites is one still holding exactly what
+OmaPilot put there. Copy something while a replacement is in flight and the
+clipboard is yours again: it is checked and left alone. A clipboard that cannot
+be read cannot be shown to still be ours either, so nothing is written to it —
+the replacement stays rather than a blind write destroying something you
+copied.
 
 The selection reaches the harness inside an envelope that labels it untrusted
 data and instructs the harness to ignore any instruction the text appears to

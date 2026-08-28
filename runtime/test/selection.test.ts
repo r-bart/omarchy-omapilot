@@ -20,13 +20,17 @@ type StubOptions = {
   clipboardWriteFails?: boolean;
 };
 
-function stubTools(options: StubOptions = {}): SelectionTools & { calls: Call[]; steps: string[]; reports: string[]; clipboard: (string | undefined)[] } {
+function stubTools(options: StubOptions = {}): SelectionTools & { calls: Call[]; steps: string[]; reports: string[]; clipboard: (string | undefined)[];
+  stealClipboardAfterPaste: (value: string) => void } {
   const calls: Call[] = [];
   // Every clipboard and paste step, in the order it happened. The order is
   // the safety property under test.
   const steps: string[] = [];
   const reports: string[] = [];
   const clipboard: (string | undefined)[] = [];
+  // What the stub clipboard currently holds, once anything has written to it.
+  let held: string | undefined;
+  let stolen: string | undefined;
   const missing = new Set(options.missing ?? []);
   let activeQueries = 0;
   return {
@@ -51,18 +55,26 @@ function stubTools(options: StubOptions = {}): SelectionTools & { calls: Call[];
     },
     clipboardRead: () => {
       steps.push("read");
-      return Promise.resolve(options.clipboardReadFails === true ? undefined : (options.clipboard ?? "what the user had"));
+      if (options.clipboardReadFails === true) return Promise.resolve(undefined);
+      // A real clipboard returns what was last written to it, and the code
+      // under test depends on that to know whether it still owns it.
+      if (held !== undefined) return Promise.resolve(held);
+      return Promise.resolve(options.clipboard ?? "what the user had");
     },
     clipboardWrite: (_executable, text) => {
       steps.push(`write:${text ?? "(cleared)"}`);
       clipboard.push(text);
-      return Promise.resolve(options.clipboardWriteFails !== true);
+      if (options.clipboardWriteFails === true) return Promise.resolve(false);
+      held = text ?? "";
+      return Promise.resolve(true);
     },
     paste: () => {
       steps.push("paste");
+      if (stolen !== undefined) held = stolen;
       if (options.pasted instanceof Error) return Promise.reject(options.pasted);
       return Promise.resolve(options.pasted ?? true);
     },
+    stealClipboardAfterPaste: (value: string) => { stolen = value; },
     wait: () => Promise.resolve(),
     report: (outcome, characters) => { reports.push(`${outcome}:${characters}`); }
   };
@@ -141,7 +153,9 @@ describe("replacing the selection", () => {
     // document as text they never asked to insert.
     const tools = stubTools({ activeAddress: "0xdeadbeef", clipboard: "a private note" });
     await replaceSelection("corrected", "0xdeadbeef", tools);
-    expect(tools.steps).toEqual(["read", "write:corrected", "paste", "write:a private note"]);
+    // The second read is the ownership check: the clipboard is only written
+    // while it still holds exactly what was put there.
+    expect(tools.steps).toEqual(["read", "write:corrected", "paste", "read", "write:a private note"]);
   });
 
   it("puts the clipboard back when the replacement fails at any step", async () => {
@@ -161,18 +175,29 @@ describe("replacing the selection", () => {
     expect(threw.steps.at(-1)).toBe("write:a private note");
   });
 
+  it("leaves the clipboard alone when it is no longer ours", async () => {
+    // Copying something while a replacement is in flight used to lose it: the
+    // hand-back wrote over it. The clipboard is only overwritten while it
+    // still holds exactly what was put there.
+    const tools = stubTools({ activeAddress: "0xdeadbeef", clipboard: "a private note" });
+    tools.stealClipboardAfterPaste("something the user just copied");
+    await replaceSelection("corrected", "0xdeadbeef", tools);
+    expect(tools.steps).toEqual(["read", "write:corrected", "paste", "read"]);
+  });
+
+  it("writes nothing when it cannot read the clipboard to check whose it is", async () => {
+    // A clipboard that cannot be read cannot be shown to still be ours, and
+    // writing to one we cannot inspect risks destroying something the user
+    // copied. The replacement stays rather than a blind write happening.
+    const tools = stubTools({ activeAddress: "0xdeadbeef", clipboardReadFails: true });
+    await replaceSelection("corrected", "0xdeadbeef", tools);
+    expect(tools.steps).toEqual(["read", "write:corrected", "paste", "read"]);
+  });
+
   it("restores an empty clipboard as empty rather than leaving the replacement behind", async () => {
     const tools = stubTools({ activeAddress: "0xdeadbeef", clipboard: "" });
     await replaceSelection("corrected", "0xdeadbeef", tools);
     expect(tools.steps.at(-1)).toBe("write:(cleared)");
-  });
-
-  it("never restores a clipboard it could not read", async () => {
-    // Writing a guess over someone's clipboard is worse than leaving the
-    // replacement in it, which at least is text they just asked for.
-    const tools = stubTools({ activeAddress: "0xdeadbeef", clipboardReadFails: true });
-    await replaceSelection("corrected", "0xdeadbeef", tools);
-    expect(tools.steps).toEqual(["read", "write:corrected", "paste"]);
   });
 
   it("pastes nothing when focus never lands on the target", async () => {

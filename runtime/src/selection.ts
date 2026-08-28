@@ -209,25 +209,36 @@ export async function replaceSelection(
   // to a guess.
   const previous = await tools.clipboardRead(paste);
 
-  // Put it back exactly once, however this ends. Never before the paste has
-  // been read: Ctrl+V makes the application ask the clipboard owner for the
-  // content, and restoring inside that window hands it the previous clipboard
-  // instead — the user's own text, pasted into their document, from a command
-  // they thought would insert a correction.
-  let restored = false;
-  const restore = async (): Promise<void> => {
-    if (restored || previous === undefined) return;
-    restored = true;
-    await tools.clipboardWrite(copy, previous === "" ? undefined : previous);
+  // Hand the clipboard back exactly once, however this ends.
+  //
+  // Never before the paste has been read: Ctrl+V makes the application ask the
+  // clipboard owner for the content, and writing inside that window hands it
+  // whatever replaced ours — the user's own text, pasted into their document,
+  // from a command they thought would insert a correction.
+  //
+  // And never over something that is no longer ours. If the user copied
+  // anything while this was in flight, the clipboard is theirs again and it is
+  // left alone; the only clipboard OmaPilot overwrites is the one still
+  // holding exactly what OmaPilot put there. When there was nothing to give
+  // back, or nothing readable to give back, that means clearing the
+  // replacement rather than leaving the user's text sitting in the clipboard
+  // for whatever reads it next.
+  let handedBack = false;
+  const handBack = async (): Promise<void> => {
+    if (handedBack) return;
+    handedBack = true;
+    const current = await tools.clipboardRead(paste);
+    if (current !== replacement) return;
+    await tools.clipboardWrite(copy, previous === undefined || previous === "" ? undefined : previous);
   };
 
   if (!await tools.clipboardWrite(copy, replacement)) {
-    await restore();
+    await handBack();
     return settle({ replaced: false, reason: "failed" });
   }
 
   if (!await focusWindow(address, tools)) {
-    await restore();
+    await handBack();
     return settle({ replaced: false, reason: "focus_failed" });
   }
 
@@ -245,7 +256,7 @@ export async function replaceSelection(
   // Only now. The application has had the chord; give it the moment it needs
   // to pull the content before the clipboard becomes the user's again.
   await tools.wait(pasteSettleMs);
-  await restore();
+  await handBack();
 
   return settle(pasted ? { replaced: true } : { replaced: false, reason: "failed" });
 }
