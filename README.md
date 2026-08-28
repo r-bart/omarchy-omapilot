@@ -51,6 +51,8 @@ compact error notice opens an inspectable details pane.
   OpenAI also needs an API key. Cloud keys are stored
   in `~/.config/omapilot/voice-auth.json`, not widget settings. Voice stays
   off until enabled there.
+- `wl-clipboard` to read the selection for text actions, and `wtype` to type a
+  correction back into the window it came from.
 - `grim` for contextual screenshots. ImageMagick, already used by OmaPilot's
   image policy, validates and normalizes every captured image.
 - Optional: Tesseract adds text-under-the-pointer extraction and the **Text**
@@ -348,6 +350,78 @@ watch the pointer, index accessibility trees, monitor the clipboard, or capture
 screens in the background. Password-manager and password-like windows are
 blocked conservatively. Clip text and pixels are framed as untrusted
 observational data and do not expand tool authority.
+
+## Work on selected text
+
+Select text anywhere on the desktop and press `Super+Alt+T`. OmaPilot reads that
+selection, asks the configured harness to correct its grammar, spelling, and
+syntax, and shows the result in the panel with **Replace** and **Regenerate**
+next to **Copy**. Replace types the corrected text over the selection in the
+window it came from; Regenerate runs the same correction again on the same
+selection.
+
+Wayland exposes no way to ask whether the focused widget is a text input, so the
+selection is the detection: a non-empty selection is what tells OmaPilot there is
+text to work on and which window owns it. With nothing selected, the panel says
+so and does nothing else.
+
+OmaPilot reads the **primary** selection — the one filled by selecting text with
+the pointer — using `wl-paste --primary`. It does not read, write, or restore the
+regular clipboard, so a text action leaves the user's copy history untouched.
+The read is single-shot and happens only when the hotkey fires. Nothing is
+watched between actions.
+
+The selection reaches the harness inside an envelope that labels it untrusted
+data and instructs the harness to ignore any instruction the text appears to
+contain. Selected text is content to correct, not a request, and it expands no
+tool authority.
+
+OmaPilot refuses to work on text from a password or credential window, matching
+the window names the capture path already refuses. The refusal happens before
+the selection is read.
+
+Replacing types the answer with `wtype`, which needs the compositor's
+virtual-keyboard protocol. Before a key is synthesized, OmaPilot dispatches focus
+to the exact window address it latched when the hotkey fired and waits for the
+compositor to confirm that window is active; an unconfirmed focus aborts the
+replacement rather than typing into whatever is focused instead. Typing is
+bounded by a timeout, so a compositor that never grants the virtual keyboard
+leaves the buttons usable instead of waiting forever. That address is a
+compositor handle held in memory for the length of one action, never attached to
+a prompt — desktop context deliberately carries no window handles. Closing the
+panel, starting a new chat, or a completed replacement ends the action and drops
+it.
+
+Replacement waits for the complete answer; nothing is typed while a response is
+still streaming. The answer is offered as typed text exactly as the harness wrote
+it, minus a wrapping code fence or a pair of quotes around the whole reply. Two
+answers are refused rather than typed: one longer than the 8,000 characters the
+protocol accepts, and one that reads as prose about the correction rather than
+the correction itself. Both say so and leave Copy available. Nothing is ever
+truncated to fit — half a replacement typed over a paragraph is worse than none.
+
+Each replacement writes its outcome — and only its outcome, never the text — to
+the broker's standard error, so a failure that reaches no one on screen is still
+traceable afterwards.
+
+A terminal is the one place this cannot work: there the selection belongs to the
+emulator rather than to the application, so there is nothing for typing to
+replace and the correction is inserted beside it. Copy is the answer there.
+
+Text actions need `wl-clipboard` for the selection and `wtype` for the
+replacement. Without `wtype`, the correction still appears in the panel and Copy
+still works.
+
+`omarchy-shell io.github.spencerbull.omapilot fixSelection` starts an action and
+`replaceSelection` accepts one, so the whole round can run without a pointer —
+bind them, or drive them from a test. Both go through the same guards as the
+hotkey and the button.
+
+`tests/text-actions-lab.html` is a page of text widgets that each report whether
+a replacement landed or was merely inserted beside the original, and
+`tests/text-action-run.sh` drives one round against whatever is selected.
+Replacing text is the one part of this feature whose behaviour is decided by the
+widget receiving the keystrokes, so it has to be run against many of them.
 
 ## Storage and privacy
 
