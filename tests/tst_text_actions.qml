@@ -12,6 +12,17 @@ TestCase {
     // The answer is typed into the user's document, so the prompt has to ask
     // for the replacement alone.
     verify(prompt.indexOf("corrected text alone") >= 0)
+    // Case was left to the model's judgement once and it read all-lowercase as
+    // a deliberate style, returning it untouched. Name it instead.
+    verify(prompt.indexOf("capitalisation") >= 0)
+    verify(prompt.indexOf("Capitalise the start of every sentence") >= 0)
+    // Preserving "formatting" was read as preserving case; line breaks are
+    // what actually has to survive.
+    verify(prompt.indexOf("line breaks") >= 0)
+    verify(prompt.indexOf("formatting") < 0)
+    // A corrector that quietly rewrites or translates is not a corrector.
+    verify(prompt.indexOf("Do not translate it") >= 0)
+    verify(prompt.indexOf("do not add or remove content") >= 0)
   }
 
   function test_promptRefusesAnEmptySelection() {
