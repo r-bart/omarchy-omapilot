@@ -16,6 +16,8 @@ type StubOptions = {
   focusAfter?: number;
   pasted?: boolean | Error;
   clipboard?: string | undefined;
+  clipboardTypes?: string[] | undefined;
+  clipboardKindsFail?: boolean;
   clipboardReadFails?: boolean;
   clipboardWriteFails?: boolean;
 };
@@ -52,6 +54,12 @@ function stubTools(options: StubOptions = {}): SelectionTools & { calls: Call[];
         return Promise.resolve({ code: 0, stdout: JSON.stringify({ address }) });
       }
       return Promise.resolve({ code: 0, stdout: "" });
+    },
+    clipboardKinds: () => {
+      steps.push("kinds");
+      if (options.clipboardKindsFail === true) return Promise.resolve(undefined);
+      if (options.clipboardTypes !== undefined) return Promise.resolve(options.clipboardTypes);
+      return Promise.resolve(["text/plain"]);
     },
     clipboardRead: () => {
       steps.push("read");
@@ -155,7 +163,7 @@ describe("replacing the selection", () => {
     await replaceSelection("corrected", "0xdeadbeef", tools);
     // The second read is the ownership check: the clipboard is only written
     // while it still holds exactly what was put there.
-    expect(tools.steps).toEqual(["read", "write:corrected", "paste", "read", "write:a private note"]);
+    expect(tools.steps).toEqual(["kinds", "read", "write:corrected", "paste", "read", "write:a private note"]);
   });
 
   it("puts the clipboard back when the replacement fails at any step", async () => {
@@ -182,7 +190,22 @@ describe("replacing the selection", () => {
     const tools = stubTools({ activeAddress: "0xdeadbeef", clipboard: "a private note" });
     tools.stealClipboardAfterPaste("something the user just copied");
     await replaceSelection("corrected", "0xdeadbeef", tools);
-    expect(tools.steps).toEqual(["read", "write:corrected", "paste", "read"]);
+    expect(tools.steps).toEqual(["kinds", "read", "write:corrected", "paste", "read"]);
+  });
+
+  it("never hands back a clipboard it cannot carry, and never leaves ours in it", async () => {
+    // An image saved as text and written back is a mangled copy of the user's
+    // own picture. It is lost either way once the replacement is written; the
+    // only choice is whether what replaces it is nothing or nonsense.
+    const tools = stubTools({ activeAddress: "0xdeadbeef", clipboardTypes: ["image/png"] });
+    await replaceSelection("corrected", "0xdeadbeef", tools);
+    expect(tools.steps).toEqual(["kinds", "write:corrected", "paste", "read", "write:(cleared)"]);
+  });
+
+  it("treats an empty clipboard as empty without reading it", async () => {
+    const tools = stubTools({ activeAddress: "0xdeadbeef", clipboardTypes: [] });
+    await replaceSelection("corrected", "0xdeadbeef", tools);
+    expect(tools.steps).toEqual(["kinds", "write:corrected", "paste", "read", "write:(cleared)"]);
   });
 
   it("writes nothing when it cannot read the clipboard to check whose it is", async () => {
@@ -191,7 +214,7 @@ describe("replacing the selection", () => {
     // copied. The replacement stays rather than a blind write happening.
     const tools = stubTools({ activeAddress: "0xdeadbeef", clipboardReadFails: true });
     await replaceSelection("corrected", "0xdeadbeef", tools);
-    expect(tools.steps).toEqual(["read", "write:corrected", "paste", "read"]);
+    expect(tools.steps).toEqual(["kinds", "read", "write:corrected", "paste", "read"]);
   });
 
   it("restores an empty clipboard as empty rather than leaving the replacement behind", async () => {

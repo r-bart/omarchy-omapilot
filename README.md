@@ -380,6 +380,11 @@ always, including when the replacement fails. The order is the safety property:
 content, and writing inside that window would hand it whatever replaced ours,
 pasting text the user never asked to insert.
 
+A clipboard holding something this cannot carry — an image, say — is not saved
+and not written back as text: it would come back as a mangled copy of the
+picture. It is lost either way once the replacement is written, and an empty
+clipboard is the better of the two.
+
 The only clipboard OmaPilot overwrites is one still holding exactly what
 OmaPilot put there. Copy something while a replacement is in flight and the
 clipboard is yours again: it is checked and left alone. A clipboard that cannot

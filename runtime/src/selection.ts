@@ -60,6 +60,9 @@ export type SelectionReplaceResult = {
 export type SelectionTools = {
   resolve: (name: string) => Promise<string | undefined>;
   run: (executable: string, args: string[], timeoutMs: number) => Promise<{ code: number; stdout: string }>;
+  // The mime types the clipboard is currently offering. Empty means an empty
+  // clipboard; undefined means the question could not be asked.
+  clipboardKinds: (executable: string) => Promise<string[] | undefined>;
   clipboardRead: (executable: string) => Promise<string | undefined>;
   clipboardWrite: (executable: string, text: string | undefined) => Promise<boolean>;
   paste: (executable: string, timeoutMs: number) => Promise<boolean>;
@@ -88,15 +91,21 @@ export function defaultSelectionTools(env: NodeJS.ProcessEnv = process.env): Sel
       const result = await runCommand(executable, args, { env, timeoutMs, maxOutput: 262_144 });
       return { code: result.code, stdout: result.stdout };
     },
+    clipboardKinds: async (executable) => {
+      try {
+        const result = await runCommand(executable, ["--list-types"], { env, timeoutMs: 3_000, maxOutput: 16_384 });
+        // A non-zero exit is how wl-paste says the clipboard is empty.
+        if (result.code !== 0) return [];
+        return result.stdout.split("\n").map((line) => line.trim()).filter((line) => line !== "");
+      } catch {
+        return undefined;
+      }
+    },
     clipboardRead: async (executable) => {
       try {
         const result = await runCommand(executable, ["--no-newline"], { env, timeoutMs: 3_000, maxOutput: 1_000_000 });
-        // A non-zero exit means an empty clipboard, which is a real state to
-        // restore to, not a failure.
-        return result.code === 0 ? result.stdout : "";
+        return result.code === 0 ? result.stdout : undefined;
       } catch {
-        // Unknown rather than empty: the caller must not "restore" a clipboard
-        // it never managed to read.
         return undefined;
       }
     },
@@ -204,10 +213,21 @@ export async function replaceSelection(
   if (copy === undefined || paste === undefined || typer === undefined)
     return settle({ replaced: false, reason: "unsupported" });
 
-  // Read what the user had before anything is disturbed. `undefined` means the
-  // read failed, and a clipboard that could not be read must not be "restored"
-  // to a guess.
-  const previous = await tools.clipboardRead(paste);
+  // What the user had, before anything is disturbed.
+  //
+  // `undefined` means it cannot be given back: either the clipboard could not
+  // be read, or it holds something this cannot carry — an image, say. Saving
+  // that as text and writing it back would hand the user a mangled copy of
+  // their own picture, which is worse than an empty clipboard. It is lost
+  // either way the moment the replacement is written; the choice is only
+  // whether what replaces it is nothing or nonsense.
+  const previous = await (async (): Promise<string | undefined> => {
+    const kinds = await tools.clipboardKinds(paste);
+    if (kinds === undefined) return undefined;
+    if (kinds.length === 0) return "";
+    if (!kinds.some((kind) => kind.toLowerCase().startsWith("text/"))) return undefined;
+    return tools.clipboardRead(paste);
+  })();
 
   // Hand the clipboard back exactly once, however this ends.
   //
