@@ -105,6 +105,19 @@ ShellRoot {
             root.fail("the chip Enter would run is not the one drawn as primary")
           if (buttons[0].tooltipText.indexOf("(Enter)") < 0)
             root.fail("the default chip does not say Enter runs it")
+          // The tooltip and the accessible name say what the word does.
+          if (buttons[0].tooltipText.indexOf("Fix grammar and syntax") < 0)
+            root.fail("the Fix chip's tooltip only repeats its label")
+          if (buttons[1].tooltipText !== "Rewrite more clearly")
+            root.fail("the Rewrite chip's tooltip reads '" + buttons[1].tooltipText + "'")
+          if (buttons[1].Accessible.name !== buttons[1].tooltipText)
+            root.fail("the chip's accessible name is not what its tooltip says")
+          // A pointer target on the desktop wants 40 pixels of height. The
+          // chips are ordinary shell buttons, so this measures the shell's
+          // own control size rather than anything invented here.
+          for (var h = 0; h < buttons.length; h++)
+            if (buttons[h].height < 32)
+              root.fail("chip " + h + " is only " + Math.round(buttons[h].height) + " px tall")
         }
       } else if (root.stage === 2) {
         // The default follows what the user last ran, so the border moves.
@@ -114,11 +127,36 @@ ShellRoot {
           root.fail("the primary chip did not follow the remembered action")
         backendStub.textActionDefault = "fix"
       } else if (root.stage === 3) {
+        // The primary chip is drawn with a border and the others are not, and
+        // the default moves as the user changes what they last ran. If that
+        // costs a pixel the whole row shuffles under the cursor every time.
+        backendStub.textActionDefault = "fix"
+        var before = root.chips().map(function(chip) { return chip.width })
+        backendStub.textActionDefault = "translate"
+        var after = root.chips().map(function(chip) { return chip.width })
+        for (var w = 0; w < before.length; w++)
+          if (before[w] !== after[w])
+            root.fail("chip " + w + " changed width with the default: "
+              + before[w] + " -> " + after[w])
+        backendStub.textActionDefault = "fix"
+      } else if (root.stage === 4) {
+        // The console is 360 pixels wide at its narrowest and a language name
+        // can be long. A chip that cannot fit must still be readable.
+        var narrow = chooser.width
+        chooser.width = 360
+        backendStub.textActionLanguage = "Brazilian Portuguese"
+        var translateChip = root.chips()[2]
+        if (translateChip.width < translateChip.implicitWidth)
+          root.fail("the translate chip is clipped at 360: needs "
+            + Math.round(translateChip.implicitWidth) + " has " + Math.round(translateChip.width))
+        backendStub.textActionLanguage = "Spanish"
+        chooser.width = narrow
+      } else if (root.stage === 5) {
         root.picked = ""
         root.chips()[1].clicked()
         if (root.picked !== "rewrite")
           root.fail("pressing a chip asked for '" + root.picked + "'")
-      } else if (root.stage === 4) {
+      } else if (root.stage === 6) {
         // Nothing is offered while the harness is answering or a replacement
         // is being typed.
         backendStub.state = "streaming"
@@ -128,7 +166,7 @@ ShellRoot {
         if (root.chips()[0].enabled) root.fail("a chip stayed live while replacing")
         backendStub.selectionReplacing = false
         if (!root.chips()[0].enabled) root.fail("the chips never came back")
-      } else if (root.stage === 5) {
+      } else if (root.stage === 7) {
         // In the console the chooser takes the empty state's place; two rows
         // of things to press is a menu, not an empty state.
         var choosers = root.descendants(content, function(item) {
@@ -145,7 +183,7 @@ ShellRoot {
           root.fail("expected one quick-action row, found " + actionRows.length)
         else if (actionRows[0].visible)
           root.fail("the desktop quick actions showed up beside the chooser")
-      } else if (root.stage === 6) {
+      } else if (root.stage === 8) {
         // Once something has been asked, the chooser is gone and the answer's
         // own controls are what is left.
         backendStub.selectionChoosing = false

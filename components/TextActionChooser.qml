@@ -36,7 +36,10 @@ Item {
   // never arrive from the composer: there a digit is a digit, and a prompt
   // that starts with a number must not launch something instead.
   Keys.onPressed: function(event) {
-    if (!root.choosing || !root.ready || event.modifiers !== Qt.NoModifier) return
+    // The keypad sends its own modifier and is still an unmodified digit,
+    // which is how PanelKeyboardNavigation reads its own keys too.
+    var plain = event.modifiers === Qt.NoModifier || event.modifiers === Qt.KeypadModifier
+    if (!root.choosing || !root.ready || !plain) return
     var index = event.key - Qt.Key_1
     if (index < 0 || index >= TextActions.actions.length) return
     root.actionRequested(String(TextActions.actions[index].id))
@@ -97,7 +100,11 @@ Item {
           readonly property bool preferred: action === root.defaultAction
           width: Math.min(implicitWidth, chipFlow.width)
           text: TextActions.chipLabel(action, root.language)
-          tooltipText: preferred ? text + " (Enter)" : text
+          // The chip is a word; the tooltip is what that word does. Repeating
+          // the label on hover teaches nothing, and it is also the accessible
+          // name, where "Fix" on its own says even less.
+          tooltipText: TextActions.questionLabel(action, "", root.language)
+            + (preferred ? " (Enter)" : "")
           enabled: root.ready
           foreground: preferred ? root.foreground : Qt.darker(root.foreground, 1.4)
           background: root.background
