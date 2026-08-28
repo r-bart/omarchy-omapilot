@@ -326,6 +326,123 @@ ShellRoot {
         if (!s.runTextAction("fix", "")) root.fail("the chooser was dead after a refusal")
         s.endTextAction()
         root.drain()
+      } else if (root.stage === 15) {
+        // A read the user walked away from must not land on the selection they
+        // latched afterwards. The protocol carries no request id, so the only
+        // safe answer is to allow one read at a time and drop the reply to an
+        // action that is gone.
+        s.resetChat()
+        root.latch("fix")
+        if (!s.selectionPending) root.fail("the read was not marked in flight")
+        s.dismissTextAction()
+        if (s.beginTextAction("fix") !== "pending")
+          root.fail("a second read started while the first was still out")
+        // Reply to the abandoned read.
+        s.applyEvent({ type: "selection", available: true, text: "text from the first window" })
+        if (s.selectionChoosing || s.textActionActive || s.selectionText !== "")
+          root.fail("an abandoned read still produced an action")
+        if (root.commandsOfType(root.drain(), "submit").length !== 0)
+          root.fail("an abandoned read submitted a prompt")
+        // And the feature still works right afterwards.
+        root.latch("")
+        root.deliverSelection("text from the second window")
+        if (!s.selectionChoosing) root.fail("the next action could not start")
+        s.endTextAction()
+        root.drain()
+      } else if (root.stage === 16) {
+        // An unrelated error while a paste is in flight must not make the real
+        // answer unreadable, and must never allow a second paste.
+        s.resetChat()
+        root.latch("fix")
+        root.deliverSelection("teh cat sat")
+        root.drain()
+        s.answerMarkdown = "The cat sat."
+        s.state = "complete"
+        s.replaceSelectionWithAnswer()
+        if (root.commandsOfType(root.drain(), "selection_replace").length !== 1)
+          root.fail("the first paste was not sent")
+        s.applyEvent({ type: "error", code: "capability_failed", message: "unrelated" })
+        s.replaceSelectionWithAnswer()
+        if (root.commandsOfType(root.drain(), "selection_replace").length !== 0)
+          root.fail("an unrelated error let the same text be pasted twice")
+        s.applyEvent({ type: "selection_replaced", replaced: true })
+        if (s.textActionActive)
+          root.fail("the real reply was dropped after an unrelated error")
+        root.drain()
+      } else if (root.stage === 17) {
+        // Regenerate resets the chat before it runs, so a refused run has to
+        // put back the action it found rather than the nothing reset left.
+        s.resetChat()
+        root.latch("")
+        root.deliverSelection("teh cat sat")
+        if (!s.runTextAction("translate", "")) root.fail("translate did not run")
+        root.drain()
+        s.answerMarkdown = "El gato se sentó."
+        s.state = "complete"
+        // The refusal has to survive the resetChat inside regenerate, and
+        // continuationBlocked does not: that reset clears it, and the test
+        // then passed for the wrong reason. An empty provider list does.
+        var harness = s.providers
+        s.providers = []
+        s.regenerateTextAction()
+        s.providers = harness
+        if (s.selectionAction !== "translate")
+          root.fail("a refused regenerate left the action as '" + s.selectionAction + "'")
+        // And Regenerate still works once the harness is back.
+        s.regenerateTextAction()
+        if (root.commandsOfType(root.drain(), "submit").length !== 1)
+          root.fail("Regenerate was dead after a refusal")
+        s.endTextAction()
+        root.drain()
+      } else if (root.stage === 18) {
+        // Asking something else while the read is still out is still asking
+        // something else. The chooser must not arrive over that conversation.
+        s.resetChat()
+        root.latch("fix")
+        if (!s.submit("what is the capital of France?"))
+          root.fail("an ordinary question could not be asked during a read")
+        root.drain()
+        s.applyEvent({ type: "selection", available: true, text: "a paragraph" })
+        if (s.selectionChoosing || s.textActionActive)
+          root.fail("a chooser arrived over an unrelated conversation")
+        s.resetChat()
+        root.drain()
+      } else if (root.stage === 19) {
+        // A text action does not send the captured context, but it must not
+        // throw it away either: the user captured it for the question they are
+        // still going to ask.
+        s.resetChat()
+        s.contextAttachments = [{
+          id: "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+          selectedRepresentationIds: ["text"]
+        }]
+        root.latch("")
+        root.deliverSelection("teh cat sat")
+        if (!s.runTextAction("fix", "")) root.fail("fix did not run")
+        root.drain()
+        if (s.contextAttachments.length !== 1)
+          root.fail("a text action threw the captured context away")
+        s.endTextAction()
+        s.resetChat()
+        root.drain()
+      } else if (root.stage === 20) {
+        // A scripted caller has only the return value to go on, so a refusal
+        // must not read as success.
+        s.resetChat()
+        root.latch("")
+        root.deliverSelection("teh cat sat")
+        s.answerMarkdown = "The cat sat."
+        s.state = "complete"
+        if (s.replaceSelectionWithAnswer() !== "choosing")
+          root.fail("a refusal while choosing did not say so to its caller")
+        if (!s.runTextAction("fix", "")) root.fail("fix did not run")
+        root.drain()
+        s.answerMarkdown = "The cat sat."
+        s.state = "complete"
+        if (s.replaceSelectionWithAnswer() !== "send")
+          root.fail("an accepted replacement did not say so to its caller")
+        root.drain()
+        s.endTextAction()
       } else {
         if (!root.failed) console.log("OMAPILOT_TEXT_ACTION_PROBE_OK")
         Qt.quit()

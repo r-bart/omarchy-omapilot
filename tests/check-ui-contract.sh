@@ -452,8 +452,17 @@ grep -Fq 'function translateSelection(): string' "$repo_dir/components/OmaPilotS
 grep -Fq 'action: selectionAction' "$repo_dir/components/OmaPilotStore.qml"
 # Asking something else leaves the selection behind, or an unrelated answer
 # stays behind the same Replace button aimed at text selected minutes ago.
-grep -Fq 'if (!selectionSubmitting && textActionActive) endTextAction()' \
+grep -Fq 'if (!selectionSubmitting && (textActionActive || selectionPending)) endTextAction()' \
   "$repo_dir/components/OmaPilotStore.qml"
+# One read at a time, and the answer to a read the user walked away from is
+# dropped: the protocol carries no request id, so a stale reply would put one
+# window's text behind another window's address.
+grep -Fq 'if (!wasPending || selectionTarget === "") return' \
+  "$repo_dir/components/OmaPilotStore.qml"
+# A late replacement is matched by the window it was sent for, not by a flag an
+# unrelated error can clear, or the same text is pasted twice.
+grep -Fq 'if (selectionReplaceTarget === "") return' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'replacing: selectionReplaceTarget !== ""' "$repo_dir/components/OmaPilotStore.qml"
 # The quote is a reminder of what is about to be worked on, not a viewer: the
 # selection can be eight thousand characters. And it is not editable, because a
 # replacement is typed over the text still sitting in the other window, which an
@@ -491,9 +500,6 @@ grep -Fq 'readonly property bool textActionReady: !busy && !selectionReplacing' 
 grep -Fq 'backend.textActionReady === true' "$repo_dir/components/TextActionChooser.qml"
 test "$(grep -Fc 'OmaPilot.OmaPilotStore.textActionReady' "$repo_dir/Panel.qml")" -eq 2
 test "$(grep -Fc 'root.backend.textActionReady' "$repo_dir/components/ConsoleContent.qml")" -eq 2
-# A replacement answered after the user moved on belongs to an action that no
-# longer exists and must not end the one now on screen.
-grep -Fq 'if (!selectionReplacing) return' "$repo_dir/components/OmaPilotStore.qml"
 # Only the composer turns typed text into the fourth action. Every other caller
 # of submit — the voice lane above all — is asking its own question.
 grep -Fq 'function submitFromComposer(text)' "$repo_dir/components/OmaPilotStore.qml"

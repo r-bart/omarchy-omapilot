@@ -125,8 +125,16 @@ Scope {
   // both. The address is a compositor handle and never reaches a prompt.
   property string selectionTarget: ""
   property string selectionText: ""
+  // True from the moment a read is asked for until the broker answers. It
+  // belongs to the wire, not to the action: the reply carries no request id,
+  // so the only safe answer is to allow one read at a time and to drop the
+  // reply to an action the user has already walked away from.
   property bool selectionPending: false
   property bool selectionReplacing: false
+  // The window a replacement was sent for. It is what tells a late answer
+  // which action it belongs to, and it outlives an unrelated error clearing
+  // the flag above, so the same text can never be pasted twice.
+  property string selectionReplaceTarget: ""
   // Between the selection arriving and a prompt leaving there is a choice.
   // Reading someone's text is not consent to send it anywhere, so nothing goes
   // out until the user picks. The action and the instruction outlive the turn
@@ -508,6 +516,11 @@ Scope {
     resetChat()
     selectionTarget = target
     selectionText = text
+    // Put the action back before running it. resetChat cleared it, and a run
+    // that is refused restores what it found — which would be nothing, leaving
+    // a live selection whose Regenerate button then does nothing at all.
+    selectionAction = action
+    selectionInstruction = instruction
     runTextAction(action, instruction)
   }
 
@@ -527,8 +540,8 @@ Scope {
     notice = ""
     selectionText = ""
     selectionTarget = ""
-    selectionPending = false
     selectionReplacing = false
+    selectionReplaceTarget = ""
     selectionChoosing = false
     selectionAction = ""
     selectionInstruction = ""
@@ -537,7 +550,7 @@ Scope {
   function replaceSelectionWithAnswer() {
     var decision = TextActions.replaceDecision({
       active: textActionActive,
-      replacing: selectionReplacing,
+      replacing: selectionReplaceTarget !== "",
       busy: busy,
       action: selectionAction,
       choosing: selectionChoosing,
@@ -546,13 +559,15 @@ Scope {
     })
     if (decision !== "send") {
       note(Protocol.selectionFailureMessage(decision))
-      return
+      return decision
     }
     selectionReplacing = true
+    selectionReplaceTarget = selectionTarget
     sendCommand(Protocol.command("selection_replace", {
       text: TextActions.replacementFromAnswer(answerMarkdown),
       address: selectionTarget
     }))
+    return decision
   }
 
   function clearDesktopContextLatch() {
@@ -590,7 +605,9 @@ Scope {
     // for text selected minutes ago, under the same Replace button, and the
     // captured context would be dropped from a chat that is not a text action.
     // A refused submit above changes nothing, which is why this sits after it.
-    if (!selectionSubmitting && textActionActive) endTextAction()
+    // A read still in flight is an action too, and it is the one that arrives
+    // as a chooser over the conversation the user started instead.
+    if (!selectionSubmitting && (textActionActive || selectionPending)) endTextAction()
     var shown = String(shownText === undefined || shownText === null ? "" : shownText).trim()
     var resumeChatId = currentChatId
     submittedResumeChatId = resumeChatId
@@ -608,8 +625,9 @@ Scope {
     // A text action is about the selected text and nothing else. Carrying the
     // captured context along would answer a different question from the one
     // the chip names.
+    var carriesAttachments = !textActionActive
     var attachmentSelections = []
-    if (!textActionActive)
+    if (carriesAttachments)
       for (var attachmentIndex = 0; attachmentIndex < contextAttachments.length; attachmentIndex++) {
         var attachment = contextAttachments[attachmentIndex]
         attachmentSelections.push({ id: attachment.id, representationIds: attachment.selectedRepresentationIds })
@@ -618,7 +636,10 @@ Scope {
     sendCommand(Protocol.submitCommand(
       currentId, prompt, provider, model, context, autoApprove, attachmentSelections, resumeChatId,
       webHandoffProvider, shown))
-    contextAttachments = []
+    // Only what was sent is spent. A text action does not carry the capture,
+    // so it must not consume it either: the user captured it for the question
+    // they have not asked yet.
+    if (carriesAttachments) contextAttachments = []
     answerChanged()
     return true
   }
@@ -1437,7 +1458,11 @@ Scope {
       return
     }
     if (type === "selection") {
+      var wasPending = selectionPending
       selectionPending = false
+      // Nobody asked, or whoever asked is gone. Taking this would put one
+      // window's text behind another window's address.
+      if (!wasPending || selectionTarget === "") return
       if (event.available !== true) {
         selectionTarget = ""
         selectionAction = ""
@@ -1466,7 +1491,10 @@ Scope {
       // while a paste is in flight abandons it and latches another. Ending an
       // action here unconditionally wiped that newer one and left a chooser
       // with no target, whose chips and composer both silently did nothing.
-      if (!selectionReplacing) return
+      // The token and not the flag, because an unrelated error clears the flag
+      // and this answer still has to be readable when it arrives.
+      if (selectionReplaceTarget === "") return
+      selectionReplaceTarget = ""
       selectionReplacing = false
       if (event.replaced === true) {
         endTextAction()
@@ -1545,8 +1573,10 @@ Scope {
     // anything to accept.
     function replaceSelection(): string {
       if (!root.textActionActive) return "no-text-action"
-      root.replaceSelectionWithAnswer()
-      return "ok"
+      // The decision, not "ok". A scripted caller has only this to go on, and
+      // every refusal used to read as success.
+      var decision = root.replaceSelectionWithAnswer()
+      return decision === "send" ? "ok" : decision
     }
     function continueInHerdr() { root.continueInHerdr() }
     function history() { root.routeIpc("history") }
@@ -1614,6 +1644,9 @@ Scope {
     onExited: function(exitCode, exitStatus) {
       root.processStarted = false
       root.initialized = false
+      // Nothing is going to answer the read now, and leaving it in flight
+      // would refuse every later text action with "still reading".
+      root.selectionPending = false
       root.pendingPermission = null
       root.permissionQueue = []
       if (root.harnessRestartPending) {
