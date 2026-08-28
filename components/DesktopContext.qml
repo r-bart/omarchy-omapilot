@@ -79,8 +79,12 @@ QtObject {
     var toplevel = isShellToplevel(Hyprland.activeToplevel) ? null : Hyprland.activeToplevel
     if (!toplevel) return ({ address: "", appId: "", title: "" })
     var ipc = toplevel.lastIpcObject || {}
+    // The toplevel's own property first: lastIpcObject is populated lazily, so
+    // a window that appeared a moment ago can have no address in it yet, and a
+    // text action would refuse with no target for no reason the user can see.
     return ({
-      address: Protocol.windowAddress(ipc.address),
+      address: Protocol.windowAddress(toplevel.address)
+        || Protocol.windowAddress(ipc.address),
       appId: appIdFor(toplevel),
       title: String(toplevel.title || ipc.title || "")
     })
