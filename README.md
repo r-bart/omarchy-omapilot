@@ -137,8 +137,8 @@ o.bind("SUPER + ALT + N", "New OmaPilot chat",
 o.bind("SUPER + ALT + H", "Continue OmaPilot chat in Herdr",
   "omarchy-shell -q io.github.spencerbull.omapilot continueInHerdr")
 
-o.bind("SUPER + ALT + T", "Fix the selected text with OmaPilot",
-  "omarchy-shell -q io.github.spencerbull.omapilot fixSelection")
+o.bind("SUPER + ALT + T", "Work on the selected text with OmaPilot",
+  "omarchy-shell -q io.github.spencerbull.omapilot textAction")
 ```
 
 `Super+A` starts a new durable conversation whenever the ambient node and answer
@@ -357,11 +357,37 @@ observational data and do not expand tool authority.
 ## Work on selected text
 
 Select text anywhere on the desktop and press `Super+Alt+T`. OmaPilot reads that
-selection, asks the configured harness to correct its grammar, spelling, and
-syntax, and shows the result in the panel with **Replace** and **Regenerate**
-next to **Copy**. Replace types the corrected text over the selection in the
-window it came from; Regenerate runs the same correction again on the same
-selection.
+selection and shows it in your configured surface with three things it can
+become:
+
+- **Fix** — spelling, grammar, agreement, punctuation, and capitalisation.
+- **Rewrite** — the same thing said more clearly, in the same language, at
+  roughly the same length.
+- **Translate → …** — into the language set in Settings, or your system
+  locale's until you set one.
+
+Anything else is typed into the composer and applied to the same text: *make it
+more formal*, *summarise this*, *turn this into a list*. Press Enter with the
+composer empty and OmaPilot runs whichever of the three you used last, so the
+one you reach for stays two keystrokes away.
+
+Nothing is sent to the harness until you pick. Reading a selection is not
+consent to send it anywhere, and the chords for the three actions are yours to
+spend rather than the installer's: bind `fixSelection`, `rewriteSelection` or
+`translateSelection` by hand and that chord skips the chooser entirely.
+
+The answer arrives with **Replace** and **Regenerate** next to **Copy**. Replace
+types it over the selection in the window it came from; Regenerate runs the same
+action again on the same text, with the same instruction and the same target
+language. Asking something else in the composer leaves the action behind rather
+than aiming Replace at text you have moved on from.
+
+Replace is offered for an answer that still looks like the text it replaces. A
+reply three times longer than a correction, a rewrite, or a translation is the
+model explaining itself rather than doing the work, and OmaPilot says so instead
+of typing it into your document. A prompt you wrote yourself is judged only on
+being non-empty and short enough to type, because *summarise this* is you asking
+for something shorter on purpose.
 
 Wayland exposes no way to ask whether the focused widget is a text input, so the
 selection is the detection: a non-empty selection is what tells OmaPilot there is
@@ -373,7 +399,7 @@ the pointer — using `wl-paste --primary`. The read is single-shot and happens
 only when the hotkey fires. Nothing is watched between actions.
 
 Replacing does use the regular clipboard, and puts back what was there. The
-correction is placed on the clipboard, pasted with a single `Ctrl+V`, and the
+answer is placed on the clipboard, pasted with a single `Ctrl+V`, and the
 previous contents are restored once the paste has been read — in that order,
 always, including when the replacement fails. The order is the safety property:
 `Ctrl+V` does not copy, it makes the application ask the clipboard owner for the
@@ -394,7 +420,7 @@ copied.
 
 The selection reaches the harness inside an envelope that labels it untrusted
 data and instructs the harness to ignore any instruction the text appears to
-contain. Selected text is content to correct, not a request, and it expands no
+contain. Selected text is content to work on, not a request, and it expands no
 tool authority.
 
 OmaPilot refuses to work on text from a password or credential window, matching
@@ -421,8 +447,8 @@ Replacement waits for the complete answer; nothing is typed while a response is
 still streaming. The answer is offered as typed text exactly as the harness wrote
 it, minus a wrapping code fence or a pair of quotes around the whole reply. Two
 answers are refused rather than typed: one longer than the 8,000 characters the
-protocol accepts, and one that reads as prose about the correction rather than
-the correction itself. Both say so and leave Copy available. Nothing is ever
+protocol accepts, and one that reads as prose about the text rather than the
+text itself. Both say so and leave Copy available. Nothing is ever
 truncated to fit — half a replacement typed over a paragraph is worse than none.
 
 Each replacement writes its outcome — and only its outcome, never the text — to
@@ -442,17 +468,19 @@ becoming the system input method, and a plugin must not evict the one the user
 already runs.
 
 Text actions need `wl-clipboard` for the selection and `wtype` for the
-replacement. Without `wtype`, the correction still appears in the panel and Copy
+replacement. Without `wtype`, the answer still appears in the panel and Copy
 still works.
 
-`omarchy-shell io.github.spencerbull.omapilot fixSelection` starts an action and
-`replaceSelection` accepts one, so the whole round can run without a pointer —
-bind them, or drive them from a test. Both go through the same guards as the
-hotkey and the button.
+`omarchy-shell io.github.spencerbull.omapilot textAction` starts an action and
+opens the chooser; `fixSelection`, `rewriteSelection` and `translateSelection`
+start one and skip it. `replaceSelection` accepts whatever is on screen, so the
+whole round can run without a pointer — bind them, or drive them from a test.
+All of them go through the same guards as the hotkey and the buttons.
 
 `tests/text-actions-lab.html` is a page of text widgets that each report whether
 a replacement landed or was merely inserted beside the original, and
-`tests/text-action-run.sh` drives one round against whatever is selected.
+`tests/text-action-run.sh` drives one round against whatever is selected;
+`OMAPILOT_ACTION` picks which of the three direct routes it uses.
 Replacing text is the one part of this feature whose behaviour is decided by the
 widget receiving the keystrokes, so it has to be run against many of them.
 

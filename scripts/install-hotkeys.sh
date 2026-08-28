@@ -161,7 +161,7 @@ descriptions=(
   "Cancel OmaPilot voice mode"
   "New OmaPilot chat"
   "Continue OmaPilot chat in Herdr"
-  "Fix the selected text with OmaPilot"
+  "Work on the selected text with OmaPilot"
 )
 commands=(
   "omarchy-shell -q io.github.spencerbull.omapilot voiceToggle"
@@ -169,7 +169,7 @@ commands=(
   "omarchy-shell -q io.github.spencerbull.omapilot voiceCancel"
   "omarchy-shell -q io.github.spencerbull.omapilot newChat"
   "omarchy-shell -q io.github.spencerbull.omapilot continueInHerdr"
-  "omarchy-shell -q io.github.spencerbull.omapilot fixSelection"
+  "omarchy-shell -q io.github.spencerbull.omapilot textAction"
 )
 
 block_file=$(mktemp "$state_dir/hotkeys.XXXXXX")

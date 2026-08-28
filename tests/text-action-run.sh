@@ -9,12 +9,25 @@
 #
 # Select text in the target window, then run this from anywhere. Nothing here
 # touches the regular clipboard.
+#
+# OMAPILOT_ACTION picks which of the direct routes to drive; they are the ones
+# that skip the chooser, which is what makes the round scriptable at all. The
+# free prompt is not here because it is typed into the composer.
 set -euo pipefail
 
 plugin="io.github.spencerbull.omapilot"
 timeout_seconds="${OMAPILOT_LAB_TIMEOUT:-90}"
+action="${OMAPILOT_ACTION:-fixSelection}"
 
 say() { printf '%s\n' "$*" >&2; }
+
+case "$action" in
+  fixSelection | rewriteSelection | translateSelection) ;;
+  *)
+    say "OMAPILOT_ACTION must be fixSelection, rewriteSelection or translateSelection"
+    exit 1
+    ;;
+esac
 
 command -v omarchy-shell >/dev/null || { say "omarchy-shell is not on PATH"; exit 1; }
 command -v wl-paste >/dev/null || { say "wl-paste is not installed"; exit 1; }
@@ -24,11 +37,12 @@ if [[ -z ${selection//[[:space:]]/} ]]; then
   say "Nothing is selected. Select text in the target window first."
   exit 1
 fi
+say "action    : ${action}"
 say "selection : ${selection}"
 
 # Fires the same route the hotkey does, so the surface the user configured is
 # the one that opens.
-omarchy-shell "$plugin" fixSelection >/dev/null
+omarchy-shell "$plugin" "$action" >/dev/null
 
 deadline=$((SECONDS + timeout_seconds))
 state=""

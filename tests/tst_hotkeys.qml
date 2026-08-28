@@ -82,6 +82,13 @@ o.bind("SUPER + ALT + T", "Fix the selected text with OmaPilot",\n\
   }
 
   function test_namesTheMethodEachChordCalls() {
+    // The chord the installer writes opens the chooser; fixSelection is still
+    // a method, because a bindings.lua written before the chooser existed
+    // still calls it and that file belongs to the user.
+    compare(Hotkeys.methodFor(
+      "omarchy-shell -q io.github.spencerbull.omapilot textAction", pluginId), "textAction")
+    compare(Hotkeys.methodFor(
+      "omarchy-shell -q io.github.spencerbull.omapilot rewriteSelection", pluginId), "rewriteSelection")
     compare(Hotkeys.methodFor(
       "omarchy-shell -q io.github.spencerbull.omapilot fixSelection", pluginId), "fixSelection")
     compare(Hotkeys.methodFor(

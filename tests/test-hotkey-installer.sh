@@ -107,11 +107,27 @@ test "$(grep -Fc -- '-- BEGIN OmaPilot managed hotkeys' "$bindings")" -eq 1
 grep -Fq -- 'hl.unbind("SUPER + ALT + X")' "$bindings"
 grep -Fq -- 'io.github.spencerbull.omapilot voiceCancel' "$bindings"
 grep -Fq -- 'hl.unbind("SUPER + ALT + T")' "$bindings"
-grep -Fq -- 'io.github.spencerbull.omapilot fixSelection' "$bindings"
+grep -Fq -- 'io.github.spencerbull.omapilot textAction' "$bindings"
 test "$(sha256sum "$bindings")" != "$legacy_checksum"
 upgraded_checksum=$(sha256sum "$bindings")
 "$installed_installer"
 test "$(sha256sum "$bindings")" = "$upgraded_checksum"
+
+# A bindings.lua written by the installer before the chooser existed still
+# calls fixSelection, and that chord is the user's now. The installer leaves it
+# alone, the method still exists, and nothing about the upgrade takes away the
+# shortcut somebody already learned.
+cp -- "$clean_bindings" "$bindings"
+cat >>"$bindings" <<'LUA'
+-- BEGIN OmaPilot managed hotkeys
+hl.unbind("SUPER + ALT + T")
+o.bind("SUPER + ALT + T", "Fix the selected text with OmaPilot",
+  "omarchy-shell -q io.github.spencerbull.omapilot fixSelection")
+-- END OmaPilot managed hotkeys
+LUA
+"$installed_installer"
+grep -Fq -- 'io.github.spencerbull.omapilot fixSelection' "$bindings"
+assert_absent 'io.github.spencerbull.omapilot textAction' "$bindings"
 
 for mode in --remove --force; do
   cp -- "$clean_bindings" "$bindings"
