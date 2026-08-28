@@ -300,13 +300,13 @@ Scope {
     })
     if (decision !== "start") {
       noteSelectionUnavailable(decision)
-      return false
+      return decision
     }
     endTextAction()
     selectionTarget = where.address
     selectionPending = true
     sendCommand(Protocol.command("selection_read"))
-    return true
+    return decision
   }
 
   // The panel opens in the same tick this is decided, so defer the notice or it
@@ -1290,7 +1290,15 @@ if (type === "selection") {
     function hide() { root.routeIpc("hide") }
     function toggle() { root.routeIpc("toggle") }
     function newChat() { root.routeIpc("newChat") }
-    function fixSelection(): string { root.ipcSelectionRequested(); return "ok" }
+    // Starts the action here, then asks whatever surface is live to show
+    // itself. Latching before the surface appears is the whole point: opening
+    // first would make OmaPilot the active window. The answer is the decision,
+    // so a caller that gets nothing can see why.
+    function fixSelection(): string {
+      var decision = root.beginTextAction()
+      root.ipcSelectionRequested()
+      return decision
+    }
     // The same call the Replace button makes, so a scripted run — or a
     // hotkey — can accept a correction without a pointer. The guards stay in
     // replaceSelectionWithAnswer; this only reports whether there was
