@@ -295,7 +295,13 @@ Panel {
     function onContextBrowserPickerRequested() { root.closeForExternalHandoff() }
     // The store has already submitted the action by the time this arrives; the
     // panel only has to be showing the chat when the answer starts.
-    function onSelectionReady(_text) { root.showChat(false) }
+    // The store has latched the window and read the text; the panel has to be
+    // showing the chat lane, and the composer has to be ready to take a free
+    // prompt, since Enter there is now the fourth action.
+    function onSelectionReady(_text) {
+      root.showChat(false)
+      Qt.callLater(function() { composer.forceInputFocus() })
+    }
     function onHotkeyInstalled() {
       if (root.voiceSetupReady) root.persistSettings({ onboardingComplete: true })
     }
@@ -859,7 +865,7 @@ Panel {
 
               Button {
                 text: "Regenerate"
-                tooltipText: "Correct the same selection again"
+                tooltipText: "Run the same action on the same selection again"
                 visible: OmaPilot.OmaPilotStore.textActionActive
                 enabled: !OmaPilot.OmaPilotStore.busy
                   && !OmaPilot.OmaPilotStore.selectionReplacing
@@ -907,12 +913,30 @@ Panel {
           }
         }
 
+        // A selection waiting to be told what to do takes the empty state's
+        // place: the quick actions ask about the desktop, and this asks about
+        // the text the user just highlighted.
+        OmaPilot.TextActionChooser {
+          id: textActionChooser
+          Layout.fillWidth: true
+          backend: OmaPilot.OmaPilotStore
+          foreground: root.foreground
+          background: root.surface
+          accent: root.accent
+          fontFamily: root.fontFamily
+          onActionRequested: function(action) {
+            if (OmaPilot.OmaPilotStore.runTextAction(action, ""))
+              answerScroll.resetForNewTurn()
+          }
+        }
+
         OmaPilot.QuickActions {
           id: quickActions
           Layout.fillWidth: true
           visible: OmaPilot.OmaPilotStore.question === ""
             && OmaPilot.OmaPilotStore.answerMarkdown === ""
             && !OmaPilot.OmaPilotStore.busy
+            && !OmaPilot.OmaPilotStore.selectionChoosing
             && quickActions.actions.length > 0
           actions: root.quickActionItems
           foreground: root.foreground

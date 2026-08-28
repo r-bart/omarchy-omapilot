@@ -465,6 +465,10 @@ if grep -Eq 'TextInput|TextEdit|TextField|TextArea' "$repo_dir/components/TextAc
 fi
 # The composer is the fourth action while a selection waits, in both fields.
 test "$(grep -Fc 'What should I do with this text?' "$repo_dir/components/Composer.qml")" -eq 2
+# Both surfaces put the chooser where their empty state already lives, and
+# neither shows the desktop quick actions over it.
+grep -Fq 'OmaPilot.TextActionChooser {' "$repo_dir/Panel.qml"
+grep -Fq '&& !OmaPilot.OmaPilotStore.selectionChoosing' "$repo_dir/Panel.qml"
 grep -Fq 'property string webHandoffProvider: "duckduckgo"' \
   "$repo_dir/components/OmaPilotStore.qml"
 # The submit call now carries the shown question after the handoff provider,
