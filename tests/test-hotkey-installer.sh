@@ -79,6 +79,7 @@ cat >>"$bindings" <<'LUA'
 o.bind("SUPER + SHIFT + A", "My existing voice chat", "my-voice-chat")
 o.bind("SUPER + ALT + X", "My existing voice cancel", "my-voice-cancel")
 o.bind("SUPER + ALT + H", "My existing handoff", "my-handoff")
+o.bind("SUPER + ALT + T", "My existing text fix", "my-text-fix")
 LUA
 all_collisions_checksum=$(sha256sum "$bindings")
 if "$installed_installer" 2>/dev/null; then
@@ -105,6 +106,8 @@ legacy_checksum=$(sha256sum "$bindings")
 test "$(grep -Fc -- '-- BEGIN OmaPilot managed hotkeys' "$bindings")" -eq 1
 grep -Fq -- 'hl.unbind("SUPER + ALT + X")' "$bindings"
 grep -Fq -- 'io.github.spencerbull.omapilot voiceCancel' "$bindings"
+grep -Fq -- 'hl.unbind("SUPER + ALT + T")' "$bindings"
+grep -Fq -- 'io.github.spencerbull.omapilot fixSelection' "$bindings"
 test "$(sha256sum "$bindings")" != "$legacy_checksum"
 upgraded_checksum=$(sha256sum "$bindings")
 "$installed_installer"
