@@ -469,6 +469,11 @@ test "$(grep -Fc 'What should I do with this text?' "$repo_dir/components/Compos
 # neither shows the desktop quick actions over it.
 grep -Fq 'OmaPilot.TextActionChooser {' "$repo_dir/Panel.qml"
 grep -Fq '&& !OmaPilot.OmaPilotStore.selectionChoosing' "$repo_dir/Panel.qml"
+grep -Fq 'OmaPilot.TextActionChooser {' "$repo_dir/components/ConsoleContent.qml"
+grep -Fq '&& !root.backend.selectionChoosing' "$repo_dir/components/ConsoleContent.qml"
+# Regenerate runs whatever ran, not the proofread, and both surfaces say so.
+test "$(grep -Fc 'Run the same action on the same selection again' \
+  "$repo_dir/Panel.qml" "$repo_dir/components/ConsoleContent.qml" | grep -c ':1$')" -eq 2
 grep -Fq 'property string webHandoffProvider: "duckduckgo"' \
   "$repo_dir/components/OmaPilotStore.qml"
 # The submit call now carries the shown question after the handoff provider,

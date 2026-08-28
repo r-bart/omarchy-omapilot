@@ -151,8 +151,11 @@ Item {
     content.showChat(false)
   }
 
-  // A text action lands in the chat lane too: its answer, and the Replace and
-  // Regenerate controls under it, only render there.
+  // A text action lands in the chat lane too: the chooser, the answer, and the
+  // Replace and Regenerate controls under it only render there. open(true)
+  // already queues the composer focus, and it lands after this returns, by
+  // which time the lane is the chat one — which is what makes Enter the fourth
+  // action rather than a keystroke into nothing.
   function openTextAction() {
     open(true)
     content.showChat(false)

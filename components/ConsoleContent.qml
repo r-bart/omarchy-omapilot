@@ -541,7 +541,7 @@ Item {
 
                 Button {
                   text: "Regenerate"
-                  tooltipText: "Correct the same selection again"
+                  tooltipText: "Run the same action on the same selection again"
                   visible: root.backend && root.backend.textActionActive
                   enabled: root.backend && !root.backend.busy
                     && !root.backend.selectionReplacing
@@ -819,11 +819,30 @@ Item {
       onEscapeRequested: root.handleEscape()
     }
 
+    // The same place the quick actions occupy, for the same reason: with a
+    // selection waiting this is what there is to do, and two rows of things to
+    // press is a menu rather than an empty state.
+    OmaPilot.TextActionChooser {
+      id: textActionChooser
+      Layout.fillWidth: true
+      visible: root.viewMode === "chat" && root.backend
+        && root.backend.selectionChoosing === true
+      backend: root.backend
+      foreground: root.foreground
+      background: root.background
+      accent: root.accent
+      fontFamily: root.fontFamily
+      onActionRequested: function(action) {
+        if (root.backend.runTextAction(action, "")) turnScroll.resetForNewTurn()
+      }
+    }
+
     OmaPilot.QuickActions {
       id: quickActions
       Layout.fillWidth: true
       visible: root.viewMode === "chat" && !root.hasTurn
-        && root.backend && !root.backend.busy && quickActions.actions.length > 0
+        && root.backend && !root.backend.busy
+        && !root.backend.selectionChoosing && quickActions.actions.length > 0
       actions: root.quickActionItems
       foreground: root.foreground
       background: root.background
