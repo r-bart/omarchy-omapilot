@@ -1,0 +1,167 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>OmaPilot text action lab</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 2rem;
+    background: #12151c; color: #d6dae3;
+    font: 14px/1.5 ui-monospace, "JetBrains Mono", monospace;
+  }
+  h1 { font-size: 1rem; margin: 0 0 .25rem; letter-spacing: .04em; }
+  p.lede { margin: 0 0 1.75rem; color: #7f8796; max-width: 62ch; }
+  .case { border: 1px solid #232838; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+  .head { display: flex; align-items: baseline; gap: .75rem; margin-bottom: .6rem; }
+  .name { font-weight: 600; }
+  .kind { color: #7f8796; font-size: .8rem; }
+  input, textarea, .editable {
+    width: 100%; box-sizing: border-box;
+    background: #0d1017; color: #e7ebf2;
+    border: 1px solid #2c3244; border-radius: 5px;
+    padding: .55rem .7rem;
+    font: inherit;
+  }
+  textarea { min-height: 4.5rem; resize: vertical; }
+  .editable { min-height: 2.6rem; }
+  input:focus, textarea:focus, .editable:focus { outline: 2px solid #4c7dff; outline-offset: 1px; }
+  .verdict { margin-top: .55rem; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+  .badge { padding: .15rem .55rem; border-radius: 999px; font-size: .75rem; letter-spacing: .05em; }
+  .untouched { background: #232838; color: #8b93a3; }
+  .replaced  { background: #123524; color: #55d98a; }
+  .inserted  { background: #3a2410; color: #f0a44a; }
+  .mangled   { background: #3a1418; color: #f0666f; }
+  .detail { color: #7f8796; font-size: .8rem; }
+  .bar { display: flex; gap: .75rem; align-items: center; margin-bottom: 1.5rem; }
+  button {
+    background: #1b2130; color: #d6dae3; border: 1px solid #2c3244;
+    border-radius: 5px; padding: .4rem .8rem; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: #4c7dff; }
+  #summary { color: #7f8796; }
+</style>
+
+<h1>OmaPilot text action lab</h1>
+<p class="lede">
+  Every field starts from the same wrong sentence. Select it, run a text action,
+  press Replace, and each field reports on its own whether the corrected text
+  <em>replaced</em> the selection or was merely <em>inserted</em> next to it.
+</p>
+
+<div class="bar">
+  <button id="reset">Reset every field</button>
+  <span id="summary"></span>
+</div>
+
+<div id="cases"></div>
+
+<script>
+  const ORIGINAL = "este frase tiene varios errores gramatical y no esta bien escrito";
+
+  // The widget kinds a replacement actually has to survive. The controlled
+  // input is the one most web apps really are: its value is owned by a state
+  // variable and written back on every input event, the way React does it.
+  const CASES = [
+    { id: "text",       name: "Plain text input",  kind: "input[type=text]" },
+    { id: "search",     name: "Search input",      kind: "input[type=search]" },
+    { id: "area",       name: "Textarea",          kind: "textarea (multi-line)" },
+    { id: "editable",   name: "Rich text",         kind: "div[contenteditable]" },
+    { id: "controlled", name: "Controlled input",  kind: "input, value owned by state (React-style)" }
+  ];
+
+  const host = document.getElementById("cases");
+  const state = {};
+
+  function fieldMarkup(item) {
+    if (item.id === "area") return `<textarea id="f-${item.id}" spellcheck="false"></textarea>`;
+    if (item.id === "editable")
+      return `<div id="f-${item.id}" class="editable" contenteditable="plaintext-only" spellcheck="false"></div>`;
+    const type = item.id === "search" ? "search" : "text";
+    return `<input id="f-${item.id}" type="${type}" spellcheck="false" autocomplete="off">`;
+  }
+
+  for (const item of CASES) {
+    const box = document.createElement("div");
+    box.className = "case";
+    box.innerHTML = `
+      <div class="head">
+        <span class="name">${item.name}</span>
+        <span class="kind">${item.kind}</span>
+      </div>
+      ${fieldMarkup(item)}
+      <div class="verdict">
+        <span class="badge untouched" id="b-${item.id}">UNTOUCHED</span>
+        <span class="detail" id="d-${item.id}"></span>
+      </div>`;
+    host.appendChild(box);
+  }
+
+  const read = (element) =>
+    element.isContentEditable ? element.textContent : element.value;
+  const write = (element, value) => {
+    if (element.isContentEditable) element.textContent = value;
+    else element.value = value;
+  };
+
+  // Verdict without knowing what the model will answer: only whether the
+  // original survived, and whether anything else arrived beside it.
+  function verdict(current) {
+    const now = current.trim().replace(/\s+/g, " ");
+    const was = ORIGINAL.trim().replace(/\s+/g, " ");
+    if (now === was) return { kind: "untouched", label: "UNTOUCHED", detail: "nothing was typed here" };
+    if (now === "") return { kind: "mangled", label: "EMPTY", detail: "the field was emptied" };
+    if (now.includes(was))
+      return {
+        kind: "inserted",
+        label: "INSERTED",
+        detail: "the original is still there, with the correction beside it"
+      };
+    // The original is gone. If a run of it survives, something ate only part.
+    const half = was.slice(0, Math.floor(was.length / 2));
+    if (now.includes(half))
+      return { kind: "mangled", label: "PARTIAL", detail: "half the original survived — the replacement is ragged" };
+    return { kind: "replaced", label: "REPLACED", detail: "the original is gone: the selection was replaced" };
+  }
+
+  function refresh() {
+    const counts = { replaced: 0, inserted: 0, mangled: 0, untouched: 0 };
+    for (const item of CASES) {
+      const element = document.getElementById(`f-${item.id}`);
+      const result = verdict(read(element));
+      counts[result.kind]++;
+      const badge = document.getElementById(`b-${item.id}`);
+      badge.className = `badge ${result.kind}`;
+      badge.textContent = result.label;
+      document.getElementById(`d-${item.id}`).textContent = result.detail;
+    }
+    document.getElementById("summary").textContent =
+      `${counts.replaced} replaced · ${counts.inserted} inserted · ${counts.mangled} mangled · ${counts.untouched} untouched`;
+  }
+
+  function reset() {
+    for (const item of CASES) {
+      const element = document.getElementById(`f-${item.id}`);
+      write(element, ORIGINAL);
+      state[item.id] = ORIGINAL;
+    }
+    refresh();
+  }
+
+  for (const item of CASES) {
+    const element = document.getElementById(`f-${item.id}`);
+    element.addEventListener("input", () => {
+      // The controlled case writes its state back over whatever was typed,
+      // which is exactly how a framework-owned input can reject synthetic input.
+      if (item.id === "controlled") {
+        state[item.id] = element.value;
+        element.value = state[item.id];
+      }
+      refresh();
+    });
+  }
+
+  document.getElementById("reset").addEventListener("click", reset);
+  // Typing is not the only way a field changes; poll so a paste or an
+  // out-of-band write still shows up.
+  setInterval(refresh, 400);
+  reset();
+</script>
