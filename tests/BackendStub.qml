@@ -32,6 +32,7 @@ QtObject {
   property bool textActionActive: false
   property bool selectionReplacing: false
   property string notice: ""
+  property var installedHotkeys: []
   property string ttsProvider: "elevenlabs"
   property string ttsModel: ""
   property string ttsVoice: ""

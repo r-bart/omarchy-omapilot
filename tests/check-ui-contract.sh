@@ -444,6 +444,13 @@ grep -Fq 'property string webHandoffProvider: "duckduckgo"' \
 # chat record keep the text the user selected.
 grep -Fq 'webHandoffProvider, shown))' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'function submit(text, shownText)' "$repo_dir/components/OmaPilotStore.qml"
+# The hotkey listing reads the user's bindings and never writes them. Only
+# the installer script may touch that file, and only its own marked block.
+grep -Fq 'watchChanges: true' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'Hotkeys.installedChords' "$repo_dir/components/OmaPilotStore.qml"
+if grep -nE 'hyprlandBindings\.(setText|write)|bindings\.lua"\)*\s*,\s*"w' "$repo_dir/components/OmaPilotStore.qml"; then
+  fail "the store must never write the user's Hyprland bindings"
+fi
 grep -Fq 'DesktopContext.snapshot()' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'Protocol.hasFeature(event.features, "desktop-context")' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'import Quickshell.Hyprland' "$repo_dir/components/DesktopContext.qml"
@@ -991,6 +998,10 @@ QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
   -input "$repo_dir/tests/tst_text_actions.qml" \
   -import "$repo_dir" || fail "text action tests failed"
+
+QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner \
+  -input "$repo_dir/tests/tst_hotkeys.qml" \
+  -import "$repo_dir" || fail "hotkey listing tests failed"
 
 smoke_root="$(mktemp -d)"
 cp "$repo_dir/tests/smoke.qml" "$smoke_root/shell.qml"
