@@ -110,6 +110,11 @@ Item {
     pendingShape = null
     if (backend && typeof backend.clearDesktopContextLatch === "function")
       backend.clearDesktopContextLatch()
+    // The panel drops a live text action when it closes and this surface did
+    // not, so a console user kept an action pointing at a window address that
+    // had stopped meaning anything.
+    if (backend && typeof backend.dismissTextAction === "function")
+      backend.dismissTextAction()
     resetLanes.restart()
   }
 
@@ -142,6 +147,13 @@ Item {
   // renders there, and an approval the user cannot see is a stalled turn with
   // no indication of why.
   function openApproval() {
+    open(true)
+    content.showChat(false)
+  }
+
+  // A text action lands in the chat lane too: its answer, and the Replace and
+  // Regenerate controls under it, only render there.
+  function openTextAction() {
     open(true)
     content.showChat(false)
   }

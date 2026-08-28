@@ -513,6 +513,13 @@ Item {
     function onIpcToggleRequested() { if (consoleLoader.item) consoleLoader.item.toggle() }
     function onIpcHistoryRequested() { if (consoleLoader.item) consoleLoader.item.openHistory() }
     function onIpcSettingsRequested() { if (consoleLoader.item) consoleLoader.item.openSettings() }
+    // Same ordering the panel needs: latch the window that owns the selection
+    // before this surface is shown, or the replacement is typed into OmaPilot
+    // instead of the document.
+    function onIpcSelectionRequested() {
+      OmaPilot.OmaPilotStore.beginTextAction()
+      if (consoleLoader.item) consoleLoader.item.openTextAction()
+    }
     function onContextAttachmentAdded() { if (consoleLoader.item) consoleLoader.item.open(true) }
     function onPendingPermissionChanged() {
       if (OmaPilot.OmaPilotStore.pendingPermission !== null && consoleLoader.item)

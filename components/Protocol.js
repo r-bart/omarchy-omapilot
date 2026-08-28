@@ -90,12 +90,15 @@ function normalizedAuthEvent(raw) {
   return result
 }
 
-function submitCommand(id, question, provider, model, desktopContext, dangerousAutoApprove, contextAttachments, resumeChatId, webHandoffProvider) {
+function submitCommand(id, question, provider, model, desktopContext, dangerousAutoApprove, contextAttachments, resumeChatId, webHandoffProvider, displayQuestion) {
   var payload = command("submit", {
     id: String(id || ""),
     question: String(question || ""),
     provider: normalizedProvider(provider) || "builtin"
   })
+  // Only when it actually differs, so an ordinary question sends one string.
+  var shown = String(displayQuestion === undefined || displayQuestion === null ? "" : displayQuestion).trim()
+  if (shown !== "" && shown !== String(question || "").trim()) payload.displayQuestion = shown
   var previousChat = String(resumeChatId || "")
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(previousChat))
     payload.resumeChatId = previousChat
@@ -244,6 +247,53 @@ function safeContextText(value, limit) {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, limit)
+}
+
+// A compositor window handle, accepted only in its exact form. It is the
+// target a text action types into, so anything that is not plainly an address
+// is refused rather than repaired.
+function windowAddress(value) {
+  var text = String(value === undefined || value === null ? "" : value)
+  return /^0x[0-9a-f]{1,30}$/i.test(text) ? text : ""
+}
+
+// Selections are multi-line, so this keeps newlines and tabs where
+// safeContextText collapses all whitespace. Control and bidirectional-display
+// characters still go.
+function safeSelectionText(value, limit) {
+  return String(value === undefined || value === null ? "" : value)
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, " ")
+    .replace(/^\s+|\s+$/g, "")
+    .slice(0, limit || 8000)
+}
+
+// Why a replacement did not land, in the user's terms. Each reason is a
+// different thing to do next, so none of them collapse into one message.
+function selectionFailureMessage(reason) {
+  var value = String(reason === undefined || reason === null ? "" : reason)
+  if (value === "unsupported") return "Install wtype to replace text"
+  if (value === "invalid_target") return "That window is no longer available"
+  if (value === "focus_failed") return "Could not return to the original window"
+  if (value === "empty") return "There is no replacement text in this answer"
+  if (value === "too_long") return "This answer is too long to type back; copy it instead"
+  if (value === "not_a_replacement") return "This answer reads like an explanation, not a replacement; copy it instead"
+  if (value === "busy") return "Wait for the answer to finish"
+  if (value === "no_action") return "There is no text action to replace"
+  return "Could not replace the text"
+}
+
+// Why a selection could not be read. An empty selection is the common case and
+// reads as guidance, not as an error.
+function selectionUnavailableMessage(reason) {
+  var value = String(reason === undefined || reason === null ? "" : reason)
+  if (value === "unsupported") return "Install wl-clipboard to work on selected text"
+  if (value === "own_surface") return "Go back to the window with your text, then press the hotkey again"
+  if (value === "sensitive") return "OmaPilot will not work on text from a password or credential window"
+  if (value === "pending") return "Still reading the last selection"
+  if (value === "target") return "Select text in a window first"
+  if (value === "failed") return "Could not read the selected text"
+  return "Select some text first"
 }
 
 function isShellAppId(value) {

@@ -29,6 +29,9 @@ QtObject {
   property string transcript: ""
   property string currentChatId: ""
   property string webHandoffProvider: "duckduckgo"
+  property bool textActionActive: false
+  property bool selectionReplacing: false
+  property string notice: ""
   property string ttsProvider: "elevenlabs"
   property string ttsModel: ""
   property string ttsVoice: ""
@@ -79,6 +82,10 @@ QtObject {
 
   signal focusComposerRequested()
 
+  property int replaceCount: 0
+  property int dismissCount: 0
+  property int regenerateCount: 0
+
   function submit(text) { submitCount++; lastSubmitted = String(text || ""); return true }
   function cancel() { cancelCount++ }
   function startDictation() {}
@@ -103,4 +110,7 @@ QtObject {
   function hasPermissionDecision(decision) { return true }
   function permissionChoiceId(decision) { return "reject-once" }
   function permissionOptionsWithoutDenyOnce() { return [] }
+  function replaceSelectionWithAnswer() { replaceCount++ }
+  function dismissTextAction() { dismissCount++ }
+  function regenerateTextAction() { regenerateCount++ }
 }

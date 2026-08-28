@@ -11,6 +11,7 @@ import "components/Presentation.js" as Presentation
 import "components/Protocol.js" as Protocol
 import "components/QuickActions.js" as ActionCatalog
 import "components/StatePhrases.js" as StatePhrases
+import "components/TextActions.js" as TextActions
 
 Panel {
   id: root
@@ -270,6 +271,11 @@ Panel {
       } else Qt.callLater(function() { composer.forceInputFocus() })
     } else {
       OmaPilot.OmaPilotStore.clearDesktopContextLatch()
+      // Putting the panel away abandons a text action: its target address
+      // describes a window as it was when the hotkey fired, and that stops
+      // being true the moment the user goes back to work. Moving to another
+      // OmaPilot surface is not putting it away, which dismissTextAction knows.
+      OmaPilot.OmaPilotStore.dismissTextAction()
     }
   }
 
@@ -287,6 +293,9 @@ Panel {
         OmaPilot.OmaPilotStore.toastRequested("Context capture overlay could not be opened")
     }
     function onContextBrowserPickerRequested() { root.closeForExternalHandoff() }
+    // The store has already submitted the action by the time this arrives; the
+    // panel only has to be showing the chat when the answer starts.
+    function onSelectionReady(_text) { root.showChat(false) }
     function onHotkeyInstalled() {
       if (root.voiceSetupReady) root.persistSettings({ onboardingComplete: true })
     }
@@ -810,6 +819,20 @@ Panel {
               }
             }
 
+            // What a text action needs to tell the user: that nothing was
+            // selected, that the replacement landed, or why it did not. The
+            // store's toast signal has no consumer in this shell, so these
+            // messages get a surface of their own rather than going nowhere.
+            Text {
+              Layout.fillWidth: true
+              text: OmaPilot.OmaPilotStore.notice
+              visible: text !== ""
+              color: Qt.darker(root.foreground, 1.45)
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
+
             // Borderless and quiet. These are follow-ups to an answer, not
             // primary controls, and three outlined buttons under every response
             // was the loudest thing in the old panel.
@@ -818,6 +841,34 @@ Panel {
               visible: OmaPilot.OmaPilotStore.answerMarkdown !== ""
                 || OmaPilot.OmaPilotStore.currentChatId !== ""
               spacing: Style.spacing.md
+
+              Button {
+                text: "Replace"
+                tooltipText: "Type this over the text you selected"
+                visible: OmaPilot.OmaPilotStore.textActionActive
+                enabled: !OmaPilot.OmaPilotStore.busy
+                  && !OmaPilot.OmaPilotStore.selectionReplacing
+                  && OmaPilot.OmaPilotStore.answerMarkdown !== ""
+                foreground: root.foreground
+                background: root.surface
+                accent: root.accent
+                bordered: true
+                focusable: true
+                onClicked: OmaPilot.OmaPilotStore.replaceSelectionWithAnswer()
+              }
+
+              Button {
+                text: "Regenerate"
+                tooltipText: "Correct the same selection again"
+                visible: OmaPilot.OmaPilotStore.textActionActive
+                enabled: !OmaPilot.OmaPilotStore.busy
+                  && !OmaPilot.OmaPilotStore.selectionReplacing
+                foreground: Qt.darker(root.foreground, 1.4)
+                background: root.surface
+                bordered: false
+                focusable: true
+                onClicked: OmaPilot.OmaPilotStore.regenerateTextAction()
+              }
 
               PanelActionButton {
                 iconText: "󰆏"

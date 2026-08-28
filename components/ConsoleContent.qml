@@ -506,9 +506,51 @@ Item {
                 Accessible.name: text
               }
 
+              // What a text action has to tell the user: that nothing was
+              // selected, that the replacement landed, or why it did not. The
+              // store's toast signal has no consumer in this shell, so these
+              // messages get a surface of their own rather than going nowhere.
+              Text {
+                Layout.fillWidth: true
+                text: root.backend ? root.backend.notice : ""
+                visible: text !== ""
+                color: Qt.darker(root.foreground, 1.45)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                wrapMode: Text.WordWrap
+              }
+
               RowLayout {
                 Layout.fillWidth: true
                 spacing: Style.spacing.md
+
+                Button {
+                  text: "Replace"
+                  tooltipText: "Type this over the text you selected"
+                  visible: root.backend && root.backend.textActionActive
+                  enabled: root.backend && !root.backend.busy
+                    && !root.backend.selectionReplacing
+                    && root.backend.answerMarkdown !== ""
+                  foreground: root.foreground
+                  background: root.background
+                  accent: root.accent
+                  bordered: true
+                  focusable: true
+                  onClicked: root.backend.replaceSelectionWithAnswer()
+                }
+
+                Button {
+                  text: "Regenerate"
+                  tooltipText: "Correct the same selection again"
+                  visible: root.backend && root.backend.textActionActive
+                  enabled: root.backend && !root.backend.busy
+                    && !root.backend.selectionReplacing
+                  foreground: Qt.darker(root.foreground, 1.4)
+                  background: root.background
+                  bordered: false
+                  focusable: true
+                  onClicked: root.backend.regenerateTextAction()
+                }
 
                 OmaPilot.CopyButton {
                   idleTooltip: "Copy answer"

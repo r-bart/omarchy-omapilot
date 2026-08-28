@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import "Protocol.js" as Protocol
 import "SessionLifecycle.js" as SessionLifecycle
+import "TextActions.js" as TextActions
 
 // One process and one ephemeral UI model for every screen. The broker is the
 // only durable authority; this singleton merely normalizes its NDJSON stream
@@ -111,6 +112,18 @@ Scope {
   property var latchedCaptureTarget: null
   property var contextAttachments: []
   property bool brokerContextAttachmentsSupported: false
+  property bool brokerSelectionSupported: false
+  // One text action at a time. The window it came from and the text it will
+  // replace live only while that action is on screen; ending the action drops
+  // both. The address is a compositor handle and never reaches a prompt.
+  property string selectionTarget: ""
+  property string selectionText: ""
+  property bool selectionPending: false
+  property bool selectionReplacing: false
+  // What OmaPilot has to say to the user in passing. The store used to emit
+  // toastRequested for this and nothing in this shell consumes that signal, so
+  // every one of those messages went nowhere. Both surfaces render this.
+  property string notice: ""
   property bool harnessRestartPending: false
   property string pendingContextRequestId: ""
   property bool continuationBlocked: false
@@ -139,6 +152,7 @@ Scope {
   readonly property bool browserCompanionBusy: browserCompanionStatus.phase === "installing"
     || browserCompanionStatus.phase === "removing"
   readonly property bool hotkeyBusy: hotkeyInstaller.running
+  readonly property bool textActionActive: selectionText !== "" && selectionTarget !== ""
   readonly property bool builtinAuthBusy: ["starting", "prompt", "info", "browser", "device_code"]
     .indexOf(String(builtinAuth.phase || "")) >= 0
 
@@ -213,6 +227,10 @@ Scope {
     surfaceHandoffPending = false
     return true
   }
+
+  signal ipcSelectionRequested()
+  signal selectionReady(string text)
+  signal selectionUnavailable(string reason)
 
   function routeIpc(method) {
     if (method === "open" || method === "show") ipcOpenRequested()
@@ -353,6 +371,105 @@ Scope {
     if (context && context.activeWindow) latchedActiveWindow = context.activeWindow
   }
 
+// A text action starts by latching the window that owns the selection,
+  // before the panel takes keyboard focus. That ordering is the same one
+  // desktop context already depends on, and here it decides where a
+  // replacement is typed, so it cannot be deferred.
+  // Every refusal below leaves an action already on screen untouched. A hotkey
+  // that cannot start a new one must never take away the Replace the user was
+  // reaching for. The decision itself lives in TextActions so it can be tested.
+  function beginTextAction() {
+    var where = DesktopContext.replaceTarget()
+    var decision = TextActions.beginDecision({
+      pending: selectionPending,
+      initialized: initialized,
+      supported: brokerSelectionSupported,
+      ownSurface: DesktopContext.activeIsOwnSurface(),
+      sensitive: TextActions.sensitiveWindow(where.appId, where.title),
+      target: where.address
+    })
+    if (decision !== "start") {
+      noteSelectionUnavailable(decision)
+      return false
+    }
+    endTextAction()
+    selectionTarget = where.address
+    selectionPending = true
+    sendCommand(Protocol.command("selection_read"))
+    return true
+  }
+
+  // The surface opens in the same tick this is decided, so defer the notice or
+  // it arrives before there is anywhere to show it.
+  function noteSelectionUnavailable(reason) {
+    Qt.callLater(function() {
+      note(Protocol.selectionUnavailableMessage(reason))
+      selectionUnavailable(reason)
+    })
+  }
+
+  function runTextAction() {
+    if (!textActionActive) return
+    var prompt = TextActions.proofreadPrompt(selectionText)
+    if (prompt === "") { endTextAction(); return }
+    notice = ""
+    if (submit(prompt, selectionText)) return
+    note("OmaPilot is not ready yet")
+    endTextAction()
+  }
+
+  // A fresh turn, with the same source text and the same target window. Going
+  // through newChat() would drop both, since abandoning the action is exactly
+  // what a new chat means everywhere else.
+  function regenerateTextAction() {
+    if (!textActionActive || busy) return
+    var target = selectionTarget
+    var text = selectionText
+    resetChat()
+    selectionTarget = target
+    selectionText = text
+    runTextAction()
+  }
+
+  // What a surface calls when it is put away. Switching between OmaPilot's own
+  // surfaces is a move, not a dismissal, and must not drop the action.
+  function dismissTextAction() {
+    if (!TextActions.dismissesTextAction(surfaceHandoffPending)) return
+    endTextAction()
+  }
+
+  function note(message) {
+    notice = String(message || "")
+    if (notice !== "") noticeLife.restart()
+  }
+
+  function endTextAction() {
+    notice = ""
+    selectionText = ""
+    selectionTarget = ""
+    selectionPending = false
+    selectionReplacing = false
+  }
+
+  function replaceSelectionWithAnswer() {
+    var decision = TextActions.replaceDecision({
+      active: textActionActive,
+      replacing: selectionReplacing,
+      busy: busy,
+      selection: selectionText,
+      answer: answerMarkdown
+    })
+    if (decision !== "send") {
+      note(Protocol.selectionFailureMessage(decision))
+      return
+    }
+    selectionReplacing = true
+    sendCommand(Protocol.command("selection_replace", {
+      text: TextActions.replacementFromAnswer(answerMarkdown),
+      address: selectionTarget
+    }))
+  }
+
   function clearDesktopContextLatch() {
     latchedActiveWindow = null
     latchedCaptureTarget = null
@@ -364,14 +481,18 @@ Scope {
     return Protocol.desktopContextWithLatchedActive(context, latchedActiveWindow)
   }
 
-  function submit(text) {
+  // `shownText` is what the user sees and what the chat record keeps, for the
+  // callers whose prompt is not what the user asked. Everyone else passes one
+  // string and nothing changes.
+  function submit(text, shownText) {
     var prompt = String(text || "").trim()
     if (!prompt || !canSubmit) return false
+    var shown = String(shownText === undefined || shownText === null ? "" : shownText).trim()
     var resumeChatId = currentChatId
     submittedResumeChatId = resumeChatId
     currentId = "qml-" + Date.now() + "-" + Math.floor(Math.random() * 100000)
     currentChatId = ""
-    question = prompt
+    question = shown !== "" ? shown : prompt
     answerMarkdown = ""
     errorDetails = null
     images = []
@@ -388,7 +509,7 @@ Scope {
     var autoApprove = configuredDangerousAutoApprove
     sendCommand(Protocol.submitCommand(
       currentId, prompt, provider, model, context, autoApprove, attachmentSelections, resumeChatId,
-      webHandoffProvider))
+      webHandoffProvider, shown))
     contextAttachments = []
     answerChanged()
     return true
@@ -566,6 +687,7 @@ Scope {
 
   function resetChat() {
     newChatPending = false
+    endTextAction()
     clearContextAttachments()
     currentId = ""
     currentChatId = ""
@@ -848,6 +970,7 @@ Scope {
       brokerDesktopContextSupported = Protocol.hasFeature(event.features, "desktop-context")
       brokerContextAttachmentsSupported = Protocol.hasFeature(event.features, "context-attachments")
       brokerCapabilityPacksSupported = Protocol.hasFeature(event.features, "capability-packs")
+      brokerSelectionSupported = Protocol.hasFeature(event.features, "selection")
       applyProviders(event.providers || [])
       history = Protocol.normalizedHistory(event.history || [])
       if (Protocol.hasFeature(event.features, "voice")) requestVoiceStatus()
@@ -1089,6 +1212,12 @@ Scope {
       return
     }
     if (type === "error") {
+      // A replacement in flight is over the moment anything errors. Without
+      // this the flag stayed true, and both buttons stayed dead.
+      if (selectionReplacing) {
+        selectionReplacing = false
+        note(Protocol.selectionFailureMessage(""))
+      }
       var capabilityCode = String(event.code || "")
       if (!event.id && (capabilityCode.indexOf("capability_") === 0
           || capabilityCode.indexOf("files_root") >= 0
@@ -1199,6 +1328,34 @@ Scope {
       if (String(event.state || "") === "continued") herdrContinued()
       return
     }
+    if (type === "selection") {
+      selectionPending = false
+      if (event.available !== true) {
+        selectionTarget = ""
+        var unavailableReason = String(event.reason || "empty")
+        notice = Protocol.selectionUnavailableMessage(unavailableReason)
+        selectionUnavailable(unavailableReason)
+        return
+      }
+      selectionText = Protocol.safeSelectionText(event.text, 8000)
+      if (selectionText === "") {
+        selectionTarget = ""
+        notice = Protocol.selectionUnavailableMessage("empty")
+        selectionUnavailable("empty")
+        return
+      }
+      selectionReady(selectionText)
+      runTextAction()
+      return
+    }
+    if (type === "selection_replaced") {
+      selectionReplacing = false
+      if (event.replaced === true) {
+        endTextAction()
+        notice = "Replaced"
+      } else notice = Protocol.selectionFailureMessage(event.reason)
+      return
+    }
     if (type === "copied") {
       toastRequested(event.copied === true ? "Copied" : "Could not copy")
       return
@@ -1208,6 +1365,20 @@ Scope {
     }
   }
 
+  // A passing message should not outlive the moment it belongs to. A text
+  // action's own refusals are re-set whenever the action changes, so this only
+  // sweeps up what nothing else clears.
+  Timer {
+    id: noticeLife
+    interval: 8000
+    repeat: false
+    onTriggered: root.notice = ""
+  }
+
+  // toastRequested has no consumer in this shell. Rather than leave every
+  // caller shouting into nothing, the store hears its own signal.
+  onToastRequested: function(message) { root.note(message) }
+
   IpcHandler {
     target: "io.github.spencerbull.omapilot"
     function open() { root.routeIpc("open") }
@@ -1216,6 +1387,16 @@ Scope {
     function hide() { root.routeIpc("hide") }
     function toggle() { root.routeIpc("toggle") }
     function newChat() { root.routeIpc("newChat") }
+    function fixSelection(): string { root.ipcSelectionRequested(); return "ok" }
+    // The same call the Replace button makes, so a scripted run — or a
+    // hotkey — can accept a correction without a pointer. The guards stay in
+    // replaceSelectionWithAnswer; this only reports whether there was
+    // anything to accept.
+    function replaceSelection(): string {
+      if (!root.textActionActive) return "no-text-action"
+      root.replaceSelectionWithAnswer()
+      return "ok"
+    }
     function continueInHerdr() { root.continueInHerdr() }
     function history() { root.routeIpc("history") }
     function settings() { root.routeIpc("settings") }
