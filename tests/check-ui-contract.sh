@@ -437,6 +437,22 @@ if grep -Fq 'backendSelection' "$repo_dir/components/OmaPilotStore.qml"; then
 fi
 grep -Fq 'property bool desktopContextEnabled: true' \
   "$repo_dir/components/OmaPilotStore.qml"
+# Reading a selection is not consent to send it anywhere. A selection arriving
+# with no action already named has to leave the chooser standing, and only the
+# direct hotkey routes may run something the moment the text lands.
+grep -Fq 'else selectionChoosing = true' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'if (TextActions.runsOnArrival(selectionAction)) runTextAction(selectionAction, "")' \
+  "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'function textAction(): string' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'function rewriteSelection(): string' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'function translateSelection(): string' "$repo_dir/components/OmaPilotStore.qml"
+# The guard is chosen by the action that ran. Dropping this field would judge
+# every free prompt by the rule written for a correction.
+grep -Fq 'action: selectionAction' "$repo_dir/components/OmaPilotStore.qml"
+# Asking something else leaves the selection behind, or an unrelated answer
+# stays behind the same Replace button aimed at text selected minutes ago.
+grep -Fq 'if (!selectionSubmitting && textActionActive) endTextAction()' \
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'property string webHandoffProvider: "duckduckgo"' \
   "$repo_dir/components/OmaPilotStore.qml"
 # The submit call now carries the shown question after the handoff provider,

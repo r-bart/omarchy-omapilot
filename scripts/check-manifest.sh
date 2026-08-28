@@ -38,6 +38,8 @@ jq -e '
     "surface":"panel",
     "sidebarWidth":440,
     "consoleReservesSpace":false,
+    "textActionLanguage":"",
+    "textActionLast":"fix",
     "voiceEnabled":false,
     "ttsProvider":"elevenlabs",
     "ttsModel":"",

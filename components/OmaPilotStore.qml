@@ -127,6 +127,22 @@ Scope {
   property string selectionText: ""
   property bool selectionPending: false
   property bool selectionReplacing: false
+  // Between the selection arriving and a prompt leaving there is a choice.
+  // Reading someone's text is not consent to send it anywhere, so nothing goes
+  // out until the user picks. The action and the instruction outlive the turn
+  // because Regenerate has to repeat what actually ran: a translation coming
+  // back as a correction would be typed over the text by the same button.
+  property bool selectionChoosing: false
+  property string selectionAction: ""
+  property string selectionInstruction: ""
+  // True only while runTextAction is inside submit. Everything else reaching
+  // submit is the user typing something new, and that leaves the action behind.
+  property bool selectionSubmitting: false
+  // Where Translate sends text, and which chip a bare Enter runs. An empty
+  // language is not "no language": it means the locale's, resolved below, so
+  // the chip never has to show a locale tag or an empty arrow.
+  property string configuredTextActionLanguage: ""
+  property string configuredTextActionLast: "fix"
   // What OmaPilot has to say to the user in passing. The store used to emit
   // toastRequested for this and nothing in this shell consumes that signal, so
   // every one of those messages went nowhere. Both surfaces render this.
@@ -160,6 +176,9 @@ Scope {
     || browserCompanionStatus.phase === "removing"
   readonly property bool hotkeyBusy: hotkeyInstaller.running
   readonly property bool textActionActive: selectionText !== "" && selectionTarget !== ""
+  readonly property string textActionLanguage:
+    TextActions.effectiveLanguage(configuredTextActionLanguage, Qt.locale().name)
+  readonly property string textActionDefault: TextActions.defaultAction(configuredTextActionLast)
   readonly property bool builtinAuthBusy: ["starting", "prompt", "info", "browser", "device_code"]
     .indexOf(String(builtinAuth.phase || "")) >= 0
 
@@ -270,6 +289,9 @@ Scope {
       ? source.quickActionsJson : ""
     var desiredShowSummarize = source.showSummarizeAction === true
     var desiredShowWorkInApp = source.showWorkInAppAction === true
+    var desiredTextActionLanguage = typeof source.textActionLanguage === "string"
+      ? source.textActionLanguage.slice(0, 40) : ""
+    var desiredTextActionLast = TextActions.defaultAction(source.textActionLast)
     var harnessChanged = desiredProvider !== configuredProvider
     var changed = harnessChanged
       || desiredBuiltinModel !== configuredBuiltinModel
@@ -288,6 +310,8 @@ Scope {
       || desiredQuickActionsJson !== configuredQuickActionsJson
       || desiredShowSummarize !== configuredShowSummarizeAction
       || desiredShowWorkInApp !== configuredShowWorkInAppAction
+      || desiredTextActionLanguage !== configuredTextActionLanguage
+      || desiredTextActionLast !== configuredTextActionLast
     if (!changed) return
     configuredProvider = desiredProvider
     configuredBuiltinModel = desiredBuiltinModel
@@ -300,6 +324,8 @@ Scope {
     configuredQuickActionsJson = desiredQuickActionsJson
     configuredShowSummarizeAction = desiredShowSummarize
     configuredShowWorkInAppAction = desiredShowWorkInApp
+    configuredTextActionLanguage = desiredTextActionLanguage
+    configuredTextActionLast = desiredTextActionLast
     desktopContextEnabled = desiredDesktopContext
     webHandoffProvider = desiredWebHandoffProvider
     voiceEnabled = desiredVoiceEnabled
@@ -385,7 +411,9 @@ Scope {
   // Every refusal below leaves an action already on screen untouched. A hotkey
   // that cannot start a new one must never take away the Replace the user was
   // reaching for. The decision itself lives in TextActions so it can be tested.
-  function beginTextAction() {
+  // An empty action opens the chooser; a named one runs the moment the text
+  // arrives, which is what a hotkey bound straight to one of them means.
+  function beginTextAction(action) {
     var where = DesktopContext.replaceTarget()
     var decision = TextActions.beginDecision({
       pending: selectionPending,
@@ -401,8 +429,16 @@ Scope {
     }
     endTextAction()
     selectionTarget = where.address
+    selectionAction = TextActions.normalizedAction(action)
     selectionPending = true
     sendCommand(Protocol.command("selection_read"))
+    return decision
+  }
+
+  // What the direct hotkeys call: one chord, one action, no chooser.
+  function startDirectTextAction(action) {
+    var decision = beginTextAction(action)
+    ipcSelectionRequested()
     return decision
   }
 
@@ -415,14 +451,35 @@ Scope {
     })
   }
 
-  function runTextAction() {
-    if (!textActionActive) return
-    var prompt = TextActions.proofreadPrompt(selectionText)
-    if (prompt === "") { endTextAction(); return }
+  // The prompt leaves here and only here. The flag is cleared before submit so
+  // submit's own choosing branch cannot call back in, and put back if submit
+  // refuses, so the chooser stays on screen for a retry instead of leaving the
+  // user with a live selection and nothing to press.
+  function runTextAction(action, instruction) {
+    if (!textActionActive) return false
+    var id = TextActions.normalizedAction(action)
+    var ask = String(instruction === undefined || instruction === null ? "" : instruction)
+    var prompt = TextActions.promptFor(id, selectionText,
+      { language: textActionLanguage, instruction: ask })
+    if (prompt === "") return false
+    var wasChoosing = selectionChoosing
+    selectionChoosing = false
+    selectionAction = id
+    selectionInstruction = ask
     notice = ""
-    if (submit(prompt, selectionText)) return
-    note("OmaPilot is not ready yet")
-    endTextAction()
+    selectionSubmitting = true
+    var sent = submit(prompt, TextActions.questionLabel(id, ask, textActionLanguage))
+    selectionSubmitting = false
+    if (!sent) {
+      selectionChoosing = wasChoosing
+      note("OmaPilot is not ready yet")
+      return false
+    }
+    // Only a preset is remembered. What the user typed is theirs, not a
+    // default to spring on them the next time they press Enter.
+    if (id !== "custom" && id !== configuredTextActionLast)
+      requestSettingsPersist({ textActionLast: id })
+    return true
   }
 
   // A fresh turn, with the same source text and the same target window. Going
@@ -432,10 +489,12 @@ Scope {
     if (!textActionActive || busy) return
     var target = selectionTarget
     var text = selectionText
+    var action = selectionAction
+    var instruction = selectionInstruction
     resetChat()
     selectionTarget = target
     selectionText = text
-    runTextAction()
+    runTextAction(action, instruction)
   }
 
   // What a surface calls when it is put away. Switching between OmaPilot's own
@@ -456,6 +515,9 @@ Scope {
     selectionTarget = ""
     selectionPending = false
     selectionReplacing = false
+    selectionChoosing = false
+    selectionAction = ""
+    selectionInstruction = ""
   }
 
   function replaceSelectionWithAnswer() {
@@ -463,6 +525,7 @@ Scope {
       active: textActionActive,
       replacing: selectionReplacing,
       busy: busy,
+      action: selectionAction,
       selection: selectionText,
       answer: answerMarkdown
     })
@@ -492,8 +555,22 @@ Scope {
   // callers whose prompt is not what the user asked. Everyone else passes one
   // string and nothing changes.
   function submit(text, shownText) {
+    // While the user is choosing, the composer is the free prompt and a bare
+    // Enter is whichever preset they last used. runTextAction clears the flag
+    // before it calls back in, so this cannot recurse.
+    if (selectionChoosing) {
+      var typed = String(text || "").trim()
+      return typed === "" ? runTextAction(textActionDefault, "")
+        : runTextAction("custom", typed)
+    }
     var prompt = String(text || "").trim()
     if (!prompt || !canSubmit) return false
+    // Asking something else is leaving the selection behind. Without this the
+    // answer to an unrelated question would still be offered as a replacement
+    // for text selected minutes ago, under the same Replace button, and the
+    // captured context would be dropped from a chat that is not a text action.
+    // A refused submit above changes nothing, which is why this sits after it.
+    if (!selectionSubmitting && textActionActive) endTextAction()
     var shown = String(shownText === undefined || shownText === null ? "" : shownText).trim()
     var resumeChatId = currentChatId
     submittedResumeChatId = resumeChatId
@@ -508,11 +585,15 @@ Scope {
     state = "preparing"
     statusMessage = "Preparing " + Protocol.providerLabel(provider) + "…"
     var context = desktopContextForSubmit()
+    // A text action is about the selected text and nothing else. Carrying the
+    // captured context along would answer a different question from the one
+    // the chip names.
     var attachmentSelections = []
-    for (var attachmentIndex = 0; attachmentIndex < contextAttachments.length; attachmentIndex++) {
-      var attachment = contextAttachments[attachmentIndex]
-      attachmentSelections.push({ id: attachment.id, representationIds: attachment.selectedRepresentationIds })
-    }
+    if (selectionAction === "")
+      for (var attachmentIndex = 0; attachmentIndex < contextAttachments.length; attachmentIndex++) {
+        var attachment = contextAttachments[attachmentIndex]
+        attachmentSelections.push({ id: attachment.id, representationIds: attachment.selectedRepresentationIds })
+      }
     var autoApprove = configuredDangerousAutoApprove
     sendCommand(Protocol.submitCommand(
       currentId, prompt, provider, model, context, autoApprove, attachmentSelections, resumeChatId,
@@ -1352,7 +1433,8 @@ Scope {
         return
       }
       selectionReady(selectionText)
-      runTextAction()
+      if (TextActions.runsOnArrival(selectionAction)) runTextAction(selectionAction, "")
+      else selectionChoosing = true
       return
     }
     if (type === "selection_replaced") {
@@ -1417,11 +1499,17 @@ Scope {
     // itself. Latching before the surface appears is the whole point: opening
     // first would make OmaPilot the active window. The answer is the decision,
     // so a caller that gets nothing can see why.
-    function fixSelection(): string {
-      var decision = root.beginTextAction()
+    function textAction(): string {
+      var decision = root.beginTextAction("")
       root.ipcSelectionRequested()
       return decision
     }
+    // The direct routes skip the chooser, for anyone who would rather spend a
+    // chord than a keystroke. fixSelection keeps its name so a bindings.lua
+    // written by an earlier installer still does what it says.
+    function fixSelection(): string { return root.startDirectTextAction("fix") }
+    function rewriteSelection(): string { return root.startDirectTextAction("rewrite") }
+    function translateSelection(): string { return root.startDirectTextAction("translate") }
     // The same call the Replace button makes, so a scripted run — or a
     // hotkey — can accept a correction without a pointer. The guards stay in
     // replaceSelectionWithAnswer; this only reports whether there was
