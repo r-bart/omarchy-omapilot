@@ -30,12 +30,14 @@ Item {
     ? backend.voxtypeOsd : ({ available: false, enabled: true, message: "" })
   readonly property var voiceStatus: backend && backend.voiceStatus
     ? backend.voiceStatus : Protocol.emptyVoiceStatus()
+  readonly property bool voiceStatusLoading: backend ? backend.voiceStatusLoading === true : false
   property bool voiceEnabled: false
   property string ttsProvider: "elevenlabs"
   property string ttsModel: ""
   property string ttsVoice: ""
   property string ttsDraftKey: ""
   property bool ttsKeyBusy: false
+  property string ttsKeyAction: ""
   property string ttsFormError: ""
   property string ttsFormNotice: ""
   readonly property var ttsCatalog: Protocol.ttsProviderStatus(voiceStatus, ttsProvider)
@@ -225,20 +227,25 @@ Item {
     }
 
     function onVoiceStatusChanged() {
-      if (root.ttsKeyBusy) {
+      var source = root.backend ? String(root.backend.voiceStatusSource || "status") : "status"
+      var completed = (root.ttsKeyAction === "save" && source === "key_set")
+        || (root.ttsKeyAction === "clear" && source === "key_clear")
+      if (root.ttsKeyBusy && completed) {
+        var action = root.ttsKeyAction
         root.ttsKeyBusy = false
+        root.ttsKeyAction = ""
         root.ttsFormError = ""
         root.ttsDraftKey = ""
-        root.ttsFormNotice = root.ttsCloud
-          ? (root.ttsCatalog.available ? "API key saved." : String(root.ttsCatalog.message || "The API key was saved."))
-          : ""
+        root.ttsFormNotice = action === "clear" ? "API key removed." : "API key saved."
       }
       root.syncTtsSelection()
     }
 
     function onTtsTestChanged() {
-      if (!root.ttsKeyBusy || !root.backend || !root.backend.ttsTest) return
+      if (!root.ttsKeyBusy || root.ttsKeyAction !== "test"
+          || !root.backend || !root.backend.ttsTest) return
       root.ttsKeyBusy = false
+      root.ttsKeyAction = ""
       root.ttsFormError = ""
       root.ttsFormNotice = "The API key works. Save it to use this provider."
     }
@@ -247,6 +254,7 @@ Item {
       var message = root.backend ? String(root.backend.ttsTestError || "") : ""
       if (!root.ttsKeyBusy || message === "") return
       root.ttsKeyBusy = false
+      root.ttsKeyAction = ""
       root.ttsFormError = message
     }
   }
@@ -942,6 +950,7 @@ Item {
             showLabel: false
             options: Protocol.ttsProviderOptions()
             value: root.ttsProvider
+            enabled: !root.ttsKeyBusy
             foreground: root.foreground
             background: root.background
             Accessible.name: "TTS provider"
@@ -998,6 +1007,7 @@ Item {
                 root.ttsFormError = ""
                 root.ttsFormNotice = ""
                 root.ttsKeyBusy = true
+                root.ttsKeyAction = "test"
                 root.ttsKeyTestRequested(root.ttsProvider, root.ttsDraftKey)
               }
             }
@@ -1015,6 +1025,7 @@ Item {
                 root.ttsFormError = ""
                 root.ttsFormNotice = ""
                 root.ttsKeyBusy = true
+                root.ttsKeyAction = "save"
                 root.ttsKeySetRequested(root.ttsProvider, root.ttsDraftKey)
               }
             }
@@ -1031,6 +1042,8 @@ Item {
                 root.ttsFormError = ""
                 root.ttsFormNotice = ""
                 root.ttsDraftKey = ""
+                root.ttsKeyBusy = true
+                root.ttsKeyAction = "clear"
                 root.ttsKeyClearRequested(root.ttsProvider)
               }
             }
@@ -1854,6 +1867,18 @@ Item {
           }
         }
       }
+    }
+
+    Text {
+      Layout.fillWidth: true
+      visible: root.selectedTab === "voice" && root.voiceStatusLoading
+      text: "Starting local voice engine… First launch may take a few seconds."
+      color: root.mutedForeground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      wrapMode: Text.Wrap
+      Accessible.role: Accessible.StaticText
+      Accessible.name: text
     }
   }
 }

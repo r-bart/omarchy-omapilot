@@ -672,6 +672,20 @@ if grep -Eq "omapilot server save probe failed|Failed to load|Type .* unavailabl
   exit 1
 fi
 
+cp "$repo_dir/tests/voice-status-loading-probe.qml" "$smoke_root/shell.qml"
+if ! OMAPILOT_BROKER_PATH=/usr/bin/tail QT_QPA_PLATFORM=offscreen timeout 5s \
+    quickshell --no-duplicate --path "$smoke_root" --no-color \
+    >"$smoke_root/voice-status.log" 2>&1; then
+  cat "$smoke_root/voice-status.log"
+  exit 1
+fi
+if grep -Eq "omapilot voice status probe failed|Failed to load|Type .* unavailable|Cannot assign|TypeError|ReferenceError" \
+    "$smoke_root/voice-status.log" \
+    || ! grep -Fq 'OMAPILOT_VOICE_STATUS_PROBE_OK' "$smoke_root/voice-status.log"; then
+  cat "$smoke_root/voice-status.log"
+  exit 1
+fi
+
 cp "$repo_dir/tests/response-activity-border-probe.qml" "$smoke_root/shell.qml"
 if ! QT_QPA_PLATFORM=offscreen timeout 5s quickshell --no-duplicate \
     --path "$smoke_root" --no-color >"$smoke_root/motion.log" 2>&1; then

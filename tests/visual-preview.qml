@@ -84,6 +84,7 @@ ShellRoot {
           voices: [{ id: "coral", name: "Coral" }] }
       ]
     })
+    property bool voiceStatusLoading: Quickshell.env("OMAPILOT_PREVIEW_VOICE_LOADING") === "1"
     property var ttsTest: null
     property string ttsTestError: ""
     property bool voiceEnabled: false

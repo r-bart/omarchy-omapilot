@@ -123,7 +123,7 @@ const MAX_SPOKEN_CHARS = 3_500;
 const PROBE_TIMEOUT_MS = 8_000;
 const SPEECH_TIMEOUT_MS = 30_000;
 const PLAY_TIMEOUT_MS = 180_000;
-const KOKORO_TIMEOUT_MS = 3_000;
+const KOKORO_TIMEOUT_MS = 15_000;
 const KOKORO_SPEAK_TIMEOUT_MS = 120_000;
 const AUDIO_METER_SAMPLE_RATE = 1_000;
 const AUDIO_METER_INTERVAL_MS = 50;
@@ -275,11 +275,14 @@ export class VoiceService {
   }
 
   async status(): Promise<VoiceStatus> {
-    const [dictation, kokoro, auth] = await Promise.all([
+    const [dictation, kokoro] = await Promise.all([
       this.#dictationStatus(),
-      this.#kokoroStatus(),
-      Promise.resolve(this.#auth())
+      this.#kokoroStatus()
     ]);
+    // Local imports can be slow on a cold start. Read credentials only after
+    // those probes finish so a concurrent key update cannot publish a stale
+    // cloud-provider snapshot when this older request eventually completes.
+    const auth = this.#auth();
     const elevenlabs = await this.#cloudStatus("elevenlabs", storedKey(auth, "elevenlabs"));
     const openai = await this.#cloudStatus("openai", storedKey(auth, "openai"));
     return { dictation, tts: [kokoro, elevenlabs, openai] };
