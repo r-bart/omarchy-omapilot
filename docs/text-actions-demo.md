@@ -8,13 +8,12 @@ After, and explicitly choose whether to replace the source.
 
 ## Recording setup
 
-- Use workspace 2 with the text-action lab and OmaPilot sidebar already open.
+- Use workspace 2 with `tests/text-actions-demo.html` and the OmaPilot sidebar
+  already open.
 - Record at 1920×1080 or 2560×1440 without microphone or desktop audio.
 - Hide notifications and close windows containing personal information.
-- Use a short, legible source sentence such as:
-  `this release note are too long and dont explain the benefit`
-- Use this custom instruction:
-  `Turn this into one concise release-note bullet.`
+- Use the default **Malleable** take and its prepared custom instruction:
+  `Turn this into one concise manifesto line.`
 
 Start and stop with Omarchy's native recorder:
 
@@ -43,3 +42,11 @@ keys, settings, terminal output, or chat history.
 > Before and After, then replace only when you're happy with the result.
 
 Export H.264 MP4 at 1080p, 30 or 60 fps, with the text readable on a phone.
+
+## Copy references
+
+The three takes use original, non-quoted demo copy inspired by DHH's writing:
+
+- [The malleable computer](https://world.hey.com/dhh/the-malleable-computer-7c187a9b)
+- [Let the agents democratize open source](https://world.hey.com/dhh/let-the-agents-democratize-open-source-9fd630a9)
+- [Sitting down with Senra](https://world.hey.com/dhh/sitting-down-with-senra-69f5e368)
