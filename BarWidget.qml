@@ -28,11 +28,19 @@ BarWidget {
 
   function injectPanel() {
     var target = panelLoader.item
-    if (!target) return
-    if ("bar" in target) target.bar = root.bar
-    if ("settings" in target) target.settings = root.settings
-    if ("anchorItem" in target) target.anchorItem = root.inlineActive ? inlineComposer : button
-    if ("hostWidget" in target) target.hostWidget = root
+    if (target) {
+      if ("bar" in target) target.bar = root.bar
+      if ("settings" in target) target.settings = root.settings
+      if ("anchorItem" in target) target.anchorItem = root.inlineActive ? inlineComposer : button
+      if ("hostWidget" in target) target.hostWidget = root
+    }
+    // Configuring the store is not part of injecting the panel, and must not
+    // depend on one being loaded. This widget owns the settings entry on both
+    // surfaces, so with the console live and `panelLoader` inactive this is the
+    // only path a console-side settings edit has back into the store. Behind
+    // the item guard, those edits reached shell.json and stopped there — the
+    // running store kept the old values until the next shell restart, and every
+    // control bound to a `configured*` mirror snapped back after being changed.
     OmaPilot.OmaPilotStore.configure(root.settings)
   }
 
@@ -92,6 +100,34 @@ BarWidget {
   function closeForPopoutSwitch() {
     inlineExpanded = false
     if (panelLoader.item) panelLoader.item.closeForPopoutSwitch()
+    releaseBarPopout()
+  }
+
+  // The bar coordinates one popout at a time and underlines whichever module
+  // holds the claim with a 2px accent rule. A KeyboardPanel hands the claim
+  // back from its own close, which is enough for every first-party module
+  // because none of them is ever destroyed while the shell runs.
+  //
+  // This one is. `panelLoader` unloads the whole panel tree the moment another
+  // surface takes the routes, and the loader wins that race: the line above
+  // finds `panelLoader.item` already null, so nothing closes and nothing
+  // releases. `bar.activePopout` kept pointing at this widget — which is very
+  // much alive — so the bar went on believing the panel was open and left the
+  // mark underlined until some other module happened to open a popout of its
+  // own. For anyone living in the console, never.
+  //
+  // Measured, and this is what decided where the release goes: a
+  // `Component.onDestruction` inside Panel.qml does not run on this path. The
+  // same teardown leaves delayed calls failing with "attempted to evaluate a
+  // function in an invalid context", so the dying tree cannot be asked to give
+  // anything back. This widget outlives it, so the release belongs here.
+  //
+  // Safe in the other caller too: `Bar.requestPopout` calls
+  // `closeForPopoutSwitch` on the outgoing owner *before* assigning the new
+  // one, so clearing the claim here is overwritten a line later.
+  function releaseBarPopout() {
+    if (bar && typeof bar.releasePopout === "function" && bar.activePopout === root)
+      bar.releasePopout(root)
   }
 
   function restoreFocus() {
@@ -100,6 +136,13 @@ BarWidget {
   }
 
   function activate() {
+    // With the console configured, the bar button becomes the console toggle,
+    // routed over the store like the compositor hotkeys — the console lives in
+    // the overlay tree and this widget cannot reach it directly.
+    if (!root.surfaceRoutesHere) {
+      OmaPilot.OmaPilotStore.ipcToggleRequested()
+      return
+    }
     if (root.opened) {
       root.close()
       return
@@ -119,8 +162,34 @@ BarWidget {
   onInlineActiveChanged: injectPanel()
   onCanInlineChanged: if (!canInline) inlineExpanded = false
 
+  // When the configured surface is the console these routes belong to
+  // Ambient.qml, which connects the same signals with the inverse guard.
+  readonly property bool surfaceRoutesHere:
+    OmaPilot.OmaPilotStore.configuredSurface === "panel"
+
+  // The other half of the surface handoff, and unguarded on purpose: it has to
+  // run both when the panel stops being the routed surface and when it becomes
+  // one, and the block below is disabled in the first of those.
   Connections {
     target: OmaPilot.OmaPilotStore
+    function onConfiguredSurfaceChanged() {
+      if (!root.surfaceRoutesHere) {
+        root.closeForPopoutSwitch()
+        return
+      }
+      // Asking for this surface is asking to see it. The intent is carried on
+      // the store rather than read from "was the old one open", because by now
+      // the popout has dismissed itself and the answer would always be no.
+      if (OmaPilot.OmaPilotStore.takeSurfaceHandoff())
+        Qt.callLater(function() { if (root.routedWidget() === root) root.open() })
+    }
+  }
+
+  // One guard for the whole route block, so the next route added here cannot
+  // forget it and fire on both surfaces.
+  Connections {
+    target: OmaPilot.OmaPilotStore
+    enabled: root.surfaceRoutesHere
     function onIpcOpenRequested() {
       if (root.routedWidget() === root) root.open()
     }
@@ -139,11 +208,29 @@ BarWidget {
     function onContextAttachmentAdded() {
       if (root.routedWidget() === root) root.open()
     }
+    // The store has already latched the source window and started the read by
+    // the time this arrives; the panel only has to show itself.
+    function onIpcSelectionRequested() {
+      if (root.routedWidget() === root) root.open()
+    }
+  }
+
+  Connections {
+    target: OmaPilot.OmaPilotStore
+    function onSettingsPersistRequested(values) {
+      // Deliberately not surface-guarded: the console has no settings
+      // injection of its own, so its settings edits persist through the bar
+      // widget precisely while this widget owns the settings entry.
+      if (root.routedWidget() === root) root.persist(values)
+    }
   }
 
   Loader {
     id: panelLoader
-    active: true
+    // A console user should not pay for a per-widget Panel tree that can
+    // never open; settings persistence flows through root.persist, not the
+    // loaded item, so nothing else needs it alive.
+    active: root.surfaceRoutesHere
     source: Qt.resolvedUrl("Panel.qml")
     visible: false
     onLoaded: {
@@ -174,7 +261,8 @@ BarWidget {
     onPressed: function(b) {
       if (b === Qt.RightButton) {
         root.inlineExpanded = false
-        if (panelLoader.item) panelLoader.item.openHistory()
+        if (!root.surfaceRoutesHere) OmaPilot.OmaPilotStore.ipcHistoryRequested()
+        else if (panelLoader.item) panelLoader.item.openHistory()
       } else root.activate()
     }
   }

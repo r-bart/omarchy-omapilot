@@ -68,6 +68,25 @@ Item {
     return null
   }
 
+  // Whether a bar widget instance of this plugin is placed in bar.layout. The
+  // widget's settings-persist relay is deliberately unguarded, so while one is
+  // placed it owns persistence; writing the plugins[] entry too would merge
+  // from a different, staler base and resurrect old values into shell.json.
+  readonly property bool barWidgetPlaced: {
+    var config = root.shell ? root.shell.shellConfig : null
+    var layout = config && config.bar ? config.bar.layout : null
+    if (!layout) return false
+    var sections = ["left", "center", "right"]
+    for (var s = 0; s < sections.length; s++) {
+      var section = layout[sections[s]] || []
+      for (var i = 0; i < section.length; i++) {
+        var entry = section[i]
+        if (entry && String(entry.id || "").indexOf(root.pluginId) === 0) return true
+      }
+    }
+    return false
+  }
+
   function persistSettings(values) {
     var entry = { id: root.pluginId }
     for (var existing in root.ownSettings)
@@ -112,6 +131,36 @@ Item {
     function onIpcNewVoiceChatRequested() { root.newVoiceChat() }
     function onIpcVoiceCancelRequested() { root.voiceCancel() }
     function onIpcAmbientDismissRequested() { root.dismiss() }
+    function onSettingsPersistRequested(values) {
+      // Only claim settings authority once we actually own a plugins[] entry
+      // and no bar widget is placed; the widget's relay handles persistence
+      // while it exists, and double-writing would race two merge bases.
+      if (!root.ownSettings || root.barWidgetPlaced) return
+      root.persistSettings(values)
+    }
+    function onConfiguredSurfaceChanged() {
+      // Switching back to the panel must not strand an open console: its own
+      // IPC routes disable with the switch, so close it from here. Docked and
+      // fullscreen are the same window, so moving between them is a resize and
+      // must not close anything.
+      if (root.consoleSurfaceLive) {
+        // Console and fullscreen are one live surface wearing two geometries,
+        // so moving between them never changes `consoleSurfaceLive` and the
+        // handoff would never be consumed here. MEASURED: it sat armed, and the
+        // next switch opened a surface the user had closed in between.
+        if (OmaPilot.OmaPilotStore.takeSurfaceHandoff())
+          Qt.callLater(function() { if (consoleLoader.item) consoleLoader.item.open(true) })
+        return
+      }
+      if (!consoleLoader.item) return
+      consoleLoader.item.close()
+      // Closing a window unmaps it in the same tick, so the teardown may
+      // already be pending — reading through the item unguarded is a TypeError
+      // on every switch back to the panel. What is left for this line is the
+      // console that was never mapped: `engaged` was false all along, nothing
+      // changed, and nothing would otherwise tell the loader to unload.
+      if (consoleLoader.item && !consoleLoader.item.engaged) consoleTeardown.restart()
+    }
   }
 
   // Presentation and conversation lifetime are deliberately separate. A failed
@@ -122,8 +171,14 @@ Item {
   property bool voiceEngaged: false
   property bool voiceSessionActive: false
 
+  // A voice turn with the console open would paint the same answer twice —
+  // top and right. The console is the focused surface; when it is up, it is
+  // the answer, so the curtain stands down.
+  readonly property bool consoleOpened: consoleLoader.item
+    ? consoleLoader.item.opened === true : false
+
   readonly property bool curtainShown:
-    voiceEngaged && (failed || hasAnswer)
+    voiceEngaged && (failed || hasAnswer) && !root.consoleOpened
 
   readonly property string phase: {
     if (!voiceEngaged) return "dormant"
@@ -384,6 +439,92 @@ Item {
     motionEnabled: root.motionEnabled
   }
 
+  // Behind a Loader because the console is strictly opt-in: default-config
+  // users should not pay for its object tree on every shell start. It stays
+  // alive through the exit slide after a surface switch, then tears down.
+  // Docked and fullscreen are one surface wearing two geometries, so switching
+  // between them keeps the same window and the same conversation rather than
+  // tearing one down to build the other. Only the panel is a different host.
+  readonly property bool consoleSurfaceLive:
+    OmaPilot.OmaPilotStore.configuredSurface === "console"
+      || OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"
+
+  // Driven, not bound. Reading `item` from the expression that decides whether
+  // `item` exists is a binding loop, and Qt says so on every surface change.
+  // Loading is immediate; unloading waits for the exit slide to finish, which
+  // the console reports through `engaged`.
+  onConsoleSurfaceLiveChanged: {
+    if (!consoleSurfaceLive) return
+    consoleLoader.active = true
+    // Switching surface is a move, not a dismissal: whoever asked for this one
+    // wants to see it. Deferred a tick because the loader has only just been
+    // told to exist.
+    if (OmaPilot.OmaPilotStore.takeSurfaceHandoff())
+      Qt.callLater(function() { if (consoleLoader.item) consoleLoader.item.open(true) })
+  }
+
+  // Unloading destroys the window, and destroying a window mid-exit takes its
+  // close animation with it. Switching back to the panel used to do exactly
+  // that in the same tick as the close, which is why the console vanished
+  // there and slid away everywhere else. It is already hidden by then, so a
+  // few hundred milliseconds of it still existing costs nothing and is the
+  // whole difference between a surface leaving and a surface disappearing.
+  Timer {
+    id: consoleTeardown
+    interval: 320
+    repeat: false
+    onTriggered: {
+      if (root.consoleSurfaceLive || !consoleLoader.item) return
+      if (!consoleLoader.item.engaged) consoleLoader.active = false
+    }
+  }
+
+  Loader {
+    id: consoleLoader
+    active: false
+    sourceComponent: OmaPilot.Console {
+      backend: OmaPilot.OmaPilotStore
+      targetScreen: root.activeScreen
+      motionEnabled: root.motionEnabled
+      surfaceWidth: OmaPilot.OmaPilotStore.configuredSidebarWidth
+      fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"
+      reservesSpace: OmaPilot.OmaPilotStore.configuredConsoleReservesSpace
+    }
+    Component.onCompleted: if (root.consoleSurfaceLive) active = true
+
+    Connections {
+      target: consoleLoader.item
+      function onEngagedChanged() {
+        if (!root.consoleSurfaceLive && consoleLoader.item
+            && !consoleLoader.item.engaged)
+          consoleTeardown.restart()
+      }
+    }
+  }
+
+  // The console answers the same IPC routes the bar widget consumes; the
+  // configured surface decides which one acts. BarWidget guards with the
+  // inverse condition, so exactly one surface responds to each gesture.
+  Connections {
+    target: OmaPilot.OmaPilotStore
+    enabled: root.consoleSurfaceLive
+    function onIpcOpenRequested() { if (consoleLoader.item) consoleLoader.item.open(true) }
+    function onIpcCloseRequested() { if (consoleLoader.item) consoleLoader.item.close() }
+    function onIpcToggleRequested() { if (consoleLoader.item) consoleLoader.item.toggle() }
+    function onIpcHistoryRequested() { if (consoleLoader.item) consoleLoader.item.openHistory() }
+    function onIpcSettingsRequested() { if (consoleLoader.item) consoleLoader.item.openSettings() }
+    // The store has already latched the source window and started the read;
+    // this surface only has to show itself, in the chat lane.
+    function onIpcSelectionRequested() {
+      if (consoleLoader.item) consoleLoader.item.openTextAction()
+    }
+    function onContextAttachmentAdded() { if (consoleLoader.item) consoleLoader.item.open(true) }
+    function onPendingPermissionChanged() {
+      if (OmaPilot.OmaPilotStore.pendingPermission !== null && consoleLoader.item)
+        consoleLoader.item.openApproval()
+    }
+  }
+
   OmaPilot.AnswerCurtain {
     shown: root.curtainShown
     question: OmaPilot.OmaPilotStore.question
@@ -423,8 +564,10 @@ Item {
 
   function close() {
     capture.close()
+    if (consoleLoader.item) consoleLoader.item.close()
     dismiss()
   }
 
   readonly property bool opened: capture.opened === true || root.voiceEngaged
+    || root.consoleOpened
 }

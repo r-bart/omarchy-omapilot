@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OmaPilot demo — The malleable computer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --walnut: #2a1e14;
+      --deep-walnut: #1a1209;
+      --raised-walnut: #352718;
+      --brass: #cfa05e;
+      --umber: #6b4a2c;
+      --sand: #e6d7b2;
+      --parchment: #f7ecd2;
+      --silverpoint: #97865f;
+      --verdigris: #74a880;
+      --selection: #4a3822;
+      font-synthesis: none;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      min-height: 100%;
+      background: var(--deep-walnut);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--sand);
+      background:
+        linear-gradient(rgba(207, 160, 94, .025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(207, 160, 94, .02) 1px, transparent 1px),
+        radial-gradient(circle at 18% 14%, rgba(207, 160, 94, .08), transparent 32rem),
+        var(--deep-walnut);
+      background-size: 42px 42px, 42px 42px, auto, auto;
+      font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    ::selection {
+      color: var(--parchment);
+      background: var(--selection);
+    }
+
+    button {
+      min-height: 44px;
+      border: 1px solid rgba(207, 160, 94, .25);
+      border-radius: 8px;
+      padding-inline: 14px;
+      color: var(--sand);
+      background: rgba(53, 39, 24, .72);
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:hover,
+    button:focus-visible {
+      border-color: var(--brass);
+      color: var(--parchment);
+      outline: none;
+    }
+
+    button[aria-pressed="true"] {
+      border-color: var(--brass);
+      color: var(--brass);
+      background: rgba(207, 160, 94, .08);
+    }
+
+    .page {
+      width: min(1120px, calc(100% - 64px));
+      margin-inline: auto;
+      padding-block: 48px;
+    }
+
+    .masthead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      margin-block-end: 34px;
+    }
+
+    .identity {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      user-select: none;
+    }
+
+    .mark {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border: 1px solid rgba(207, 160, 94, .32);
+      border-radius: 10px;
+      color: var(--brass);
+      background: var(--walnut);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 24px;
+    }
+
+    .eyebrow,
+    .meta,
+    .prompt-label {
+      color: var(--silverpoint);
+      font-size: 12px;
+      line-height: 1.4;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+
+    .name {
+      margin-block-start: 2px;
+      color: var(--parchment);
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .takes {
+      display: flex;
+      gap: 8px;
+    }
+
+    .sheet {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(207, 160, 94, .22);
+      border-radius: 18px;
+      background: rgba(42, 30, 20, .94);
+      box-shadow: 0 30px 80px rgba(0, 0, 0, .28);
+    }
+
+    .sheet::before {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 3px;
+      content: "";
+      background: linear-gradient(var(--brass), var(--umber));
+    }
+
+    .sheet-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 22px 28px;
+      border-block-end: 1px solid rgba(207, 160, 94, .13);
+    }
+
+    h1 {
+      margin: 0;
+      color: var(--parchment);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(30px, 4vw, 48px);
+      font-weight: 400;
+      line-height: 1.08;
+      letter-spacing: -.025em;
+      text-wrap: balance;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: none;
+      color: var(--verdigris);
+      font-size: 13px;
+    }
+
+    .status::before {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      content: "";
+    }
+
+    .editor {
+      min-height: 260px;
+      padding: 38px 42px 46px;
+      color: var(--parchment);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(27px, 3.6vw, 44px);
+      line-height: 1.25;
+      letter-spacing: -.018em;
+      overflow-wrap: break-word;
+      caret-color: var(--brass);
+    }
+
+    .editor:focus {
+      outline: none;
+      background: rgba(207, 160, 94, .025);
+    }
+
+    .prompt {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 18px;
+      margin-block-start: 18px;
+      padding: 18px 20px;
+      border: 1px solid rgba(207, 160, 94, .18);
+      border-radius: 12px;
+      background: rgba(42, 30, 20, .78);
+    }
+
+    .prompt-copy {
+      margin-block-start: 5px;
+      color: var(--sand);
+      font-size: 15px;
+      line-height: 1.5;
+      text-wrap: pretty;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      margin-block-start: 16px;
+      color: var(--silverpoint);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .footer span:last-child { text-align: end; }
+
+    @media (max-width: 720px) {
+      .page { width: min(100% - 28px, 1120px); padding-block: 22px; }
+      .masthead { align-items: flex-start; flex-direction: column; }
+      .editor { min-height: 240px; padding: 28px 24px 34px; }
+      .sheet-head { align-items: flex-start; flex-direction: column; }
+      .prompt { grid-template-columns: 1fr; }
+      .footer { flex-direction: column; }
+      .footer span:last-child { text-align: start; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="masthead">
+      <div class="identity">
+        <div class="mark" aria-hidden="true">A</div>
+        <div>
+          <div class="eyebrow">Omarchy field notes</div>
+          <div class="name">The malleable computer</div>
+        </div>
+      </div>
+      <nav class="takes" aria-label="Demo text">
+        <button type="button" data-take="0" aria-pressed="true">Fix</button>
+        <button type="button" data-take="1" aria-pressed="false">Rewrite</button>
+        <button type="button" data-take="2" aria-pressed="false">Translate</button>
+        <button type="button" data-take="3" aria-pressed="false">Custom</button>
+      </nav>
+    </header>
+
+    <article class="sheet">
+      <header class="sheet-head">
+        <div>
+          <div class="meta" id="section">Draft 01 · Personal computing</div>
+          <h1 id="title">Make the machine yours</h1>
+        </div>
+        <div class="status">Ready to edit</div>
+      </header>
+      <div
+        id="demo-text"
+        class="editor"
+        contenteditable="plaintext-only"
+        role="textbox"
+        aria-multiline="true"
+        aria-label="Demo text"
+        spellcheck="false"
+      ></div>
+    </article>
+
+    <aside class="prompt" aria-label="Suggested custom instruction">
+      <div>
+        <div class="prompt-label">Custom instruction</div>
+        <div class="prompt-copy" id="prompt"></div>
+      </div>
+      <button type="button" id="copy-prompt">Copy instruction</button>
+    </aside>
+
+    <footer class="footer">
+      <span>Select the text, open OmaPilot, review Before / After, then Replace.</span>
+      <span>Original demo copy inspired by recent writing from DHH on Omarchy and open source.</span>
+    </footer>
+  </main>
+
+  <script>
+    const TAKES = [
+      {
+        section: "Take 01 · Fix",
+        title: "Fix grammar",
+        text: "DHH keep arguing that computers should belongs to the people using them.",
+        prompt: "Use OmaPilot's Fix action."
+      },
+      {
+        section: "Take 02 · Rewrite",
+        title: "Rewrite clearly",
+        text: "DHH's point is that when software can be changed by its owner then the computer stops being a sealed appliance and starts becoming something personal.",
+        prompt: "Use OmaPilot's Rewrite action."
+      },
+      {
+        section: "Take 03 · Translate",
+        title: "Translate",
+        text: "DHH argues that small teams can still build ambitious software without asking permission.",
+        prompt: "Translate this into Spanish."
+      },
+      {
+        section: "Take 04 · Custom instruction",
+        title: "Custom instruction",
+        text: "DHH keeps returning to a simple idea: open source should make the computer malleable for the person using it.",
+        prompt: "Turn this into one concise manifesto line."
+      }
+    ];
+
+    const editor = document.getElementById("demo-text");
+    const section = document.getElementById("section");
+    const title = document.getElementById("title");
+    const prompt = document.getElementById("prompt");
+    const copyButton = document.getElementById("copy-prompt");
+    const takeButtons = [...document.querySelectorAll("[data-take]")];
+
+    function showTake(index) {
+      const take = TAKES[index];
+      section.textContent = take.section;
+      title.textContent = take.title;
+      editor.textContent = take.text;
+      prompt.textContent = take.prompt;
+      for (const button of takeButtons)
+        button.setAttribute("aria-pressed", String(Number(button.dataset.take) === index));
+    }
+
+    for (const button of takeButtons)
+      button.addEventListener("click", () => showTake(Number(button.dataset.take)));
+
+    async function copyInstruction() {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(prompt.textContent);
+        return;
+      }
+      const transfer = document.createElement("textarea");
+      transfer.value = prompt.textContent;
+      transfer.setAttribute("readonly", "");
+      transfer.style.position = "fixed";
+      transfer.style.opacity = "0";
+      document.body.appendChild(transfer);
+      transfer.select();
+      document.execCommand("copy");
+      transfer.remove();
+    }
+
+    copyButton.addEventListener("click", async () => {
+      await copyInstruction();
+      copyButton.textContent = "Copied";
+      window.setTimeout(() => { copyButton.textContent = "Copy instruction"; }, 1200);
+    });
+
+    const hashTake = window.location.hash.match(/^#take=(\d+)$/);
+    const requestedTake = Number(
+      new URLSearchParams(window.location.search).get("take")
+      || (hashTake ? hashTake[1] : 0)
+    );
+    const initialTake = Number.isInteger(requestedTake) && requestedTake >= 0 && requestedTake < TAKES.length
+      ? requestedTake
+      : 0;
+    showTake(initialTake);
+    window.addEventListener("hashchange", () => {
+      const match = window.location.hash.match(/^#take=(\d+)$/);
+      const index = match ? Number(match[1]) : 0;
+      if (Number.isInteger(index) && index >= 0 && index < TAKES.length) showTake(index);
+      editor.focus();
+    });
+    editor.focus();
+  </script>
+</body>
+</html>

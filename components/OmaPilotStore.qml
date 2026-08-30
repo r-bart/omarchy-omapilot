@@ -5,6 +5,8 @@ import Quickshell
 import Quickshell.Io
 import "Protocol.js" as Protocol
 import "SessionLifecycle.js" as SessionLifecycle
+import "TextActions.js" as TextActions
+import "Hotkeys.js" as Hotkeys
 
 // One process and one ephemeral UI model for every screen. The broker is the
 // only durable authority; this singleton merely normalizes its NDJSON stream
@@ -54,7 +56,16 @@ Scope {
   property string hotkeyAction: ""
   property string hotkeyMessage: ""
   property string hotkeyProcessError: ""
+  // The chords currently bound to OmaPilot, read from the user's own
+  // Hyprland bindings. Shown, never written: the installer owns one marked
+  // block in that file and nothing else may claim a keybinding it does not
+  // control. A chord skipped over a collision is simply absent here, which
+  // is more than the user can see today.
+  property var installedHotkeys: []
   property var voiceStatus: Protocol.emptyVoiceStatus()
+  property bool voiceStatusPending: false
+  property bool voiceStatusLoading: false
+  property string voiceStatusSource: "status"
   property var ttsTest: null
   property bool ttsTestPending: false
   property string ttsTestError: ""
@@ -88,6 +99,19 @@ Scope {
   property string configuredCodexModel: ""
   property string configuredOpencodeModel: ""
   property bool configuredDangerousAutoApprove: false
+  // Which desktop surface answers the open/close/toggle/history/settings
+  // routes: the bar panel popout, the full-height console docked to an edge, or
+  // the same console content taking the whole screen. "panel" keeps today's
+  // behavior; the other two are strictly opt-in.
+  property string configuredSurface: "panel"
+  property int configuredSidebarWidth: 440
+  // Whether the docked console asks the compositor to hold its column open.
+  property bool configuredConsoleReservesSpace: false
+  // The console renders quick-action chips itself, so the pieces Panel.qml
+  // reads straight from its injected settings need configured mirrors here.
+  property string configuredQuickActionsJson: ""
+  property bool configuredShowSummarizeAction: false
+  property bool configuredShowWorkInAppAction: false
   property bool desktopContextEnabled: true
   property string webHandoffProvider: "duckduckgo"
   property var capabilities: []
@@ -98,6 +122,42 @@ Scope {
   property var latchedCaptureTarget: null
   property var contextAttachments: []
   property bool brokerContextAttachmentsSupported: false
+  property bool brokerSelectionSupported: false
+  // One text action at a time. The window it came from and the text it will
+  // replace live only while that action is on screen; ending the action drops
+  // both. The address is a compositor handle and never reaches a prompt.
+  property string selectionTarget: ""
+  property string selectionText: ""
+  // True from the moment a read is asked for until the broker answers. It
+  // belongs to the wire, not to the action: the reply carries no request id,
+  // so the only safe answer is to allow one read at a time and to drop the
+  // reply to an action the user has already walked away from.
+  property bool selectionPending: false
+  property bool selectionReplacing: false
+  // The window a replacement was sent for. It is what tells a late answer
+  // which action it belongs to, and it outlives an unrelated error clearing
+  // the flag above, so the same text can never be pasted twice.
+  property string selectionReplaceTarget: ""
+  // Between the selection arriving and a prompt leaving there is a choice.
+  // Reading someone's text is not consent to send it anywhere, so nothing goes
+  // out until the user picks. The action and the instruction outlive the turn
+  // because Regenerate has to repeat what actually ran: a translation coming
+  // back as a correction would be typed over the text by the same button.
+  property bool selectionChoosing: false
+  property string selectionAction: ""
+  property string selectionInstruction: ""
+  // True only while runTextAction is inside submit. Everything else reaching
+  // submit is the user typing something new, and that leaves the action behind.
+  property bool selectionSubmitting: false
+  // Where Translate sends text, and which chip a bare Enter runs. An empty
+  // language is not "no language": it means the locale's, resolved below, so
+  // the chip never has to show a locale tag or an empty arrow.
+  property string configuredTextActionLanguage: ""
+  property string configuredTextActionLast: "fix"
+  // What OmaPilot has to say to the user in passing. The store used to emit
+  // toastRequested for this and nothing in this shell consumes that signal, so
+  // every one of those messages went nowhere. Both surfaces render this.
+  property string notice: ""
   property bool harnessRestartPending: false
   property string pendingContextRequestId: ""
   property bool continuationBlocked: false
@@ -123,11 +183,38 @@ Scope {
   readonly property bool contextCaptureAvailable: initialized && brokerContextAttachmentsSupported && !busy
   readonly property bool browserCompanionConnected: browserCompanionStatus.chromiumConnected === true
     || browserCompanionStatus.firefoxConnected === true
+
+  Timer {
+    id: voiceStatusLoadingDelay
+    interval: 650
+    repeat: false
+    onTriggered: if (root.voiceStatusPending) root.voiceStatusLoading = true
+  }
   readonly property bool browserCompanionBusy: browserCompanionStatus.phase === "installing"
     || browserCompanionStatus.phase === "removing"
   readonly property bool hotkeyBusy: hotkeyInstaller.running
+  readonly property bool textActionActive: selectionText !== "" && selectionTarget !== ""
+  // One rule for "the text-action controls can be pressed": the harness is not
+  // answering and no replacement is being typed. It was written inline in the
+  // chooser and beside both Regenerate buttons, which is three places to keep
+  // saying the same thing and the way they stop agreeing.
+  readonly property bool textActionReady: !busy && !selectionReplacing
+  readonly property string textActionLanguage:
+    TextActions.effectiveLanguage(configuredTextActionLanguage, Qt.locale().name)
+  readonly property string textActionDefault: TextActions.defaultAction(configuredTextActionLast)
   readonly property bool builtinAuthBusy: ["starting", "prompt", "info", "browser", "device_code"]
     .indexOf(String(builtinAuth.phase || "")) >= 0
+
+  function textActionStatePayload() {
+    return ({
+      state: state,
+      pending: selectionPending,
+      active: textActionActive,
+      choosing: selectionChoosing,
+      action: selectionAction,
+      turnId: currentId
+    })
+  }
 
   signal answerChanged()
   signal focusComposerRequested()
@@ -149,6 +236,61 @@ Scope {
   signal ttsSpoken()
   signal hotkeyInstalled()
   signal contextAttachmentAdded()
+  // Settings authority stays with whichever host owns the settings entry — the
+  // bar widget today, the overlay once a plugins[] entry exists. Surfaces that
+  // receive no settings injection (the console) persist through this relay
+  // instead of guessing where the entry lives.
+  signal settingsPersistRequested(var values)
+
+  function requestSettingsPersist(values) {
+    settingsPersistRequested(values || {})
+  }
+
+  // The surface has three entry points — the settings dropdown, the header's
+  // cycle button, and these for a hotkey. All of them go through the same
+  // persist relay, so no caller can leave the surfaces disagreeing about which
+  // one is live. Both return the surface being switched to, not the current
+  // one: the write is asynchronous and `configuredSurface` only catches up once
+  // the owner has merged and echoed the settings back.
+  // Naming a surface outright, for a hotkey bound to one of them rather than to
+  // the cycle. An unrecognized name lands on the panel instead of nowhere.
+  //
+  // Asking for a surface is asking to see it, so the request carries that
+  // across. Reading "was the old one open" when the setting lands is too late:
+  // the bar panel is a popout and has already dismissed itself by then, which
+  // is why switching back to the console left nothing on screen and needed a
+  // second press.
+  function selectSurface(value) {
+    var next = Protocol.normalizedSurface(value)
+    // Only when it actually moves. Asking for the surface you are already on
+    // would otherwise leave the intent armed for whatever switch came next,
+    // and open a surface the user had deliberately closed.
+    if (next !== configuredSurface) surfaceHandoffPending = true
+    requestSettingsPersist({ surface: next })
+    return next
+  }
+
+  function cycleSurface() {
+    var next = Protocol.nextSurface(configuredSurface)
+    if (next !== configuredSurface) surfaceHandoffPending = true
+    requestSettingsPersist({ surface: next })
+    return next
+  }
+
+  // One-shot, consumed by whichever surface becomes the live one. Nothing else
+  // sets it, so a shell restart reading the same value from disk does not pop a
+  // surface open at login.
+  property bool surfaceHandoffPending: false
+
+  function takeSurfaceHandoff() {
+    if (!surfaceHandoffPending) return false
+    surfaceHandoffPending = false
+    return true
+  }
+
+  signal ipcSelectionRequested()
+  signal selectionReady(string text)
+  signal selectionUnavailable(string reason)
 
   function routeIpc(method) {
     if (method === "open" || method === "show") ipcOpenRequested()
@@ -172,6 +314,18 @@ Scope {
     var desiredTtsProvider = Protocol.normalizedTtsProvider(source.ttsProvider) || "elevenlabs"
     var desiredTtsModel = String(source.ttsModel || "")
     var desiredTtsVoice = String(source.ttsVoice || "")
+    var desiredSurface = Protocol.normalizedSurface(source.surface)
+    var rawSidebarWidth = Number(source.sidebarWidth)
+    var desiredSidebarWidth = isFinite(rawSidebarWidth) && rawSidebarWidth > 0
+      ? Math.min(560, Math.max(360, Math.round(rawSidebarWidth))) : 440
+    var desiredConsoleReservesSpace = source.consoleReservesSpace === true
+    var desiredQuickActionsJson = typeof source.quickActionsJson === "string"
+      ? source.quickActionsJson : ""
+    var desiredShowSummarize = source.showSummarizeAction === true
+    var desiredShowWorkInApp = source.showWorkInAppAction === true
+    var desiredTextActionLanguage = typeof source.textActionLanguage === "string"
+      ? source.textActionLanguage.slice(0, 40) : ""
+    var desiredTextActionLast = TextActions.defaultAction(source.textActionLast)
     var harnessChanged = desiredProvider !== configuredProvider
     var changed = harnessChanged
       || desiredBuiltinModel !== configuredBuiltinModel
@@ -184,12 +338,28 @@ Scope {
       || desiredTtsProvider !== ttsProvider
       || desiredTtsModel !== ttsModel
       || desiredTtsVoice !== ttsVoice
+      || desiredSurface !== configuredSurface
+      || desiredSidebarWidth !== configuredSidebarWidth
+      || desiredConsoleReservesSpace !== configuredConsoleReservesSpace
+      || desiredQuickActionsJson !== configuredQuickActionsJson
+      || desiredShowSummarize !== configuredShowSummarizeAction
+      || desiredShowWorkInApp !== configuredShowWorkInAppAction
+      || desiredTextActionLanguage !== configuredTextActionLanguage
+      || desiredTextActionLast !== configuredTextActionLast
     if (!changed) return
     configuredProvider = desiredProvider
     configuredBuiltinModel = desiredBuiltinModel
     configuredCodexModel = desiredCodexModel
     configuredOpencodeModel = desiredOpencodeModel
     configuredDangerousAutoApprove = desiredDangerousAutoApprove
+    configuredSurface = desiredSurface
+    configuredSidebarWidth = desiredSidebarWidth
+    configuredConsoleReservesSpace = desiredConsoleReservesSpace
+    configuredQuickActionsJson = desiredQuickActionsJson
+    configuredShowSummarizeAction = desiredShowSummarize
+    configuredShowWorkInAppAction = desiredShowWorkInApp
+    configuredTextActionLanguage = desiredTextActionLanguage
+    configuredTextActionLast = desiredTextActionLast
     desktopContextEnabled = desiredDesktopContext
     webHandoffProvider = desiredWebHandoffProvider
     voiceEnabled = desiredVoiceEnabled
@@ -268,6 +438,167 @@ Scope {
     if (context && context.activeWindow) latchedActiveWindow = context.activeWindow
   }
 
+// A text action starts by latching the window that owns the selection,
+  // before the panel takes keyboard focus. That ordering is the same one
+  // desktop context already depends on, and here it decides where a
+  // replacement is typed, so it cannot be deferred.
+  // Every refusal below leaves an action already on screen untouched. A hotkey
+  // that cannot start a new one must never take away the Replace the user was
+  // reaching for. The decision itself lives in TextActions so it can be tested.
+  // An empty action opens the chooser; a named one runs the moment the text
+  // arrives, which is what a hotkey bound straight to one of them means.
+  function beginTextAction(action) {
+    var where = DesktopContext.replaceTarget()
+    var decision = TextActions.beginDecision({
+      pending: selectionPending,
+      initialized: initialized,
+      supported: brokerSelectionSupported,
+      ownSurface: DesktopContext.activeIsOwnSurface(),
+      sensitive: TextActions.sensitiveWindow(where.appId, where.title),
+      terminal: TextActions.terminalWindow(where.appId),
+      target: where.address
+    })
+    if (decision !== "start") {
+      noteSelectionUnavailable(decision)
+      return decision
+    }
+    endTextAction()
+    selectionTarget = where.address
+    selectionAction = TextActions.normalizedAction(action)
+    selectionPending = true
+    sendCommand(Protocol.command("selection_read"))
+    return decision
+  }
+
+  // What the direct hotkeys call: one chord, one action, no chooser.
+  function startDirectTextAction(action) {
+    var decision = beginTextAction(action)
+    ipcSelectionRequested()
+    return decision
+  }
+
+  // The surface opens in the same tick this is decided, so defer the notice or
+  // it arrives before there is anywhere to show it.
+  function noteSelectionUnavailable(reason) {
+    Qt.callLater(function() {
+      note(Protocol.selectionUnavailableMessage(reason))
+      selectionUnavailable(reason)
+    })
+  }
+
+  // The prompt leaves here and only here. The flag is cleared before submit so
+  // submit's own choosing branch cannot call back in, and put back if submit
+  // refuses, so the chooser stays on screen for a retry instead of leaving the
+  // user with a live selection and nothing to press.
+  function runTextAction(action, instruction, requestedLanguage) {
+    if (!textActionActive) return false
+    var id = TextActions.normalizedAction(action)
+    var ask = String(instruction === undefined || instruction === null ? "" : instruction)
+    var language = String(requestedLanguage || textActionLanguage)
+    var prompt = TextActions.promptFor(id, selectionText,
+      { language: language, instruction: ask })
+    if (prompt === "") return false
+    var wasChoosing = selectionChoosing
+    var previousAction = selectionAction
+    var previousInstruction = selectionInstruction
+    selectionChoosing = false
+    selectionAction = id
+    selectionInstruction = ask
+    notice = ""
+    selectionSubmitting = true
+    var sent = submit(prompt, TextActions.questionLabel(id, ask, language))
+    selectionSubmitting = false
+    if (!sent) {
+      // Everything this wrote has to come back, not only the flag: the action
+      // it names outlives the turn and the attachment path reads it.
+      selectionChoosing = wasChoosing
+      selectionAction = previousAction
+      selectionInstruction = previousInstruction
+      note("OmaPilot is not ready yet")
+      return false
+    }
+    // Only a preset is remembered. What the user typed is theirs, not a
+    // default to spring on them the next time they press Enter.
+    if (id !== "custom" && id !== configuredTextActionLast)
+      requestSettingsPersist({ textActionLast: id })
+    return true
+  }
+
+  // A fresh turn, with the same source text and the same target window. Going
+  // through newChat() would drop both, since abandoning the action is exactly
+  // what a new chat means everywhere else.
+  // Repeating needs something to repeat. Over the chooser this used to reset
+  // the chat, drop the chooser, and leave the selection latched with no chips,
+  // no answer and nothing that could act on it.
+  function regenerateTextAction() {
+    if (!textActionActive || busy || selectionChoosing) return
+    var returnChatId = currentChatId
+    var target = selectionTarget
+    var text = selectionText
+    var action = selectionAction
+    var instruction = selectionInstruction
+    resetChat()
+    // resetChat deliberately leaves an ordinary new turn with no
+    // continuation. A text action is an overlay on the conversation that was
+    // already open, so keep that return point without ever sending it as the
+    // provider's resumeChatId.
+    currentChatId = returnChatId
+    selectionTarget = target
+    selectionText = text
+    // Put the action back before running it. resetChat cleared it, and a run
+    // that is refused restores what it found — which would be nothing, leaving
+    // a live selection whose Regenerate button then does nothing at all.
+    selectionAction = action
+    selectionInstruction = instruction
+    runTextAction(action, instruction)
+  }
+
+  // What a surface calls when it is put away. Switching between OmaPilot's own
+  // surfaces is a move, not a dismissal, and must not drop the action.
+  function dismissTextAction() {
+    if (!TextActions.dismissesTextAction(surfaceHandoffPending)) return
+    endTextAction()
+  }
+
+  function note(message) {
+    notice = String(message || "")
+    if (notice !== "") noticeLife.restart()
+  }
+
+  function endTextAction() {
+    notice = ""
+    selectionText = ""
+    selectionTarget = ""
+    selectionReplacing = false
+    selectionReplaceTarget = ""
+    selectionChoosing = false
+    selectionAction = ""
+    selectionInstruction = ""
+  }
+
+  function replaceSelectionWithAnswer() {
+    var decision = TextActions.replaceDecision({
+      active: textActionActive,
+      replacing: selectionReplaceTarget !== "",
+      busy: busy,
+      action: selectionAction,
+      choosing: selectionChoosing,
+      selection: selectionText,
+      answer: answerMarkdown
+    })
+    if (decision !== "send") {
+      note(Protocol.selectionFailureMessage(decision))
+      return decision
+    }
+    selectionReplacing = true
+    selectionReplaceTarget = selectionTarget
+    sendCommand(Protocol.command("selection_replace", {
+      text: TextActions.replacementFromAnswer(answerMarkdown),
+      address: selectionTarget
+    }))
+    return decision
+  }
+
   function clearDesktopContextLatch() {
     latchedActiveWindow = null
     latchedCaptureTarget = null
@@ -279,14 +610,44 @@ Scope {
     return Protocol.desktopContextWithLatchedActive(context, latchedActiveWindow)
   }
 
-  function submit(text) {
+  // `shownText` is what the user sees and what the chat record keeps, for the
+  // callers whose prompt is not what the user asked. Everyone else passes one
+  // string and nothing changes.
+  // Hosts hide their composer while the chooser is visible. Keep this routing
+  // defensive for a stale or third-party host: only text explicitly submitted
+  // from a composer may become a custom transformation. Every other caller —
+  // the voice lane above all — is asking its own question, and wrapping that
+  // around whatever happened to be selected would hijack the request.
+  function submitFromComposer(text) {
+    if (!selectionChoosing) return submit(text)
+    var typed = String(text || "").trim()
+    // runTextAction clears the flag before it calls submit, so this cannot
+    // come back around.
+    return typed === "" ? runTextAction(textActionDefault, "")
+      : runTextAction("custom", typed)
+  }
+
+  function submit(text, shownText) {
     var prompt = String(text || "").trim()
     if (!prompt || !canSubmit) return false
-    var resumeChatId = currentChatId
-    submittedResumeChatId = resumeChatId
+    // Asking something else is leaving the selection behind. Without this the
+    // answer to an unrelated question would still be offered as a replacement
+    // for text selected minutes ago, under the same Replace button, and the
+    // captured context would be dropped from a chat that is not a text action.
+    // A refused submit above changes nothing, which is why this sits after it.
+    // A read still in flight is an action too, and it is the one that arrives
+    // as a chooser over the conversation the user started instead.
+    if (!selectionSubmitting && (textActionActive || selectionPending)) endTextAction()
+    var shown = String(shownText === undefined || shownText === null ? "" : shownText).trim()
+    var committedChatId = currentChatId
+    // A text action must neither learn from nor mutate the conversation that
+    // happened to be open behind it. Keep that chat for the UI to return to,
+    // but start the transformation in a fresh provider session.
+    var resumeChatId = textActionActive ? "" : committedChatId
+    submittedResumeChatId = committedChatId
     currentId = "qml-" + Date.now() + "-" + Math.floor(Math.random() * 100000)
     currentChatId = ""
-    question = prompt
+    question = shown !== "" ? shown : prompt
     answerMarkdown = ""
     errorDetails = null
     images = []
@@ -295,16 +656,24 @@ Scope {
     state = "preparing"
     statusMessage = "Preparing " + Protocol.providerLabel(provider) + "…"
     var context = desktopContextForSubmit()
+    // A text action is about the selected text and nothing else. Carrying the
+    // captured context along would answer a different question from the one
+    // the chip names.
+    var carriesAttachments = !textActionActive
     var attachmentSelections = []
-    for (var attachmentIndex = 0; attachmentIndex < contextAttachments.length; attachmentIndex++) {
-      var attachment = contextAttachments[attachmentIndex]
-      attachmentSelections.push({ id: attachment.id, representationIds: attachment.selectedRepresentationIds })
-    }
+    if (carriesAttachments)
+      for (var attachmentIndex = 0; attachmentIndex < contextAttachments.length; attachmentIndex++) {
+        var attachment = contextAttachments[attachmentIndex]
+        attachmentSelections.push({ id: attachment.id, representationIds: attachment.selectedRepresentationIds })
+      }
     var autoApprove = configuredDangerousAutoApprove
     sendCommand(Protocol.submitCommand(
       currentId, prompt, provider, model, context, autoApprove, attachmentSelections, resumeChatId,
-      webHandoffProvider))
-    contextAttachments = []
+      webHandoffProvider, shown, !textActionActive))
+    // Only what was sent is spent. A text action does not carry the capture,
+    // so it must not consume it either: the user captured it for the question
+    // they have not asked yet.
+    if (carriesAttachments) contextAttachments = []
     answerChanged()
     return true
   }
@@ -481,6 +850,7 @@ Scope {
 
   function resetChat() {
     newChatPending = false
+    endTextAction()
     clearContextAttachments()
     currentId = ""
     currentChatId = ""
@@ -544,7 +914,20 @@ Scope {
   function setVoxtypeOsd(enabled) {
     sendCommand(Protocol.command("voxtype_osd_set", { enabled: enabled === true }))
   }
-  function requestVoiceStatus() { sendCommand(Protocol.command("voice_status")) }
+  function beginVoiceStatus() {
+    voiceStatusPending = true
+    voiceStatusLoading = false
+    voiceStatusLoadingDelay.restart()
+  }
+  function finishVoiceStatus() {
+    voiceStatusLoadingDelay.stop()
+    voiceStatusPending = false
+    voiceStatusLoading = false
+  }
+  function requestVoiceStatus() {
+    beginVoiceStatus()
+    sendCommand(Protocol.command("voice_status"))
+  }
   function setTtsKey(provider, apiKey) {
     ttsTest = null
     ttsTestError = ""
@@ -763,6 +1146,7 @@ Scope {
       brokerDesktopContextSupported = Protocol.hasFeature(event.features, "desktop-context")
       brokerContextAttachmentsSupported = Protocol.hasFeature(event.features, "context-attachments")
       brokerCapabilityPacksSupported = Protocol.hasFeature(event.features, "capability-packs")
+      brokerSelectionSupported = Protocol.hasFeature(event.features, "selection")
       applyProviders(event.providers || [])
       history = Protocol.normalizedHistory(event.history || [])
       if (Protocol.hasFeature(event.features, "voice")) requestVoiceStatus()
@@ -782,8 +1166,11 @@ Scope {
       return
     }
     if (type === "voice") {
+      finishVoiceStatus()
       ttsTestPending = false
       ttsTestError = ""
+      voiceStatusSource = ["key_set", "key_clear"].indexOf(String(event.source || "")) >= 0
+        ? String(event.source) : "status"
       voiceStatus = Protocol.normalizedVoiceStatus(event)
       return
     }
@@ -1004,6 +1391,12 @@ Scope {
       return
     }
     if (type === "error") {
+      // A replacement in flight is over the moment anything errors. Without
+      // this the flag stayed true, and both buttons stayed dead.
+      if (selectionReplacing) {
+        selectionReplacing = false
+        note(Protocol.selectionFailureMessage(""))
+      }
       var capabilityCode = String(event.code || "")
       if (!event.id && (capabilityCode.indexOf("capability_") === 0
           || capabilityCode.indexOf("files_root") >= 0
@@ -1114,6 +1507,51 @@ Scope {
       if (String(event.state || "") === "continued") herdrContinued()
       return
     }
+    if (type === "selection") {
+      var wasPending = selectionPending
+      selectionPending = false
+      // Nobody asked, or whoever asked is gone. Taking this would put one
+      // window's text behind another window's address.
+      if (!wasPending || selectionTarget === "") return
+      if (event.available !== true) {
+        selectionTarget = ""
+        selectionAction = ""
+        selectionInstruction = ""
+        var unavailableReason = String(event.reason || "empty")
+        notice = Protocol.selectionUnavailableMessage(unavailableReason)
+        selectionUnavailable(unavailableReason)
+        return
+      }
+      selectionText = Protocol.safeSelectionText(event.text, 8000)
+      if (selectionText === "") {
+        selectionTarget = ""
+        selectionAction = ""
+        selectionInstruction = ""
+        notice = Protocol.selectionUnavailableMessage("empty")
+        selectionUnavailable("empty")
+        return
+      }
+      selectionReady(selectionText)
+      if (TextActions.runsOnArrival(selectionAction)) runTextAction(selectionAction, "")
+      else selectionChoosing = true
+      return
+    }
+    if (type === "selection_replaced") {
+      // The action this answers may already be gone: pressing the hotkey again
+      // while a paste is in flight abandons it and latches another. Ending an
+      // action here unconditionally wiped that newer one and left a chooser
+      // with no target, whose chips and composer both silently did nothing.
+      // The token and not the flag, because an unrelated error clears the flag
+      // and this answer still has to be readable when it arrives.
+      if (selectionReplaceTarget === "") return
+      selectionReplaceTarget = ""
+      selectionReplacing = false
+      if (event.replaced === true) {
+        endTextAction()
+        notice = "Replaced"
+      } else notice = Protocol.selectionFailureMessage(event.reason)
+      return
+    }
     if (type === "copied") {
       toastRequested(event.copied === true ? "Copied" : "Could not copy")
       return
@@ -1121,6 +1559,39 @@ Scope {
     if (type === "link" && event.opened === false) {
       toastRequested("Could not open that link")
     }
+  }
+
+  // A passing message should not outlive the moment it belongs to. A text
+  // action's own refusals are re-set whenever the action changes, so this only
+  // sweeps up what nothing else clears.
+  Timer {
+    id: noticeLife
+    interval: 8000
+    repeat: false
+    onTriggered: root.notice = ""
+  }
+
+  // toastRequested has no consumer in this shell. Rather than leave every
+  // caller shouting into nothing, the store hears its own signal.
+  onToastRequested: function(message) { root.note(message) }
+
+// The IpcHandler target below is the same string, spelled out there because
+  // the UI contract pins that literal.
+  readonly property string pluginIdentity: "io.github.spencerbull.omapilot"
+
+  readonly property string hyprlandBindingsPath:
+    (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config"))
+      + "/hypr/bindings.lua"
+
+  FileView {
+    id: hyprlandBindings
+    path: root.hyprlandBindingsPath
+    // The installer rewrites this file, so the list has to follow it rather
+    // than be a snapshot from startup.
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.installedHotkeys = Hotkeys.installedChords(text(), root.pluginIdentity)
+    onFileChanged: reload()
   }
 
   IpcHandler {
@@ -1131,9 +1602,51 @@ Scope {
     function hide() { root.routeIpc("hide") }
     function toggle() { root.routeIpc("toggle") }
     function newChat() { root.routeIpc("newChat") }
+    // Starts the action here, then asks whatever surface is live to show
+    // itself. Latching before the surface appears is the whole point: opening
+    // first would make OmaPilot the active window. The answer is the decision,
+    // so a caller that gets nothing can see why.
+    function textAction(): string {
+      var decision = root.beginTextAction("")
+      root.ipcSelectionRequested()
+      return decision
+    }
+    // The direct routes skip the chooser, for anyone who would rather spend a
+    // chord than a keystroke. fixSelection keeps its name so a bindings.lua
+    // written by an earlier installer still does what it says.
+    function fixSelection(): string { return root.startDirectTextAction("fix") }
+    function rewriteSelection(): string { return root.startDirectTextAction("rewrite") }
+    function translateSelection(): string { return root.startDirectTextAction("translate") }
+    // The scripted equivalent of pressing one chooser chip. It remains gated
+    // by the same choosing flag and calls the same store function as the UI;
+    // this gives desktop E2E a stable route without exposing selected text.
+    function chooseTextAction(action: string): string {
+      if (!root.selectionChoosing) return "no-chooser"
+      return root.runTextAction(action, "") ? "ok" : "refused"
+    }
+    // Scripted custom instructions are useful for desktop integration tests
+    // and automation. They remain behind the live chooser and the store's
+    // normal validation, and never expose the captured selection to callers.
+    function chooseCustomTextAction(instruction: string): string {
+      if (!root.selectionChoosing) return "no-chooser"
+      return root.runTextAction("custom", instruction) ? "ok" : "refused"
+    }
+    // The same call the Replace button makes, so a scripted run — or a
+    // hotkey — can accept a correction without a pointer. The guards stay in
+    // replaceSelectionWithAnswer; this only reports whether there was
+    // anything to accept.
+    function replaceSelection(): string {
+      if (!root.textActionActive) return "no-text-action"
+      // The decision, not "ok". A scripted caller has only this to go on, and
+      // every refusal used to read as success.
+      var decision = root.replaceSelectionWithAnswer()
+      return decision === "send" ? "ok" : decision
+    }
     function continueInHerdr() { root.continueInHerdr() }
     function history() { root.routeIpc("history") }
     function settings() { root.routeIpc("settings") }
+    function cycleSurface(): string { return root.cycleSurface() }
+    function surface(name: string): string { return root.selectSurface(name) }
     function voiceStart(): string { root.ipcVoiceStartRequested(); return "ok" }
     function voiceStop(): string { root.ipcVoiceStopRequested(); return "ok" }
     function voiceToggle(): string { root.ipcVoiceToggleRequested(); return "ok" }
@@ -1141,6 +1654,13 @@ Scope {
     function voiceCancel(): string { root.ipcVoiceCancelRequested(); return "ok" }
     function dismiss(): string { root.ipcAmbientDismissRequested(); return "ok" }
     function status(): string { return "store=" + root.state }
+    // Test and support observability without exposing the selected text, its
+    // window address, the prompt, or the answer. `turnId` lets a caller prove
+    // that complete belongs to the action it just started rather than to the
+    // previous conversation.
+    function textActionState(): string {
+      return JSON.stringify(root.textActionStatePayload())
+    }
   }
 
   // Hotkeys modify user-owned compositor configuration, so this helper starts
@@ -1193,8 +1713,12 @@ Scope {
     }
 
     onExited: function(exitCode, exitStatus) {
+      root.finishVoiceStatus()
       root.processStarted = false
       root.initialized = false
+      // Nothing is going to answer the read now, and leaving it in flight
+      // would refuse every later text action with "still reading".
+      root.selectionPending = false
       root.pendingPermission = null
       root.permissionQueue = []
       if (root.harnessRestartPending) {

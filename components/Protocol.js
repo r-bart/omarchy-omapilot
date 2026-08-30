@@ -90,12 +90,18 @@ function normalizedAuthEvent(raw) {
   return result
 }
 
-function submitCommand(id, question, provider, model, desktopContext, dangerousAutoApprove, contextAttachments, resumeChatId, webHandoffProvider) {
+function submitCommand(id, question, provider, model, desktopContext, dangerousAutoApprove, contextAttachments, resumeChatId, webHandoffProvider, displayQuestion, saveToHistory) {
   var payload = command("submit", {
     id: String(id || ""),
     question: String(question || ""),
     provider: normalizedProvider(provider) || "builtin"
   })
+  // Only when it actually differs, so an ordinary question sends one string.
+  var shown = String(displayQuestion === undefined || displayQuestion === null ? "" : displayQuestion).trim()
+  if (shown !== "" && shown !== String(question || "").trim()) payload.displayQuestion = shown
+  // Persistence is the default and therefore stays off the ordinary wire.
+  // Only an explicitly ephemeral caller needs to say anything.
+  if (saveToHistory === false) payload.saveToHistory = false
   var previousChat = String(resumeChatId || "")
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(previousChat))
     payload.resumeChatId = previousChat
@@ -244,6 +250,64 @@ function safeContextText(value, limit) {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, limit)
+}
+
+// A compositor window handle, accepted only in its exact form. It is the
+// target a text action types into, so anything that is not plainly an address
+// is refused rather than repaired.
+function windowAddress(value) {
+  var text = String(value === undefined || value === null ? "" : value)
+  return /^0x[0-9a-f]{1,30}$/i.test(text) ? text : ""
+}
+
+// Quickshell's typed HyprlandToplevel.address omits the `0x` prefix used by
+// the compositor's JSON IPC object. Accept that one native representation at
+// the trusted API boundary; wire-facing callers keep the strict validator.
+function hyprlandWindowAddress(value) {
+  var text = String(value === undefined || value === null ? "" : value)
+  if (/^[0-9a-f]{1,30}$/i.test(text)) text = "0x" + text
+  return windowAddress(text)
+}
+
+// Selections are multi-line, so this keeps newlines and tabs where
+// safeContextText collapses all whitespace. Control and bidirectional-display
+// characters still go.
+function safeSelectionText(value, limit) {
+  return String(value === undefined || value === null ? "" : value)
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, " ")
+    .replace(/^\s+|\s+$/g, "")
+    .slice(0, limit || 8000)
+}
+
+// Why a replacement did not land, in the user's terms. Each reason is a
+// different thing to do next, so none of them collapse into one message.
+function selectionFailureMessage(reason) {
+  var value = String(reason === undefined || reason === null ? "" : reason)
+  if (value === "unsupported") return "Install wtype to replace text"
+  if (value === "invalid_target") return "That window is no longer available"
+  if (value === "focus_failed") return "Could not return to the original window"
+  if (value === "empty") return "There is no replacement text in this answer"
+  if (value === "too_long") return "This answer is too long to type back; copy it instead"
+  if (value === "not_a_replacement") return "This answer reads like an explanation, not a replacement; copy it instead"
+  if (value === "busy") return "Wait for the answer to finish"
+  if (value === "no_action") return "There is no text action to replace"
+  if (value === "choosing") return "Choose what to do with the selected text first"
+  return "Could not replace the text"
+}
+
+// Why a selection could not be read. An empty selection is the common case and
+// reads as guidance, not as an error.
+function selectionUnavailableMessage(reason) {
+  var value = String(reason === undefined || reason === null ? "" : reason)
+  if (value === "unsupported") return "Install wl-clipboard to work on selected text"
+  if (value === "own_surface") return "Go back to the window with your text, then press the hotkey again"
+  if (value === "sensitive") return "OmaPilot will not work on text from a password or credential window"
+  if (value === "terminal") return "Text replacement is not safe in terminal windows"
+  if (value === "pending") return "Still reading the last selection"
+  if (value === "target") return "Select text in a window first"
+  if (value === "failed") return "Could not read the selected text"
+  return "Select some text first"
 }
 
 function isShellAppId(value) {
@@ -784,6 +848,26 @@ function normalizedWebHandoffProvider(value) {
   return ["duckduckgo", "google", "chatgpt", "claude", "grok"].indexOf(provider) >= 0 ? provider : ""
 }
 
+// The surfaces the conversation can be shown on, ordered by how much of the
+// screen they take. Anything unrecognized — a config from before the console
+// existed, a hand-edited typo — reads as the panel, which is the default.
+function surfaceOrder() {
+  return ["panel", "console", "fullscreen"]
+}
+
+function normalizedSurface(value) {
+  var surface = String(value || "").toLowerCase()
+  return surfaceOrder().indexOf(surface) >= 0 ? surface : "panel"
+}
+
+// One gesture, always forward, always landing somewhere valid: an unrecognized
+// current value normalizes to the panel first and so advances to the console
+// rather than getting stuck.
+function nextSurface(value) {
+  var order = surfaceOrder()
+  return order[(order.indexOf(normalizedSurface(value)) + 1) % order.length]
+}
+
 function webHandoffProviderOptions() {
   return ["duckduckgo", "google", "chatgpt", "claude", "grok"].map(function(value) {
     return { value: value, label: webHandoffProviderLabel(value) }
@@ -808,7 +892,11 @@ function harnessOptions() {
 
 function providerLabel(value) {
   var provider = normalizedProvider(value)
-  if (provider === "builtin") return "Built-in (OmaPilot)"
+  // Not "Built-in (OmaPilot)": everywhere this label is shown, the product
+  // name is already on the screen — the console header above it, the settings
+  // page it sits in. What the row is choosing between is built-in, Codex and
+  // OpenCode, and that is what it should read.
+  if (provider === "builtin") return "Built-in"
   if (provider === "codex") return "Codex"
   if (provider === "opencode") return "OpenCode"
   return String(value || "")
@@ -1069,8 +1157,44 @@ function normalizedHistory(input) {
       model: String(row.model || ""),
       timestamp: String(row.createdAt || row.timestamp || ""),
       images: Array.isArray(row.images) ? row.images : [],
-      resumable: row.resumable === true || (row.session && row.session.resumable === true)
+      resumable: row.resumable === true || (row.session && row.session.resumable === true),
+      // The thread key, kept rather than flattened away. Every turn is its own
+      // record; what makes a run of them one conversation is sharing an acpId,
+      // and without it the console can only ever show the turn in front of it.
+      acpId: String((row.session && row.session.acpId) || row.acpId || "")
     })
   }
   return result
+}
+
+// The turns before this one in the same conversation, oldest first.
+//
+// History arrives newest-first and flat: thirty records across every session
+// the user has had. A conversation is the run of them that shares an acpId, so
+// that is the grouping — and a record without one is a conversation of one,
+// which is the honest answer rather than a guess. Harnesses that do not resume
+// natively have no acpId at all, and lumping their turns together by adjacency
+// would invent a thread that the broker cannot reconstruct.
+//
+// The current turn is excluded: it is painted live from `question` and
+// `answerMarkdown`, and it is already in history the moment it completes.
+function threadBefore(history, chatId) {
+  var source = Array.isArray(history) ? history : []
+  var current = String(chatId || "")
+  var at = -1
+  for (var i = 0; i < source.length; i++) {
+    if (String(source[i].id) === current) { at = i; break }
+  }
+  if (at < 0) return []
+  var key = String(source[at].acpId || "")
+  if (key === "") return []
+  // History is newest-first, so everything before this turn is everything
+  // after it in the list. Strictly earlier and not "the rest of the thread":
+  // in practice the live turn is the newest of its conversation, but a caller
+  // asking about an older one is asking what led up to it.
+  var thread = []
+  for (var j = at + 1; j < source.length; j++) {
+    if (String(source[j].acpId || "") === key) thread.push(source[j])
+  }
+  return thread.reverse()
 }

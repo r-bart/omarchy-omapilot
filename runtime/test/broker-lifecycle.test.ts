@@ -51,8 +51,10 @@ describe("broker lifecycle cleanup", () => {
     expect(cleaned.sort()).toEqual(["provider-session-1", "provider-session-2"]);
   });
 
-  it("cleans the provider session evicted by the 30-chat cap", async () => {
-    const fixture = await setup();
+  it("cleans the provider session evicted by the chat cap", async () => {
+    // A small cap: what is under test is that eviction reaches the session
+    // cleaner, not how many chats the store keeps by default.
+    const fixture = await setup(30);
     for (let index = 0; index < 30; index += 1) await fixture.history.save(record(index));
     const cleaned: string[] = [];
     const broker = new OmaPilotBroker(fixture.events.push.bind(fixture.events), {
@@ -63,6 +65,27 @@ describe("broker lifecycle cleanup", () => {
     await broker.handle({ type: "submit", id: "evict", question: "Newest", provider: "codex" });
     expect((await fixture.history.list())).toHaveLength(30);
     expect(cleaned).toContain("provider-session-0");
+  }, 20_000);
+
+  it("returns a text action without persisting a chat or provider session", async () => {
+    const fixture = await setup();
+    const cleaned: string[] = [];
+    const broker = new OmaPilotBroker(fixture.events.push.bind(fixture.events), {
+      history: fixture.history, images: new ImageStore(fixture.paths), env: fixture.env,
+      sessionCleaner: (_provider, sessionId) => { cleaned.push(sessionId); return Promise.resolve(true); }
+    });
+    await broker.handle({ type: "initialize", protocolVersion: 2, harness: "codex" });
+    await broker.handle({
+      type: "submit", id: "text-action", question: "Fix teh sentence", provider: "codex",
+      displayQuestion: "Fix spelling and grammar", saveToHistory: false
+    });
+
+    expect(await fixture.history.list()).toEqual([]);
+    expect(fixture.events).toContainEqual({
+      type: "complete", id: "text-action", answer: expect.any(String)
+    });
+    expect(fixture.events.some((event) => event.type === "complete" && "chat" in event)).toBe(false);
+    expect(cleaned).toHaveLength(1);
   }, 20_000);
 
   it("uses OpenCode's native CLI when ACP cannot delete persisted sessions", async () => {
@@ -419,6 +442,76 @@ describe("Herdr handoff serialization", () => {
 });
 
 describe("voice provider status", () => {
+  it("publishes only the newest concurrent voice status", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-voice-revision-")); roots.push(root);
+    const env = { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: join(root, "config") };
+    const events: BrokerEvent[] = [];
+    const probes: Array<(available: boolean) => void> = [];
+    const voice = new VoiceService(
+      env,
+      {
+        dictationAvailable: () => Promise.resolve(false),
+        kokoroAvailable: () => new Promise<boolean>((resolveProbe) => { probes.push(resolveProbe); })
+      }
+    );
+    const broker = new OmaPilotBroker(events.push.bind(events), { voice, env });
+
+    const older = broker.handle({ type: "voice_status" });
+    await vi.waitFor(() => expect(probes).toHaveLength(1));
+    const newer = broker.handle({ type: "voice_status" });
+    await vi.waitFor(() => expect(probes).toHaveLength(2));
+    probes[1]?.(true);
+    await newer;
+    probes[0]?.(false);
+    await older;
+
+    const statuses = events.filter((event) => event.type === "voice");
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]?.type === "voice" ? statuses[0].tts[0]?.available : false).toBe(true);
+  });
+
+  it("lets a key mutation supersede an older pending voice status", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-voice-key-revision-")); roots.push(root);
+    const env = { ...process.env, HOME: root, OMAPILOT_CONFIG_DIR: join(root, "config") };
+    const events: BrokerEvent[] = [];
+    const probes: Array<(available: boolean) => void> = [];
+    const voice = new VoiceService(
+      env,
+      {
+        dictationAvailable: () => Promise.resolve(false),
+        kokoroAvailable: () => new Promise<boolean>((resolveProbe) => { probes.push(resolveProbe); }),
+        fetch: (input) => Promise.resolve(new Response(JSON.stringify(
+          (typeof input === "string" ? input : input instanceof URL ? input.href : input.url).includes("/v2/voices")
+            ? { voices: [] }
+            : []
+        ), { status: 200 }))
+      }
+    );
+    const broker = new OmaPilotBroker(events.push.bind(events), { voice, env });
+
+    const older = broker.handle({ type: "voice_status" });
+    await vi.waitFor(() => expect(probes).toHaveLength(1));
+    const saving = broker.handle({
+      type: "tts_key_set", provider: "elevenlabs", apiKey: "eleven-race-test-key"
+    });
+    await vi.waitFor(() => expect(probes).toHaveLength(2));
+    probes[0]?.(false);
+    await older;
+    expect(events.filter((event) => event.type === "voice")).toHaveLength(0);
+    probes[1]?.(false);
+    await saving;
+
+    const statuses = events.filter((event) => event.type === "voice");
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]).toMatchObject({
+      type: "voice",
+      source: "key_set",
+      tts: expect.arrayContaining([
+        expect.objectContaining({ id: "elevenlabs", available: true, configured: true })
+      ])
+    });
+  });
+
   it("emits a voice catalog without secrets and acknowledges a tested key", async () => {
     const root = await mkdtemp(join(tmpdir(), "omapilot-voice-")); roots.push(root);
     const config = join(root, ".config/omapilot");
@@ -485,7 +578,7 @@ describe("voice provider status", () => {
   });
 });
 
-async function setup(): Promise<{
+async function setup(maxChats?: number): Promise<{
   paths: ReturnType<typeof omapilotPaths>;
   history: HistoryStore;
   events: BrokerEvent[];
@@ -496,7 +589,7 @@ async function setup(): Promise<{
   const paths = omapilotPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
   return {
     paths,
-    history: new HistoryStore(paths),
+    history: new HistoryStore(paths, maxChats),
     events: [],
     env: {
       ...process.env,

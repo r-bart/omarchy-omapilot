@@ -30,12 +30,14 @@ Item {
     ? backend.voxtypeOsd : ({ available: false, enabled: true, message: "" })
   readonly property var voiceStatus: backend && backend.voiceStatus
     ? backend.voiceStatus : Protocol.emptyVoiceStatus()
+  readonly property bool voiceStatusLoading: backend ? backend.voiceStatusLoading === true : false
   property bool voiceEnabled: false
   property string ttsProvider: "elevenlabs"
   property string ttsModel: ""
   property string ttsVoice: ""
   property string ttsDraftKey: ""
   property bool ttsKeyBusy: false
+  property string ttsKeyAction: ""
   property string ttsFormError: ""
   property string ttsFormNotice: ""
   readonly property var ttsCatalog: Protocol.ttsProviderStatus(voiceStatus, ttsProvider)
@@ -57,6 +59,7 @@ Item {
   readonly property bool browserCompanionBusy: backend ? backend.browserCompanionBusy === true : false
   readonly property bool hotkeyBusy: backend ? backend.hotkeyBusy === true : false
   readonly property string hotkeyMessage: backend ? String(backend.hotkeyMessage || "") : ""
+  readonly property var installedHotkeys: backend && backend.installedHotkeys ? backend.installedHotkeys : []
   property bool browserRemoveConfirmation: false
   property bool browserSetupExpanded: false
   // Add-an-endpoint form state. Nothing here is persisted until the broker
@@ -94,6 +97,7 @@ Item {
     || authMethodPicker.popupOpen || authPromptPicker.popupOpen
     || webHandoffProviderPicker.popupOpen || ttsProviderPicker.popupOpen
     || ttsModelPicker.popupOpen || ttsVoicePicker.popupOpen
+    || surfacePicker.popupOpen || sidebarWidthPicker.popupOpen
   readonly property bool modalInteractionActive: popupOpen
     || browserCompanionBusy
     || (selectedTab === "desktop" && browserRemoveConfirmation)
@@ -131,6 +135,15 @@ Item {
   signal ttsKeyClearRequested(string provider)
   signal ttsKeyTestRequested(string provider, string apiKey)
   signal dismissed()
+
+  // The surface group persists through the store's relay instead of the host
+  // signal chain: this view is hosted by both the panel and the console, and
+  // only the settings-authority owner knows where the entry lives. Every other
+  // group predates the relay and keeps its signal path.
+  function requestSurfacePersist(values) {
+    if (root.backend && typeof root.backend.requestSettingsPersist === "function")
+      root.backend.requestSettingsPersist(values)
+  }
 
   function resetServerForm() {
     serverFormError = ""
@@ -225,20 +238,25 @@ Item {
     }
 
     function onVoiceStatusChanged() {
-      if (root.ttsKeyBusy) {
+      var source = root.backend ? String(root.backend.voiceStatusSource || "status") : "status"
+      var completed = (root.ttsKeyAction === "save" && source === "key_set")
+        || (root.ttsKeyAction === "clear" && source === "key_clear")
+      if (root.ttsKeyBusy && completed) {
+        var action = root.ttsKeyAction
         root.ttsKeyBusy = false
+        root.ttsKeyAction = ""
         root.ttsFormError = ""
         root.ttsDraftKey = ""
-        root.ttsFormNotice = root.ttsCloud
-          ? (root.ttsCatalog.available ? "API key saved." : String(root.ttsCatalog.message || "The API key was saved."))
-          : ""
+        root.ttsFormNotice = action === "clear" ? "API key removed." : "API key saved."
       }
       root.syncTtsSelection()
     }
 
     function onTtsTestChanged() {
-      if (!root.ttsKeyBusy || !root.backend || !root.backend.ttsTest) return
+      if (!root.ttsKeyBusy || root.ttsKeyAction !== "test"
+          || !root.backend || !root.backend.ttsTest) return
       root.ttsKeyBusy = false
+      root.ttsKeyAction = ""
       root.ttsFormError = ""
       root.ttsFormNotice = "The API key works. Save it to use this provider."
     }
@@ -247,6 +265,7 @@ Item {
       var message = root.backend ? String(root.backend.ttsTestError || "") : ""
       if (!root.ttsKeyBusy || message === "") return
       root.ttsKeyBusy = false
+      root.ttsKeyAction = ""
       root.ttsFormError = message
     }
   }
@@ -308,6 +327,8 @@ Item {
     ttsProviderPicker.close()
     ttsModelPicker.close()
     ttsVoicePicker.close()
+    surfacePicker.close()
+    sidebarWidthPicker.close()
     if (restoreFocus !== false)
       Qt.callLater(function() { tabBar.forceActiveFocus() })
   }
@@ -336,16 +357,43 @@ Item {
         onClicked: root.dismissed()
       }
 
-      SettingsTabs {
-        id: tabBar
+      // The tab row measures ~294px at scale 1 and fits the panel with room to
+      // spare, but the console's 404px minus the back button can pinch it, and
+      // large font scales pinch it anywhere. The Flickable only engages when
+      // the labels genuinely do not fit; otherwise it is inert.
+      Flickable {
+        id: tabScroll
         Layout.fillWidth: true
         Layout.alignment: Qt.AlignTop
-        current: root.selectedTab
-        foreground: root.foreground
-        accent: root.accent
-        fontFamily: root.fontFamily
-        motionEnabled: root.motionEnabled
-        onSelected: function(id) { root.selectTab(id) }
+        implicitHeight: tabBar.implicitHeight
+        contentWidth: tabBar.width
+        contentHeight: tabBar.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentWidth > width
+
+        SettingsTabs {
+          id: tabBar
+          width: Math.max(implicitWidth, tabScroll.width)
+          current: root.selectedTab
+          foreground: root.foreground
+          accent: root.accent
+          fontFamily: root.fontFamily
+          motionEnabled: root.motionEnabled
+          onSelected: function(id) { root.selectTab(id) }
+          // Keyboard navigation must never select a tab the clip has hidden.
+          onCurrentIndexChanged: tabScroll.ensureCurrentVisible()
+        }
+
+        function ensureCurrentVisible() {
+          if (contentWidth <= width) return
+          var left = tabBar.currentTabX
+          var right = left + tabBar.currentTabWidth
+          if (left < contentX)
+            contentX = Math.max(0, left - Style.spacing.xl)
+          else if (right > contentX + width)
+            contentX = Math.min(contentWidth - width, right - width + Style.spacing.xl)
+        }
       }
     }
 
@@ -942,6 +990,7 @@ Item {
             showLabel: false
             options: Protocol.ttsProviderOptions()
             value: root.ttsProvider
+            enabled: !root.ttsKeyBusy
             foreground: root.foreground
             background: root.background
             Accessible.name: "TTS provider"
@@ -998,6 +1047,7 @@ Item {
                 root.ttsFormError = ""
                 root.ttsFormNotice = ""
                 root.ttsKeyBusy = true
+                root.ttsKeyAction = "test"
                 root.ttsKeyTestRequested(root.ttsProvider, root.ttsDraftKey)
               }
             }
@@ -1015,6 +1065,7 @@ Item {
                 root.ttsFormError = ""
                 root.ttsFormNotice = ""
                 root.ttsKeyBusy = true
+                root.ttsKeyAction = "save"
                 root.ttsKeySetRequested(root.ttsProvider, root.ttsDraftKey)
               }
             }
@@ -1031,6 +1082,8 @@ Item {
                 root.ttsFormError = ""
                 root.ttsFormNotice = ""
                 root.ttsDraftKey = ""
+                root.ttsKeyBusy = true
+                root.ttsKeyAction = "clear"
                 root.ttsKeyClearRequested(root.ttsProvider)
               }
             }
@@ -1456,6 +1509,125 @@ Item {
 
           Text {
             Layout.fillWidth: true
+            text: "Surface"
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+          }
+
+          Dropdown {
+            id: surfacePicker
+            Layout.fillWidth: true
+            showLabel: false
+            options: [
+              { value: "panel", label: "Bar panel — compact popout" },
+              { value: "console", label: "Console — full-height sidebar" },
+              { value: "fullscreen", label: "Console — full screen" }
+            ]
+            value: root.backend
+              ? Protocol.normalizedSurface(root.backend.configuredSurface) : "panel"
+            enabled: root.backend && !root.backend.busy
+            foreground: root.foreground
+            background: root.background
+            Accessible.name: "Surface"
+            onChanged: function(value) {
+              root.requestSurfacePersist({
+                surface: Protocol.normalizedSurface(value) })
+            }
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "The console keeps the conversation, approvals, history, and these settings on one surface — docked to the right edge, or filling the screen. The panel stays available as the compact quick turn."
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.Wrap
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
+          }
+
+          Toggle {
+            Layout.fillWidth: true
+            visible: root.backend && root.backend.configuredSurface === "console"
+            label: "Hold the column open"
+            description: "Tile windows beside the console instead of behind it, the way the bar holds its own strip. Opening and closing the console reflows the layout."
+            checked: root.backend && root.backend.configuredConsoleReservesSpace
+            enabled: root.backend && !root.backend.busy
+            foreground: root.foreground
+            accent: root.accent
+            fontFamily: root.fontFamily
+            Accessible.name: label
+            onClicked: root.requestSurfacePersist({
+              consoleReservesSpace: !(root.backend
+                && root.backend.configuredConsoleReservesSpace) })
+          }
+
+          Dropdown {
+            id: sidebarWidthPicker
+            Layout.fillWidth: true
+            visible: root.backend && root.backend.configuredSurface === "console"
+            showLabel: false
+            options: [
+              { value: "360", label: "Console width · 360" },
+              { value: "400", label: "Console width · 400" },
+              { value: "440", label: "Console width · 440" },
+              { value: "500", label: "Console width · 500" },
+              { value: "560", label: "Console width · 560" }
+            ]
+            value: root.backend ? String(root.backend.configuredSidebarWidth) : "440"
+            enabled: root.backend && !root.backend.busy
+            foreground: root.foreground
+            background: root.background
+            Accessible.name: "Console width"
+            onChanged: function(value) {
+              root.requestSurfacePersist({ sidebarWidth: Number(value) || 440 })
+            }
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Text actions"
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+          }
+
+          // One language, not a picker. Any other language is already one
+          // sentence away — select the text, press the hotkey, and type it —
+          // and the Dropdown here only opens downward, which is the wrong
+          // shape for a list of languages this far down the panel.
+          TextField {
+            id: textActionLanguageInput
+            Layout.fillWidth: true
+            maximumLength: 40
+            text: root.backend ? String(root.backend.configuredTextActionLanguage || "") : ""
+            placeholderText: root.backend
+              ? "Following your system locale · " + String(root.backend.textActionLanguage || "English")
+              : "English"
+            foreground: root.foreground
+            accent: root.accent
+            Accessible.name: "Translate to"
+            onEditingFinished: root.requestSurfacePersist({
+              textActionLanguage: String(text || "").replace(/^\s+|\s+$/g, "")
+            })
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "The language the Translate action sends text to. Leave it empty to follow your system locale. Any other language is one prompt away: select text, press the hotkey, and type it."
+            color: root.mutedForeground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.Wrap
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
+          }
+
+          Text {
+            Layout.fillWidth: true
             text: "Global hotkeys"
             color: root.mutedForeground
             font.family: root.fontFamily
@@ -1472,6 +1644,61 @@ Item {
             wrapMode: Text.Wrap
             Accessible.role: Accessible.StaticText
             Accessible.name: text
+          }
+
+          // Read from the bindings file, not from anything OmaPilot stores.
+          // Nothing here edits a chord: that file is the user's, and a second
+          // owner is how the two end up disagreeing while Hyprland obeys only
+          // the file. What this can do is answer "which chords do I have",
+          // which nothing else does — including for a chord the installer
+          // skipped over a collision and reported only on standard error.
+          ColumnLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: Style.spacing.sm
+            spacing: Style.spacing.xs
+            visible: root.installedHotkeys.length > 0
+
+            Repeater {
+              model: root.installedHotkeys
+
+              RowLayout {
+                Layout.fillWidth: true
+                spacing: Style.spacing.md
+
+                Text {
+                  text: modelData.chord
+                  color: root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  font.bold: true
+                  Accessible.role: Accessible.StaticText
+                  Accessible.name: text
+                }
+
+                Text {
+                  Layout.fillWidth: true
+                  text: modelData.description
+                  color: root.mutedForeground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  elide: Text.ElideRight
+                  Accessible.role: Accessible.StaticText
+                  Accessible.name: text
+                }
+              }
+            }
+
+            Text {
+              Layout.fillWidth: true
+              Layout.topMargin: Style.spacing.xs
+              text: "Change a chord by editing that file. A shortcut you do not see here was never installed, or its chord was already taken."
+              color: root.mutedForeground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.Wrap
+              Accessible.role: Accessible.StaticText
+              Accessible.name: text
+            }
           }
 
           RowLayout {
@@ -1854,6 +2081,18 @@ Item {
           }
         }
       }
+    }
+
+    Text {
+      Layout.fillWidth: true
+      visible: root.selectedTab === "voice" && root.voiceStatusLoading
+      text: "Starting local voice engine… First launch may take a few seconds."
+      color: root.mutedForeground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      wrapMode: Text.Wrap
+      Accessible.role: Accessible.StaticText
+      Accessible.name: text
     }
   }
 }

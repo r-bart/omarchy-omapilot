@@ -35,13 +35,33 @@ jq -e '
     "desktopContext":"On",
     "webHandoffProvider":"duckduckgo",
     "dangerousAutoApprove":false,
+    "surface":"panel",
+    "sidebarWidth":440,
+    "consoleReservesSpace":false,
+    "textActionLanguage":"",
+    "textActionLast":"fix",
     "voiceEnabled":false,
     "ttsProvider":"elevenlabs",
     "ttsModel":"",
     "ttsVoice":"",
     "onboardingComplete":false
   }
-  and ([.barWidget.schema[].key] | sort) == (["builtinModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "provider", "ttsModel", "ttsProvider", "ttsVoice", "voiceEnabled", "webHandoffProvider"] | sort)
+  and ([.barWidget.schema[].key] | sort) == (["builtinModel", "codexModel", "dangerousAutoApprove", "desktopContext", "opencodeModel", "consoleReservesSpace", "provider", "surface", "ttsModel", "ttsProvider", "ttsVoice", "voiceEnabled", "webHandoffProvider"] | sort)
+  and (.barWidget.schema[] | select(.key == "surface")) == {
+    "key":"surface",
+    "type":"enum",
+    "label":"Surface",
+    "options":["panel", "console", "fullscreen"],
+    "defaultValue":"panel",
+    "description":"Answer from the compact bar panel, from a full-height console docked to the right edge of the focused output, or from that same console maximized over the usable screen."
+  }
+  and (.barWidget.schema[] | select(.key == "consoleReservesSpace")) == {
+    "key":"consoleReservesSpace",
+    "type":"boolean",
+    "label":"Hold the column open",
+    "defaultValue":false,
+    "description":"Let the docked console tile with your windows instead of floating over them. Opening and closing it reflows the layout."
+  }
   and (.barWidget.schema[] | select(.key == "webHandoffProvider")) == {
     "key":"webHandoffProvider",
     "type":"enum",

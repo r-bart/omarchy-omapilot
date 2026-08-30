@@ -19,14 +19,20 @@ and compatibility; it is not a plugin security review.
 6. Render `preview.png` with `npm run preview`, inspect it, and verify the same
    surface in the live Omarchy shell.
 7. Validate a clean archive of the exact candidate commit with Omarchy Quattro.
-   This `0.2.0` candidate is pinned to Quattro commit
+   The upstream `0.2.0` baseline is pinned to Quattro commit
    `ef6d9e6605b121df15bf310e630e04f0c1119fc8`.
-8. Push the exact candidate to `dev`, merge it to the default `main` branch only
-   after review and green CI, then rerun the marketplace validator and security
-   baseline against that public `main` commit.
+8. For the community fork, push the exact candidate to `develop`, merge it to
+   the default `main` branch only after review and green CI, then rerun the
+   validator against that public `main` commit.
+9. Community releases use a SemVer prerelease suffix such as
+   `0.2.1-rbart.1`. Create the matching `v0.2.1-rbart.1` tag only from the
+   validated `main` commit. Never reuse an upstream version for downstream code.
 
 The packaging workflow builds artifacts for review; it does not create or
 publish a GitHub Release.
+
+The community maintainer may attach those exact artifacts to a GitHub Release
+after the tag, archive hashes, provenance, and clean-worktree commit all match.
 
 ## Marketplace submission
 

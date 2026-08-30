@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Protocol.js" as Protocol
+import "Presentation.js" as Presentation
 
 Item {
   id: root
@@ -16,6 +17,12 @@ Item {
   property color background: Color.popups.background
   property color accent: Color.accent
   property string fontFamily: Style.font.family
+
+  // The bar panel has no header to put the surface switch in, so it keeps it
+  // here. The console turns this off and shows the same row beside its gear.
+  property bool showSurfaceSwitch: true
+  readonly property string currentSurface: root.backend
+    ? Protocol.normalizedSurface(root.backend.configuredSurface) : "panel"
 
   signal providerChanged(string provider)
   signal modelChanged(string provider, string model)
@@ -44,7 +51,7 @@ Item {
   implicitHeight: inlineMode ? Style.bar.sizeHorizontal : panelComposer.implicitHeight
 
   function submit() {
-    if (!backend || !backend.submit(draftText)) return
+    if (!backend || !backend.submitFromComposer(draftText)) return
     draftText = ""
     submitted()
   }
@@ -59,6 +66,7 @@ Item {
   }
 
   function forceInputFocus() {
+    if (!root.visible) return
     if (inlineMode) inlineInput.forceActiveFocus()
     else promptInput.forceActiveFocus()
   }
@@ -124,9 +132,13 @@ Item {
       Layout.fillHeight: true
       enabled: root.backend && !root.backend.busy && !root.backend.continuationBlocked
       text: root.draftText
-      placeholderText: root.backend && root.backend.initialized
-        ? "What do you want to do?"
-        : "Starting…"
+      // Hosts hide the composer while a selection is waiting. Keep this text
+      // defensive for any future host that renders it during that state.
+      placeholderText: root.backend && root.backend.selectionChoosing === true
+        ? "What should I do with this text?"
+        : root.backend && root.backend.initialized
+          ? "What do you want to do?"
+          : "Starting…"
       foreground: root.foreground
       horizontalPadding: Style.spacing.md
       verticalPadding: Style.spacing.xxs
@@ -218,49 +230,79 @@ Item {
     Item {
       id: promptRow
       Layout.fillWidth: true
-      Layout.preferredHeight: Math.max(Style.space(34), promptInput.implicitHeight + Style.spacing.md)
+      // Grows with the draft, then stops. Unbounded, a pasted block took the
+      // height it wanted: the composer sits under a `fillHeight` conversation,
+      // so sixty lines of paste squeezed the answer above it to nothing and
+      // then pushed itself off the bottom of the window. Nine lines is where
+      // it stops growing and starts scrolling.
+      readonly property int maxPromptHeight: Style.space(180)
+      Layout.preferredHeight: Math.max(Style.space(34),
+        Math.min(promptInput.implicitHeight + Style.spacing.md, maxPromptHeight))
       visible: !root.backend || root.backend.pendingPermission === null
 
-      TextArea {
-        id: promptInput
+      // Past the cap the editor scrolls inside the row. `TextArea.flickable`
+      // is the form QtQuick.Controls provides for exactly this, and it owns
+      // the two parts worth not hand-rolling: keeping the caret in view, and
+      // arbitrating a press-drag between selecting text and panning. The
+      // editor keeps its own implicit height under it, which is what the cap
+      // above reads.
+      //
+      // `interactive` is bound rather than left on, so a drag inside a draft
+      // that fits cannot be taken for a flick when there is nothing to scroll.
+      Flickable {
+        id: promptScroll
         anchors {
           left: parent.left; right: promptTools.left; top: parent.top; bottom: parent.bottom
           rightMargin: Style.spacing.md
         }
-        enabled: root.backend && !root.backend.continuationBlocked
-          && root.backend.state !== "streaming" && root.backend.state !== "preparing"
-        text: root.draftText
-        placeholderText: root.backend && root.backend.initialized
-          ? "Ask, or describe what to do"
-          : "Starting OmaPilot\u2026"
-        placeholderTextColor: Qt.darker(root.foreground, 1.7)
-        color: root.foreground
-        selectionColor: Style.selectionFillFor(root.foreground, root.accent)
-        selectedTextColor: root.foreground
-        font.family: root.fontFamily
-        // Deliberately larger than body: the request is the most important
-        // text in the panel, and the old body-size input buried it.
-        font.pixelSize: Style.font.heading
-        wrapMode: TextEdit.Wrap
-        background: null
-        leftPadding: 0
-        topPadding: 0
-        bottomPadding: 0
-        Accessible.name: "OmaPilot request"
-        onTextEdited: root.draftText = text
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
 
-        Keys.onPressed: function(event) {
-          if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-              && !(event.modifiers & Qt.ShiftModifier)) {
-            root.submit()
-            event.accepted = true
-          } else if (event.key === Qt.Key_H && (event.modifiers & Qt.ControlModifier)) {
-            root.historyRequested()
-            event.accepted = true
-          } else if (event.key === Qt.Key_Escape) {
-            if (root.backend && root.backend.busy) root.backend.cancel()
-            else root.escapeRequested()
-            event.accepted = true
+        TextArea.flickable: TextArea {
+          id: promptInput
+          enabled: root.backend && !root.backend.continuationBlocked
+            && root.backend.state !== "streaming" && root.backend.state !== "preparing"
+          text: root.draftText
+          placeholderText: root.backend && root.backend.selectionChoosing === true
+            ? "What should I do with this text?"
+            : root.backend && root.backend.initialized
+              ? "Ask, or describe what to do"
+              : "Starting OmaPilot\u2026"
+          // 1.7 measured 4.12:1 against the popup background on the shipped
+          // theme — under the 4.5:1 floor, and the heading token this renders
+          // at is well short of the size that earns the 3:1 large-text
+          // allowance. 1.6 clears it at 4.57:1 and still reads as a
+          // placeholder.
+          placeholderTextColor: Qt.darker(root.foreground, 1.6)
+          color: root.foreground
+          selectionColor: Style.selectionFillFor(root.foreground, root.accent)
+          selectedTextColor: root.foreground
+          font.family: root.fontFamily
+          // Deliberately larger than body: the request is the most important
+          // text in the panel, and the old body-size input buried it.
+          font.pixelSize: Style.font.heading
+          wrapMode: TextEdit.Wrap
+          background: null
+          leftPadding: 0
+          topPadding: 0
+          bottomPadding: 0
+          Accessible.name: "OmaPilot request"
+          onTextEdited: root.draftText = text
+
+          Keys.onPressed: function(event) {
+            if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                && !(event.modifiers & Qt.ShiftModifier)) {
+              root.submit()
+              event.accepted = true
+            } else if (event.key === Qt.Key_H && (event.modifiers & Qt.ControlModifier)) {
+              root.historyRequested()
+              event.accepted = true
+            } else if (event.key === Qt.Key_Escape) {
+              if (root.backend && root.backend.busy) root.backend.cancel()
+              else root.escapeRequested()
+              event.accepted = true
+            }
           }
         }
       }
@@ -273,6 +315,43 @@ Item {
         anchors.right: parent.right
         anchors.top: parent.top
         spacing: Style.spacing.xs
+
+        // The surface switch lives here, beside the other composer actions,
+        // because the composer is the one piece all three surfaces share. In
+        // the header it existed only inside the console — reachable to leave a
+        // surface, never to enter one, which left the bar panel with no way in
+        // short of a dropdown five tabs deep in settings.
+        //
+        // All three, always, rather than one button that cycles. Cycling showed
+        // the icon of the *next* surface, so the one you wanted was one click
+        // away or two and never named: going back to the bar panel from the
+        // console meant passing through fullscreen to discover where it was.
+        // Two extra glyphs buy every destination in one click, and the current
+        // surface stays on show and marked — a row that changed width as you
+        // switched would be a row you had to re-find every time.
+        Repeater {
+          model: root.showSurfaceSwitch ? Protocol.surfaceOrder() : []
+
+          PanelActionButton {
+            readonly property string surfaceName: String(modelData)
+            readonly property bool current: root.currentSurface === surfaceName
+
+            iconText: Presentation.surfaceIcon(surfaceName)
+            tooltipText: Presentation.surfaceTooltip(surfaceName)
+            // Same marking the console header uses, so the control reads as
+            // one control that lives in two places rather than two controls.
+            foreground: current ? root.accent : root.foreground
+            focusable: true
+            // Moving surfaces mid-turn would tear the answer out from under the
+            // user; the settings dropdown holds the same line.
+            enabled: root.backend && !root.backend.busy
+            Accessible.name: current ? tooltipText + " (current)" : tooltipText
+            onClicked: {
+              if (root.backend && typeof root.backend.selectSurface === "function")
+                root.backend.selectSurface(surfaceName)
+            }
+          }
+        }
 
         PanelActionButton {
           iconText: "󰹑"

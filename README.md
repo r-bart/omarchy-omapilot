@@ -1,10 +1,13 @@
 # OmaPilot for Omarchy
 
-OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget and contextual-capture overlay for asking questions and working on your desktop through an authenticated AI harness. It can summarize the active window, research current information, clip a window or exact region, work through bounded app connectors, remember the latest 30 completed chats, and hand a conversation to Herdr when you want to keep going.
+OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget and contextual-capture overlay for asking questions and working on your desktop through an authenticated AI harness. It can summarize the active window, research current information, clip a window or exact region, work through bounded app connectors, remember your recent completed chats, and hand a conversation to Herdr when you want to keep going.
 
-The repository carries the `0.2.0` marketplace candidate under the permanent
-plugin ID `io.github.spencerbull.omapilot`. Its plugin, IPC, package, runtime,
-and user-data identifiers consistently use the OmaPilot namespace.
+This fork carries the `0.2.1-rbart.1` community build under OmaPilot's permanent
+plugin ID `io.github.spencerbull.omapilot`. Spencer Bull remains the original
+author of OmaPilot; the selected-text actions and this maintained community
+build are contributed by [@r-bart](https://github.com/r-bart). Plugin, IPC,
+package, runtime, and user-data identifiers remain in the OmaPilot namespace so
+the fork stays compatible with upstream and can contribute changes back.
 
 ## Preview
 
@@ -51,6 +54,8 @@ compact error notice opens an inspectable details pane.
   OpenAI also needs an API key. Cloud keys are stored
   in `~/.config/omapilot/voice-auth.json`, not widget settings. Voice stays
   off until enabled there.
+- `wl-clipboard` to read the selection for text actions, and `wtype` to type a
+  correction back into the window it came from.
 - `grim` for contextual screenshots. ImageMagick, already used by OmaPilot's
   image policy, validates and normalizes every captured image.
 - Optional: Tesseract adds text-under-the-pointer extraction and the **Text**
@@ -82,6 +87,23 @@ Hyprland configuration without that final button press.
 
 Review the repository before enabling it: Omarchy plugins execute unsandboxed inside the long-lived shell process.
 
+### Community build
+
+The default branch of `r-bart/omarchy-omapilot` is the tested, installable
+community release. It includes selected-text Fix, Rewrite, Translate, custom
+instructions, Before/After review, and explicit replacement.
+
+```bash
+omarchy plugin add https://github.com/r-bart/omarchy-omapilot.git
+omarchy plugin validate ~/.config/omarchy/plugins/io.github.spencerbull.omapilot
+omarchy plugin enable io.github.spencerbull.omapilot right
+```
+
+### Upstream build
+
+Install Spencer Bull's upstream repository when you want the official upstream
+state instead of the community release:
+
 ```bash
 omarchy plugin add https://github.com/spencerbull/omarchy-omapilot.git
 omarchy plugin validate ~/.config/omarchy/plugins/io.github.spencerbull.omapilot
@@ -102,12 +124,31 @@ file with system Node;
 Git history anchors those generated files to their TypeScript source and pinned
 lockfile. Release archives add an SBOM, provenance record, and SHA-256 checksum.
 
+The fork uses `main` for public, validated releases and `develop` for integrated
+work awaiting the next release. Feature branches stay isolated. Contributions
+intended for Spencer's repository are rebuilt as focused branches from
+`origin/main` or `origin/dev`, rather than asking upstream to merge the fork's
+entire downstream history. See [Community fork maintenance](docs/community-fork.md).
+
 Update or remove it with the standard plugin commands:
 
 ```bash
 omarchy plugin update io.github.spencerbull.omapilot
 omarchy plugin remove io.github.spencerbull.omapilot
 ```
+
+Restart the shell after an update that adds an IPC action:
+
+```bash
+omarchy-restart-shell
+```
+
+OmaPilot's store is a QML singleton, and a singleton outlives the plugin
+reload that a changed file triggers. The old object keeps the IPC handler it
+was built with, so an action added by the update answers `Function not found.`
+until the shell is restarted — and because the installed bindings call
+`omarchy-shell -q`, that answer is swallowed and the new chord simply does
+nothing.
 
 ## Global hotkeys
 
@@ -134,6 +175,9 @@ o.bind("SUPER + ALT + N", "New OmaPilot chat",
   "omarchy-shell -q io.github.spencerbull.omapilot newChat")
 o.bind("SUPER + ALT + H", "Continue OmaPilot chat in Herdr",
   "omarchy-shell -q io.github.spencerbull.omapilot continueInHerdr")
+
+o.bind("SUPER + ALT + T", "Work on the selected text with OmaPilot",
+  "omarchy-shell -q io.github.spencerbull.omapilot textAction")
 ```
 
 `Super+A` starts a new durable conversation whenever the ambient node and answer
@@ -148,8 +192,12 @@ conversation has a saved chat ID.
 The managed block is written only after that explicit action and becomes normal
 user-owned Hyprland configuration. Existing user-defined collisions are left
 alone. Running the installer again adds newly introduced defaults to its marked
-block without rewriting existing bindings. To install from a terminal while
-still preserving collisions, or to deliberately replace every chord, run:
+block. While every line in the block is still one the installer wrote, it also
+brings those up to date, so a chord that pointed at a method renamed by an
+upgrade follows the upgrade instead of quietly staying behind. Edit any line in
+the block and it stops being the installer's: from then on the block is only
+added to, never rewritten. To install from a terminal while still preserving
+collisions, or to deliberately replace every chord, run:
 
 ```bash
 ~/.config/omarchy/plugins/io.github.spencerbull.omapilot/scripts/install-hotkeys.sh
@@ -349,9 +397,148 @@ screens in the background. Password-manager and password-like windows are
 blocked conservatively. Clip text and pixels are framed as untrusted
 observational data and do not expand tool authority.
 
+## Work on selected text
+
+Select text anywhere on the desktop and press `Super+Alt+T`. OmaPilot reads that
+selection and shows it in your configured surface with three things it can
+become:
+
+- **Fix** — spelling, grammar, agreement, punctuation, and capitalisation.
+- **Rewrite** — the same thing said more clearly, in the same language, at
+  roughly the same length.
+- **Translate → …** — into the language set in Settings, or your system
+  locale's until you set one.
+
+Anything else is typed into the composer and applied to the same text: *make it
+more formal*, *summarise this*, *turn this into a list*. Press Enter with the
+composer empty and OmaPilot runs whichever of the three you used last, so the
+one you reach for stays two keystrokes away.
+
+Nothing is sent to the harness until you pick. Reading a selection is not
+consent to send it anywhere, and the chords for the three actions are yours to
+spend rather than the installer's: bind `fixSelection`, `rewriteSelection` or
+`translateSelection` by hand and that chord skips the chooser entirely.
+
+Text actions are ephemeral transformations, not chats. Their prompts, answers,
+and provider sessions are not added to conversation history, and an action
+started over an open chat neither resumes nor alters that chat.
+
+The answer arrives with **Replace** and **Regenerate** next to **Copy**. Replace
+types it over the selection in the window it came from; Regenerate runs the same
+action again on the same text, with the same instruction and the same target
+language. Asking something else in the composer leaves the action behind rather
+than aiming Replace at text you have moved on from.
+
+Replace is offered for an answer that still looks like the text it replaces. A
+reply three times longer than a correction, a rewrite, or a translation is the
+model explaining itself rather than doing the work, and OmaPilot says so instead
+of typing it into your document. A prompt you wrote yourself is judged only on
+being non-empty and short enough to type, because *summarise this* is you asking
+for something shorter on purpose.
+
+Wayland exposes no way to ask whether the focused widget is a text input, so the
+selection is the detection: a non-empty selection is what tells OmaPilot there is
+text to work on and which window owns it. With nothing selected, the panel says
+so and does nothing else.
+
+OmaPilot reads the **primary** selection — the one filled by selecting text with
+the pointer — using `wl-paste --primary`. The read is single-shot and happens
+only when the hotkey fires. Nothing is watched between actions.
+
+Replacing does use the regular clipboard, and puts back what was there. The
+answer is placed on the clipboard, pasted with a single `Ctrl+V`, and the
+previous contents are restored once the paste has been read — in that order,
+always, including when the replacement fails. The order is the safety property:
+`Ctrl+V` does not copy, it makes the application ask the clipboard owner for the
+content, and writing inside that window would hand it whatever replaced ours,
+pasting text the user never asked to insert.
+
+A clipboard holding something this cannot carry — an image, say — is not saved
+and not written back as text: it would come back as a mangled copy of the
+picture. It is lost either way once the replacement is written, and an empty
+clipboard is the better of the two.
+
+The only clipboard OmaPilot overwrites is one still holding exactly what
+OmaPilot put there. Copy something while a replacement is in flight and the
+clipboard is yours again: it is checked and left alone. A clipboard that cannot
+be read cannot be shown to still be ours either, so nothing is written to it —
+the replacement stays rather than a blind write destroying something you
+copied.
+
+The selection reaches the harness inside an envelope that labels it untrusted
+data and instructs the harness to ignore any instruction the text appears to
+contain. Selected text is content to work on, not a request, and it expands no
+tool authority.
+
+OmaPilot refuses to work on text from a password or credential window, matching
+the window names the capture path already refuses. The refusal happens before
+the selection is read.
+
+Replacing sends one `Ctrl+V` through `wtype`, which needs the compositor's
+virtual-keyboard protocol. Before a key is synthesized, OmaPilot dispatches focus
+to the exact window address it latched when the hotkey fired and waits for the
+compositor to confirm that window is active; an unconfirmed focus aborts the
+replacement rather than pasting into whatever is focused instead. The paste is
+bounded by a timeout, so a compositor that never grants the virtual keyboard
+leaves the buttons usable instead of waiting forever. That address is a
+compositor handle held in memory for the length of one action, never attached to
+a prompt — desktop context deliberately carries no window handles.
+
+An action ends when the surface showing it is put away, when a new chat starts,
+or when a replacement completes. Moving between OmaPilot's own surfaces is a
+move, not a dismissal, and keeps the action. All three surfaces end it the same
+way, because an address describes a window as it was when the hotkey fired and
+stops meaning anything once the user has gone back to work.
+
+Replacement waits for the complete answer; nothing is typed while a response is
+still streaming. The answer is offered as typed text exactly as the harness wrote
+it, minus a wrapping code fence or a pair of quotes around the whole reply. Two
+answers are refused rather than typed: one longer than the 8,000 characters the
+protocol accepts, and one that reads as prose about the text rather than the
+text itself. Both say so and leave Copy available. Nothing is ever
+truncated to fit — half a replacement typed over a paragraph is worse than none.
+
+Each replacement writes its outcome — and only its outcome, never the text — to
+the broker's standard error, so a failure that reaches no one on screen is still
+traceable afterwards.
+
+An earlier version typed the replacement one character at a time and lost
+characters doing it: four from a 166-character replacement with capitals, one
+without, at the same index every run, unchanged at 6, 14 and 30 milliseconds
+between keystrokes. Not the length — 240 characters typed clean. Not the number
+of distinct characters — 62 typed clean. A paste is one key event and the
+application reads the string whole; the same replacement arrived intact.
+
+Wayland does have a way to insert text without synthesizing keys at all,
+`input_method_v2`, and OmaPilot deliberately does not use it: that means
+becoming the system input method, and a plugin must not evict the one the user
+already runs.
+
+Text actions need `wl-clipboard` for the selection and `wtype` for the
+replacement. Without `wtype`, the answer still appears in the panel and Copy
+still works.
+
+`omarchy-shell io.github.spencerbull.omapilot textAction` starts an action and
+opens the chooser; `fixSelection`, `rewriteSelection` and `translateSelection`
+start one and skip it. `replaceSelection` accepts whatever is on screen, so the
+whole round can run without a pointer — bind them, or drive them from a test.
+All of them go through the same guards as the hotkey and the buttons.
+
+`tests/text-actions-lab.html` is a page of text widgets that each report whether
+a replacement landed or was merely inserted beside the original, and
+`tests/text-action-run.sh` drives one round against whatever is selected;
+`OMAPILOT_ACTION` picks which of the three direct routes it uses.
+Replacing text is the one part of this feature whose behaviour is decided by the
+widget receiving the keystrokes, so it has to be run against many of them.
+
 ## Storage and privacy
 
-OmaPilot persists only completed chats, capped at the newest 30. A chat contains the question, rendered answer source, timestamp, provider/model metadata, content references, and a resumable session identity when the harness supplies one. Draft text, authentication output, tokens, environment variables, and provider credentials are not persisted.
+OmaPilot persists only completed conversations, capped at the newest 200. Text
+actions are explicitly excluded. A saved chat contains the question, rendered
+answer source, timestamp, provider/model metadata, content references, and a
+resumable session identity when the harness supplies one. Draft text,
+authentication output, tokens, environment variables, and provider credentials
+are not persisted.
 
 Quick-action labels, prompts, and order are stored with the existing inline
 Omarchy widget settings. OmaPilot validates that list on every read, drops
@@ -484,4 +671,8 @@ gates are in [`docs/release.md`](docs/release.md).
 
 ## License and attribution
 
-OmaPilot is MIT licensed. ACP adapters and bundled dependencies retain their own licenses; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and the generated release SBOM.
+OmaPilot is MIT licensed and was created by Spencer Bull. This community build
+is maintained by [@r-bart](https://github.com/r-bart); selected-text actions are
+part of that downstream contribution. ACP adapters and bundled dependencies
+retain their own licenses; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
+and the generated release SBOM.

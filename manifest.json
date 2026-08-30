@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.spencerbull.omapilot",
   "name": "OmaPilot",
-  "version": "0.2.0",
+  "version": "0.2.1-rbart.1",
   "author": "Spencer Bull",
   "license": "MIT",
   "description": "Use authenticated AI harnesses from a native Omarchy desktop surface.",
@@ -29,6 +29,11 @@
       "desktopContext": "On",
       "webHandoffProvider": "duckduckgo",
       "dangerousAutoApprove": false,
+      "surface": "panel",
+      "sidebarWidth": 440,
+      "consoleReservesSpace": false,
+      "textActionLanguage": "",
+      "textActionLast": "fix",
       "voiceEnabled": false,
       "ttsProvider": "elevenlabs",
       "ttsModel": "",
@@ -80,6 +85,21 @@
         "options": ["duckduckgo", "google", "chatgpt", "claude", "grok"],
         "defaultValue": "duckduckgo",
         "description": "Choose where OmaPilot opens current-information questions. AI sites also receive a paste-ready copy; answers stay in the browser."
+      },
+      {
+        "key": "surface",
+        "type": "enum",
+        "label": "Surface",
+        "options": ["panel", "console", "fullscreen"],
+        "defaultValue": "panel",
+        "description": "Answer from the compact bar panel, from a full-height console docked to the right edge of the focused output, or from that same console maximized over the usable screen."
+      },
+      {
+        "key": "consoleReservesSpace",
+        "type": "boolean",
+        "label": "Hold the column open",
+        "defaultValue": false,
+        "description": "Let the docked console tile with your windows instead of floating over them. Opening and closing it reflows the layout."
       },
       {
         "key": "dangerousAutoApprove",

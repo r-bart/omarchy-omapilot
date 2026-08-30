@@ -2,6 +2,7 @@
 set -euo pipefail
 
 plugin_id="io.github.spencerbull.omapilot"
+block_note="-- Added at the user request from OmaPilot settings. Edit these bindings freely."
 begin_marker="-- BEGIN OmaPilot managed hotkeys"
 end_marker="-- END OmaPilot managed hotkeys"
 
@@ -128,9 +129,29 @@ if ((remove)); then
   exit 0
 fi
 
+# Whether the block still holds only the lines this script writes. If it does,
+# nothing in it was chosen by anybody: a chord left pointing at a method we
+# renamed is our own stale output, and leaving it is how someone upgrades the
+# plugin and finds the new chord unreachable while the old one keeps working
+# and says nothing. The moment a line in there is not ours, the block is the
+# user's — the header invites editing — and it is appended to, never rewritten.
+managed_block_is_pristine() {
+  awk -v begin="$begin_marker" -v end="$end_marker" -v id="$plugin_id" -v note="$block_note" '
+    $0 == begin { managed = 1; next }
+    $0 == end { managed = 0; next }
+    !managed { next }
+    $0 == note { next }
+    /^[[:space:]]*$/ { next }
+    /^hl\.unbind\("[^"]*"\)$/ { next }
+    /^o\.bind\("[^"]*", "[^"]*",$/ { next }
+    { if (!index($0, "\"omarchy-shell -q " id " ")) { foreign = 1; exit } }
+    END { exit foreign }
+  ' "$bindings_file"
+}
+
 update_existing=0
 if ((begin_count == 1)); then
-  if ((force)); then
+  if ((force)) || managed_block_is_pristine; then
     remove_managed_block
   else
     update_existing=1
@@ -153,6 +174,7 @@ chords=(
   "SUPER + ALT + X"
   "SUPER + ALT + N"
   "SUPER + ALT + H"
+  "SUPER + ALT + T"
 )
 descriptions=(
   "Talk to OmaPilot"
@@ -160,6 +182,7 @@ descriptions=(
   "Cancel OmaPilot voice mode"
   "New OmaPilot chat"
   "Continue OmaPilot chat in Herdr"
+  "Work on the selected text with OmaPilot"
 )
 commands=(
   "omarchy-shell -q io.github.spencerbull.omapilot voiceToggle"
@@ -167,6 +190,7 @@ commands=(
   "omarchy-shell -q io.github.spencerbull.omapilot voiceCancel"
   "omarchy-shell -q io.github.spencerbull.omapilot newChat"
   "omarchy-shell -q io.github.spencerbull.omapilot continueInHerdr"
+  "omarchy-shell -q io.github.spencerbull.omapilot textAction"
 )
 
 block_file=$(mktemp "$state_dir/hotkeys.XXXXXX")
@@ -177,7 +201,7 @@ installed_count=0
 {
   if ((!update_existing)); then
     printf '%s\n' "$begin_marker"
-    printf '%s\n' '-- Added at the user request from OmaPilot settings. Edit these bindings freely.'
+    printf '%s\n' "$block_note"
   fi
   for index in "${!chords[@]}"; do
     if ((!force)) && has_user_binding "${chords[$index]}"; then
@@ -214,7 +238,18 @@ if ((update_existing)); then
   ' "$bindings_file" >"$candidate_file"
 else
   {
-    cat "$bindings_file"
+    # Trailing blank lines are dropped before the separator goes back on.
+    # Removing the block leaves behind the blank line that was written in front
+    # of it, and a pristine block is now rebuilt rather than appended to, so
+    # without this the file would grow one blank line per run.
+    awk '
+      { lines[NR] = $0 }
+      END {
+        last = NR
+        while (last > 0 && lines[last] ~ /^[[:space:]]*$/) last--
+        for (i = 1; i <= last; i++) print lines[i]
+      }
+    ' "$bindings_file"
     printf '\n'
     cat "$block_file"
   } >"$candidate_file"

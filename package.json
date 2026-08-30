@@ -1,6 +1,6 @@
 {
   "name": "omarchy-omapilot",
-  "version": "0.2.0",
+  "version": "0.2.1-rbart.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -12,6 +12,20 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint 'runtime/**/*.ts' --max-warnings=0",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:live": "bash scripts/test-live.sh",
+    "test:e2e:browser": "node tests/text-action-browser-e2e.mjs",
+    "test:e2e:browser:live": "OMAPILOT_E2E_LIVE_PROVIDER=codex node tests/text-action-browser-e2e.mjs",
+    "test:e2e:browser:live-ui": "OMAPILOT_E2E_LIVE_PROVIDER=ui node tests/text-action-browser-e2e.mjs",
+    "test:e2e:browser:live-ui:translate": "OMAPILOT_E2E_LIVE_PROVIDER=ui OMAPILOT_E2E_UI_ROUTE=chooser-translate OMAPILOT_E2E_INITIAL='Hola mundo.\\nEsta es una prueba multilinea.' node tests/text-action-browser-e2e.mjs",
+    "test:e2e:browser:live-ui:custom": "OMAPILOT_E2E_LIVE_PROVIDER=ui OMAPILOT_E2E_UI_ROUTE=chooser-custom node tests/text-action-browser-e2e.mjs",
+    "test:e2e:electron": "OMAPILOT_E2E_ELECTRON=1 node tests/text-action-browser-e2e.mjs",
+    "test:e2e:gtk": "node tests/text-action-gtk-e2e.mjs",
+    "test:e2e:qt": "node tests/text-action-qt-e2e.mjs",
+    "test:e2e:terminal": "node tests/text-action-terminal-e2e.mjs",
+    "test:e2e:desktop": "bash tests/test-desktop-e2e.sh",
+    "test:qml": "bash tests/check-ui-contract.sh",
+    "test:qml:unit": "bash tests/test-qml-units.sh",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "dependencies": {
@@ -24,6 +38,7 @@
   "devDependencies": {
     "@eslint/js": "9.39.2",
     "@types/node": "25.0.10",
+    "@vitest/coverage-v8": "4.1.11",
     "esbuild": "0.28.2",
     "eslint": "9.39.2",
     "typescript": "5.9.3",

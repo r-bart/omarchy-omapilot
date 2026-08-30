@@ -63,6 +63,33 @@ QtObject {
     })
   }
 
+// The exact window a text action must return its result to. This is a
+  // compositor handle: it stays in memory for the length of one action and is
+  // never attached to a prompt, because desktop context deliberately carries
+  // no window handles.
+  // True when the focused window is OmaPilot's own surface. Pressing the
+  // hotkey from there is not a failure to find a window; it is the wrong
+  // window, and saying so is the difference between a dead end and an
+  // instruction.
+  function activeIsOwnSurface() {
+    return isShellToplevel(Hyprland.activeToplevel)
+  }
+
+  function replaceTarget() {
+    var toplevel = isShellToplevel(Hyprland.activeToplevel) ? null : Hyprland.activeToplevel
+    if (!toplevel) return ({ address: "", appId: "", title: "" })
+    var ipc = toplevel.lastIpcObject || {}
+    // The toplevel's own property first: lastIpcObject is populated lazily, so
+    // a window that appeared a moment ago can have no address in it yet, and a
+    // text action would refuse with no target for no reason the user can see.
+    return ({
+      address: Protocol.hyprlandWindowAddress(toplevel.address)
+        || Protocol.windowAddress(ipc.address),
+      appId: appIdFor(toplevel),
+      title: String(toplevel.title || ipc.title || "")
+    })
+  }
+
   function captureTarget() {
     var toplevel = isShellToplevel(Hyprland.activeToplevel) ? null : Hyprland.activeToplevel
     if (!toplevel) return null

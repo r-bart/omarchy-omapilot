@@ -1,0 +1,5 @@
+{
+  "name": "omapilot-electron-text-editor-e2e",
+  "private": true,
+  "main": "main.cjs"
+}

@@ -11,6 +11,7 @@ import "components/Presentation.js" as Presentation
 import "components/Protocol.js" as Protocol
 import "components/QuickActions.js" as ActionCatalog
 import "components/StatePhrases.js" as StatePhrases
+import "components/TextActions.js" as TextActions
 
 Panel {
   id: root
@@ -92,6 +93,7 @@ Panel {
   readonly property bool panelWindowActive: panelFocus.Window.window
     ? panelFocus.Window.window.active : false
   readonly property bool modalInteractionActive: composer.popupOpen
+    || textActionChooser.popupOpen
     || OmaPilot.OmaPilotStore.pendingPermission !== null
     || root.previewSource !== ""
     || (root.viewMode === "settings" && settingsView.modalInteractionActive)
@@ -112,7 +114,11 @@ Panel {
     id: thinkingPhraseSwap
     PropertyAnimation {
       target: activityStatus; property: "opacity"
-      to: 0; duration: 180; easing.type: Easing.OutQuad
+      // Out accelerates away, in decelerates to a stop. The pair used to be
+      // the other way round, which made the phrase linger on its way out and
+      // then hold at almost-invisible on its way back in — the fade you
+      // wanted to read was slowest exactly where there was nothing to read.
+      to: 0; duration: 180; easing.type: Easing.InQuad
     }
     ScriptAction {
       script: root.thinkingPhraseIndex = (root.thinkingPhraseIndex + 1)
@@ -120,7 +126,7 @@ Panel {
     }
     PropertyAnimation {
       target: activityStatus; property: "opacity"
-      to: 1; duration: 260; easing.type: Easing.InQuad
+      to: 1; duration: 260; easing.type: Easing.OutQuad
     }
   }
 
@@ -266,6 +272,11 @@ Panel {
       } else Qt.callLater(function() { composer.forceInputFocus() })
     } else {
       OmaPilot.OmaPilotStore.clearDesktopContextLatch()
+      // Putting the panel away abandons a text action: its target address
+      // describes a window as it was when the hotkey fired, and that stops
+      // being true the moment the user goes back to work. Moving to another
+      // OmaPilot surface is not putting it away, which dismissTextAction knows.
+      OmaPilot.OmaPilotStore.dismissTextAction()
     }
   }
 
@@ -283,6 +294,11 @@ Panel {
         OmaPilot.OmaPilotStore.toastRequested("Context capture overlay could not be opened")
     }
     function onContextBrowserPickerRequested() { root.closeForExternalHandoff() }
+    // The store has latched the window and read the text; the panel has to be
+    // showing the chat lane. The chooser then owns every transformation field.
+    function onSelectionReady(_text) {
+      root.showChat(false)
+    }
     function onHotkeyInstalled() {
       if (root.voiceSetupReady) root.persistSettings({ onboardingComplete: true })
     }
@@ -292,6 +308,11 @@ Panel {
     enabled: root.opened
     sequence: "Escape"
     onActivated: {
+      if (textActionChooser.popupOpen) {
+        textActionChooser.closePopup()
+        return
+      }
+      if (textActionChooser.collapseCustom()) return
       var action = Presentation.escapeAction(root.viewMode, composer.popupOpen,
         settingsView.popupOpen, root.previewSource !== "", OmaPilot.OmaPilotStore.busy)
       if (action === "close-composer-popup") composer.closePopups()
@@ -370,6 +391,7 @@ Panel {
         OmaPilot.Composer {
           id: composer
           Layout.fillWidth: true
+          visible: !OmaPilot.OmaPilotStore.selectionChoosing
           backend: OmaPilot.OmaPilotStore
           foreground: root.foreground
           background: root.surface
@@ -378,6 +400,30 @@ Panel {
           onSubmitted: answerScroll.resetForNewTurn()
           onHistoryRequested: root.viewMode === "history" ? root.showChat() : root.openHistory()
           onEscapeRequested: root.close()
+        }
+
+        OmaPilot.TextActionChooser {
+          id: textActionChooser
+          Layout.fillWidth: true
+          backend: OmaPilot.OmaPilotStore
+          foreground: root.foreground
+          background: root.surface
+          accent: root.accent
+          fontFamily: root.fontFamily
+          onActionRequested: function(action, instruction, language) {
+            if (OmaPilot.OmaPilotStore.runTextAction(action, instruction, language))
+              answerScroll.resetForNewTurn()
+          }
+          onLanguageRequested: function(language) {
+            OmaPilot.OmaPilotStore.requestSettingsPersist({ textActionLanguage: language })
+          }
+        }
+
+        Rectangle {
+          Layout.fillWidth: true
+          implicitHeight: 1
+          visible: textActionChooser.visible
+          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
         }
 
         OmaPilot.SetupGuide {
@@ -654,21 +700,48 @@ Panel {
                   followLatest = true
                   followMotionEnabled = false
                   contentY = 0
-                  Qt.callLater(function() { answerScroll.followMotionEnabled = true })
+                  restoreFollowMotion.restart()
                 }
 
                 function showFromStart() {
                   followLatest = false
                   followMotionEnabled = false
                   contentY = 0
-                  Qt.callLater(function() { answerScroll.followMotionEnabled = true })
+                  restoreFollowMotion.restart()
                 }
 
                 function followContentIfNeeded() {
                   if (!followLatest) return
-                  Qt.callLater(function() {
-                    if (answerScroll.followLatest) answerScroll.contentY = answerScroll.maximumContentY()
-                  })
+                  followContent.restart()
+                }
+
+                // Deferred through Timers rather than `Qt.callLater`, because a
+                // callLater outlives the object whose closure it captured. The
+                // panel tree is destroyed at runtime on every surface switch,
+                // and a pending call landing afterwards ran against a Flickable
+                // whose meta-object was already gone:
+                //
+                //   TypeError: Property 'maximumContentY' of object
+                //   QQuickFlickable is not a function
+                //
+                // — two of those in the shell log for every panel destruction,
+                // alongside "attempted to evaluate a function in an invalid
+                // context". A Timer is a child of this Flickable, so it dies
+                // with it and the deferred work simply never runs, which is
+                // exactly the right answer for a viewport nobody will see
+                // again. Both also collapse repeats the way callLater did:
+                // `restart()` on a pending timer just moves the deadline.
+                Timer {
+                  id: followContent
+                  interval: 0
+                  onTriggered: if (answerScroll.followLatest)
+                    answerScroll.contentY = answerScroll.maximumContentY()
+                }
+
+                Timer {
+                  id: restoreFollowMotion
+                  interval: 0
+                  onTriggered: answerScroll.followMotionEnabled = true
                 }
 
                 onContentHeightChanged: followContentIfNeeded()
@@ -779,6 +852,20 @@ Panel {
               }
             }
 
+            // What a text action needs to tell the user: that nothing was
+            // selected, that the replacement landed, or why it did not. The
+            // store's toast signal has no consumer in this shell, so these
+            // messages get a surface of their own rather than going nowhere.
+            Text {
+              Layout.fillWidth: true
+              text: OmaPilot.OmaPilotStore.notice
+              visible: text !== ""
+              color: Qt.darker(root.foreground, 1.45)
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
+
             // Borderless and quiet. These are follow-ups to an answer, not
             // primary controls, and three outlined buttons under every response
             // was the loudest thing in the old panel.
@@ -787,6 +874,34 @@ Panel {
               visible: OmaPilot.OmaPilotStore.answerMarkdown !== ""
                 || OmaPilot.OmaPilotStore.currentChatId !== ""
               spacing: Style.spacing.md
+
+              Button {
+                text: "Replace"
+                tooltipText: "Type this over the text you selected"
+                visible: OmaPilot.OmaPilotStore.textActionActive
+                  && !OmaPilot.OmaPilotStore.selectionChoosing
+                enabled: OmaPilot.OmaPilotStore.textActionReady
+                  && OmaPilot.OmaPilotStore.answerMarkdown !== ""
+                foreground: root.foreground
+                background: root.surface
+                accent: root.accent
+                bordered: true
+                focusable: true
+                onClicked: OmaPilot.OmaPilotStore.replaceSelectionWithAnswer()
+              }
+
+              Button {
+                text: "Regenerate"
+                tooltipText: "Run the same action on the same selection again"
+                visible: OmaPilot.OmaPilotStore.textActionActive
+                  && !OmaPilot.OmaPilotStore.selectionChoosing
+                enabled: OmaPilot.OmaPilotStore.textActionReady
+                foreground: Qt.darker(root.foreground, 1.4)
+                background: root.surface
+                bordered: false
+                focusable: true
+                onClicked: OmaPilot.OmaPilotStore.regenerateTextAction()
+              }
 
               PanelActionButton {
                 iconText: "󰆏"
@@ -831,6 +946,7 @@ Panel {
           visible: OmaPilot.OmaPilotStore.question === ""
             && OmaPilot.OmaPilotStore.answerMarkdown === ""
             && !OmaPilot.OmaPilotStore.busy
+            && !OmaPilot.OmaPilotStore.selectionChoosing
             && quickActions.actions.length > 0
           actions: root.quickActionItems
           foreground: root.foreground

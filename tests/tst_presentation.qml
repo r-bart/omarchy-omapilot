@@ -62,6 +62,21 @@ TestCase {
     compare(Presentation.escapeAction("chat", false, false, false, false), "close-panel")
   }
 
+  function test_theLadderHasNoFocusRung() {
+    // There was a sixth rung once: focused and at rest handed the compositor's
+    // keyboard back instead of closing. Only a layer-shell surface could do
+    // that, and both hosts are ordinary now — the panel never passed the
+    // argument and the console became a real window, which has no protocol for
+    // unfocusing itself. Escape at rest closes, and a stray extra argument
+    // from an old caller cannot resurrect the rung.
+    compare(Presentation.escapeAction("chat", false, false, false, false), "close-panel")
+    compare(Presentation.escapeAction("chat", false, false, false, false, true), "close-panel")
+    compare(Presentation.escapeAction("chat", false, false, false, true, true), "cancel")
+    compare(Presentation.escapeAction("settings", false, false, false, false, true), "show-chat")
+    compare(Presentation.escapeAction("chat", true, false, false, false, true), "close-composer-popup")
+    compare(Presentation.escapeAction("chat", false, false, true, false, true), "close-preview")
+  }
+
   function test_settingsTabsAreAClosedLaneSet() {
     compare(Presentation.settingsTabIds().join(","), "agent,skills,voice,servers,desktop,actions")
     compare(Presentation.normalizedSettingsTab("desktop"), "desktop")

@@ -1,7 +1,12 @@
 singleton OmaPilotStore 1.0 OmaPilotStore.qml
 singleton DesktopContext 1.0 DesktopContext.qml
+singleton ConsolePlacement 1.0 ConsolePlacement.qml
 Composer 1.0 Composer.qml
+Console 1.0 Console.qml
+ConsoleContent 1.0 ConsoleContent.qml
+ConsoleTurn 1.0 ConsoleTurn.qml
 ContextAttachmentPreview 1.0 ContextAttachmentPreview.qml
+CopyButton 1.0 CopyButton.qml
 ErrorDetailsView 1.0 ErrorDetailsView.qml
 ErrorNotice 1.0 ErrorNotice.qml
 HistoryView 1.0 HistoryView.qml
@@ -12,6 +17,7 @@ QuickActions 1.0 QuickActions.qml
 QuickActionEditor 1.0 QuickActionEditor.qml
 ResponseActivityBorder 1.0 ResponseActivityBorder.qml
 SettingsView 1.0 SettingsView.qml
+TextActionChooser 1.0 TextActionChooser.qml
 SettingsTabs 1.0 SettingsTabs.qml
 VoiceNode 1.0 VoiceNode.qml
 AnswerCurtain 1.0 AnswerCurtain.qml

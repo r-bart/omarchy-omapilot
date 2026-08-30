@@ -14,6 +14,7 @@ import { ImagePolicyError, ImageStore, isAllowedExternalLink } from "./images.js
 import { normalizeToolPermission, type PendingToolPermission } from "./permissions.js";
 import { discoverProviders, fallbackModels, isPiProvider, type DiscoveredProvider } from "./providers.js";
 import { launchDetached, resolveExecutable } from "./process.js";
+import { defaultSelectionTools, readPrimarySelection, replaceSelection, type SelectionTools } from "./selection.js";
 import type { BrokerCommand, BrokerEvent, ChatRecord, CustomProviderView, ProviderId, ProviderInfo } from "./types.js";
 import type { RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import type { AuthEvent, AuthPrompt } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/auth/types.js";
@@ -66,6 +67,7 @@ export class OmaPilotBroker {
   readonly #permissionTimeoutMs: number;
   readonly #contextAttachments: ContextAttachmentStore;
   readonly #browserCompanion: BrowserCompanionServer;
+  readonly #selectionTools: SelectionTools;
   #providers = new Map<string, DiscoveredProvider>();
   #runs = new Map<string, AcpRun>();
   #handoffs = new Map<string, Promise<void>>();
@@ -76,11 +78,12 @@ export class OmaPilotBroker {
   #browserCompanionSetupBusy = false;
   #browserCompanionSetupPhase: "installing" | "removing" | undefined;
   #browserCompanionStatusRevision = 0;
+  #voiceStatusRevision = 0;
   #ttsSpeakId: string | undefined;
 
   constructor(
     emit: (event: BrokerEvent) => void,
-    options: { history?: HistoryStore; images?: ImageStore; contextAttachments?: ContextAttachmentStore; dictation?: DictationClient; voice?: VoiceService; sessionCleaner?: SessionCleaner; herdrContinue?: HerdrContinue; env?: NodeJS.ProcessEnv; permissionTimeoutMs?: number } = {}
+    options: { history?: HistoryStore; images?: ImageStore; contextAttachments?: ContextAttachmentStore; dictation?: DictationClient; voice?: VoiceService; sessionCleaner?: SessionCleaner; herdrContinue?: HerdrContinue; env?: NodeJS.ProcessEnv; permissionTimeoutMs?: number; selectionTools?: SelectionTools } = {}
   ) {
     this.#emit = emit;
     this.#history = options.history ?? new HistoryStore();
@@ -103,6 +106,7 @@ export class OmaPilotBroker {
     this.#herdrContinue = options.herdrContinue ?? continueInHerdr;
     this.#env = options.env ?? process.env;
     this.#permissionTimeoutMs = options.permissionTimeoutMs ?? 60_000;
+    this.#selectionTools = options.selectionTools ?? defaultSelectionTools(this.#env);
   }
 
   async handle(command: BrokerCommand): Promise<boolean> {
@@ -157,6 +161,10 @@ export class OmaPilotBroker {
       case "load_image": await this.#loadImage(command.url, command.id); break;
       case "open_link": await this.#openLink(command.url); break;
       case "copy": await this.#copy(command.text); break;
+      case "selection_read": this.#emit({ type: "selection", ...await readPrimarySelection(this.#selectionTools) }); break;
+      case "selection_replace":
+        this.#emit({ type: "selection_replaced", ...await replaceSelection(command.text, command.address, this.#selectionTools) });
+        break;
       case "shutdown": {
         this.#ttsStop();
         this.#cancelAuth(this.#authFlow?.id);
@@ -190,7 +198,7 @@ export class OmaPilotBroker {
     }));
     this.#providers = new Map(discovered.map((provider) => [provider.id, provider]));
     const history = (await this.#history.list()).map((chat) => presentChat(chat));
-    this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context", "context-attachments", "voice", "capability-packs"], providers: discovered.map(publicProvider), history });
+    this.#emit({ type: "ready", protocolVersion: 2, features: ["desktop-context", "context-attachments", "voice", "capability-packs", "selection"], providers: discovered.map(publicProvider), history });
     await this.#emitCapabilities();
     if (command.harness === "builtin") this.#emit({ type: "auth_methods", methods: authMethods });
   }
@@ -363,14 +371,26 @@ export class OmaPilotBroker {
         if (result.defaultModel !== undefined) provider.defaultModel = result.defaultModel;
         this.#emit({ type: "providers", providers: [...this.#providers.values()].map(publicProvider) });
       }
+      const shown = command.displayQuestion ?? command.question;
+      if (command.saveToHistory === false) {
+        // A text transformation has no conversation to resume. Do not leave
+        // the provider's one-shot session or generated files behind either.
+        const cleanup: Promise<unknown>[] = [];
+        if (result.sessionId !== undefined) cleanup.push(this.#sessionCleaner(provider, result.sessionId));
+        for (const image of result.images) cleanup.push(this.#images.remove(image));
+        await Promise.allSettled(cleanup);
+        this.#emit({ type: "complete", id: command.id, answer: result.answer });
+        this.#emit({ type: "state", id: command.id, state: "idle" });
+        return;
+      }
       const chat: ChatRecord = {
         schemaVersion: 1,
         id: randomUUID(),
         createdAt: new Date().toISOString(),
-        title: command.question.replaceAll(/\s+/g, " ").slice(0, 80),
+        title: shown.replaceAll(/\s+/g, " ").slice(0, 80),
         provider: provider.id,
         ...(selectedModel === undefined ? {} : { model: selectedModel }),
-        question: command.question,
+        question: shown,
         answer: result.answer,
         images: result.images,
         session: {
@@ -627,12 +647,16 @@ export class OmaPilotBroker {
   }
 
   async #emitVoiceStatus(): Promise<void> {
+    const revision = ++this.#voiceStatusRevision;
     try {
       const status = await this.#voice.status();
-      this.#emit({ type: "voice", dictation: status.dictation, tts: status.tts });
+      if (revision !== this.#voiceStatusRevision) return;
+      this.#emit({ type: "voice", source: "status", dictation: status.dictation, tts: status.tts });
     } catch {
+      if (revision !== this.#voiceStatusRevision) return;
       this.#emit({
         type: "voice",
+        source: "status",
         dictation: { available: false, message: "Voice status could not be loaded." },
         tts: []
       });
@@ -641,29 +665,37 @@ export class OmaPilotBroker {
 
   async #ttsKeySet(provider: string, apiKey: string): Promise<void> {
     if (!isCloudTtsProviderId(provider)) return;
+    ++this.#voiceStatusRevision;
     try {
       const status = await this.#voice.setKey(provider, apiKey);
-      this.#emit({ type: "voice", dictation: status.dictation, tts: status.tts });
+      // A completed mutation is the newest authoritative snapshot. Advance
+      // again to suppress status probes that began while validation ran.
+      ++this.#voiceStatusRevision;
+      this.#emit({ type: "voice", source: "key_set", dictation: status.dictation, tts: status.tts });
     } catch (error) {
       this.#emit({
         type: "tts_test_failed",
         provider,
         message: error instanceof VoiceError ? error.message : "The API key could not be saved"
       });
+      await this.#emitVoiceStatus();
     }
   }
 
   async #ttsKeyClear(provider: string): Promise<void> {
     if (!isCloudTtsProviderId(provider)) return;
+    ++this.#voiceStatusRevision;
     try {
       const status = await this.#voice.clearKey(provider);
-      this.#emit({ type: "voice", dictation: status.dictation, tts: status.tts });
+      ++this.#voiceStatusRevision;
+      this.#emit({ type: "voice", source: "key_clear", dictation: status.dictation, tts: status.tts });
     } catch (error) {
       this.#emit({
         type: "tts_test_failed",
         provider,
         message: error instanceof VoiceError ? error.message : "The API key could not be removed"
       });
+      await this.#emitVoiceStatus();
     }
   }
 

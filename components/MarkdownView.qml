@@ -3,6 +3,7 @@ import QtQuick.Controls
 import qs.Commons
 import qs.Ui
 import "Protocol.js" as Protocol
+import "." as OmaPilot
 
 Item {
   id: root
@@ -166,15 +167,15 @@ Item {
           elide: Text.ElideRight
         }
 
-        PanelActionButton {
+        OmaPilot.CopyButton {
           id: copyCode
           anchors.verticalCenter: parent.verticalCenter
-          iconText: "󰆏"
-          tooltipText: "Copy code"
-          foreground: root.foreground
-          focusable: true
-          Accessible.name: tooltipText
-          onClicked: root.copyRequested(block.text)
+          idleTooltip: "Copy code"
+          doneTooltip: "Code copied"
+          sourceText: block.text
+          idleForeground: root.foreground
+          doneForeground: root.accent
+          onCopyRequested: function(text) { root.copyRequested(text) }
         }
       }
 

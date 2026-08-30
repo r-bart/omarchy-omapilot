@@ -8,6 +8,7 @@ Item {
   height: 420
 
   property bool confirmingClear: false
+  property bool confirmingDelete: false
   property var historyItems: [
     { id: "chat-1", title: "First" },
     { id: "chat-2", title: "Second" },
@@ -34,6 +35,7 @@ Item {
       list: historyList
       history: root.historyItems
       confirmingClear: root.confirmingClear
+      confirmingDelete: root.confirmingDelete
       onChatSelected: function(chat) {
         root.selectedCount += 1
         root.selectedChatId = String(chat.id || "")
@@ -56,6 +58,7 @@ Item {
 
     function init() {
       root.confirmingClear = false
+      root.confirmingDelete = false
       root.selectedCount = 0
       root.selectedChatId = ""
       root.deletedCount = 0
@@ -150,6 +153,56 @@ Item {
 
       keyClick(Qt.Key_Escape)
       compare(root.closeCount, 1)
+    }
+
+    // Deleting one chat is irreversible — the record, its images and its Pi
+    // session all go — so Delete arms first and deletes second, the same two
+    // steps "Clear all" has always taken. The view owns the arming; what the
+    // handler owes is that a second Delete gets through, and that no other key
+    // does anything except withdraw the question.
+    //
+    // Said plainly: only the second of these two discriminates. Deleting the
+    // armed row passes with the armed branch removed as well, because Delete
+    // then falls through to the idle path and emits the same signal. It is a
+    // regression guard, not evidence.
+    function test_armedDeleteConfirmsOnSecondDelete() {
+      root.confirmingDelete = true
+      keyClick(Qt.Key_Delete)
+      compare(root.deletedCount, 1)
+      compare(root.deletedChatId, "chat-1")
+      compare(root.cancelledCount, 0)
+    }
+
+    function test_armedDeleteWithdrawsOnAnythingElse() {
+      var withdrawing = [
+        Qt.Key_Escape, Qt.Key_Down, Qt.Key_Up, Qt.Key_J, Qt.Key_K,
+        Qt.Key_Return, Qt.Key_Enter
+      ]
+      for (var i = 0; i < withdrawing.length; i++) {
+        root.confirmingDelete = true
+        historyList.currentIndex = 1
+        var event = { key: withdrawing[i], modifiers: Qt.NoModifier, accepted: false }
+        historyKeyboard.handleKey(event)
+        verify(event.accepted)
+        compare(root.cancelledCount, i + 1)
+        // The keypress that withdraws does nothing else: it does not move the
+        // cursor off the row, open the chat, or close the view.
+        compare(historyList.currentIndex, 1)
+        compare(root.deletedCount, 0)
+        compare(root.selectedCount, 0)
+        compare(root.closeCount, 0)
+      }
+    }
+
+    // A modified Delete is inert armed as well as idle, so a stray
+    // Ctrl+Delete cannot answer a question the user has not read.
+    function test_armedDeleteIgnoresModifiedKeys() {
+      root.confirmingDelete = true
+      var event = { key: Qt.Key_Delete, modifiers: Qt.ControlModifier, accepted: false }
+      historyKeyboard.handleKey(event)
+      verify(!event.accepted)
+      compare(root.deletedCount, 0)
+      compare(root.cancelledCount, 0)
     }
   }
 }

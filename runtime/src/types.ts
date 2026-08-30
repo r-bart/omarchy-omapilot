@@ -73,6 +73,13 @@ const submitCommand = z.object({
   type: z.literal("submit"),
   id: z.string().min(1).max(120),
   question: z.string().trim().min(1).max(100_000),
+  // What the user actually asked, when that differs from the prompt the
+  // harness receives. A text action wraps the selection in instructions; the
+  // panel and the chat record should show the selection, not the wrapper.
+  displayQuestion: z.string().trim().min(1).max(8_000).optional(),
+  // Text actions are one-shot transformations, not conversations. Omitted is
+  // the backwards-compatible default: ordinary submissions remain durable.
+  saveToHistory: z.boolean().optional(),
   provider: providerIdSchema,
   resumeChatId: z.string().uuid().optional(),
   model: z.preprocess((value) => typeof value === "string" && value.trim() === "" ? undefined : value, z.string().min(1).max(500).optional()),
@@ -80,7 +87,10 @@ const submitCommand = z.object({
   contextAttachments: z.array(contextAttachmentSelectionSchema).max(4).optional(),
   webHandoffProvider: webHandoffProviderSchema.optional(),
   dangerousAutoApprove: z.boolean().optional()
-});
+}).refine(
+  (value) => value.saveToHistory !== false || value.resumeChatId === undefined,
+  { message: "an ephemeral submission cannot resume a saved conversation", path: ["resumeChatId"] }
+);
 const contextBeginCommand = z.object({
   type: z.literal("context_begin"),
   id: z.string().min(1).max(120),
@@ -138,6 +148,15 @@ const chatCommand = z.object({ type: z.enum(["continue_in_herdr", "history_delet
 const linkCommand = z.object({ type: z.literal("open_link"), url: z.string().max(8_192) });
 const imageCommand = z.object({ type: z.literal("load_image"), id: z.string().min(1).max(200).optional(), url: z.string().max(8_192) });
 const copyCommand = z.object({ type: z.literal("copy"), text: z.string().max(1_000_000) });
+
+// Typing a replacement into another window is authority the rest of the UI
+// does not have, so the target is an exact compositor address the store
+// latched when the hotkey fired, never a description the harness supplied.
+const selectionReplaceCommand = z.object({
+  type: z.literal("selection_replace"),
+  text: z.string().min(1).max(8_000),
+  address: z.string().min(3).max(32)
+}).strict();
 
 // A user-registered OpenAI-compatible endpoint. The broker validates these
 // again in custom-providers.ts; this schema only bounds the wire shape so a
@@ -215,6 +234,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   linkCommand,
   imageCommand,
   copyCommand,
+  selectionReplaceCommand,
   customProviderTestCommand,
   customProviderAddCommand,
   z.object({ type: z.literal("voxtype_osd_set"), enabled: z.boolean() }),
@@ -224,7 +244,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   ttsKeyTestCommand,
   ttsSpeakCommand,
   ttsStopCommand,
-  z.object({ type: z.enum(["dictation_start", "dictation_stop", "dictation_cancel", "history_list", "history_clear", "custom_provider_list", "capabilities_list", "voxtype_osd_status", "voice_status", "shutdown"]) })
+  z.object({ type: z.enum(["dictation_start", "dictation_stop", "dictation_cancel", "history_list", "history_clear", "custom_provider_list", "capabilities_list", "voxtype_osd_status", "voice_status", "selection_read", "shutdown"]) })
 ]);
 export type BrokerCommand = z.infer<typeof commandSchema>;
 
@@ -347,7 +367,7 @@ export type ChatRecord = {
 export type ChatView = Omit<ChatRecord, "images"> & { images: RenderableImage[] };
 
 export type BrokerEvent =
-  | { type: "ready"; protocolVersion: 2; features: Array<"desktop-context" | "context-attachments" | "voice" | "capability-packs">; providers: ProviderInfo[]; history: ChatView[] }
+  | { type: "ready"; protocolVersion: 2; features: Array<"desktop-context" | "context-attachments" | "voice" | "capability-packs" | "selection">; providers: ProviderInfo[]; history: ChatView[] }
   | { type: "capabilities"; capabilities: CapabilityView[] }
   | { type: "providers"; providers: ProviderInfo[] }
   | { type: "custom_provider_saved"; provider: CustomProviderView }
@@ -355,7 +375,7 @@ export type BrokerEvent =
   | { type: "custom_provider_test_failed"; baseUrl: string; message: string }
   | { type: "custom_providers"; providers: CustomProviderView[] }
   | { type: "voxtype_osd"; available: boolean; enabled: boolean; message?: string }
-  | { type: "voice"; dictation: VoiceStatus["dictation"]; tts: TtsProviderStatus[] }
+  | { type: "voice"; source: "status" | "key_set" | "key_clear"; dictation: VoiceStatus["dictation"]; tts: TtsProviderStatus[] }
   | { type: "tts_tested"; provider: "elevenlabs" | "openai"; result: TtsProviderStatus }
   | { type: "tts_test_failed"; provider: "elevenlabs" | "openai"; message: string }
   | { type: "tts_speaking"; id: string; metered: boolean }
@@ -386,4 +406,6 @@ export type BrokerEvent =
   | { type: "history"; history: ChatView[] }
   | { type: "herdr"; chatId: string; state: "opening" | "continued" | "unavailable" | "failed"; mode?: "native" | "transcript"; message?: string; stage?: "availability" | "launch" | "workspace" | "session" | "transcript" | "focus"; errorCode?: string }
   | { type: "link"; url: string; opened: boolean }
-  | { type: "copied"; copied: boolean };
+  | { type: "copied"; copied: boolean }
+  | { type: "selection"; available: boolean; text: string; reason?: "unsupported" | "empty" | "failed" }
+  | { type: "selection_replaced"; replaced: boolean; reason?: "unsupported" | "invalid_target" | "focus_failed" | "empty" | "failed" };

@@ -5,16 +5,19 @@ repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo_root"
 
 ./scripts/check-manifest.sh
+./scripts/check-test-contract.sh
 ./tests/test-hotkey-installer.sh
 node ./browser-companion/scripts/check.mjs
 
-if command -v shellcheck >/dev/null && shellcheck --version >/dev/null 2>&1; then
-  mapfile -t shell_files < <(find scripts browser-companion -type f \
+shellcheck_bin="${OMAPILOT_SHELLCHECK:-}"
+if [[ -z $shellcheck_bin ]]; then shellcheck_bin=$(command -v shellcheck || true); fi
+if [[ -n $shellcheck_bin && -x $shellcheck_bin ]] && "$shellcheck_bin" --version >/dev/null 2>&1; then
+  mapfile -t shell_files < <(find scripts browser-companion tests -type f \
     \( -name '*.sh' -o -name 'omapilot-browser-companion-host' \) -print | sort)
-  shell_files+=(tests/test-hotkey-installer.sh)
-  shellcheck "${shell_files[@]}"
+  "$shellcheck_bin" "${shell_files[@]}"
 else
-  printf 'validate: shellcheck unavailable; skipping shell lint\n' >&2
+  printf 'validate: ShellCheck is required (set OMAPILOT_SHELLCHECK to its executable)\n' >&2
+  exit 1
 fi
 
 node --check browser-companion/extension/background.js
@@ -22,17 +25,13 @@ node --check browser-companion/extension/picker.js
 node --check browser-companion/extension/popup.js
 node --check browser-companion/native-host/host.mjs
 
-if command -v qmllint >/dev/null; then
-  mapfile -t qml_files < <(find . -path './node_modules' -prune -o -path './dist' -prune -o -type f -name '*.qml' -print | sort)
-  if ((${#qml_files[@]})); then
-    qmllint "${qml_files[@]}"
-  fi
-else
-  printf 'validate: qmllint unavailable; skipping QML lint\n' >&2
-fi
-
 if [[ -f package.json ]]; then
   ./scripts/check-release-metadata.sh
+  # The QML gate owns the correct Omarchy import paths, curated lint surface,
+  # unit suites, and live Wayland probes. Running bare qmllint over every
+  # preview file produces thousands of false missing-import warnings and proves
+  # less than this contract does.
+  npm run test:qml
   npm run check
 else
   printf 'validate: package.json unavailable; skipping broker checks\n' >&2

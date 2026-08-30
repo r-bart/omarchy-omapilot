@@ -61,7 +61,7 @@ describe("voice TTS providers", () => {
       `#!${process.execPath}`,
       "const source = process.argv[3] ?? '';",
       "const imports = ['import numpy as np', 'import soundfile as sf', 'from kokoro import KPipeline'];",
-      "process.exit(process.argv[2] === '-c' && imports.every((value) => source.includes(value)) ? 0 : 1);"
+      "setTimeout(() => process.exit(process.argv[2] === '-c' && imports.every((value) => source.includes(value)) ? 0 : 1), 3_500);"
     ].join("\n"));
     await chmod(python, 0o700);
 
@@ -71,6 +71,38 @@ describe("voice TTS providers", () => {
     );
     const status = await voice.status();
     expect(status.tts[0]).toMatchObject({ id: "kokoro", available: true, configured: true });
+  }, 10_000);
+
+  it("reads cloud credentials after a slow local probe completes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-voice-auth-race-"));
+    roots.push(root);
+    const config = join(root, "config");
+    let announceProbe: () => void = () => undefined;
+    let finishProbe: (available: boolean) => void = () => undefined;
+    const probeStarted = new Promise<void>((resolveStarted) => { announceProbe = resolveStarted; });
+    const slowProbe = new Promise<boolean>((resolveProbe) => { finishProbe = resolveProbe; });
+    const voice = new VoiceService(
+      { HOME: root, OMAPILOT_CONFIG_DIR: config },
+      {
+        dictationAvailable: () => Promise.resolve(false),
+        kokoroAvailable: () => { announceProbe(); return slowProbe; },
+        fetch: (input) => Promise.resolve(jsonResponse(
+          requestUrl(input).includes("/v2/voices") ? { voices: [] } : []
+        ))
+      }
+    );
+
+    const pending = voice.status();
+    await probeStarted;
+    await mkdir(config, { recursive: true });
+    await writeFile(join(config, "voice-auth.json"), JSON.stringify({
+      elevenlabs: { type: "api_key", key: "eleven-race-test-key" }
+    }));
+    finishProbe(false);
+
+    const status = await pending;
+    expect(status.tts.find((provider) => provider.id === "elevenlabs"))
+      .toMatchObject({ available: true, configured: true });
   });
 
   it("reports local Kokoro and Voxtype without storing secrets", async () => {

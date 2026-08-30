@@ -64,6 +64,11 @@ function responsePhase(state, hasAnswer) {
   return { label: "", tone: "muted", waiting: false }
 }
 
+// `focused` arrives only from the console, which can hold the compositor's
+// keyboard while staying open: Escape at rest hands the keyboard back before
+// anything closes. Five-argument callers leave it undefined and keep their
+// exact prior behavior. The terminal value stays "close-panel" — it names the
+// ladder's final step, not a surface; each caller maps it to its own close.
 function escapeAction(viewMode, composerPopupOpen, settingsPopupOpen,
                       previewOpen, busy) {
   if (composerPopupOpen) return "close-composer-popup"
@@ -101,4 +106,22 @@ function adjacentSettingsTab(current, delta) {
   if (next < 0) next = 0
   if (next >= ids.length) next = ids.length - 1
   return ids[next]
+}
+
+// How the surface cycle button presents itself. It names its destination, not
+// where it already is: an icon for the current surface leaves the user to guess
+// what pressing it does. Glyphs are Nerd Font — md-dock_window,
+// cod-layout_sidebar_right, md-fullscreen — kept beside their labels so the two
+// cannot drift apart. Anything unrecognized describes the panel, which is where
+// Protocol.normalizedSurface sends an unrecognized value anyway.
+function surfaceIcon(surface) {
+  if (surface === "console") return ""
+  if (surface === "fullscreen") return "󰊓"
+  return "󱂬"
+}
+
+function surfaceTooltip(surface) {
+  if (surface === "console") return "Dock to the right edge"
+  if (surface === "fullscreen") return "Fill the screen"
+  return "Shrink to the bar panel"
 }

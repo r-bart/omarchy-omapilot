@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readdir, rm, truncate, utimes, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { HistoryStore, presentChat } from "../src/history.js";
+import { HistoryStore, MAX_CHATS, presentChat } from "../src/history.js";
 import { omapilotPaths } from "../src/paths.js";
 import type { ChatRecord, StoredImage } from "../src/types.js";
 
@@ -10,10 +10,13 @@ const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
 describe("history store", () => {
-  it("atomically retains only the newest 30 complete chats", async () => {
+  it("atomically retains only the newest chats up to its cap", async () => {
     const root = await mkdtemp(join(tmpdir(), "omapilot-history-")); roots.push(root);
     const paths = omapilotPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
-    const store = new HistoryStore(paths);
+    // A small cap, because what is under test is the eviction, not the number.
+    // The default is MAX_CHATS and every save rescans the whole directory, so
+    // exercising it at full size would write 205 files to watch 5 disappear.
+    const store = new HistoryStore(paths, 30);
     const evicted: ChatRecord[] = [];
     for (let index = 0; index < 35; index += 1) evicted.push(...await store.save(record(index)));
     const records = await store.list();
@@ -22,6 +25,32 @@ describe("history store", () => {
     expect(records.at(-1)?.title).toBe("Chat 5");
     expect((await readdir(paths.records)).some((name) => name.endsWith(".tmp"))).toBe(false);
     expect(evicted.map((chat) => chat.title)).toEqual(["Chat 0", "Chat 1", "Chat 2", "Chat 3", "Chat 4"]);
+  });
+
+  it("keeps months of chats by default, not days", () => {
+    // Eviction is destructive and silent, so the default is worth pinning:
+    // 30 was a few days of real use, and a conversation you meant to come back
+    // to is gone with no warning and no way back.
+    expect(MAX_CHATS).toBeGreaterThanOrEqual(200);
+  });
+
+  // Eviction is silent and permanent, so every way of asking for a nonsense
+  // cap has to land somewhere survivable. NaN is the one that mattered:
+  // Math.max(1, Math.floor(NaN)) is NaN, slice(0, NaN) is empty, and the guard
+  // against deleting everything deleted everything.
+  it.each([
+    ["zero", 0, 1],
+    ["negative", -5, 1],
+    ["fractional", 1.9, 1],
+    ["NaN", Number.NaN, 2],
+    ["Infinity", Number.POSITIVE_INFINITY, 2]
+  ])("survives a %s cap", async (_name, cap, expected) => {
+    const root = await mkdtemp(join(tmpdir(), "omapilot-history-floor-")); roots.push(root);
+    const paths = omapilotPaths({ HOME: root, XDG_STATE_HOME: join(root, "state"), XDG_CACHE_HOME: join(root, "cache"), XDG_RUNTIME_DIR: join(root, "run") });
+    const store = new HistoryStore(paths, cap);
+    await store.save(record(1));
+    await store.save(record(2));
+    expect(await store.list()).toHaveLength(expected);
   });
 
   it("deletes one record and clears all state", async () => {

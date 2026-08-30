@@ -16,6 +16,19 @@ Item {
   property color accent: Color.accent
   property string fontFamily: Style.font.family
   property bool motionEnabled: true
+  // The active tab's geometry, published so a clipping host can keep the
+  // keyboard-selected tab in view. The width sum forces re-evaluation when
+  // the repeater relays out, same trick the glow segment already used.
+  readonly property real currentTabX: {
+    var _w = tabRow.width + tabRepeater.count
+    var item = tabRepeater.itemAt(root.currentIndex)
+    return item ? item.x : _w * 0
+  }
+  readonly property real currentTabWidth: {
+    var _w = tabRow.width + tabRepeater.count
+    var item = tabRepeater.itemAt(root.currentIndex)
+    return item ? item.width : Math.max(Style.space(24), _w * 0 + Style.space(36))
+  }
   readonly property int currentIndex: {
     var ids = Presentation.settingsTabIds()
     var index = ids.indexOf(Presentation.normalizedSettingsTab(root.current))
@@ -128,20 +141,9 @@ Item {
       Rectangle {
         id: glowSegment
         height: parent.height
-        width: Math.max(Style.space(24), activeTabWidth)
-        x: activeTabX
+        width: Math.max(Style.space(24), root.currentTabWidth)
+        x: root.currentTabX
         color: root.accent
-
-        readonly property real activeTabX: {
-          var _w = tabRow.width + tabRepeater.count
-          var item = tabRepeater.itemAt(root.currentIndex)
-          return item ? item.x : _w * 0
-        }
-        readonly property real activeTabWidth: {
-          var _w = tabRow.width + tabRepeater.count
-          var item = tabRepeater.itemAt(root.currentIndex)
-          return item ? item.width : Math.max(Style.space(24), _w * 0 + Style.space(36))
-        }
 
         Behavior on x {
           enabled: root.motionEnabled
