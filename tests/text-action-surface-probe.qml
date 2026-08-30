@@ -245,6 +245,30 @@ ShellRoot {
         if (chooser.visible) root.fail("the chooser stayed up after an action ran")
         if (chooser.implicitHeight !== 0)
           root.fail("the hidden chooser still takes " + chooser.implicitHeight + " pixels")
+        var before = root.descendants(content, function(item) {
+          return item.visible && item.Accessible.name !== undefined
+            && String(item.Accessible.name).indexOf("Before: ") === 0
+        })
+        if (before.length !== 1)
+          root.fail("the result card has " + before.length + " visible original texts")
+        else if (String(before[0].text) !== backendStub.selectionText)
+          root.fail("the result card's Before text is not the selected text")
+        var after = root.descendants(content, function(item) {
+          return item.visible && item.text === "After"
+        })
+        if (after.length !== 1)
+          root.fail("the result card has " + after.length + " visible After labels")
+      } else if (root.stage === 9) {
+        // A normal answer uses the same plate but is not a replacement diff.
+        // It must not inherit labels or selected text from the completed action.
+        backendStub.textActionActive = false
+        var comparison = root.descendants(content, function(item) {
+          return item.visible && (item.text === "Before" || item.text === "After"
+            || (item.Accessible.name !== undefined
+              && String(item.Accessible.name).indexOf("Before: ") === 0))
+        })
+        if (comparison.length !== 0)
+          root.fail("a normal answer still shows the text-action comparison")
       } else {
         if (!root.failed) console.log("OMAPILOT_TEXT_ACTION_SURFACE_PROBE_OK")
         Qt.quit()
