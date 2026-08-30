@@ -253,9 +253,10 @@
         </div>
       </div>
       <nav class="takes" aria-label="Demo text">
-        <button type="button" data-take="0" aria-pressed="true">Malleable</button>
-        <button type="button" data-take="1" aria-pressed="false">Open source</button>
-        <button type="button" data-take="2" aria-pressed="false">Small teams</button>
+        <button type="button" data-take="0" aria-pressed="true">Fix</button>
+        <button type="button" data-take="1" aria-pressed="false">Rewrite</button>
+        <button type="button" data-take="2" aria-pressed="false">Translate</button>
+        <button type="button" data-take="3" aria-pressed="false">Custom</button>
       </nav>
     </header>
 
@@ -295,22 +296,28 @@
   <script>
     const TAKES = [
       {
-        section: "Draft 01 · Personal computing",
-        title: "Make the machine yours",
-        text: "Open source promised everyone could shape their computer, but changing software still required specialist skills and too much time.",
+        section: "Take 01 · Fix",
+        title: "Fix grammar",
+        text: "DHH keep arguing that computers should belongs to the people using them.",
+        prompt: "Use OmaPilot's Fix action."
+      },
+      {
+        section: "Take 02 · Rewrite",
+        title: "Rewrite clearly",
+        text: "DHH's point is that when software can be changed by its owner then the computer stops being a sealed appliance and starts becoming something personal.",
+        prompt: "Use OmaPilot's Rewrite action."
+      },
+      {
+        section: "Take 03 · Translate",
+        title: "Translate",
+        text: "DHH argues that small teams can still build ambitious software without asking permission.",
+        prompt: "Translate this into Spanish."
+      },
+      {
+        section: "Take 04 · Custom instruction",
+        title: "Custom instruction",
+        text: "DHH keeps returning to a simple idea: open source should make the computer malleable for the person using it.",
         prompt: "Turn this into one concise manifesto line."
-      },
-      {
-        section: "Draft 02 · Open source",
-        title: "From permission to participation",
-        text: "AI agents are making open source easier to change, so more people can finally adapt the software they use instead of merely accepting it.",
-        prompt: "Rewrite this as a punchy social post under 18 words."
-      },
-      {
-        section: "Draft 03 · Building",
-        title: "Constraints create momentum",
-        text: "Small teams can build remarkable things when they embrace their constraints and focus their energy on the edge that makes them different.",
-        prompt: "Make this warmer and more direct without changing its meaning."
       }
     ];
 
@@ -356,7 +363,22 @@
       window.setTimeout(() => { copyButton.textContent = "Copy instruction"; }, 1200);
     });
 
-    showTake(0);
+    const hashTake = window.location.hash.match(/^#take=(\d+)$/);
+    const requestedTake = Number(
+      new URLSearchParams(window.location.search).get("take")
+      || (hashTake ? hashTake[1] : 0)
+    );
+    const initialTake = Number.isInteger(requestedTake) && requestedTake >= 0 && requestedTake < TAKES.length
+      ? requestedTake
+      : 0;
+    showTake(initialTake);
+    window.addEventListener("hashchange", () => {
+      const match = window.location.hash.match(/^#take=(\d+)$/);
+      const index = match ? Number(match[1]) : 0;
+      if (Number.isInteger(index) && index >= 0 && index < TAKES.length) showTake(index);
+      editor.focus();
+    });
+    editor.focus();
   </script>
 </body>
 </html>

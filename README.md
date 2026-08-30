@@ -2,9 +2,12 @@
 
 OmaPilot is a native [Omarchy Quattro](https://github.com/basecamp/omarchy/tree/quattro) bar widget and contextual-capture overlay for asking questions and working on your desktop through an authenticated AI harness. It can summarize the active window, research current information, clip a window or exact region, work through bounded app connectors, remember your recent completed chats, and hand a conversation to Herdr when you want to keep going.
 
-The repository carries the `0.2.0` marketplace candidate under the permanent
-plugin ID `io.github.spencerbull.omapilot`. Its plugin, IPC, package, runtime,
-and user-data identifiers consistently use the OmaPilot namespace.
+This fork carries the `0.2.1-rbart.1` community build under OmaPilot's permanent
+plugin ID `io.github.spencerbull.omapilot`. Spencer Bull remains the original
+author of OmaPilot; the selected-text actions and this maintained community
+build are contributed by [@r-bart](https://github.com/r-bart). Plugin, IPC,
+package, runtime, and user-data identifiers remain in the OmaPilot namespace so
+the fork stays compatible with upstream and can contribute changes back.
 
 ## Preview
 
@@ -84,6 +87,23 @@ Hyprland configuration without that final button press.
 
 Review the repository before enabling it: Omarchy plugins execute unsandboxed inside the long-lived shell process.
 
+### Community build
+
+The default branch of `r-bart/omarchy-omapilot` is the tested, installable
+community release. It includes selected-text Fix, Rewrite, Translate, custom
+instructions, Before/After review, and explicit replacement.
+
+```bash
+omarchy plugin add https://github.com/r-bart/omarchy-omapilot.git
+omarchy plugin validate ~/.config/omarchy/plugins/io.github.spencerbull.omapilot
+omarchy plugin enable io.github.spencerbull.omapilot right
+```
+
+### Upstream build
+
+Install Spencer Bull's upstream repository when you want the official upstream
+state instead of the community release:
+
 ```bash
 omarchy plugin add https://github.com/spencerbull/omarchy-omapilot.git
 omarchy plugin validate ~/.config/omarchy/plugins/io.github.spencerbull.omapilot
@@ -103,6 +123,12 @@ execute their embedded JavaScript payloads directly from the read-only launcher
 file with system Node;
 Git history anchors those generated files to their TypeScript source and pinned
 lockfile. Release archives add an SBOM, provenance record, and SHA-256 checksum.
+
+The fork uses `main` for public, validated releases and `develop` for integrated
+work awaiting the next release. Feature branches stay isolated. Contributions
+intended for Spencer's repository are rebuilt as focused branches from
+`origin/main` or `origin/dev`, rather than asking upstream to merge the fork's
+entire downstream history. See [Community fork maintenance](docs/community-fork.md).
 
 Update or remove it with the standard plugin commands:
 
@@ -645,4 +671,8 @@ gates are in [`docs/release.md`](docs/release.md).
 
 ## License and attribution
 
-OmaPilot is MIT licensed. ACP adapters and bundled dependencies retain their own licenses; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and the generated release SBOM.
+OmaPilot is MIT licensed and was created by Spencer Bull. This community build
+is maintained by [@r-bart](https://github.com/r-bart); selected-text actions are
+part of that downstream contribution. ACP adapters and bundled dependencies
+retain their own licenses; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
+and the generated release SBOM.

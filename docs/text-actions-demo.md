@@ -2,9 +2,9 @@
 
 ## Goal
 
-Show the complete value in 35–45 seconds: select imperfect text in another
-application, describe a custom transformation in OmaPilot, inspect Before and
-After, and explicitly choose whether to replace the source.
+Show the complete value in 35–45 seconds: select text in another application,
+run Fix, Rewrite, Translate, and a custom transformation in OmaPilot, inspect
+Before and After, and explicitly choose whether to replace the source.
 
 ## Recording setup
 
@@ -12,7 +12,10 @@ After, and explicitly choose whether to replace the source.
   already open.
 - Record at 1920×1080 or 2560×1440 without microphone or desktop audio.
 - Hide notifications and close windows containing personal information.
-- Use the default **Malleable** take and its prepared custom instruction:
+- Use the four prepared takes: **Fix grammar**, **Rewrite clearly**,
+  **Translate**, and **Custom instruction**. Spanish is the selected language
+  in the translation example; Translate itself remains language-agnostic.
+- Use the prepared custom instruction:
   `Turn this into one concise manifesto line.`
 
 Start and stop with Omarchy's native recorder:
@@ -24,16 +27,16 @@ omarchy screenrecord --stop-recording
 
 ## Shot list
 
-1. Select the imperfect sentence in the lab.
-2. Open OmaPilot's selected-text action.
-3. Pause briefly on Fix, Rewrite, Translate, and its language selector.
-4. Expand **Custom instruction**, type the instruction, and run it.
-5. Hold on the Before / After preview long enough to read both versions.
-6. Press **Replace** and show the changed sentence in the source application.
+1. Select the prepared sentence for each take.
+2. Open OmaPilot's selected-text action and show the shortcut overlay.
+3. Run Fix, Rewrite, Translate with Spanish selected, and Custom instruction.
+4. Hold on each Before / After preview long enough to read both versions.
+5. Press **Replace** and hold on the changed sentence before the next title.
 
 Keep the pointer movement direct and avoid waiting on the model in the final
-cut; trim the generation pause to roughly one second. Do not show provider
-keys, settings, terminal output, or chat history.
+cut; trim the generation pause to roughly one second, but preserve a readable
+result hold. Do not show provider keys, settings, terminal output, or chat
+history.
 
 ## Suggested community copy
 
@@ -45,7 +48,7 @@ Export H.264 MP4 at 1080p, 30 or 60 fps, with the text readable on a phone.
 
 ## Copy references
 
-The three takes use original, non-quoted demo copy inspired by DHH's writing:
+The four takes use original, non-quoted demo copy inspired by DHH's writing:
 
 - [The malleable computer](https://world.hey.com/dhh/the-malleable-computer-7c187a9b)
 - [Let the agents democratize open source](https://world.hey.com/dhh/let-the-agents-democratize-open-source-9fd630a9)

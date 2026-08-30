@@ -114,3 +114,21 @@ For each release candidate record:
 - three consecutive green deterministic desktop runs;
 - authenticated provider results and timestamp;
 - every explicit limitation or waived live dependency.
+
+### Community candidate `0.2.1-rbart.1` (2026-08-31)
+
+- Runtime and coverage match the recorded baseline above: 281 passed and nine
+  declared live skips; all global and selection-safety ratchets pass.
+- QML contracts and probes pass with 153 tests, zero failures, and zero skips.
+- Three consecutive desktop runs pass in Chromium, Electron 44, GTK 4, Qt, and
+  Foot's fail-closed terminal case.
+- The installed UI path passes three consecutive direct Fix, chooser Translate,
+  and chooser Custom runs. Translate replaces a multiline Spanish selection
+  with English while preserving line structure.
+- Built-in smoke, all three Codex live policy cases, and three consecutive
+  Codex-to-Chromium replacements pass.
+- Three rebuilds produce identical broker, capability MCP, adapter, and browser
+  manifest hashes. Two release packages are byte-identical, including archive,
+  SBOM, provenance, and checksums.
+- OpenCode and ElevenLabs remain explicitly not configured on this host. They
+  are optional integration cells, not silently reported as passing.

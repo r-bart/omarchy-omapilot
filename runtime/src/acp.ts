@@ -33,7 +33,7 @@ export type ToolObservation = {
   title?: string | null;
   status?: string | null;
 };
-const OMAPILOT_CLIENT_VERSION = "0.2.0";
+const OMAPILOT_CLIENT_VERSION = "0.2.1-rbart.1";
 
 export function providerPolicyEnvironment(provider: DiscoveredProvider): NodeJS.ProcessEnv {
   return secureEnvironment(provider);

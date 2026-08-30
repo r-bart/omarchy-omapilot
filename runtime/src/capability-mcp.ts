@@ -4,7 +4,7 @@ import { capabilityToolAcpReadOnly, createCapabilityRegistry } from "./capabilit
 import type { CapabilityView } from "./capabilities/index.js";
 
 const SERVER_NAME = "omapilot-personal-capabilities";
-const SERVER_VERSION = "0.2.0";
+const SERVER_VERSION = "0.2.1-rbart.1";
 const PROTOCOL_VERSION = "2025-03-26";
 const MAX_MESSAGE_BYTES = 1_100_000;
 const scope = process.env.OMAPILOT_CAPABILITY_ACP_SCOPE;

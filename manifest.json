@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.spencerbull.omapilot",
   "name": "OmaPilot",
-  "version": "0.2.0",
+  "version": "0.2.1-rbart.1",
   "author": "Spencer Bull",
   "license": "MIT",
   "description": "Use authenticated AI harnesses from a native Omarchy desktop surface.",
