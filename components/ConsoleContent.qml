@@ -364,7 +364,13 @@ Item {
           // Anchored to the bottom of the viewport while it fits, so the
           // conversation grows upward from the composer like any chat — the
           // stretched-panel layout left its dead space at the bottom instead.
-          y: Math.max(0, turnScroll.height - implicitHeight)
+          // Ordinary chat grows upward from the composer. A text action is a
+          // preview-and-confirm flow that starts in the card above, so its
+          // result must stay at the top where that card just disappeared;
+          // putting it at the bottom makes the same task jump across the full
+          // height of the sidebar before Replace can be reviewed.
+          y: root.backend && root.backend.textActionActive
+            ? 0 : Math.max(0, turnScroll.height - implicitHeight)
           spacing: Style.space(18)
 
           // The conversation so far. Every turn is its own record and what

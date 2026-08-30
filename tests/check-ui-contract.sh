@@ -525,6 +525,10 @@ if [[ -z "$chooser_line" || -z "$main_line" || "$chooser_line" -ge "$main_line" 
   printf 'the sidebar text-action chooser must sit above the conversation body\n' >&2
   exit 1
 fi
+# Once an action runs, its preview takes the card's former place at the top;
+# ordinary chat alone keeps the bottom-growing conversation layout.
+grep -Fq 'y: root.backend && root.backend.textActionActive' \
+  "$repo_dir/components/ConsoleContent.qml"
 # Regenerate runs whatever ran, not the proofread, and both surfaces say so.
 test "$(grep -Fc 'Run the same action on the same selection again' \
   "$repo_dir/Panel.qml" "$repo_dir/components/ConsoleContent.qml" | grep -c ':1$')" -eq 2
