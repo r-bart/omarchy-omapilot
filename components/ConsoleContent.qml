@@ -832,8 +832,11 @@ Item {
       background: root.background
       accent: root.accent
       fontFamily: root.fontFamily
-      onActionRequested: function(action) {
-        if (root.backend.runTextAction(action, "")) turnScroll.resetForNewTurn()
+      onActionRequested: function(action, language) {
+        if (root.backend.runTextAction(action, "", language)) turnScroll.resetForNewTurn()
+      }
+      onLanguageRequested: function(language) {
+        root.requestPersist({ textActionLanguage: language })
       }
     }
 

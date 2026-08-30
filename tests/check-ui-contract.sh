@@ -483,14 +483,18 @@ if grep -Eq 'TextInput|TextEdit|TextField|TextArea' "$repo_dir/components/TextAc
   printf 'The quoted selection must not be editable\n' >&2
   exit 1
 fi
-# The three chips are peers, so all three are drawn as chips at rest. Marking
-# only the one Enter runs left the other two as dimmed words that read as
-# unavailable, and gave them an affordance that existed only under the cursor.
-grep -Fq 'bordered: true' "$repo_dir/components/TextActionChooser.qml"
-# No tooltip on a chip: Button renders it above the control, and the control
-# sits directly under the quote, so the tip covers the text being decided on.
+# The three actions are full-width rows inside one decision card. Translation
+# owns the native selector here: at the top of the chat body its downward popup
+# has room and does not clip against the panel edge.
+grep -Fq 'What do you want to do with this selection?' "$repo_dir/components/TextActionChooser.qml"
+grep -Fq 'Grammar and syntax, without changing the tone' "$repo_dir/components/TextActionChooser.qml"
+grep -Fq 'Clearer, while preserving the meaning' "$repo_dir/components/TextActionChooser.qml"
+grep -Fq 'Accessible.name: "Translate to"' "$repo_dir/components/TextActionChooser.qml"
+grep -Fq 'onLanguageRequested: function(language)' "$repo_dir/Panel.qml"
+grep -Fq 'onLanguageRequested: function(language)' "$repo_dir/components/ConsoleContent.qml"
+# No tooltip on a row: it would cover the quoted selection it explains.
 if grep -Fq 'tooltipText' "$repo_dir/components/TextActionChooser.qml"; then
-  printf 'a chip tooltip is drawn over the quote it explains\n' >&2
+  printf 'an action tooltip is drawn over the quote it explains\n' >&2
   exit 1
 fi
 # The composer is the fourth action while a selection waits, in both fields.

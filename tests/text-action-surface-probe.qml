@@ -120,11 +120,6 @@ ShellRoot {
           for (var b = 0; b < buttons.length; b++)
             if (!buttons[b].bordered)
               root.fail("chip " + b + " has no border until it is hovered")
-          // No tooltips: Button draws them above the control, and the control
-          // sits under the quote, so the tip covers the text being decided on.
-          for (var t = 0; t < buttons.length; t++)
-            if (buttons[t].tooltipText !== "")
-              root.fail("chip " + t + " carries a tooltip that covers the quote")
           // What the word means still reaches a screen reader.
           if (buttons[0].Accessible.name.indexOf("Fix grammar and syntax") < 0)
             root.fail("the Fix chip's accessible name only repeats its label")

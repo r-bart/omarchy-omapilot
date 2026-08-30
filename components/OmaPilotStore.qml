@@ -480,12 +480,13 @@ Scope {
   // submit's own choosing branch cannot call back in, and put back if submit
   // refuses, so the chooser stays on screen for a retry instead of leaving the
   // user with a live selection and nothing to press.
-  function runTextAction(action, instruction) {
+  function runTextAction(action, instruction, requestedLanguage) {
     if (!textActionActive) return false
     var id = TextActions.normalizedAction(action)
     var ask = String(instruction === undefined || instruction === null ? "" : instruction)
+    var language = String(requestedLanguage || textActionLanguage)
     var prompt = TextActions.promptFor(id, selectionText,
-      { language: textActionLanguage, instruction: ask })
+      { language: language, instruction: ask })
     if (prompt === "") return false
     var wasChoosing = selectionChoosing
     var previousAction = selectionAction
@@ -495,7 +496,7 @@ Scope {
     selectionInstruction = ask
     notice = ""
     selectionSubmitting = true
-    var sent = submit(prompt, TextActions.questionLabel(id, ask, textActionLanguage))
+    var sent = submit(prompt, TextActions.questionLabel(id, ask, language))
     selectionSubmitting = false
     if (!sent) {
       // Everything this wrote has to come back, not only the flag: the action

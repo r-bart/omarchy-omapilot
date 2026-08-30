@@ -22,11 +22,17 @@ Item {
   property color accent: Color.accent
   property string fontFamily: Style.font.family
 
-  signal actionRequested(string action)
+  signal actionRequested(string action, string language)
+  signal languageRequested(string language)
 
   readonly property bool choosing: backend && backend.selectionChoosing === true
   readonly property string defaultAction: backend ? String(backend.textActionDefault || "fix") : "fix"
   readonly property string language: backend ? String(backend.textActionLanguage || "English") : "English"
+  readonly property var languageOptions: {
+    var values = ["English", "Spanish", "French", "German", "Italian", "Portuguese"]
+    if (values.indexOf(language) < 0) values.unshift(language)
+    return values
+  }
   readonly property bool ready: backend && backend.textActionReady === true
 
   visible: choosing
@@ -42,7 +48,7 @@ Item {
     if (!root.choosing || !root.ready || !plain) return
     var index = event.key - Qt.Key_1
     if (index < 0 || index >= TextActions.actions.length) return
-    root.actionRequested(String(TextActions.actions[index].id))
+    root.actionRequested(String(TextActions.actions[index].id), root.language)
     event.accepted = true
   }
 
@@ -52,58 +58,99 @@ Item {
     anchors.right: parent.right
     spacing: Style.spacing.md
 
+    Rectangle {
+      Layout.fillWidth: true
+      implicitHeight: cardColumn.implicitHeight + Style.spacing.lg * 2
+      radius: Style.cornerRadius
+      color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.035)
+      border.width: Style.normalBorderWidth
+      border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.16)
+
+      ColumnLayout {
+        id: cardColumn
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.leftMargin: Style.spacing.lg
+        anchors.rightMargin: Style.spacing.lg
+        spacing: Style.spacing.md
+
+        Text {
+          Layout.fillWidth: true
+          text: "What do you want to do with this selection?"
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+          font.bold: true
+          wrapMode: Text.Wrap
+        }
+
     // The selection, quoted. Not editable: what a replacement is typed over is
     // the text still sitting in the other window, so an edited copy here would
     // be pasted across something it no longer matches. Six lines because the
     // selection can be eight thousand characters and this is a reminder of
     // what is about to be worked on, not a place to read it.
-    RowLayout {
-      Layout.fillWidth: true
-      spacing: Style.spacing.md
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.spacing.md
 
-      Rectangle {
-        Layout.preferredWidth: Style.space(3)
-        Layout.fillHeight: true
-        radius: width / 2
-        color: root.accent
-      }
+          Rectangle {
+            Layout.preferredWidth: Style.space(3)
+            Layout.fillHeight: true
+            radius: width / 2
+            color: root.accent
+          }
 
-      Text {
-        Layout.fillWidth: true
-        text: root.backend ? String(root.backend.selectionText || "") : ""
-        color: Qt.darker(root.foreground, 1.2)
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        wrapMode: Text.Wrap
-        maximumLineCount: 6
-        elide: Text.ElideRight
-        Accessible.role: Accessible.StaticText
-        Accessible.name: "Selected text: " + text
-      }
-    }
+          Text {
+            Layout.fillWidth: true
+            text: root.backend ? String(root.backend.selectionText || "") : ""
+            color: Qt.darker(root.foreground, 1.2)
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            wrapMode: Text.Wrap
+            maximumLineCount: 6
+            elide: Text.ElideRight
+            Accessible.role: Accessible.StaticText
+            Accessible.name: "Selected text: " + text
+          }
+        }
 
-    Flow {
-      id: chipFlow
-      Layout.fillWidth: true
-      Layout.preferredHeight: chipFlow.implicitHeight
-      spacing: Style.spacing.controlGap
+        ColumnLayout {
+          Layout.fillWidth: true
+          spacing: Style.spacing.xxs
 
-      Repeater {
-        model: TextActions.actions
+          Repeater {
+            model: TextActions.actions
 
-        delegate: Button {
-          required property var modelData
-          readonly property string action: String(modelData.id || "")
+            delegate: Rectangle {
+              required property var modelData
+              required property int index
+              readonly property string action: String(modelData.id || "")
           // Which one Enter runs. Not a hierarchy: these three are peers, and
           // the first version borrowed the primary/secondary contrast that
           // Replace and Regenerate use, where one action is the answer and the
           // other is a fallback. Here it left two of the three drawn as plain
           // dimmed words, so they read as unavailable rather than as choices.
-          readonly property bool preferred: action === root.defaultAction
-          readonly property string description: TextActions.questionLabel(action, "", root.language)
-          width: Math.min(implicitWidth, chipFlow.width)
-          text: TextActions.chipLabel(action, root.language)
-          enabled: root.ready
+              readonly property bool preferred: action === root.defaultAction
+              readonly property string description: TextActions.questionLabel(action, "", root.language)
+              // Named surface properties keep the visual probe coupled to
+              // states rather than to private Text children.
+              readonly property color foreground: !root.ready
+                ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.4)
+                : preferred ? root.accent : root.foreground
+              readonly property string text: TextActions.chipLabel(action, root.language)
+              readonly property bool bordered: true
+              function clicked() { root.actionRequested(action, root.language) }
+              Layout.fillWidth: true
+              implicitHeight: action === "translate" ? Style.space(58) : Style.space(52)
+              radius: Style.cornerRadius
+              color: rowHover.hovered || activeFocus
+                ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.09)
+                : "transparent"
+              border.width: activeFocus ? Style.normalBorderWidth : 0
+              border.color: root.accent
+              enabled: root.ready
+              activeFocusOnTab: true
           // Colour carries every state, so nothing here changes the metrics:
           // the row must not shuffle when the remembered action moves. The
           // shell's Button paints no disabled state of its own, so an
@@ -117,20 +164,66 @@ Item {
           // the background, so the chip that cannot be pressed would be drawn
           // stronger than the ones that can. Measured on this theme pair:
           // contrast 15.4 -> 3.4 on dark, and 16.2 -> 18.2 on light.
-          foreground: !root.ready
-            ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.4)
-            : preferred ? root.accent
-            : root.foreground
-          background: root.background
-          accent: root.accent
-          fontFamily: root.fontFamily
-          // All three, so a chip looks like a chip before the cursor is on it.
-          bordered: true
-          focusable: true
-          // The shell's control height is 32, under the 40 a desktop pointer
-          // target wants. Three chips shown once per invocation can afford the
-          // extra four pixels a side that a bar full of buttons cannot.
-          verticalPadding: Style.spacing.controlPaddingY + Style.spacing.sm
+              RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: Style.spacing.md
+                anchors.rightMargin: Style.spacing.md
+                spacing: Style.spacing.md
+
+                Text {
+                  Layout.preferredWidth: Style.space(24)
+                  text: action === "fix" ? "✓" : action === "rewrite" ? "↗" : "文"
+                  color: root.accent
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+                  horizontalAlignment: Text.AlignHCenter
+                }
+
+                ColumnLayout {
+                  Layout.fillWidth: true
+                  spacing: 0
+                  Text {
+                    Layout.fillWidth: true
+                    text: action === "fix" ? "Fix" : action === "rewrite" ? "Rewrite" : "Translate"
+                    color: parent.parent.parent.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    font.bold: true
+                  }
+                  Text {
+                    Layout.fillWidth: true
+                    text: action === "fix" ? "Grammar and syntax, without changing the tone"
+                      : action === "rewrite" ? "Clearer, while preserving the meaning"
+                      : "Choose the destination language"
+                    color: Qt.darker(root.foreground, 1.35)
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    elide: Text.ElideRight
+                  }
+                }
+
+                Dropdown {
+                  visible: action === "translate"
+                  Layout.preferredWidth: Style.space(132)
+                  showLabel: false
+                  options: root.languageOptions
+                  value: root.language
+                  enabled: root.ready
+                  foreground: root.foreground
+                  background: root.background
+                  accent: root.accent
+                  Accessible.name: "Translate to"
+                  onChanged: function(value) { root.languageRequested(value) }
+                }
+
+                Text {
+                  visible: action !== "translate"
+                  text: String(index + 1)
+                  color: Qt.darker(root.foreground, 1.65)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                }
+              }
           // No hover tip on a chip. Button draws one above the control, and
           // the control sits directly under the quote, so it covers the very
           // text being decided about. It also composes its background from the
@@ -138,8 +231,21 @@ Item {
           // behind it, so it reads as text fading in over text. The chip is a
           // word and the composer below already asks the question; the long
           // form stays below, where it costs nothing.
-          Accessible.name: description + (preferred ? " (Enter)" : "")
-          onClicked: root.actionRequested(action)
+              HoverHandler { id: rowHover }
+              TapHandler {
+                onTapped: root.actionRequested(action, root.language)
+              }
+              Keys.onPressed: function(event) {
+                if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+                    || event.key === Qt.Key_Space)) {
+                  root.actionRequested(action, root.language)
+                  event.accepted = true
+                }
+              }
+              Accessible.role: Accessible.Button
+              Accessible.name: description + (preferred ? " (Enter)" : "")
+            }
+          }
         }
       }
     }

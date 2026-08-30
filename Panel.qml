@@ -924,9 +924,12 @@ Panel {
           background: root.surface
           accent: root.accent
           fontFamily: root.fontFamily
-          onActionRequested: function(action) {
-            if (OmaPilot.OmaPilotStore.runTextAction(action, ""))
+          onActionRequested: function(action, language) {
+            if (OmaPilot.OmaPilotStore.runTextAction(action, "", language))
               answerScroll.resetForNewTurn()
+          }
+          onLanguageRequested: function(language) {
+            OmaPilot.OmaPilotStore.requestSettingsPersist({ textActionLanguage: language })
           }
         }
 
