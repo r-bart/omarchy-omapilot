@@ -39,6 +39,7 @@ QtObject {
   property string textActionLanguage: "English"
   property string textActionDefault: "fix"
   property int runTextActionCount: 0
+  property bool runTextActionAccepted: true
   property string notice: ""
   property var installedHotkeys: []
   property string ttsProvider: "elevenlabs"
@@ -121,12 +122,12 @@ QtObject {
   function permissionOptionsWithoutDenyOnce() { return [] }
   function replaceSelectionWithAnswer() { replaceCount++ }
   function submitFromComposer(text) { return submit(text) }
-  function runTextAction(action, instruction) {
+  function runTextAction(action, instruction, language) {
     runTextActionCount++
     selectionAction = String(action || "")
     selectionInstruction = String(instruction || "")
-    selectionChoosing = false
-    return true
+    if (runTextActionAccepted) selectionChoosing = false
+    return runTextActionAccepted
   }
   function dismissTextAction() { dismissCount++ }
   function regenerateTextAction() { regenerateCount++ }

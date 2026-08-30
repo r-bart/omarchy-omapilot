@@ -490,6 +490,13 @@ grep -Fq 'What do you want to do with this selection?' "$repo_dir/components/Tex
 grep -Fq 'Grammar and syntax, without changing the tone' "$repo_dir/components/TextActionChooser.qml"
 grep -Fq 'Clearer, while preserving the meaning' "$repo_dir/components/TextActionChooser.qml"
 grep -Fq 'Accessible.name: "Translate to"' "$repo_dir/components/TextActionChooser.qml"
+grep -Fq 'text: "Custom instruction"' "$repo_dir/components/TextActionChooser.qml"
+grep -Fq 'property bool customExpanded: false' "$repo_dir/components/TextActionChooser.qml"
+grep -Fq 'property string customDraft: ""' "$repo_dir/components/TextActionChooser.qml"
+grep -Fq 'text: "Instruction"' "$repo_dir/components/TextActionChooser.qml"
+grep -Fq 'text: "Run instruction"' "$repo_dir/components/TextActionChooser.qml"
+grep -Fq 'event.modifiers & (Qt.ControlModifier | Qt.MetaModifier)' \
+  "$repo_dir/components/TextActionChooser.qml"
 grep -Fq 'enabled: action !== "translate"' "$repo_dir/components/TextActionChooser.qml"
 grep -Fq 'Accessible.name: "Translate to " + root.language' "$repo_dir/components/TextActionChooser.qml"
 grep -Fq 'readonly property bool popupOpen: _languagePopupOpen' "$repo_dir/components/TextActionChooser.qml"
@@ -497,6 +504,10 @@ grep -Fq 'textActionChooser.closePopup()' "$repo_dir/Panel.qml"
 grep -Fq 'textActionChooser.closePopup()' "$repo_dir/components/ConsoleContent.qml"
 grep -Fq 'onLanguageRequested: function(language)' "$repo_dir/Panel.qml"
 grep -Fq 'onLanguageRequested: function(language)' "$repo_dir/components/ConsoleContent.qml"
+# The chooser owns the only custom editor while a selection awaits a decision.
+grep -Fq 'visible: !OmaPilot.OmaPilotStore.selectionChoosing' "$repo_dir/Panel.qml"
+grep -Fq 'visible: root.viewMode === "chat" && root.backend' "$repo_dir/components/ConsoleContent.qml"
+grep -Fq '&& !root.backend.selectionChoosing' "$repo_dir/components/ConsoleContent.qml"
 # No tooltip on a row: it would cover the quoted selection it explains.
 if grep -Fq 'tooltipText' "$repo_dir/components/TextActionChooser.qml"; then
   printf 'an action tooltip is drawn over the quote it explains\n' >&2
