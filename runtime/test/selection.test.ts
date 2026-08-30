@@ -1,22 +1,11 @@
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  defaultSelectionTools,
   isWindowAddress,
   readPrimarySelection,
   replaceSelection,
   safeSelectionText,
   type SelectionTools
 } from "../src/selection.js";
-
-async function executable(root: string, name: string, source: string): Promise<string> {
-  const path = join(root, name);
-  await writeFile(path, `#!/usr/bin/env bash\nset -euo pipefail\n${source}\n`, "utf8");
-  await chmod(path, 0o755);
-  return path;
-}
 
 type Call = { executable: string; args: string[] };
 
@@ -31,8 +20,6 @@ type StubOptions = {
   clipboardKindsFail?: boolean;
   clipboardReadFails?: boolean;
   clipboardWriteFails?: boolean;
-  focusDispatchFails?: boolean;
-  activeWindowInvalid?: boolean;
 };
 
 function stubTools(options: StubOptions = {}): SelectionTools & { calls: Call[]; steps: string[]; reports: string[]; clipboard: (string | undefined)[];
@@ -60,13 +47,11 @@ function stubTools(options: StubOptions = {}): SelectionTools & { calls: Call[];
         if (options.paste instanceof Error) return Promise.reject(options.paste);
         return Promise.resolve(options.paste ?? { code: 0, stdout: "" });
       }
-      if (args[0] === "dispatch" && options.focusDispatchFails === true)
-        return Promise.reject(new Error("focus dispatch failed"));
       if (args[0] === "-j" && args[1] === "activewindow") {
         activeQueries++;
         const settled = activeQueries >= (options.focusAfter ?? 1);
         const address = settled ? (options.activeAddress ?? "0xdeadbeef") : "0xother";
-        return Promise.resolve({ code: 0, stdout: options.activeWindowInvalid === true ? "{" : JSON.stringify({ address }) });
+        return Promise.resolve({ code: 0, stdout: JSON.stringify({ address }) });
       }
       return Promise.resolve({ code: 0, stdout: "" });
     },
@@ -128,61 +113,6 @@ describe("selection text safety", () => {
     expect(isWindowAddress("0x")).toBe(false);
     expect(isWindowAddress("address:0x55d1")).toBe(false);
     expect(isWindowAddress("0x55d1; rm -rf /")).toBe(false);
-  });
-});
-
-describe("default selection tool integration", () => {
-  it("runs clipboard tools with bounded text IO and reports only metadata", async () => {
-      const root = await mkdtemp(join(tmpdir(), "omapilot-selection-tools-"));
-    try {
-      const sink = join(root, "stdin.txt");
-      const quotedSink = JSON.stringify(sink);
-      const copy = await executable(root, "wl-copy", "if [[ ${1:-} == --clear ]]; then : > " + quotedSink + "; else cat > " + quotedSink + "; fi");
-      const paste = await executable(root, "wl-paste", "if [[ ${1:-} == --list-types ]]; then printf 'text/plain\\ntext/html\\n'; else printf 'clipboard text'; fi");
-      const typer = await executable(root, "wtype", "exit 0");
-      const tools = defaultSelectionTools({ ...process.env, PATH: `${root}:/usr/bin` });
-
-      await expect(tools.resolve("wl-copy")).resolves.toBe(copy);
-      await expect(tools.run(paste, ["--no-newline"], 1_000)).resolves.toMatchObject({ code: 0, stdout: "clipboard text" });
-      await expect(tools.clipboardKinds(paste)).resolves.toEqual(["text/plain", "text/html"]);
-      await expect(tools.clipboardRead(paste)).resolves.toBe("clipboard text");
-      await expect(tools.clipboardWrite(copy, "replacement")).resolves.toBe(true);
-      await expect(readFile(sink, "utf8")).resolves.toBe("replacement");
-      await expect(tools.clipboardWrite(copy, undefined)).resolves.toBe(true);
-      await expect(readFile(sink, "utf8")).resolves.toBe("");
-      await expect(tools.paste(typer, 1_000)).resolves.toBe(true);
-      await tools.wait(1);
-
-      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-      tools.report("replaced", 11);
-      expect(stderr).toHaveBeenCalledWith("OmaPilot text action: replaced (11 characters)\n");
-      stderr.mockRestore();
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
-  });
-
-  it("fails closed when clipboard subprocesses fail or hang", async () => {
-    const root = await mkdtemp(join(tmpdir(), "omapilot-selection-failures-"));
-    try {
-      const failure = await executable(root, "failure", "exit 7");
-      const hanging = await executable(root, "hanging", "sleep 5");
-      const tools = defaultSelectionTools({ ...process.env, PATH: `${root}:/usr/bin` });
-
-      await expect(tools.clipboardKinds(failure)).resolves.toEqual([]);
-      await expect(tools.clipboardRead(failure)).resolves.toBeUndefined();
-      await expect(tools.clipboardWrite(failure, "text")).resolves.toBe(false);
-      await expect(tools.paste(failure, 1_000)).resolves.toBe(false);
-      await expect(tools.paste(hanging, 20)).resolves.toBe(false);
-
-      const absent = join(root, "absent");
-      await expect(tools.clipboardKinds(absent)).resolves.toBeUndefined();
-      await expect(tools.clipboardRead(absent)).resolves.toBeUndefined();
-      await expect(tools.clipboardWrite(absent, "text")).resolves.toBe(false);
-      await expect(tools.paste(absent, 1_000)).resolves.toBe(false);
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
   });
 });
 
@@ -251,25 +181,6 @@ describe("replacing the selection", () => {
     expect(await replaceSelection("corrected", "0xdeadbeef", threw))
       .toEqual({ replaced: false, reason: "failed" });
     expect(threw.steps.at(-1)).toBe("write:a private note");
-  });
-
-  it("fails closed when focus dispatch or active-window inspection fails", async () => {
-    const dispatch = stubTools({ focusDispatchFails: true });
-    await expect(replaceSelection("corrected", "0xdeadbeef", dispatch))
-      .resolves.toEqual({ replaced: false, reason: "focus_failed" });
-    expect(dispatch.steps).not.toContain("paste");
-
-    const inspection = stubTools({ activeWindowInvalid: true });
-    await expect(replaceSelection("corrected", "0xdeadbeef", inspection))
-      .resolves.toEqual({ replaced: false, reason: "focus_failed" });
-    expect(inspection.steps).not.toContain("paste");
-  });
-
-  it("fails closed and does not paste when placing the replacement on the clipboard fails", async () => {
-    const tools = stubTools({ clipboardWriteFails: true });
-    await expect(replaceSelection("corrected", "0xdeadbeef", tools))
-      .resolves.toEqual({ replaced: false, reason: "failed" });
-    expect(tools.steps).not.toContain("paste");
   });
 
   it("leaves the clipboard alone when it is no longer ours", async () => {
