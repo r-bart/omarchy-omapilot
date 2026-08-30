@@ -21,6 +21,8 @@ const port = await new Promise((resolvePort, reject) => {
 });
 const initial = "teh cat sat on teh mat";
 let browser;
+let browserClosed;
+const stage = (message) => process.stderr.write(`browser e2e: ${message}\n`);
 
 async function until(operation, timeoutMs, label) {
   const deadline = Date.now() + timeoutMs;
@@ -77,6 +79,8 @@ try {
     "--ozone-platform=wayland",
     `--app=${pathToFileURL(join(root, "tests/text-actions-lab.html")).href}`,
   ], { stdio: "ignore", detached: true });
+  browserClosed = new Promise((resolveClosed) => browser.once("close", resolveClosed));
+  stage("Chromium launched");
 
   const socket = await cdpSocket();
   await new Promise((resolveOpen, reject) => {
@@ -92,6 +96,7 @@ try {
     const clients = JSON.parse(stdout);
     return clients.find((client) => String(client.title).includes("OmaPilot text action lab"))?.address;
   }, 15_000, "Chromium lab window");
+  stage(`lab window found at ${address}`);
 
   await command("hyprctl", ["dispatch", `hl.dsp.focus({ window = "address:${address}" })`]);
   await evaluate(socket, `(() => { const field = document.querySelector('textarea'); field.value = ${JSON.stringify(initial)}; field.focus(); field.select(); return field.value; })()`);
@@ -101,17 +106,21 @@ try {
     return stdout === initial ? stdout : undefined;
   }, 5_000, "primary selection");
   if (selected !== initial) throw new Error("The browser did not own the expected primary selection");
+  stage("primary selection verified");
 
   await command("omarchy-shell", ["io.github.spencerbull.omapilot", "fixSelection"]);
+  stage("Fix submitted through shell IPC");
   await until(async () => {
     const { stdout } = await command("omarchy-shell", ["io.github.spencerbull.omapilot", "status"]);
     if (stdout.trim() === "store=error" || stdout.trim() === "store=unavailable")
       throw new Error(`OmaPilot stopped in ${stdout.trim()}`);
     return stdout.trim() === "store=complete";
   }, 120_000, "OmaPilot answer");
+  stage("answer completed");
 
   const { stdout: replace } = await command("omarchy-shell", ["io.github.spencerbull.omapilot", "replaceSelection"]);
   if (replace.trim() !== "ok") throw new Error(`Replacement returned ${replace.trim() || "no response"}`);
+  stage("replacement accepted");
 
   const finalText = await until(async () => {
     const value = await evaluate(socket, "document.querySelector('textarea').value");
@@ -124,6 +133,10 @@ try {
 } finally {
   if (browser?.pid !== undefined) {
     try { process.kill(-browser.pid, "SIGTERM"); } catch {}
+    await Promise.race([
+      browserClosed,
+      new Promise((resolveWait) => setTimeout(resolveWait, 3_000)),
+    ]);
   }
-  await rm(profile, { recursive: true, force: true });
+  await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 }

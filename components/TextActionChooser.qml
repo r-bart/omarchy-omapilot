@@ -110,7 +110,15 @@ Item {
           // unavailable chip has to say so here or it looks live and does
           // nothing. The border colour follows the foreground, which is what
           // marks the preferred chip without giving it a shape of its own.
-          foreground: !root.ready ? Qt.darker(root.foreground, 2.2)
+          //
+          // Fading toward the surface, not toward black. `Qt.darker` is what
+          // this file reaches for elsewhere, and it is wrong for a state that
+          // has to recede: on a light theme it walks dark text further from
+          // the background, so the chip that cannot be pressed would be drawn
+          // stronger than the ones that can. Measured on this theme pair:
+          // contrast 15.4 -> 3.4 on dark, and 16.2 -> 18.2 on light.
+          foreground: !root.ready
+            ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.4)
             : preferred ? root.accent
             : root.foreground
           background: root.background

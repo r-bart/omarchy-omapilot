@@ -50,6 +50,19 @@ ShellRoot {
     return found.length > 0 ? found[0] : null
   }
 
+  // How far a chip's text lands from the surface behind it, once its alpha is
+  // composited. This is what the eye is given, and it is the only measure that
+  // means the same thing on a light theme as on a dark one: quieter is nearer
+  // the background, whichever direction that happens to be.
+  function gapFromSurface(color) {
+    var surface = chooser.background
+    var a = color.a
+    var r = color.r * a + surface.r * (1 - a)
+    var g = color.g * a + surface.g * (1 - a)
+    var b = color.b * a + surface.b * (1 - a)
+    return Math.abs(r - surface.r) + Math.abs(g - surface.g) + Math.abs(b - surface.b)
+  }
+
   BackendStub {
     id: backendStub
     selectionChoosing: true
@@ -174,20 +187,41 @@ ShellRoot {
         // paints no disabled state of its own, so a chip that is off stays
         // exactly as inviting as one that works unless the chooser says
         // otherwise. Looking live and doing nothing is the worse failure.
-        var live = String(root.chips()[1].foreground)
-        backendStub.state = "streaming"
-        if (root.chips()[0].enabled) root.fail("a chip stayed live while streaming")
-        if (String(root.chips()[1].foreground) === live)
-          root.fail("a chip that cannot be pressed is drawn exactly like one that can")
-        backendStub.state = "composing"
-        backendStub.selectionReplacing = true
-        if (root.chips()[0].enabled) root.fail("a chip stayed live while replacing")
-        if (String(root.chips()[1].foreground) === live)
-          root.fail("a chip stayed fully lit while a replacement was being typed")
-        backendStub.selectionReplacing = false
-        if (!root.chips()[0].enabled) root.fail("the chips never came back")
-        if (String(root.chips()[1].foreground) !== live)
-          root.fail("the chips came back still dimmed")
+        // Measured as distance from the surface behind it, not as "some other
+        // colour", and measured under both palettes. Darkening is what dims
+        // text on a dark theme and what brightens it on a light one, so a
+        // probe that only ever runs dark would sign off on a dead chip drawn
+        // as the loudest thing in the row for every light theme there is.
+        var themeForeground = chooser.foreground
+        var themeBackground = chooser.background
+        var palettes = [
+          { name: "the theme", fg: themeForeground, bg: themeBackground },
+          { name: "a light theme", fg: "#1a1a1a", bg: "#faf6f0" }
+        ]
+        for (var p = 0; p < palettes.length; p++) {
+          chooser.foreground = palettes[p].fg
+          chooser.background = palettes[p].bg
+          var where = " under " + palettes[p].name
+          var live = root.gapFromSurface(root.chips()[1].foreground)
+
+          backendStub.state = "streaming"
+          if (root.chips()[0].enabled) root.fail("a chip stayed live while streaming" + where)
+          if (root.gapFromSurface(root.chips()[1].foreground) >= live)
+            root.fail("a chip that cannot be pressed is drawn no quieter than one that can" + where)
+
+          backendStub.state = "composing"
+          backendStub.selectionReplacing = true
+          if (root.chips()[0].enabled) root.fail("a chip stayed live while replacing" + where)
+          if (root.gapFromSurface(root.chips()[1].foreground) >= live)
+            root.fail("a chip stayed fully lit while a replacement was being typed" + where)
+
+          backendStub.selectionReplacing = false
+          if (!root.chips()[0].enabled) root.fail("the chips never came back" + where)
+          if (root.gapFromSurface(root.chips()[1].foreground) !== live)
+            root.fail("the chips came back still dimmed" + where)
+        }
+        chooser.foreground = themeForeground
+        chooser.background = themeBackground
       } else if (root.stage === 7) {
         // In the console the chooser takes the empty state's place; two rows
         // of things to press is a menu, not an empty state.
