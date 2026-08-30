@@ -15,6 +15,8 @@ ShellRoot {
   property bool failed: false
   property int stage: 0
   property string picked: ""
+  property string pickedInstruction: ""
+  property string pickedLanguage: ""
 
   function fail(message) {
     failed = true
@@ -75,7 +77,11 @@ ShellRoot {
     id: chooser
     width: 420
     backend: backendStub
-    onActionRequested: function(action) { root.picked = action }
+    onActionRequested: function(action, instruction, language) {
+      root.picked = action
+      root.pickedInstruction = instruction
+      root.pickedLanguage = language
+    }
   }
 
   OmaPilot.ConsoleContent {
@@ -178,6 +184,52 @@ ShellRoot {
         if (root.picked !== "rewrite")
           root.fail("pressing a chip asked for '" + root.picked + "'")
       } else if (root.stage === 6) {
+        // The fourth route expands in place and gives typing focus to the
+        // editor. Empty text cannot run, and a multiline instruction reaches
+        // the host together with the language visible in the chooser.
+        root.picked = ""
+        chooser.expandCustom()
+        if (!chooser.customExpanded) root.fail("the custom editor did not expand")
+      } else if (root.stage === 7) {
+        // The offscreen probe has no active window, so Qt cannot grant
+        // activeFocus. `focus` still proves expandCustom routed focus to the
+        // real editor; the manual Wayland pass certifies active keyboard focus.
+        var editors = root.descendants(chooser, function(item) {
+          return item.visible && item.Accessible.name === "Instruction"
+            && item.placeholderText !== undefined
+        })
+        if (editors.length !== 1 || !editors[0].focus)
+          root.fail("the expanded custom editor was not selected for focus")
+        if (chooser.requestAction("custom", "   "))
+          root.fail("an empty custom instruction reported success")
+        if (root.picked !== "") root.fail("an empty custom instruction reached the host")
+        chooser.customDraft = "Keep 123 items\non separate lines"
+        if (!chooser.requestAction("custom", chooser.customDraft))
+          root.fail("a multiline custom instruction was refused")
+        if (root.picked !== "custom" || root.pickedInstruction !== chooser.customDraft)
+          root.fail("the host did not receive the exact custom instruction")
+        if (root.pickedLanguage !== backendStub.textActionLanguage)
+          root.fail("the custom instruction lost the selected language")
+        chooser.collapseCustom()
+      } else if (root.stage === 8) {
+        // A host refusal keeps the chooser and its draft available for retry.
+        var contentChoosers = root.descendants(content, function(item) {
+          return item.defaultAction !== undefined && item.language !== undefined
+        })
+        if (contentChoosers.length !== 1) root.fail("cannot find the console chooser for retry")
+        else {
+          var hosted = contentChoosers[0]
+          hosted.customDraft = "Preserve this draft\nfor the retry"
+          hosted.expandCustom()
+          backendStub.runTextActionAccepted = false
+          if (!hosted.requestAction("custom", hosted.customDraft))
+            root.fail("the chooser did not hand the custom request to its host")
+          if (!backendStub.selectionChoosing || !hosted.customExpanded
+              || hosted.customDraft !== "Preserve this draft\nfor the retry")
+            root.fail("a refused host submission destroyed the custom draft")
+          backendStub.runTextActionAccepted = true
+        }
+      } else if (root.stage === 9) {
         // Nothing is offered while the harness is answering or a replacement
         // is being typed — and it has to look that way. The shell's Button
         // paints no disabled state of its own, so a chip that is off stays
@@ -218,7 +270,7 @@ ShellRoot {
         }
         chooser.foreground = themeForeground
         chooser.background = themeBackground
-      } else if (root.stage === 7) {
+      } else if (root.stage === 10) {
         // In the console the chooser takes the empty state's place; two rows
         // of things to press is a menu, not an empty state.
         var choosers = root.descendants(content, function(item) {
@@ -235,7 +287,7 @@ ShellRoot {
           root.fail("expected one quick-action row, found " + actionRows.length)
         else if (actionRows[0].visible)
           root.fail("the desktop quick actions showed up beside the chooser")
-      } else if (root.stage === 8) {
+      } else if (root.stage === 11) {
         // Once something has been asked, the chooser is gone and the answer's
         // own controls are what is left.
         backendStub.selectionChoosing = false
@@ -258,7 +310,7 @@ ShellRoot {
         })
         if (after.length !== 1)
           root.fail("the result card has " + after.length + " visible After labels")
-      } else if (root.stage === 9) {
+      } else if (root.stage === 12) {
         // A normal answer uses the same plate but is not a replacement diff.
         // It must not inherit labels or selected text from the completed action.
         backendStub.textActionActive = false
