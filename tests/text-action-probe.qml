@@ -147,11 +147,26 @@ ShellRoot {
         root.latch("")
         root.deliverSelection("The build is broken.")
         s.selectionChoosing = true
-        if (!s.runTextAction("custom", "expand this into a paragraph"))
+        var customInstruction = "expand this into a paragraph\nwithout inventing facts"
+        var rememberedPreset = s.configuredTextActionLast
+        if (!s.runTextAction("custom", customInstruction))
           root.fail("a free prompt did not run")
-        if (s.question !== "expand this into a paragraph")
+        if (s.question !== customInstruction)
           root.fail("the thread shows the envelope instead of the instruction")
-        root.drain()
+        if (s.selectionInstruction !== customInstruction)
+          root.fail("the multiline instruction was changed in the store")
+        if (s.configuredTextActionLast !== rememberedPreset)
+          root.fail("a custom instruction replaced the remembered preset")
+        var customSubmits = root.commandsOfType(root.drain(), "submit")
+        if (customSubmits.length !== 1) root.fail("expected one custom submit")
+        else {
+          if (customSubmits[0].saveToHistory !== false)
+            root.fail("the custom instruction was allowed to become chat history")
+          if (customSubmits[0].resumeChatId !== undefined)
+            root.fail("the custom instruction resumed the open conversation")
+          if (String(customSubmits[0].displayQuestion) !== customInstruction)
+            root.fail("the custom instruction was not used as its display label")
+        }
         root.answer("The build is currently broken on the main branch, and has been "
           + "since the most recent commit to the test harness. Every pipeline since "
           + "has stopped at the same step, so nobody has been able to merge for the "
@@ -326,14 +341,18 @@ ShellRoot {
         root.latch("")
         root.deliverSelection("a paragraph the user just selected")
         s.continuationBlocked = true
-        if (s.runTextAction("rewrite", "")) root.fail("a refused send reported success")
+        var refusedInstruction = "Make this formal\nand keep both lines"
+        if (s.runTextAction("custom", refusedInstruction)) root.fail("a refused send reported success")
         s.continuationBlocked = false
         if (!s.selectionChoosing) root.fail("a refused send took the chooser away")
         if (s.selectionAction !== "" || s.selectionInstruction !== "")
           root.fail("a refused send left '" + s.selectionAction + "' written")
         if (s.notice === "") root.fail("the refusal said nothing to the user")
         // And the chooser still works afterwards.
-        if (!s.runTextAction("fix", "")) root.fail("the chooser was dead after a refusal")
+        if (!s.runTextAction("custom", refusedInstruction))
+          root.fail("the chooser was dead after a refused custom instruction")
+        if (s.selectionInstruction !== refusedInstruction)
+          root.fail("the custom instruction changed during retry")
         s.endTextAction()
         root.drain()
       } else if (root.stage === 15) {
@@ -385,7 +404,8 @@ ShellRoot {
         s.resetChat()
         root.latch("")
         root.deliverSelection("teh cat sat")
-        if (!s.runTextAction("translate", "")) root.fail("translate did not run")
+        var regeneratedInstruction = "Correct this\nKeep the informal tone"
+        if (!s.runTextAction("custom", regeneratedInstruction)) root.fail("custom did not run")
         root.drain()
         s.answerMarkdown = "El gato se sentó."
         s.state = "complete"
@@ -397,8 +417,10 @@ ShellRoot {
         s.providers = []
         s.regenerateTextAction()
         s.providers = harness
-        if (s.selectionAction !== "translate")
+        if (s.selectionAction !== "custom")
           root.fail("a refused regenerate left the action as '" + s.selectionAction + "'")
+        if (s.selectionInstruction !== regeneratedInstruction)
+          root.fail("a refused regenerate changed the custom instruction")
         // And Regenerate still works once the harness is back.
         s.regenerateTextAction()
         var regenerated = root.commandsOfType(root.drain(), "submit")
@@ -406,9 +428,13 @@ ShellRoot {
           root.fail("Regenerate was dead after a refusal")
         else if (regenerated[0].resumeChatId !== undefined || regenerated[0].saveToHistory !== false)
           root.fail("Regenerate mixed the ephemeral action into its return conversation")
+        if (s.selectionInstruction !== regeneratedInstruction)
+          root.fail("Regenerate did not preserve the exact custom instruction")
         if (s.submittedResumeChatId !== "10000000-0000-4000-8000-000000000017")
           root.fail("Regenerate lost the conversation behind the action")
         s.endTextAction()
+        if (s.selectionInstruction !== "")
+          root.fail("ending the action retained the custom instruction")
         root.drain()
       } else if (root.stage === 18) {
         // Asking something else while the read is still out is still asking
