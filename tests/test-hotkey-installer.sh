@@ -114,19 +114,40 @@ upgraded_checksum=$(sha256sum "$bindings")
 test "$(sha256sum "$bindings")" = "$upgraded_checksum"
 
 # A bindings.lua written by the installer before the chooser existed still
-# calls fixSelection, and that chord is the user's now. The installer leaves it
-# alone, the method still exists, and nothing about the upgrade takes away the
-# shortcut somebody already learned.
+# calls fixSelection. Nobody chose that: this script wrote it. While the block
+# is still exactly what this script writes, it is ours to bring up to date, and
+# leaving it stale is how somebody upgrades the plugin and finds the new chord
+# silently unreachable — the old chord keeps working and nothing says why.
 cp -- "$clean_bindings" "$bindings"
 cat >>"$bindings" <<'LUA'
 -- BEGIN OmaPilot managed hotkeys
+-- Added at the user request from OmaPilot settings. Edit these bindings freely.
 hl.unbind("SUPER + ALT + T")
 o.bind("SUPER + ALT + T", "Fix the selected text with OmaPilot",
   "omarchy-shell -q io.github.spencerbull.omapilot fixSelection")
 -- END OmaPilot managed hotkeys
 LUA
 "$installed_installer"
-grep -Fq -- 'io.github.spencerbull.omapilot fixSelection' "$bindings"
+grep -Fq -- 'io.github.spencerbull.omapilot textAction' "$bindings"
+grep -Fq -- 'Work on the selected text with OmaPilot' "$bindings"
+assert_absent 'io.github.spencerbull.omapilot fixSelection' "$bindings"
+# The chord itself is unchanged, which is what A11 asks for: fixSelection is
+# still a method, so a hand-written binding elsewhere keeps working.
+grep -Fq -- 'o.bind("SUPER + ALT + T"' "$bindings"
+
+# The moment the block stops being ours, it stops being ours to rewrite. A
+# chord the user pointed somewhere else survives the upgrade untouched, and the
+# header invites exactly that: "Edit these bindings freely."
+cp -- "$clean_bindings" "$bindings"
+cat >>"$bindings" <<'LUA'
+-- BEGIN OmaPilot managed hotkeys
+-- Added at the user request from OmaPilot settings. Edit these bindings freely.
+hl.unbind("SUPER + ALT + T")
+o.bind("SUPER + ALT + T", "My own text thing", "my-own-script --selection")
+-- END OmaPilot managed hotkeys
+LUA
+"$installed_installer"
+grep -Fq -- 'my-own-script --selection' "$bindings"
 assert_absent 'io.github.spencerbull.omapilot textAction' "$bindings"
 
 for mode in --remove --force; do

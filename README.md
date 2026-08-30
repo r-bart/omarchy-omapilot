@@ -111,6 +111,19 @@ omarchy plugin update io.github.spencerbull.omapilot
 omarchy plugin remove io.github.spencerbull.omapilot
 ```
 
+Restart the shell after an update that adds an IPC action:
+
+```bash
+omarchy-restart-shell
+```
+
+OmaPilot's store is a QML singleton, and a singleton outlives the plugin
+reload that a changed file triggers. The old object keeps the IPC handler it
+was built with, so an action added by the update answers `Function not found.`
+until the shell is restarted — and because the installed bindings call
+`omarchy-shell -q`, that answer is swallowed and the new chord simply does
+nothing.
+
 ## Global hotkeys
 
 OmaPilot exposes compositor-safe IPC actions for a contextual voice session,
@@ -153,8 +166,12 @@ conversation has a saved chat ID.
 The managed block is written only after that explicit action and becomes normal
 user-owned Hyprland configuration. Existing user-defined collisions are left
 alone. Running the installer again adds newly introduced defaults to its marked
-block without rewriting existing bindings. To install from a terminal while
-still preserving collisions, or to deliberately replace every chord, run:
+block. While every line in the block is still one the installer wrote, it also
+brings those up to date, so a chord that pointed at a method renamed by an
+upgrade follows the upgrade instead of quietly staying behind. Edit any line in
+the block and it stops being the installer's: from then on the block is only
+added to, never rewritten. To install from a terminal while still preserving
+collisions, or to deliberately replace every chord, run:
 
 ```bash
 ~/.config/omarchy/plugins/io.github.spencerbull.omapilot/scripts/install-hotkeys.sh
