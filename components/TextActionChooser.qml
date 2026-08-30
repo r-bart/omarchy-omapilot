@@ -338,7 +338,7 @@ Item {
                 enabled: root.ready
                 Accessible.role: Accessible.Button
                 Accessible.name: "Custom instruction"
-                Accessible.expanded: root.customExpanded
+                Accessible.description: root.customExpanded ? "Expanded" : "Collapsed"
 
                 RowLayout {
                   anchors.fill: parent

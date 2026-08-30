@@ -165,6 +165,7 @@ Item {
       textActionChooser.closePopup()
       return
     }
+    if (textActionChooser.collapseCustom()) return
     var approvalInFront = backend && backend.pendingPermission !== null
       && viewMode === "chat" && previewSource === "" && !composer.popupOpen
     if (approvalInFront && backend.hasPermissionDecision("reject_once")) {
@@ -293,8 +294,8 @@ Item {
       background: root.background
       accent: root.accent
       fontFamily: root.fontFamily
-      onActionRequested: function(action, language) {
-        if (root.backend.runTextAction(action, "", language)) turnScroll.resetForNewTurn()
+      onActionRequested: function(action, instruction, language) {
+        if (root.backend.runTextAction(action, instruction, language)) turnScroll.resetForNewTurn()
       }
       onLanguageRequested: function(language) {
         root.requestPersist({ textActionLanguage: language })
@@ -890,7 +891,7 @@ Item {
     OmaPilot.Composer {
       id: composer
       Layout.fillWidth: true
-      visible: root.viewMode === "chat"
+      visible: root.viewMode === "chat" && (!root.backend || !root.backend.selectionChoosing)
       // The header above carries the surface switch here. The bar panel has no
       // header, so there it stays in the composer's own action row.
       showSurfaceSwitch: false

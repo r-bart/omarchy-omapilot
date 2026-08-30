@@ -66,6 +66,7 @@ Item {
   }
 
   function forceInputFocus() {
+    if (!root.visible) return
     if (inlineMode) inlineInput.forceActiveFocus()
     else promptInput.forceActiveFocus()
   }

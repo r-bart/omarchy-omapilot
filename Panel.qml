@@ -301,7 +301,6 @@ Panel {
     // prompt, since Enter there is now the fourth action.
     function onSelectionReady(_text) {
       root.showChat(false)
-      Qt.callLater(function() { composer.forceInputFocus() })
     }
     function onHotkeyInstalled() {
       if (root.voiceSetupReady) root.persistSettings({ onboardingComplete: true })
@@ -316,6 +315,7 @@ Panel {
         textActionChooser.closePopup()
         return
       }
+      if (textActionChooser.collapseCustom()) return
       var action = Presentation.escapeAction(root.viewMode, composer.popupOpen,
         settingsView.popupOpen, root.previewSource !== "", OmaPilot.OmaPilotStore.busy)
       if (action === "close-composer-popup") composer.closePopups()
@@ -394,6 +394,7 @@ Panel {
         OmaPilot.Composer {
           id: composer
           Layout.fillWidth: true
+          visible: !OmaPilot.OmaPilotStore.selectionChoosing
           backend: OmaPilot.OmaPilotStore
           foreground: root.foreground
           background: root.surface
@@ -412,8 +413,8 @@ Panel {
           background: root.surface
           accent: root.accent
           fontFamily: root.fontFamily
-          onActionRequested: function(action, language) {
-            if (OmaPilot.OmaPilotStore.runTextAction(action, "", language))
+          onActionRequested: function(action, instruction, language) {
+            if (OmaPilot.OmaPilotStore.runTextAction(action, instruction, language))
               answerScroll.resetForNewTurn()
           }
           onLanguageRequested: function(language) {

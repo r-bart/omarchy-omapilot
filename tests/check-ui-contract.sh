@@ -505,8 +505,10 @@ grep -Fq 'onLanguageRequested: function(language)' "$repo_dir/Panel.qml"
 grep -Fq 'onLanguageRequested: function(language)' "$repo_dir/components/ConsoleContent.qml"
 # The chooser owns the only custom editor while a selection awaits a decision.
 grep -Fq 'visible: !OmaPilot.OmaPilotStore.selectionChoosing' "$repo_dir/Panel.qml"
-grep -Fq 'visible: root.viewMode === "chat" && root.backend' "$repo_dir/components/ConsoleContent.qml"
-grep -Fq '&& !root.backend.selectionChoosing' "$repo_dir/components/ConsoleContent.qml"
+grep -Fq 'visible: root.viewMode === "chat" && (!root.backend || !root.backend.selectionChoosing)' \
+  "$repo_dir/components/ConsoleContent.qml"
+grep -Fq 'textActionChooser.collapseCustom()' "$repo_dir/Panel.qml"
+grep -Fq 'textActionChooser.collapseCustom()' "$repo_dir/components/ConsoleContent.qml"
 # No tooltip on a row: it would cover the quoted selection it explains.
 if grep -Fq 'tooltipText' "$repo_dir/components/TextActionChooser.qml"; then
   printf 'an action tooltip is drawn over the quote it explains\n' >&2
