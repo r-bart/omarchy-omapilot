@@ -458,6 +458,8 @@ grep -Fq 'if (TextActions.runsOnArrival(selectionAction)) runTextAction(selectio
 grep -Fq 'function textAction(): string' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'function rewriteSelection(): string' "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'function translateSelection(): string' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'function chooseCustomTextAction(instruction: string): string' \
+  "$repo_dir/components/OmaPilotStore.qml"
 # The guard is chosen by the action that ran. Dropping this field would judge
 # every free prompt by the rule written for a correction.
 grep -Fq 'action: selectionAction' "$repo_dir/components/OmaPilotStore.qml"
@@ -514,7 +516,9 @@ if grep -Fq 'tooltipText' "$repo_dir/components/TextActionChooser.qml"; then
   printf 'an action tooltip is drawn over the quote it explains\n' >&2
   exit 1
 fi
-# The composer is the fourth action while a selection waits, in both fields.
+# Composer placeholders remain defensive for third-party or stale hosts, even
+# though the two first-party hosts hide those fields while the chooser owns the
+# selection.
 test "$(grep -Fc 'What should I do with this text?' "$repo_dir/components/Composer.qml")" -eq 2
 # Both surfaces put the chooser where their empty state already lives, and
 # neither shows the desktop quick actions over it.

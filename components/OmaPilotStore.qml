@@ -1598,6 +1598,13 @@ Scope {
       if (!root.selectionChoosing) return "no-chooser"
       return root.runTextAction(action, "") ? "ok" : "refused"
     }
+    // Scripted custom instructions are useful for desktop integration tests
+    // and automation. They remain behind the live chooser and the store's
+    // normal validation, and never expose the captured selection to callers.
+    function chooseCustomTextAction(instruction: string): string {
+      if (!root.selectionChoosing) return "no-chooser"
+      return root.runTextAction("custom", instruction) ? "ok" : "refused"
+    }
     // The same call the Replace button makes, so a scripted run — or a
     // hotkey — can accept a correction without a pointer. The guards stay in
     // replaceSelectionWithAnswer; this only reports whether there was

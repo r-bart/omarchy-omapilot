@@ -2,8 +2,7 @@
 
 ## Status
 
-Proposed. This document fixes the product and interaction decisions needed to
-plan implementation; it does not authorize production changes by itself.
+Implemented and certified on 2026-08-30.
 
 ## Problem
 

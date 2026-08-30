@@ -46,8 +46,8 @@ reviewed justification in this document.
 
 The gate is layered rather than multiplying every semantic action by every
 widget: deterministic runs prove replacement mechanics on each toolkit, while
-the installed-UI runs prove direct Fix and chooser-based multiline Translate
-through the complete QML/provider path.
+the installed-UI runs prove direct Fix, chooser-based multiline Translate, and
+a custom instruction through the complete QML/provider path.
 
 | Toolkit | Target controls | Expected result |
 | --- | --- | --- |
@@ -89,8 +89,10 @@ unchanged.
   Wayland runs. Foot passes its fail-closed command-integrity E2E.
 - Installed UI path: QML IPC → packaged broker → built-in provider → Chromium
   replacement passed three consecutive direct Fix runs and three consecutive
-  chooser-based multiline Translate runs. One additional chatty translation
-  was correctly refused as `not_a_replacement` and did not reach the editor.
+  chooser-based multiline Translate runs. The custom-instruction chooser route
+  also passed three consecutive provider-to-Chromium replacements. One
+  additional chatty translation was correctly refused as `not_a_replacement`
+  and did not reach the editor.
   Quickshell's prefixless native window address is normalized only at its
   trusted API boundary, and completion is tied to a new turn identity.
 - Authenticated harnesses: Built-in passed three consecutive smoke turns;

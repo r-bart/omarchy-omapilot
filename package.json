@@ -18,6 +18,7 @@
     "test:e2e:browser:live": "OMAPILOT_E2E_LIVE_PROVIDER=codex node tests/text-action-browser-e2e.mjs",
     "test:e2e:browser:live-ui": "OMAPILOT_E2E_LIVE_PROVIDER=ui node tests/text-action-browser-e2e.mjs",
     "test:e2e:browser:live-ui:translate": "OMAPILOT_E2E_LIVE_PROVIDER=ui OMAPILOT_E2E_UI_ROUTE=chooser-translate OMAPILOT_E2E_INITIAL='Hola mundo.\\nEsta es una prueba multilinea.' node tests/text-action-browser-e2e.mjs",
+    "test:e2e:browser:live-ui:custom": "OMAPILOT_E2E_LIVE_PROVIDER=ui OMAPILOT_E2E_UI_ROUTE=chooser-custom node tests/text-action-browser-e2e.mjs",
     "test:e2e:electron": "OMAPILOT_E2E_ELECTRON=1 node tests/text-action-browser-e2e.mjs",
     "test:e2e:gtk": "node tests/text-action-gtk-e2e.mjs",
     "test:e2e:qt": "node tests/text-action-qt-e2e.mjs",

@@ -223,25 +223,30 @@ try {
   const liveProvider = process.env.OMAPILOT_E2E_LIVE_PROVIDER;
   if (liveProvider === "ui") {
     const uiRoute = process.env.OMAPILOT_E2E_UI_ROUTE ?? "direct-fix";
+    const chooserRoute = uiRoute === "chooser-translate" || uiRoute === "chooser-custom";
+    const expectedAction = uiRoute === "chooser-translate" ? "translate"
+      : uiRoute === "chooser-custom" ? "custom" : "fix";
     const actionState = async () => {
       const { stdout } = await command("omarchy-shell", ["io.github.spencerbull.omapilot", "textActionState"]);
       return JSON.parse(stdout);
     };
     const before = await actionState();
-    const method = uiRoute === "chooser-translate" ? "textAction" : "fixSelection";
+    const method = chooserRoute ? "textAction" : "fixSelection";
     const { stdout: startOutput } = await command("omarchy-shell", ["io.github.spencerbull.omapilot", method]);
     const startDecision = startOutput.trim();
     if (startDecision !== "start")
       throw new Error(`OmaPilot refused the text action: ${startDecision || "no response"}`);
     stage(`${uiRoute} submitted through shell IPC (${startDecision})`);
-    if (uiRoute === "chooser-translate") {
+    if (chooserRoute) {
       await until(async () => (await actionState()).choosing === true, 10_000, "OmaPilot chooser");
-      const { stdout: chooseOutput } = await command("omarchy-shell", [
-        "io.github.spencerbull.omapilot", "chooseTextAction", "translate"
-      ]);
+      const chooserArgs = uiRoute === "chooser-custom"
+        ? ["io.github.spencerbull.omapilot", "chooseCustomTextAction",
+          "Correct spelling and grammar while preserving the meaning. Return only the revised text."]
+        : ["io.github.spencerbull.omapilot", "chooseTextAction", "translate"];
+      const { stdout: chooseOutput } = await command("omarchy-shell", chooserArgs);
       if (chooseOutput.trim() !== "ok")
         throw new Error(`OmaPilot chooser returned ${chooseOutput.trim() || "no response"}`);
-      stage("Translate selected through chooser action route");
+      stage(`${expectedAction} selected through chooser action route`);
     }
     const completed = await until(async () => {
       const current = await actionState();
@@ -250,7 +255,7 @@ try {
       return current.turnId !== "" && current.turnId !== before.turnId && current.state === "complete"
         ? current : undefined;
     }, 180_000, "new OmaPilot answer");
-    if (completed.action !== (uiRoute === "chooser-translate" ? "translate" : "fix"))
+    if (completed.action !== expectedAction)
       throw new Error(`OmaPilot completed the wrong action: ${completed.action || "none"}`);
     stage("answer completed");
     const { stdout: replace } = await command("omarchy-shell", ["io.github.spencerbull.omapilot", "replaceSelection"]);
@@ -268,7 +273,8 @@ try {
     return typeof value === "string" && value !== initial ? value : undefined;
   }, 10_000, "browser replacement");
   if (finalText === initial) throw new Error("The text action left the selected text unchanged");
-  if (liveProvider !== "ui" || (process.env.OMAPILOT_E2E_UI_ROUTE ?? "direct-fix") === "direct-fix")
+  if (liveProvider !== "ui"
+      || ["direct-fix", "chooser-custom"].includes(process.env.OMAPILOT_E2E_UI_ROUTE ?? "direct-fix"))
     if (/\bteh\b/iu.test(finalText)) throw new Error(`Correction still contains the original typo: ${finalText}`);
 
   const controls = [{ selector: primarySelector, kind: "textarea", final: finalText }];
@@ -291,8 +297,10 @@ try {
     }
   }
 
-  const reportedAction = liveProvider === "ui" && process.env.OMAPILOT_E2E_UI_ROUTE === "chooser-translate"
-    ? "translate" : "fix";
+  const reportedAction = liveProvider === "ui"
+    ? (process.env.OMAPILOT_E2E_UI_ROUTE === "chooser-translate" ? "translate"
+      : process.env.OMAPILOT_E2E_UI_ROUTE === "chooser-custom" ? "custom" : "fix")
+    : "fix";
   process.stdout.write(JSON.stringify({ result: "pass", app: electron ? "electron" : "chromium", action: reportedAction, initial, final: finalText, controls }) + "\n");
   socket.close();
 } finally {
