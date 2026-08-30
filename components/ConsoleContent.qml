@@ -275,6 +275,35 @@ Item {
       color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
     }
 
+    // A pending selection belongs to the sidebar, not to the bottom of the
+    // conversation. Keeping the decision card directly under the persistent
+    // metadata makes it visible immediately and leaves the whole column below
+    // the language picker for Dropdown's downward popup.
+    OmaPilot.TextActionChooser {
+      id: textActionChooser
+      Layout.fillWidth: true
+      visible: root.viewMode === "chat" && root.backend
+        && root.backend.selectionChoosing === true
+      backend: root.backend
+      foreground: root.foreground
+      background: root.background
+      accent: root.accent
+      fontFamily: root.fontFamily
+      onActionRequested: function(action, language) {
+        if (root.backend.runTextAction(action, "", language)) turnScroll.resetForNewTurn()
+      }
+      onLanguageRequested: function(language) {
+        root.requestPersist({ textActionLanguage: language })
+      }
+    }
+
+    Rectangle {
+      Layout.fillWidth: true
+      implicitHeight: 1
+      visible: textActionChooser.visible
+      color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
+    }
+
     Item {
       id: mainArea
       Layout.fillWidth: true
@@ -817,27 +846,6 @@ Item {
       onSubmitted: turnScroll.resetForNewTurn()
       onHistoryRequested: root.viewMode === "history" ? root.showChat() : root.openHistory()
       onEscapeRequested: root.handleEscape()
-    }
-
-    // The same place the quick actions occupy, for the same reason: with a
-    // selection waiting this is what there is to do, and two rows of things to
-    // press is a menu rather than an empty state.
-    OmaPilot.TextActionChooser {
-      id: textActionChooser
-      Layout.fillWidth: true
-      visible: root.viewMode === "chat" && root.backend
-        && root.backend.selectionChoosing === true
-      backend: root.backend
-      foreground: root.foreground
-      background: root.background
-      accent: root.accent
-      fontFamily: root.fontFamily
-      onActionRequested: function(action, language) {
-        if (root.backend.runTextAction(action, "", language)) turnScroll.resetForNewTurn()
-      }
-      onLanguageRequested: function(language) {
-        root.requestPersist({ textActionLanguage: language })
-      }
     }
 
     OmaPilot.QuickActions {

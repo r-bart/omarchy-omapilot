@@ -505,6 +505,15 @@ grep -Fq 'OmaPilot.TextActionChooser {' "$repo_dir/Panel.qml"
 grep -Fq '&& !OmaPilot.OmaPilotStore.selectionChoosing' "$repo_dir/Panel.qml"
 grep -Fq 'OmaPilot.TextActionChooser {' "$repo_dir/components/ConsoleContent.qml"
 grep -Fq '&& !root.backend.selectionChoosing' "$repo_dir/components/ConsoleContent.qml"
+# In the sidebar, the chooser is fixed immediately below the header metadata
+# and its divider, before the scrollable conversation. That placement is what
+# gives the language Dropdown room to open downward.
+chooser_line="$(grep -n 'id: textActionChooser' "$repo_dir/components/ConsoleContent.qml" | cut -d: -f1)"
+main_line="$(grep -n 'id: mainArea' "$repo_dir/components/ConsoleContent.qml" | cut -d: -f1)"
+if [[ -z "$chooser_line" || -z "$main_line" || "$chooser_line" -ge "$main_line" ]]; then
+  printf 'the sidebar text-action chooser must sit above the conversation body\n' >&2
+  exit 1
+fi
 # Regenerate runs whatever ran, not the proofread, and both surfaces say so.
 test "$(grep -Fc 'Run the same action on the same selection again' \
   "$repo_dir/Panel.qml" "$repo_dir/components/ConsoleContent.qml" | grep -c ':1$')" -eq 2
