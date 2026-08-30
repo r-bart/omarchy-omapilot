@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
@@ -22,11 +23,14 @@ Item {
   property color accent: Color.accent
   property string fontFamily: Style.font.family
 
-  signal actionRequested(string action, string language)
+  signal actionRequested(string action, string instruction, string language)
   signal languageRequested(string language)
 
   property bool _languagePopupOpen: false
+  property bool customExpanded: false
+  property string customDraft: ""
   readonly property bool popupOpen: _languagePopupOpen
+  readonly property bool customInputFocused: customEditor.activeFocus
 
   readonly property bool choosing: backend && backend.selectionChoosing === true
   readonly property string defaultAction: backend ? String(backend.textActionDefault || "fix") : "fix"
@@ -39,10 +43,25 @@ Item {
   }
   readonly property bool ready: backend && backend.textActionReady === true
 
-  function requestAction(action) {
+  function requestAction(action, instruction) {
     var id = TextActions.normalizedAction(action)
     if (!root.choosing || !root.ready || id === "") return false
-    root.actionRequested(id, root.language)
+    var ask = String(instruction === undefined ? "" : instruction).trim()
+    if (id === "custom" && ask === "") return false
+    root.actionRequested(id, ask, root.language)
+    return true
+  }
+
+  function expandCustom() {
+    if (!root.ready) return
+    root.customExpanded = true
+    Qt.callLater(function() { customEditor.forceActiveFocus() })
+  }
+
+  function collapseCustom() {
+    if (!root.customExpanded) return false
+    root.customExpanded = false
+    Qt.callLater(function() { customDisclosure.forceActiveFocus() })
     return true
   }
 
@@ -56,6 +75,17 @@ Item {
   visible: choosing
   implicitHeight: choosing ? column.implicitHeight : 0
 
+  onChoosingChanged: if (!choosing) customExpanded = false
+
+  Connections {
+    target: root.backend
+    function onTextActionActiveChanged() {
+      if (root.backend && root.backend.textActionActive) return
+      root.customExpanded = false
+      root.customDraft = ""
+    }
+  }
+
   // Digits reach here from a focused chip, as keys the chip did not take. They
   // never arrive from the composer: there a digit is a digit, and a prompt
   // that starts with a number must not launch something instead.
@@ -63,7 +93,7 @@ Item {
     // The keypad sends its own modifier and is still an unmodified digit,
     // which is how PanelKeyboardNavigation reads its own keys too.
     var plain = event.modifiers === Qt.NoModifier || event.modifiers === Qt.KeypadModifier
-    if (!root.choosing || !root.ready || !plain) return
+    if (!root.choosing || !root.ready || root.customInputFocused || !plain) return
     var index = event.key - Qt.Key_1
     if (index < 0 || index >= TextActions.actions.length) return
     root.requestAction(String(TextActions.actions[index].id))
@@ -243,7 +273,7 @@ Item {
                   bordered: true
                   focusable: true
                   Accessible.name: "Translate to " + root.language
-                  onClicked: root.requestAction("translate")
+                  onClicked: root.requestAction("translate", "")
                 }
 
                 Text {
@@ -275,6 +305,167 @@ Item {
               }
               Accessible.role: action === "translate" ? Accessible.Grouping : Accessible.Button
               Accessible.name: description + (preferred ? " (Enter)" : "")
+            }
+          }
+
+          Rectangle {
+            id: customRow
+            readonly property color rowForeground: root.ready ? root.foreground
+              : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.4)
+            Layout.fillWidth: true
+            implicitHeight: customColumn.implicitHeight + Style.spacing.md * 2
+            radius: Style.cornerRadius
+            color: customHover.hovered || customDisclosure.activeFocus
+              ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.09)
+              : "transparent"
+            border.width: customDisclosure.activeFocus ? Style.normalBorderWidth : 0
+            border.color: root.accent
+
+            ColumnLayout {
+              id: customColumn
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              anchors.leftMargin: Style.spacing.md
+              anchors.rightMargin: Style.spacing.md
+              spacing: Style.spacing.md
+
+              Item {
+                id: customDisclosure
+                Layout.fillWidth: true
+                implicitHeight: Style.space(44)
+                activeFocusOnTab: true
+                enabled: root.ready
+                Accessible.role: Accessible.Button
+                Accessible.name: "Custom instruction"
+                Accessible.expanded: root.customExpanded
+
+                RowLayout {
+                  anchors.fill: parent
+                  spacing: Style.spacing.md
+
+                  Text {
+                    Layout.preferredWidth: Style.space(24)
+                    text: "󰅂"
+                    color: root.ready ? root.accent : customRow.rowForeground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    horizontalAlignment: Text.AlignHCenter
+                  }
+
+                  ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 0
+                    Text {
+                      Layout.fillWidth: true
+                      text: "Custom instruction"
+                      color: customRow.rowForeground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      font.bold: true
+                    }
+                    Text {
+                      Layout.fillWidth: true
+                      text: "Describe another transformation"
+                      color: Qt.darker(root.foreground, 1.35)
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      elide: Text.ElideRight
+                    }
+                  }
+
+                  Text {
+                    text: root.customExpanded ? "󰅃" : "󰅀"
+                    color: Qt.darker(root.foreground, 1.2)
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                  }
+                }
+
+                HoverHandler { id: customHover }
+                TapHandler {
+                  onTapped: root.customExpanded ? root.collapseCustom() : root.expandCustom()
+                }
+                Keys.onPressed: function(event) {
+                  if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+                      || event.key === Qt.Key_Space) {
+                    root.customExpanded ? root.collapseCustom() : root.expandCustom()
+                    event.accepted = true
+                  }
+                }
+              }
+
+              ColumnLayout {
+                Layout.fillWidth: true
+                visible: root.customExpanded
+                spacing: Style.spacing.sm
+
+                Text {
+                  Layout.fillWidth: true
+                  text: "Instruction"
+                  color: Qt.darker(root.foreground, 1.2)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  font.bold: true
+                }
+
+                Rectangle {
+                  Layout.fillWidth: true
+                  implicitHeight: Style.space(92)
+                  radius: Math.max(0, Style.cornerRadius - Style.spacing.sm)
+                  color: root.background
+                  border.width: Style.normalBorderWidth
+                  border.color: customEditor.activeFocus ? root.accent
+                    : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.18)
+
+                  TextArea {
+                    id: customEditor
+                    anchors.fill: parent
+                    anchors.margins: Style.spacing.sm
+                    text: root.customDraft
+                    enabled: root.ready
+                    placeholderText: "Make it more formal…"
+                    color: root.foreground
+                    placeholderTextColor: Qt.darker(root.foreground, 1.6)
+                    selectionColor: Style.selectionFillFor(root.foreground, root.accent)
+                    selectedTextColor: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    wrapMode: TextEdit.Wrap
+                    background: null
+                    padding: 0
+                    Accessible.name: "Instruction"
+                    onTextChanged: if (root.customDraft !== text) root.customDraft = text
+                    Keys.onPressed: function(event) {
+                      var submitModifier = event.modifiers & (Qt.ControlModifier | Qt.MetaModifier)
+                      if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                          && submitModifier) {
+                        if (root.requestAction("custom", text)) event.accepted = true
+                      } else if (event.key === Qt.Key_Escape) {
+                        root.collapseCustom()
+                        event.accepted = true
+                      }
+                    }
+                  }
+                }
+
+                RowLayout {
+                  Layout.fillWidth: true
+                  Item { Layout.fillWidth: true }
+                  Button {
+                    text: "Run instruction"
+                    enabled: root.ready && root.customDraft.trim() !== ""
+                    foreground: root.accent
+                    background: root.background
+                    accent: root.accent
+                    bordered: true
+                    focusable: true
+                    verticalPadding: Style.spacing.controlPaddingY + Style.spacing.sm
+                    Accessible.name: "Run custom instruction"
+                    onClicked: root.requestAction("custom", root.customDraft)
+                  }
+                }
+              }
             }
           }
         }

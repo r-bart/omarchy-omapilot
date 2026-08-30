@@ -479,10 +479,9 @@ grep -Fq 'replacing: selectionReplaceTarget !== ""' "$repo_dir/components/OmaPil
 # replacement is typed over the text still sitting in the other window, which an
 # edited copy here would no longer match.
 grep -Fq 'maximumLineCount: 6' "$repo_dir/components/TextActionChooser.qml"
-if grep -Eq 'TextInput|TextEdit|TextField|TextArea' "$repo_dir/components/TextActionChooser.qml"; then
-  printf 'The quoted selection must not be editable\n' >&2
-  exit 1
-fi
+# The chooser now owns one editor for the user's instruction; the selected
+# source remains a plain Text node with the six-line cap above.
+grep -Fq 'id: customEditor' "$repo_dir/components/TextActionChooser.qml"
 # The three actions are full-width rows inside one decision card. Translation
 # owns the native selector here: at the top of the chat body its downward popup
 # has room and does not clip against the panel edge.
