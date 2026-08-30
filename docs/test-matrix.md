@@ -74,9 +74,9 @@ unchanged.
 ## Current certification evidence (2026-08-30)
 
 - Runtime: 278 passed; nine explicitly declared live cases skipped by default.
-- Coverage: 71.58% statements, 61.66% branches, 76.01% functions, and
-  77.13% lines. The global ratchet uses the integer floor of these results.
-- Selection safety boundary: 96.82% statements, 92.98% branches, 100%
+- Coverage: 71.59% statements, 61.68% branches, 76.04% functions, and
+  77.14% lines. The global ratchet uses the integer floor of these results.
+- Selection safety boundary: 96.87% statements, 92.98% branches, 100%
   functions, and 100% lines.
 - QML: 153 tests across all `tst_*.qml` suites pass with zero skips; the
   complete contract and surface-probe suite also passes against the installed

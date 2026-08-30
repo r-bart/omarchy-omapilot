@@ -49,6 +49,10 @@ describe("NDJSON protocol", () => {
       type: "submit", id: "ephemeral", question: "Fix this", provider: "codex",
       saveToHistory: "false"
     }).success).toBe(false);
+    expect(commandSchema.safeParse({
+      type: "submit", id: "ephemeral", question: "Fix this", provider: "codex",
+      saveToHistory: false, resumeChatId: "10000000-0000-4000-8000-000000000001"
+    }).success).toBe(false);
   });
 
   it("accepts a bounded versioned desktop snapshot and rejects unknown context fields", () => {

@@ -521,11 +521,17 @@ Scope {
   // no answer and nothing that could act on it.
   function regenerateTextAction() {
     if (!textActionActive || busy || selectionChoosing) return
+    var returnChatId = currentChatId
     var target = selectionTarget
     var text = selectionText
     var action = selectionAction
     var instruction = selectionInstruction
     resetChat()
+    // resetChat deliberately leaves an ordinary new turn with no
+    // continuation. A text action is an overlay on the conversation that was
+    // already open, so keep that return point without ever sending it as the
+    // provider's resumeChatId.
+    currentChatId = returnChatId
     selectionTarget = target
     selectionText = text
     // Put the action back before running it. resetChat cleared it, and a run

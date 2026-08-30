@@ -87,7 +87,10 @@ const submitCommand = z.object({
   contextAttachments: z.array(contextAttachmentSelectionSchema).max(4).optional(),
   webHandoffProvider: webHandoffProviderSchema.optional(),
   dangerousAutoApprove: z.boolean().optional()
-});
+}).refine(
+  (value) => value.saveToHistory !== false || value.resumeChatId === undefined,
+  { message: "an ephemeral submission cannot resume a saved conversation", path: ["resumeChatId"] }
+);
 const contextBeginCommand = z.object({
   type: z.literal("context_begin"),
   id: z.string().min(1).max(120),

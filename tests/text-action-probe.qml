@@ -386,6 +386,7 @@ ShellRoot {
         root.drain()
         s.answerMarkdown = "El gato se sentó."
         s.state = "complete"
+        s.currentChatId = "10000000-0000-4000-8000-000000000017"
         // The refusal has to survive the resetChat inside regenerate, and
         // continuationBlocked does not: that reset clears it, and the test
         // then passed for the wrong reason. An empty provider list does.
@@ -397,8 +398,13 @@ ShellRoot {
           root.fail("a refused regenerate left the action as '" + s.selectionAction + "'")
         // And Regenerate still works once the harness is back.
         s.regenerateTextAction()
-        if (root.commandsOfType(root.drain(), "submit").length !== 1)
+        var regenerated = root.commandsOfType(root.drain(), "submit")
+        if (regenerated.length !== 1)
           root.fail("Regenerate was dead after a refusal")
+        else if (regenerated[0].resumeChatId !== undefined || regenerated[0].saveToHistory !== false)
+          root.fail("Regenerate mixed the ephemeral action into its return conversation")
+        if (s.submittedResumeChatId !== "10000000-0000-4000-8000-000000000017")
+          root.fail("Regenerate lost the conversation behind the action")
         s.endTextAction()
         root.drain()
       } else if (root.stage === 18) {
