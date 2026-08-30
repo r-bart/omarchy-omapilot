@@ -187,7 +187,7 @@ Item {
                 : preferred ? root.accent : root.foreground
               function closePopup() { languagePicker.close() }
               Layout.fillWidth: true
-              implicitHeight: action === "translate" ? Style.space(58) : Style.space(52)
+              implicitHeight: action === "translate" ? Style.space(92) : Style.space(52)
               radius: Style.cornerRadius
               color: rowHover.hovered || activeFocus
                 ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.09)
@@ -226,7 +226,7 @@ Item {
 
                 ColumnLayout {
                   Layout.fillWidth: true
-                  spacing: 0
+                  spacing: action === "translate" ? Style.spacing.sm : 0
                   Text {
                     Layout.fillWidth: true
                     text: action === "fix" ? "Fix" : action === "rewrite" ? "Rewrite" : "Translate"
@@ -245,35 +245,39 @@ Item {
                     font.pixelSize: Style.font.caption
                     elide: Text.ElideRight
                   }
-                }
 
-                Dropdown {
-                  id: languagePicker
-                  visible: action === "translate"
-                  Layout.preferredWidth: Style.space(132)
-                  showLabel: false
-                  options: root.languageOptions
-                  value: root.language
-                  enabled: root.ready
-                  foreground: root.foreground
-                  background: root.background
-                  accent: root.accent
-                  Accessible.name: "Translate to"
-                  onPopupOpenChanged: root._languagePopupOpen = popupOpen
-                  onChanged: function(value) { root.languageRequested(value) }
-                }
+                  RowLayout {
+                    Layout.fillWidth: true
+                    visible: action === "translate"
+                    spacing: Style.spacing.sm
 
-                Button {
-                  visible: action === "translate"
-                  text: "Run"
-                  enabled: root.ready
-                  foreground: root.foreground
-                  background: root.background
-                  accent: root.accent
-                  bordered: true
-                  focusable: true
-                  Accessible.name: "Translate to " + root.language
-                  onClicked: root.requestAction("translate", "")
+                    Dropdown {
+                      id: languagePicker
+                      Layout.fillWidth: true
+                      showLabel: false
+                      options: root.languageOptions
+                      value: root.language
+                      enabled: root.ready
+                      foreground: root.foreground
+                      background: root.background
+                      accent: root.accent
+                      Accessible.name: "Translate to"
+                      onPopupOpenChanged: root._languagePopupOpen = popupOpen
+                      onChanged: function(value) { root.languageRequested(value) }
+                    }
+
+                    Button {
+                      text: "Translate"
+                      enabled: root.ready
+                      foreground: root.foreground
+                      background: root.background
+                      accent: root.accent
+                      bordered: true
+                      focusable: true
+                      Accessible.name: "Translate to " + root.language
+                      onClicked: root.requestAction("translate", "")
+                    }
+                  }
                 }
 
                 Text {

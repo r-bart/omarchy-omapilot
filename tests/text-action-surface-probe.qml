@@ -127,6 +127,16 @@ ShellRoot {
             root.fail("expected one language picker, found " + pickers.length)
           else if (pickers[0].value !== "Spanish")
             root.fail("the language picker shows '" + pickers[0].value + "'")
+          // Choosing a language is reversible; sending it is not. Keep the
+          // confirmation separate and name the action instead of using a
+          // generic verb that loses its meaning away from this row.
+          var translateButtons = root.descendants(chooser, function(item) {
+            return item.visible && item.text === "Translate"
+              && item.Accessible.name === "Translate to Spanish"
+          })
+          if (translateButtons.length !== 1)
+            root.fail("expected one explicit Translate button, found "
+              + translateButtons.length)
           // What the word means still reaches a screen reader.
           if (buttons[0].Accessible.name.indexOf("Fix grammar and syntax") < 0)
             root.fail("the Fix chip's accessible name only repeats its label")
