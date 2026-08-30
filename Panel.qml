@@ -294,11 +294,8 @@ Panel {
         OmaPilot.OmaPilotStore.toastRequested("Context capture overlay could not be opened")
     }
     function onContextBrowserPickerRequested() { root.closeForExternalHandoff() }
-    // The store has already submitted the action by the time this arrives; the
-    // panel only has to be showing the chat when the answer starts.
     // The store has latched the window and read the text; the panel has to be
-    // showing the chat lane, and the composer has to be ready to take a free
-    // prompt, since Enter there is now the fourth action.
+    // showing the chat lane. The chooser then owns every transformation field.
     function onSelectionReady(_text) {
       root.showChat(false)
     }

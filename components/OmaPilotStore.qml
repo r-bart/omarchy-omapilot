@@ -603,10 +603,11 @@ Scope {
   // `shownText` is what the user sees and what the chat record keeps, for the
   // callers whose prompt is not what the user asked. Everyone else passes one
   // string and nothing changes.
-  // What the user typed into the composer, which is the only field that turns
-  // into the fourth action. Every other caller of submit is asking its own
-  // question — the voice lane above all — and having that wrapped around
-  // whatever happened to be selected is not a text action, it is a hijack.
+  // Hosts hide their composer while the chooser is visible. Keep this routing
+  // defensive for a stale or third-party host: only text explicitly submitted
+  // from a composer may become a custom transformation. Every other caller —
+  // the voice lane above all — is asking its own question, and wrapping that
+  // around whatever happened to be selected would hijack the request.
   function submitFromComposer(text) {
     if (!selectionChoosing) return submit(text)
     var typed = String(text || "").trim()
