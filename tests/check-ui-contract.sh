@@ -529,6 +529,12 @@ fi
 # ordinary chat alone keeps the bottom-growing conversation layout.
 grep -Fq 'y: root.backend && root.backend.textActionActive' \
   "$repo_dir/components/ConsoleContent.qml"
+# The replacement preview carries both sides of the comparison in the same
+# answer plate, with a quiet divider before the generated result.
+grep -Fq 'text: "Before"' "$repo_dir/components/ConsoleContent.qml"
+grep -Fq 'text: root.backend ? root.backend.selectionText : ""' \
+  "$repo_dir/components/ConsoleContent.qml"
+grep -Fq 'text: "After"' "$repo_dir/components/ConsoleContent.qml"
 # Regenerate runs whatever ran, not the proofread, and both surfaces say so.
 test "$(grep -Fc 'Run the same action on the same selection again' \
   "$repo_dir/Panel.qml" "$repo_dir/components/ConsoleContent.qml" | grep -c ':1$')" -eq 2

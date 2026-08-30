@@ -507,25 +507,71 @@ Item {
                 onClicked: root.backend.retryBroker()
               }
 
-              OmaPilot.MarkdownView {
+              ColumnLayout {
                 Layout.fillWidth: true
                 visible: root.backend && (root.backend.answerMarkdown !== ""
                   || root.backend.images.length > 0)
-                markdown: root.backend ? root.backend.answerMarkdown : ""
-                images: root.backend ? root.backend.images : []
-                foreground: root.foreground
-                background: root.background
-                accent: root.accent
-                fontFamily: root.fontFamily
-                onLinkActivated: function(url) { root.backend.activateLink(url) }
-                onImageLoadRequested: function(image) {
-                  if (typeof root.backend.requestImage === "function") root.backend.requestImage(image)
+                spacing: Style.spacing.md
+
+                Text {
+                  Layout.fillWidth: true
+                  visible: root.backend && root.backend.textActionActive
+                  text: "Before"
+                  color: Qt.darker(root.foreground, 1.4)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  font.bold: true
+                  Accessible.role: Accessible.Heading
                 }
-                onImagePreviewRequested: function(source, alt) {
-                  root.previewSource = source
-                  root.previewAlt = alt
+
+                Text {
+                  Layout.fillWidth: true
+                  visible: root.backend && root.backend.textActionActive
+                  text: root.backend ? root.backend.selectionText : ""
+                  color: Qt.darker(root.foreground, 1.2)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+                  wrapMode: Text.Wrap
+                  Accessible.role: Accessible.StaticText
+                  Accessible.name: "Before: " + text
                 }
-                onCopyRequested: function(text) { root.backend.copyText(text) }
+
+                Rectangle {
+                  Layout.fillWidth: true
+                  implicitHeight: 1
+                  visible: root.backend && root.backend.textActionActive
+                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
+                }
+
+                Text {
+                  Layout.fillWidth: true
+                  visible: root.backend && root.backend.textActionActive
+                  text: "After"
+                  color: Qt.darker(root.foreground, 1.4)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  font.bold: true
+                  Accessible.role: Accessible.Heading
+                }
+
+                OmaPilot.MarkdownView {
+                  Layout.fillWidth: true
+                  markdown: root.backend ? root.backend.answerMarkdown : ""
+                  images: root.backend ? root.backend.images : []
+                  foreground: root.foreground
+                  background: root.background
+                  accent: root.accent
+                  fontFamily: root.fontFamily
+                  onLinkActivated: function(url) { root.backend.activateLink(url) }
+                  onImageLoadRequested: function(image) {
+                    if (typeof root.backend.requestImage === "function") root.backend.requestImage(image)
+                  }
+                  onImagePreviewRequested: function(source, alt) {
+                    root.previewSource = source
+                    root.previewAlt = alt
+                  }
+                  onCopyRequested: function(text) { root.backend.copyText(text) }
+                }
               }
 
               // Provenance closes the plate on its own line; at 404px the
