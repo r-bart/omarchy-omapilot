@@ -490,6 +490,11 @@ grep -Fq 'What do you want to do with this selection?' "$repo_dir/components/Tex
 grep -Fq 'Grammar and syntax, without changing the tone' "$repo_dir/components/TextActionChooser.qml"
 grep -Fq 'Clearer, while preserving the meaning' "$repo_dir/components/TextActionChooser.qml"
 grep -Fq 'Accessible.name: "Translate to"' "$repo_dir/components/TextActionChooser.qml"
+grep -Fq 'enabled: action !== "translate"' "$repo_dir/components/TextActionChooser.qml"
+grep -Fq 'Accessible.name: "Translate to " + root.language' "$repo_dir/components/TextActionChooser.qml"
+grep -Fq 'readonly property bool popupOpen: _languagePopupOpen' "$repo_dir/components/TextActionChooser.qml"
+grep -Fq 'textActionChooser.closePopup()' "$repo_dir/Panel.qml"
+grep -Fq 'textActionChooser.closePopup()' "$repo_dir/components/ConsoleContent.qml"
 grep -Fq 'onLanguageRequested: function(language)' "$repo_dir/Panel.qml"
 grep -Fq 'onLanguageRequested: function(language)' "$repo_dir/components/ConsoleContent.qml"
 # No tooltip on a row: it would cover the quoted selection it explains.
@@ -503,6 +508,12 @@ test "$(grep -Fc 'What should I do with this text?' "$repo_dir/components/Compos
 # neither shows the desktop quick actions over it.
 grep -Fq 'OmaPilot.TextActionChooser {' "$repo_dir/Panel.qml"
 grep -Fq '&& !OmaPilot.OmaPilotStore.selectionChoosing' "$repo_dir/Panel.qml"
+panel_chooser_line="$(grep -n 'id: textActionChooser' "$repo_dir/Panel.qml" | cut -d: -f1)"
+panel_answer_line="$(grep -n 'id: answerCard' "$repo_dir/Panel.qml" | cut -d: -f1)"
+if [[ -z "$panel_chooser_line" || -z "$panel_answer_line" || "$panel_chooser_line" -ge "$panel_answer_line" ]]; then
+  printf 'the panel text-action chooser must sit above the answer body\n' >&2
+  exit 1
+fi
 grep -Fq 'OmaPilot.TextActionChooser {' "$repo_dir/components/ConsoleContent.qml"
 grep -Fq '&& !root.backend.selectionChoosing' "$repo_dir/components/ConsoleContent.qml"
 # In the sidebar, the chooser is fixed immediately below the header metadata

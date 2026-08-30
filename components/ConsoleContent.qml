@@ -161,6 +161,10 @@ Item {
     // the user cannot see would be worse than the dangling request. And when
     // the harness offered no reject option, the ladder runs too, so Escape
     // still cancels the turn instead of dying against a missing choice.
+    if (textActionChooser.popupOpen) {
+      textActionChooser.closePopup()
+      return
+    }
     var approvalInFront = backend && backend.pendingPermission !== null
       && viewMode === "chat" && previewSource === "" && !composer.popupOpen
     if (approvalInFront && backend.hasPermissionDecision("reject_once")) {

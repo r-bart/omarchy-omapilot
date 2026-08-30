@@ -111,15 +111,16 @@ ShellRoot {
           if (buttons[0].action !== "fix" || buttons[1].action !== "rewrite"
               || buttons[2].action !== "translate")
             root.fail("the chips are in the wrong order")
-          // Where a translation is going is on the chip, not behind a setting.
-          if (buttons[2].text !== "Translate → Spanish")
-            root.fail("the translate chip reads '" + buttons[2].text + "'")
-          // Every chip is drawn as a chip before the cursor arrives. An
-          // affordance that only exists under the pointer is not one, and the
-          // two that had none read as disabled next to the one that did.
-          for (var b = 0; b < buttons.length; b++)
-            if (!buttons[b].bordered)
-              root.fail("chip " + b + " has no border until it is hovered")
+          // Translation exposes a real single-select control in its row. The
+          // current value has to be visible before the action is run.
+          var pickers = root.descendants(chooser, function(item) {
+            return item.visible && item.options !== undefined && item.value !== undefined
+              && item.Accessible.name === "Translate to"
+          })
+          if (pickers.length !== 1)
+            root.fail("expected one language picker, found " + pickers.length)
+          else if (pickers[0].value !== "Spanish")
+            root.fail("the language picker shows '" + pickers[0].value + "'")
           // What the word means still reaches a screen reader.
           if (buttons[0].Accessible.name.indexOf("Fix grammar and syntax") < 0)
             root.fail("the Fix chip's accessible name only repeats its label")
@@ -173,7 +174,7 @@ ShellRoot {
         chooser.width = narrow
       } else if (root.stage === 5) {
         root.picked = ""
-        root.chips()[1].clicked()
+        chooser.requestAction("rewrite")
         if (root.picked !== "rewrite")
           root.fail("pressing a chip asked for '" + root.picked + "'")
       } else if (root.stage === 6) {

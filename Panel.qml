@@ -93,6 +93,7 @@ Panel {
   readonly property bool panelWindowActive: panelFocus.Window.window
     ? panelFocus.Window.window.active : false
   readonly property bool modalInteractionActive: composer.popupOpen
+    || textActionChooser.popupOpen
     || OmaPilot.OmaPilotStore.pendingPermission !== null
     || root.previewSource !== ""
     || (root.viewMode === "settings" && settingsView.modalInteractionActive)
@@ -311,6 +312,10 @@ Panel {
     enabled: root.opened
     sequence: "Escape"
     onActivated: {
+      if (textActionChooser.popupOpen) {
+        textActionChooser.closePopup()
+        return
+      }
       var action = Presentation.escapeAction(root.viewMode, composer.popupOpen,
         settingsView.popupOpen, root.previewSource !== "", OmaPilot.OmaPilotStore.busy)
       if (action === "close-composer-popup") composer.closePopups()
@@ -397,6 +402,30 @@ Panel {
           onSubmitted: answerScroll.resetForNewTurn()
           onHistoryRequested: root.viewMode === "history" ? root.showChat() : root.openHistory()
           onEscapeRequested: root.close()
+        }
+
+        OmaPilot.TextActionChooser {
+          id: textActionChooser
+          Layout.fillWidth: true
+          backend: OmaPilot.OmaPilotStore
+          foreground: root.foreground
+          background: root.surface
+          accent: root.accent
+          fontFamily: root.fontFamily
+          onActionRequested: function(action, language) {
+            if (OmaPilot.OmaPilotStore.runTextAction(action, "", language))
+              answerScroll.resetForNewTurn()
+          }
+          onLanguageRequested: function(language) {
+            OmaPilot.OmaPilotStore.requestSettingsPersist({ textActionLanguage: language })
+          }
+        }
+
+        Rectangle {
+          Layout.fillWidth: true
+          implicitHeight: 1
+          visible: textActionChooser.visible
+          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
         }
 
         OmaPilot.SetupGuide {
@@ -910,26 +939,6 @@ Panel {
                 onClicked: OmaPilot.OmaPilotStore.continueInHerdr()
               }
             }
-          }
-        }
-
-        // A selection waiting to be told what to do takes the empty state's
-        // place: the quick actions ask about the desktop, and this asks about
-        // the text the user just highlighted.
-        OmaPilot.TextActionChooser {
-          id: textActionChooser
-          Layout.fillWidth: true
-          backend: OmaPilot.OmaPilotStore
-          foreground: root.foreground
-          background: root.surface
-          accent: root.accent
-          fontFamily: root.fontFamily
-          onActionRequested: function(action, language) {
-            if (OmaPilot.OmaPilotStore.runTextAction(action, "", language))
-              answerScroll.resetForNewTurn()
-          }
-          onLanguageRequested: function(language) {
-            OmaPilot.OmaPilotStore.requestSettingsPersist({ textActionLanguage: language })
           }
         }
 

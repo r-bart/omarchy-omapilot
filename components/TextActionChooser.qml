@@ -25,15 +25,33 @@ Item {
   signal actionRequested(string action, string language)
   signal languageRequested(string language)
 
+  property bool _languagePopupOpen: false
+  readonly property bool popupOpen: _languagePopupOpen
+
   readonly property bool choosing: backend && backend.selectionChoosing === true
   readonly property string defaultAction: backend ? String(backend.textActionDefault || "fix") : "fix"
   readonly property string language: backend ? String(backend.textActionLanguage || "English") : "English"
   readonly property var languageOptions: {
-    var values = ["English", "Spanish", "French", "German", "Italian", "Portuguese"]
+    var values = ["English", "Spanish", "French", "German", "Italian", "Portuguese",
+      "Catalan", "Dutch", "Polish", "Russian", "Arabic", "Chinese", "Japanese", "Korean"]
     if (values.indexOf(language) < 0) values.unshift(language)
     return values
   }
   readonly property bool ready: backend && backend.textActionReady === true
+
+  function requestAction(action) {
+    var id = TextActions.normalizedAction(action)
+    if (!root.choosing || !root.ready || id === "") return false
+    root.actionRequested(id, root.language)
+    return true
+  }
+
+  function closePopup() {
+    for (var i = 0; i < actionsRepeater.count; i++) {
+      var row = actionsRepeater.itemAt(i)
+      if (row && typeof row.closePopup === "function") row.closePopup()
+    }
+  }
 
   visible: choosing
   implicitHeight: choosing ? column.implicitHeight : 0
@@ -48,7 +66,7 @@ Item {
     if (!root.choosing || !root.ready || !plain) return
     var index = event.key - Qt.Key_1
     if (index < 0 || index >= TextActions.actions.length) return
-    root.actionRequested(String(TextActions.actions[index].id), root.language)
+    root.requestAction(String(TextActions.actions[index].id))
     event.accepted = true
   }
 
@@ -120,6 +138,7 @@ Item {
           spacing: Style.spacing.xxs
 
           Repeater {
+            id: actionsRepeater
             model: TextActions.actions
 
             delegate: Rectangle {
@@ -133,14 +152,10 @@ Item {
           // dimmed words, so they read as unavailable rather than as choices.
               readonly property bool preferred: action === root.defaultAction
               readonly property string description: TextActions.questionLabel(action, "", root.language)
-              // Named surface properties keep the visual probe coupled to
-              // states rather than to private Text children.
               readonly property color foreground: !root.ready
                 ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.4)
                 : preferred ? root.accent : root.foreground
-              readonly property string text: TextActions.chipLabel(action, root.language)
-              readonly property bool bordered: true
-              function clicked() { root.actionRequested(action, root.language) }
+              function closePopup() { languagePicker.close() }
               Layout.fillWidth: true
               implicitHeight: action === "translate" ? Style.space(58) : Style.space(52)
               radius: Style.cornerRadius
@@ -150,7 +165,7 @@ Item {
               border.width: activeFocus ? Style.normalBorderWidth : 0
               border.color: root.accent
               enabled: root.ready
-              activeFocusOnTab: true
+              activeFocusOnTab: action !== "translate"
           // Colour carries every state, so nothing here changes the metrics:
           // the row must not shuffle when the remembered action moves. The
           // shell's Button paints no disabled state of its own, so an
@@ -203,6 +218,7 @@ Item {
                 }
 
                 Dropdown {
+                  id: languagePicker
                   visible: action === "translate"
                   Layout.preferredWidth: Style.space(132)
                   showLabel: false
@@ -213,7 +229,21 @@ Item {
                   background: root.background
                   accent: root.accent
                   Accessible.name: "Translate to"
+                  onPopupOpenChanged: root._languagePopupOpen = popupOpen
                   onChanged: function(value) { root.languageRequested(value) }
+                }
+
+                Button {
+                  visible: action === "translate"
+                  text: "Run"
+                  enabled: root.ready
+                  foreground: root.foreground
+                  background: root.background
+                  accent: root.accent
+                  bordered: true
+                  focusable: true
+                  Accessible.name: "Translate to " + root.language
+                  onClicked: root.requestAction("translate")
                 }
 
                 Text {
@@ -233,16 +263,17 @@ Item {
           // form stays below, where it costs nothing.
               HoverHandler { id: rowHover }
               TapHandler {
-                onTapped: root.actionRequested(action, root.language)
+                enabled: action !== "translate"
+                onTapped: root.requestAction(action)
               }
               Keys.onPressed: function(event) {
                 if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter
                     || event.key === Qt.Key_Space)) {
-                  root.actionRequested(action, root.language)
+                  root.requestAction(action)
                   event.accepted = true
                 }
               }
-              Accessible.role: Accessible.Button
+              Accessible.role: action === "translate" ? Accessible.Grouping : Accessible.Button
               Accessible.name: description + (preferred ? " (Enter)" : "")
             }
           }
