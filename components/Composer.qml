@@ -132,8 +132,8 @@ Item {
       Layout.fillHeight: true
       enabled: root.backend && !root.backend.busy && !root.backend.continuationBlocked
       text: root.draftText
-      // While a selection is waiting to be told what to do, this field is the
-      // fourth action rather than a new question.
+      // Hosts hide the composer while a selection is waiting. Keep this text
+      // defensive for any future host that renders it during that state.
       placeholderText: root.backend && root.backend.selectionChoosing === true
         ? "What should I do with this text?"
         : root.backend && root.backend.initialized

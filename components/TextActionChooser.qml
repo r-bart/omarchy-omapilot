@@ -7,13 +7,13 @@ import "TextActions.js" as TextActions
 
 // What the selection can become, offered before anything is sent.
 //
-// It shows the text the user selected and the three presets that can be run on
-// it. The fourth action, a free prompt, is the composer below and has no chip
-// here, because it is whatever the user types rather than a fixed thing.
+// It shows the text the user selected, three presets, and an inline custom
+// instruction. Keeping all four transformations in this card makes their
+// relationship to the captured selection explicit.
 //
-// This emits which preset was picked and nothing else. What that runs, and
-// what gets remembered, belongs to the store: a component that decides is a
-// second place to keep the same rule, and both surfaces instantiate this one.
+// This emits the normalized choice, instruction, and language. What gets sent
+// or remembered belongs to the store: a component that decides is a second
+// place to keep the same rule, and both surfaces instantiate this one.
 Item {
   id: root
 
@@ -288,9 +288,8 @@ Item {
           // the control sits directly under the quote, so it covers the very
           // text being decided about. It also composes its background from the
           // theme background, which on this surface is the colour already
-          // behind it, so it reads as text fading in over text. The chip is a
-          // word and the composer below already asks the question; the long
-          // form stays below, where it costs nothing.
+          // behind it, so it reads as text fading in over text. The row's
+          // visible label and description already explain the action.
               HoverHandler { id: rowHover }
               TapHandler {
                 enabled: action !== "translate"
