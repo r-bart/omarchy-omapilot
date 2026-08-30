@@ -63,6 +63,9 @@ Scope {
   // is more than the user can see today.
   property var installedHotkeys: []
   property var voiceStatus: Protocol.emptyVoiceStatus()
+  property bool voiceStatusPending: false
+  property bool voiceStatusLoading: false
+  property string voiceStatusSource: "status"
   property var ttsTest: null
   property bool ttsTestPending: false
   property string ttsTestError: ""
@@ -180,6 +183,13 @@ Scope {
   readonly property bool contextCaptureAvailable: initialized && brokerContextAttachmentsSupported && !busy
   readonly property bool browserCompanionConnected: browserCompanionStatus.chromiumConnected === true
     || browserCompanionStatus.firefoxConnected === true
+
+  Timer {
+    id: voiceStatusLoadingDelay
+    interval: 650
+    repeat: false
+    onTriggered: if (root.voiceStatusPending) root.voiceStatusLoading = true
+  }
   readonly property bool browserCompanionBusy: browserCompanionStatus.phase === "installing"
     || browserCompanionStatus.phase === "removing"
   readonly property bool hotkeyBusy: hotkeyInstaller.running
@@ -904,7 +914,20 @@ Scope {
   function setVoxtypeOsd(enabled) {
     sendCommand(Protocol.command("voxtype_osd_set", { enabled: enabled === true }))
   }
-  function requestVoiceStatus() { sendCommand(Protocol.command("voice_status")) }
+  function beginVoiceStatus() {
+    voiceStatusPending = true
+    voiceStatusLoading = false
+    voiceStatusLoadingDelay.restart()
+  }
+  function finishVoiceStatus() {
+    voiceStatusLoadingDelay.stop()
+    voiceStatusPending = false
+    voiceStatusLoading = false
+  }
+  function requestVoiceStatus() {
+    beginVoiceStatus()
+    sendCommand(Protocol.command("voice_status"))
+  }
   function setTtsKey(provider, apiKey) {
     ttsTest = null
     ttsTestError = ""
@@ -1143,8 +1166,11 @@ Scope {
       return
     }
     if (type === "voice") {
+      finishVoiceStatus()
       ttsTestPending = false
       ttsTestError = ""
+      voiceStatusSource = ["key_set", "key_clear"].indexOf(String(event.source || "")) >= 0
+        ? String(event.source) : "status"
       voiceStatus = Protocol.normalizedVoiceStatus(event)
       return
     }
@@ -1687,6 +1713,7 @@ Scope {
     }
 
     onExited: function(exitCode, exitStatus) {
+      root.finishVoiceStatus()
       root.processStarted = false
       root.initialized = false
       // Nothing is going to answer the read now, and leaving it in flight

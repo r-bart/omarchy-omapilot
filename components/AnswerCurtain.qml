@@ -9,9 +9,10 @@ import "." as OmaPilot
 // The answer curtain: slides down from the top of the focused output, under the
 // Omarchy bar, holds the response, then leaves.
 //
-// Click-through and unfocused by default, so an answer can arrive while the user
-// keeps typing. `ExclusionMode.Normal` with a zero zone means it respects the
-// bar's reserved strip but reserves nothing itself, so no window ever reflows.
+// Unfocused and click-through outside the answer viewport, so an answer can
+// arrive while the user keeps typing. `ExclusionMode.Normal` with a zero zone
+// means it respects the bar's reserved strip but reserves nothing itself, so no
+// window ever reflows.
 //
 // The slide is ours rather than the compositor's: Omarchy pins layersIn and
 // layersOut to a global fade, so the surface stays static and the card animates
@@ -35,6 +36,8 @@ Item {
 
   signal linkActivated(string url)
 
+  onShownChanged: if (shown) answerScroll.contentY = 0
+
   PanelWindow {
     id: surface
     screen: root.targetScreen
@@ -45,7 +48,12 @@ Item {
     visible: root.shown || card.slid > 0.001
     exclusionMode: ExclusionMode.Normal
     exclusiveZone: 0
-    mask: Region {}
+    // Preserve the ambient surface's click-through behavior outside the card.
+    // Keeping this region stable also lets streaming content become scrollable
+    // without remapping the input mask.
+    mask: Region {
+      item: card
+    }
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "omapilot-curtain"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
@@ -63,8 +71,10 @@ Item {
       }
 
       width: Math.min(parent.width - Style.space(96), Style.space(940))
+      readonly property real naturalBodyHeight:
+        provenanceRow.height + body.spacing + answerContent.implicitHeight
       height: Math.min(surface.height - Style.space(24),
-                       body.implicitHeight + Style.space(52))
+                       naturalBodyHeight + Style.space(52))
       anchors.horizontalCenter: parent.horizontalCenter
       y: -height * (1 - card.slid) + Style.space(14) * card.slid
       opacity: card.slid
@@ -127,11 +137,13 @@ Item {
           leftMargin: Style.space(30); rightMargin: Style.space(30)
           topMargin: Style.space(24)
         }
+        height: Math.max(0, parent.height - Style.space(52))
         spacing: Style.spacing.xxl
 
         // Provenance row: what was asked, and who answered. Nothing else — no
         // logo, no gear, no buttons. Restraint is the point.
         Item {
+          id: provenanceRow
           width: parent.width
           height: Math.max(askText.implicitHeight, whoText.implicitHeight)
           Text {
@@ -155,15 +167,28 @@ Item {
           }
         }
 
-        OmaPilot.MarkdownView {
+        Flickable {
+          id: answerScroll
+          objectName: "answerCurtainScroll"
           width: parent.width
-          markdown: root.markdown
-          images: root.images
-          foreground: Color.popups.text
-          background: Color.popups.background
-          accent: root.lightColor
-          fontFamily: Style.font.family
-          onLinkActivated: function(url) { root.linkActivated(url) }
+          height: Math.max(0, body.height - provenanceRow.height - body.spacing)
+          contentWidth: width
+          contentHeight: answerContent.implicitHeight
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
+
+          OmaPilot.MarkdownView {
+            id: answerContent
+            width: answerScroll.width
+            markdown: root.markdown
+            images: root.images
+            foreground: Color.popups.text
+            background: Color.popups.background
+            accent: root.lightColor
+            fontFamily: Style.font.family
+            onLinkActivated: function(url) { root.linkActivated(url) }
+          }
         }
       }
     }

@@ -375,7 +375,7 @@ export type BrokerEvent =
   | { type: "custom_provider_test_failed"; baseUrl: string; message: string }
   | { type: "custom_providers"; providers: CustomProviderView[] }
   | { type: "voxtype_osd"; available: boolean; enabled: boolean; message?: string }
-  | { type: "voice"; dictation: VoiceStatus["dictation"]; tts: TtsProviderStatus[] }
+  | { type: "voice"; source: "status" | "key_set" | "key_clear"; dictation: VoiceStatus["dictation"]; tts: TtsProviderStatus[] }
   | { type: "tts_tested"; provider: "elevenlabs" | "openai"; result: TtsProviderStatus }
   | { type: "tts_test_failed"; provider: "elevenlabs" | "openai"; message: string }
   | { type: "tts_speaking"; id: string; metered: boolean }

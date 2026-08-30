@@ -49,6 +49,7 @@ qml_files=(
   "$repo_dir/components/VoiceNode.qml"
   "$repo_dir/components/VoiceWave.qml"
   "$repo_dir/components/ActivityFilament.qml"
+  "$repo_dir/components/AnswerCurtain.qml"
   "$repo_dir/components/ResponseActivityBorder.qml"
   "$repo_dir/components/internal/PermissionFocusGuard.qml"
   "$repo_dir/components/internal/PanelKeyboardNavigation.qml"
@@ -60,6 +61,7 @@ qml_files=(
   "$repo_dir/components/Presentation.js"
   "$repo_dir/components/QuickActions.js"
   "$repo_dir/tests/composer-growth-probe.qml"
+  "$repo_dir/tests/answer-curtain-preview.qml"
   "$repo_dir/tests/motion-preview.qml"
   "$repo_dir/tests/state-motion-preview.qml"
   "$repo_dir/tests/voice-node-preview.qml"
@@ -922,6 +924,15 @@ grep -Fq 'onRotatingActivityStatusChanged:' "$repo_dir/Panel.qml"
 grep -Fq 'text: root.activityStatusText' "$repo_dir/Panel.qml"
 grep -Fq 'StatePhrases.thinkingAt(0)' "$repo_dir/tests/visual-preview.qml"
 grep -Fq 'StateColor.forPhase' "$repo_dir/components/AnswerCurtain.qml"
+grep -Fq 'id: answerScroll' "$repo_dir/components/AnswerCurtain.qml"
+grep -Fq 'contentHeight: answerContent.implicitHeight' \
+  "$repo_dir/components/AnswerCurtain.qml"
+grep -Fq 'boundsBehavior: Flickable.StopAtBounds' \
+  "$repo_dir/components/AnswerCurtain.qml"
+grep -Fq 'interactive: contentHeight > height' \
+  "$repo_dir/components/AnswerCurtain.qml"
+grep -Fq 'item: card' \
+  "$repo_dir/components/AnswerCurtain.qml"
 grep -Fq 'colorizationColor: root.accent' "$repo_dir/components/ActivityFilament.qml"
 grep -Fq 'id: responseStatusSlot' "$repo_dir/Panel.qml"
 grep -Fq 'Layout.minimumWidth: Style.space(140)' "$repo_dir/Panel.qml"
@@ -1274,6 +1285,20 @@ if grep -Eq "omapilot text action surface probe failed|Failed to load|Type .* un
     "$smoke_root/text-action-surface.log" \
     || ! grep -Fq 'OMAPILOT_TEXT_ACTION_SURFACE_PROBE_OK' "$smoke_root/text-action-surface.log"; then
   cat "$smoke_root/text-action-surface.log"
+  exit 1
+fi
+
+cp "$repo_dir/tests/voice-status-loading-probe.qml" "$smoke_root/shell.qml"
+if ! OMAPILOT_BROKER_PATH=/usr/bin/tail QT_QPA_PLATFORM=offscreen timeout 5s \
+    quickshell --no-duplicate --path "$smoke_root" --no-color \
+    >"$smoke_root/voice-status.log" 2>&1; then
+  cat "$smoke_root/voice-status.log"
+  exit 1
+fi
+if grep -Eq "omapilot voice status probe failed|Failed to load|Type .* unavailable|Cannot assign|TypeError|ReferenceError" \
+    "$smoke_root/voice-status.log" \
+    || ! grep -Fq 'OMAPILOT_VOICE_STATUS_PROBE_OK' "$smoke_root/voice-status.log"; then
+  cat "$smoke_root/voice-status.log"
   exit 1
 fi
 
