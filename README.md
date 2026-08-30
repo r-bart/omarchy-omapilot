@@ -393,6 +393,10 @@ consent to send it anywhere, and the chords for the three actions are yours to
 spend rather than the installer's: bind `fixSelection`, `rewriteSelection` or
 `translateSelection` by hand and that chord skips the chooser entirely.
 
+Text actions are ephemeral transformations, not chats. Their prompts, answers,
+and provider sessions are not added to conversation history, and an action
+started over an open chat neither resumes nor alters that chat.
+
 The answer arrives with **Replace** and **Regenerate** next to **Copy**. Replace
 types it over the selection in the window it came from; Regenerate runs the same
 action again on the same text, with the same instruction and the same target
@@ -503,7 +507,12 @@ widget receiving the keystrokes, so it has to be run against many of them.
 
 ## Storage and privacy
 
-OmaPilot persists only completed chats, capped at the newest 200. A chat contains the question, rendered answer source, timestamp, provider/model metadata, content references, and a resumable session identity when the harness supplies one. Draft text, authentication output, tokens, environment variables, and provider credentials are not persisted.
+OmaPilot persists only completed conversations, capped at the newest 200. Text
+actions are explicitly excluded. A saved chat contains the question, rendered
+answer source, timestamp, provider/model metadata, content references, and a
+resumable session identity when the harness supplies one. Draft text,
+authentication output, tokens, environment variables, and provider credentials
+are not persisted.
 
 Quick-action labels, prompts, and order are stored with the existing inline
 Omarchy widget settings. OmaPilot validates that list on every read, drops

@@ -12,6 +12,9 @@ require_elevenlabs_key() {
 }
 
 case "$mode" in
+  builtin)
+    node tests/builtin-live-smoke.mjs
+    ;;
   codex)
     OMAPILOT_LIVE_CODEX_BEHAVIOR=1 npx vitest run runtime/test/codex-live.test.ts
     ;;
@@ -23,12 +26,13 @@ case "$mode" in
     npx vitest run runtime/test/tts.test.ts -t 'probes a real ElevenLabs key'
     ;;
   all)
+    "$0" builtin
     "$0" codex
     "$0" opencode
     "$0" tts
     ;;
   *)
-    printf 'usage: %s [all|codex|opencode|tts]\n' "$0" >&2
+    printf 'usage: %s [all|builtin|codex|opencode|tts]\n' "$0" >&2
     exit 2
     ;;
 esac

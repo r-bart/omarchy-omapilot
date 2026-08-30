@@ -83,7 +83,7 @@ QtObject {
     // a window that appeared a moment ago can have no address in it yet, and a
     // text action would refuse with no target for no reason the user can see.
     return ({
-      address: Protocol.windowAddress(toplevel.address)
+      address: Protocol.hyprlandWindowAddress(toplevel.address)
         || Protocol.windowAddress(ipc.address),
       appId: appIdFor(toplevel),
       title: String(toplevel.title || ipc.title || "")

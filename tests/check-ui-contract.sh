@@ -6,6 +6,15 @@ omarchy_shell="${OMARCHY_PATH:-/usr/share/omarchy}/shell"
 smoke_root=""
 preview_root=""
 
+# A standalone `! grep` is exempt from Bash's errexit semantics, so it does
+# not enforce a negative contract under `set -e`. Every absence assertion goes
+# through a real conditional that returns failure for forbidden text.
+absent() {
+  if grep "$@"; then
+    return 1
+  fi
+}
+
 cleanup() {
   if [[ -n $smoke_root && -d $smoke_root ]]; then rm -rf -- "$smoke_root"; fi
   if [[ -n $preview_root && -d $preview_root ]]; then rm -rf -- "$preview_root"; fi
@@ -95,9 +104,9 @@ fi
 grep -Fq 'FloatingWindow {' "$repo_dir/components/Console.qml"
 # Anchored so the comments above may still name what this file stopped being;
 # the import is the real gate, since WlrLayershell cannot be used without it.
-! grep -qE '^import Quickshell\.Wayland' "$repo_dir/components/Console.qml"
-! grep -qE '^[[:space:]]*PanelWindow[[:space:]]*\{' "$repo_dir/components/Console.qml"
-! grep -qE '^[[:space:]]*WlrLayershell\.' "$repo_dir/components/Console.qml"
+absent -qE '^import Quickshell\.Wayland' "$repo_dir/components/Console.qml"
+absent -qE '^[[:space:]]*PanelWindow[[:space:]]*\{' "$repo_dir/components/Console.qml"
+absent -qE '^[[:space:]]*WlrLayershell\.' "$repo_dir/components/Console.qml"
 # Quickshell sets app_id per process, so every toplevel of the shell arrives as
 # org.quickshell and the title is the only stable identifier — Omarchy singles
 # out its own dev gallery the same way. One source of truth for it, because the
@@ -129,11 +138,11 @@ grep -Fq 'function toggle() {' "$repo_dir/components/Console.qml"
 grep -Fq 'else if (!root.focused) takeFocus()' "$repo_dir/components/Console.qml"
 # No fold-to-a-handle state: it would spend a column of the surface on a gesture
 # the bar icon already performs, from a control the user has to discover.
-! grep -q 'collapsed' "$repo_dir/components/Console.qml"
+absent -q 'collapsed' "$repo_dir/components/Console.qml"
 # All compositor coupling lives in one place. Console.qml is about a window;
 # ConsolePlacement is about Hyprland. Keeping the import out is what keeps that
 # true, and what makes the no-Hyprland path a single check instead of a habit.
-! grep -qE '^import Quickshell\.Hyprland' "$repo_dir/components/Console.qml"
+absent -qE '^import Quickshell\.Hyprland' "$repo_dir/components/Console.qml"
 grep -Fq 'singleton ConsolePlacement 1.0 ConsolePlacement.qml' "$repo_dir/components/qmldir"
 grep -Fq 'readonly property bool available' "$repo_dir/components/ConsolePlacement.qml"
 # The toplevel model is populated lazily and starts empty, so a lookup that runs
@@ -147,7 +156,7 @@ grep -Fq 'Hyprland.refreshToplevels()' "$repo_dir/components/ConsolePlacement.qm
 # hidden and shown again comes back focused, every time it has been tried.
 grep -Fq 'ConsolePlacement.activate(root.windowTitle)' "$repo_dir/components/Console.qml"
 grep -Fq 'if (!root.opened || root.focused) return' "$repo_dir/components/Console.qml"
-! grep -Fq 'if (ConsolePlacement.activate(' "$repo_dir/components/Console.qml"
+absent -Fq 'if (ConsolePlacement.activate(' "$repo_dir/components/Console.qml"
 # To the compositor a remap is a brand-new window: it comes back tiled at a
 # default size. Measured. The shape is carried across rather than recomputed,
 # because recomputing overwrites a drag that until the next of the three
@@ -160,7 +169,7 @@ grep -Fq 'function snapshot(' "$repo_dir/components/ConsolePlacement.qml"
 # and the console reopened in whatever lane it had been left in.
 grep -Fq 'onTriggered: if (!root.opened) content.reset()' \
   "$repo_dir/components/Console.qml"
-! grep -Fq 'onVisibleChanged: if (!visible' "$repo_dir/components/Console.qml"
+absent -Fq 'onVisibleChanged: if (!visible' "$repo_dir/components/Console.qml"
 
 # The dispatch acts on the active window, so it may only run once the active
 # window is known to be ours. Placing someone else's window is worse than
@@ -192,7 +201,7 @@ grep -Fq '!root.reservesSpace, root.fullscreen)' "$repo_dir/components/Console.q
 grep -Fq 'if (!pendingShape || !engaged || !focused) return' \
   "$repo_dir/components/Console.qml"
 grep -Fq 'onFocusedChanged: if (focused) flushShape()' "$repo_dir/components/Console.qml"
-! grep -Fq 'root.activate(root.pendingTitle)' "$repo_dir/components/ConsolePlacement.qml"
+absent -Fq 'root.activate(root.pendingTitle)' "$repo_dir/components/ConsolePlacement.qml"
 # A dispatch reports nothing, so the only way to know is to look afterwards.
 # One retry, then say so: a console silently the wrong shape is the hardest
 # kind of bug to be told about.
@@ -209,7 +218,7 @@ grep -Fq '"consoleReservesSpace": false' "$repo_dir/manifest.json"
 # Maximized, never fullscreen. Real fullscreen covers the bar, and the bar holds
 # the icon that dismisses the console: a state that hides its own exit.
 grep -Fq 'maximized: root.fullscreen' "$repo_dir/components/Console.qml"
-! grep -qE '^[[:space:]]*fullscreen:[[:space:]]*(true|root\.fullscreen)' \
+absent -qE '^[[:space:]]*fullscreen:[[:space:]]*(true|root\.fullscreen)' \
   "$repo_dir/components/Console.qml"
 # Measured live: Hyprland ignores a client's own xdg maximize request, so the
 # window property alone leaves the console exactly where it was. It stays as the
@@ -217,7 +226,7 @@ grep -Fq 'maximized: root.fullscreen' "$repo_dir/components/Console.qml"
 # usable area — 1, maximized, not 2, which would cover the bar.
 grep -Fq 'window.fullscreen_state({ internal = 1, client = 1 })' \
   "$repo_dir/components/ConsolePlacement.qml"
-! grep -Fq 'internal = 2' "$repo_dir/components/ConsolePlacement.qml"
+absent -Fq 'internal = 2' "$repo_dir/components/ConsolePlacement.qml"
 # Leaving maximized hands the window back to the compositor, not to us, so the
 # column has to be asked for again.
 # Changing surface is the request itself, so it may take the keyboard — over
@@ -235,16 +244,16 @@ grep -Fq 'fullscreen: OmaPilot.OmaPilotStore.configuredSurface === "fullscreen"'
 # ordinary windows now, and no protocol lets a window unfocus itself. Leaving
 # the rung in place would be a branch no caller can reach and a test asserting
 # behaviour that cannot happen.
-! grep -q 'releasesFocus' "$repo_dir/components/ConsoleContent.qml" \
+absent -q 'releasesFocus' "$repo_dir/components/ConsoleContent.qml" \
   "$repo_dir/components/Console.qml"
-! grep -q 'releaseFocusRequested' "$repo_dir/components/ConsoleContent.qml"
-! grep -q 'release-focus' "$repo_dir/components/Presentation.js" \
+absent -q 'releaseFocusRequested' "$repo_dir/components/ConsoleContent.qml"
+absent -q 'release-focus' "$repo_dir/components/Presentation.js" \
   "$repo_dir/components/ConsoleContent.qml"
 grep -Fq 'previewOpen, busy) {' "$repo_dir/components/Presentation.js"
 # The content still does not know what window hosts it. That is what lets all 24
 # of its states render offscreen in the preview harness, and it is the reason the
 # migration touches one file instead of eight hundred lines.
-! grep -qE '^import Quickshell\.(Wayland|Hyprland)' "$repo_dir/components/ConsoleContent.qml"
+absent -qE '^import Quickshell\.(Wayland|Hyprland)' "$repo_dir/components/ConsoleContent.qml"
 # The surface switch lives with the composer, the one piece all three surfaces
 # share, so it is reachable to enter a surface and not only to leave one.
 grep -Fq 'onClicked: {' "$repo_dir/components/Composer.qml"
@@ -254,7 +263,7 @@ grep -Fq 'onClicked: {' "$repo_dir/components/Composer.qml"
 # through fullscreen to find out where it was.
 grep -Fq 'Presentation.surfaceIcon(surfaceName)' "$repo_dir/components/Composer.qml"
 grep -Fq 'root.backend.selectSurface(surfaceName)' "$repo_dir/components/Composer.qml"
-! grep -Fq 'cycleSurface()' "$repo_dir/components/Composer.qml"
+absent -Fq 'cycleSurface()' "$repo_dir/components/Composer.qml"
 # The switch lives in each surface's own chrome: the console has a header with
 # room beside the gear, the bar panel has no header at all. That asymmetry is
 # the reason the switch left the header in the first place, so the composer copy
@@ -296,7 +305,7 @@ grep -Fq 'signal newChatRequested()' "$repo_dir/components/OmaPilotHeader.qml"
 # with the new chat behind them and the caret nowhere.
 grep -Fq 'onNewChatRequested: root.startNewChat()' "$repo_dir/components/ConsoleContent.qml"
 grep -Fq 'function startNewChat()' "$repo_dir/components/ConsoleContent.qml"
-! grep -Fq 'text: "New chat"' "$repo_dir/components/ConsoleContent.qml"
+absent -Fq 'text: "New chat"' "$repo_dir/components/ConsoleContent.qml"
 # Harness and model are a choice, not a label, so they are pickers in the footer
 # rather than static text in the header. Naming them in both places would be the
 # same identity said twice, which is what the header line was already doing.
@@ -313,14 +322,16 @@ grep -Fq 'onModelPicked:' "$repo_dir/components/ConsoleContent.qml"
 # console up with the rest of the screen.
 grep -Fq 'readonly property int edgeInset: outerGap + borderSize' \
   "$repo_dir/components/ConsolePlacement.qml"
-! grep -Fq 'providerLabel' "$repo_dir/components/OmaPilotHeader.qml"
-! grep -Fq 'root.backend.model' "$repo_dir/components/OmaPilotHeader.qml"
+absent -Fq 'providerLabel' "$repo_dir/components/OmaPilotHeader.qml"
+# The model appears only as the selected value of the editable picker above;
+# providerLabel remains forbidden because static identity text would duplicate
+# that control.
 # The harness label does not carry the product name. Every place it is shown
 # already says OmaPilot; what the row chooses between is built-in, Codex and
 # OpenCode.
 grep -Fq 'if (provider === "builtin") return "Built-in"' \
   "$repo_dir/components/Protocol.js"
-! grep -q 'surfaceCycle' "$repo_dir/components/OmaPilotHeader.qml"
+absent -q 'surfaceCycle' "$repo_dir/components/OmaPilotHeader.qml"
 # The console shows the conversation, not one turn of it. That is what a column
 # ten times the height of the bar panel is for; before this it showed exactly
 # what the panel showed. Every turn is its own record, so the thread is the run
@@ -339,7 +350,7 @@ grep -Fq 'if (String(source[j].acpId || "") === key) thread.push(source[j])' \
   "$repo_dir/components/Protocol.js"
 # A finished turn can be read and copied; retrying, cancelling and the Herdr
 # handoff belong to the one that is still running.
-! grep -q 'onRetryRequested\|backend.cancel()\|continueInHerdr' \
+absent -q 'onRetryRequested\|backend.cancel()\|continueInHerdr' \
   "$repo_dir/components/ConsoleTurn.qml"
 # Every answer wears the same plate, live or finished, and the two must not
 # drift into two sets of numbers — a reader should not be able to tell which
@@ -364,7 +375,7 @@ grep -Fq 'confirming ? "Click again to delete" : "Delete chat"' \
 grep -Fq 'Protocol.providerShortLabel(provider)' "$repo_dir/components/ConsoleTurn.qml"
 # The panel and the curtain stay single-turn. They are the glance surfaces; the
 # console is the deliberate one, and that distinction is design/ambient-ux.md.
-! grep -q 'threadBefore' "$repo_dir/Panel.qml" "$repo_dir/components/AnswerCurtain.qml"
+absent -q 'threadBefore' "$repo_dir/Panel.qml" "$repo_dir/components/AnswerCurtain.qml"
 
 # The content column stops growing past a readable measure and centres instead.
 # min() keeps every docked width inert, so the docked render is unchanged.
@@ -414,7 +425,7 @@ grep -Fq 'active: root.surfaceRoutesHere' "$repo_dir/BarWidget.qml"
 grep -Fq 'bar.activePopout === root' "$repo_dir/BarWidget.qml"
 grep -Fq 'bar.releasePopout(root)' "$repo_dir/BarWidget.qml"
 grep -Fq 'releaseBarPopout()' "$repo_dir/BarWidget.qml"
-! grep -Fq 'Component.onDestruction' "$repo_dir/Panel.qml"
+absent -Fq 'Component.onDestruction' "$repo_dir/Panel.qml"
 # The filament is the state light generalized, never a parallel component.
 grep -Fq 'property bool vertical: false' "$repo_dir/components/StateLightBar.qml"
 grep -Fq 'vertical: true' "$repo_dir/components/ConsoleContent.qml"
@@ -523,7 +534,9 @@ grep -Fq 'property string webHandoffProvider: "duckduckgo"' \
 # The submit call now carries the shown question after the handoff provider,
 # so a text action can send the harness its envelope while the panel and the
 # chat record keep the text the user selected.
-grep -Fq 'webHandoffProvider, shown))' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'webHandoffProvider, shown, !textActionActive))' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'var resumeChatId = textActionActive ? "" : committedChatId' \
+  "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'function submit(text, shownText)' "$repo_dir/components/OmaPilotStore.qml"
 # The hotkey listing reads the user's bindings and never writes them. Only
 # the installer script may touch that file, and only its own marked block.
@@ -726,7 +739,7 @@ grep -Fq '|| (pendingHerdrChatId === "" && currentId !== "" && busy)' \
   "$repo_dir/components/OmaPilotStore.qml"
 grep -Fq 'if (root.newChatPending && !root.busy) root.resetChat()' \
   "$repo_dir/components/OmaPilotStore.qml"
-grep -Fq 'submittedResumeChatId = resumeChatId' "$repo_dir/components/OmaPilotStore.qml"
+grep -Fq 'submittedResumeChatId = committedChatId' "$repo_dir/components/OmaPilotStore.qml"
 test "$(grep -Fc 'restoreSubmittedContinuation()' \
   "$repo_dir/components/OmaPilotStore.qml")" -ge 3
 grep -Fq 'pendingHerdrChatId = currentChatId' "$repo_dir/components/OmaPilotStore.qml"
@@ -1012,8 +1025,8 @@ test "$(grep -Fc 'OmaPilot.OmaPilotStore.takeSurfaceHandoff()' "$repo_dir/Ambien
 grep -Fq 'OmaPilot.OmaPilotStore.takeSurfaceHandoff()' "$repo_dir/BarWidget.qml"
 # One-shot and set nowhere else, so a shell restart reading the same value off
 # disk does not pop a surface open at login.
-! grep -Fq 'surfaceHandoffPending' "$repo_dir/Ambient.qml"
-! grep -Fq 'surfaceHandoffPending' "$repo_dir/BarWidget.qml"
+absent -Fq 'surfaceHandoffPending' "$repo_dir/Ambient.qml"
+absent -Fq 'surfaceHandoffPending' "$repo_dir/BarWidget.qml"
 test "$(grep -Fc 'IpcHandler {' "$repo_dir/components/OmaPilotStore.qml")" -eq 1
 if grep -Fq 'IpcHandler {' "$repo_dir/BarWidget.qml" \
     || grep -Fq 'IpcHandler {' "$repo_dir/Ambient.qml"; then

@@ -1,0 +1,41 @@
+name: Live and desktop E2E
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: omapilot-live-e2e
+  cancel-in-progress: false
+
+jobs:
+  omarchy-live:
+    runs-on: [self-hosted, linux, x64, omarchy]
+    timeout-minutes: 45
+    env:
+      ELEVEN_LABS_API_KEY: ${{ secrets.ELEVEN_LABS_API_KEY }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - name: Deterministic desktop matrix, three consecutive runs
+        run: npm run test:e2e:desktop
+      - name: Authenticated provider matrix
+        run: npm run test:live -- all
+      - name: Codex provider-to-desktop path
+        run: npm run test:e2e:browser:live
+      - name: Installed UI-to-desktop path, three consecutive runs
+        run: |
+          for run in 1 2 3; do
+            echo "Installed UI E2E run $run/3"
+            npm run test:e2e:browser:live-ui
+            npm run test:e2e:browser:live-ui:translate
+          done

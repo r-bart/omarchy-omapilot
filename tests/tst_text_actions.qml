@@ -81,6 +81,7 @@ TestCase {
     }
     compare(TextActions.beginDecision(withField("ownSurface", true)), "own_surface")
     compare(TextActions.beginDecision(withField("sensitive", true)), "sensitive")
+    compare(TextActions.beginDecision(withField("terminal", true)), "terminal")
     compare(TextActions.beginDecision(withField("target", "")), "target")
     compare(TextActions.beginDecision(withField("pending", true)), "pending")
     compare(TextActions.beginDecision(withField("initialized", false)), "unsupported")
@@ -98,6 +99,18 @@ TestCase {
     // Refused before the target is even considered, so nothing is read first.
     compare(TextActions.beginDecision({ pending: false, initialized: true,
       supported: true, ownSurface: false, sensitive: true, target: "" }), "sensitive")
+  }
+
+  function test_aTerminalIsRefusedBeforeAnythingIsRead() {
+    verify(TextActions.terminalWindow("foot"))
+    verify(TextActions.terminalWindow("kitty.desktop"))
+    verify(TextActions.terminalWindow("com.mitchellh.ghostty"))
+    verify(TextActions.terminalWindow("org.wezfurlong.wezterm"))
+    verify(!TextActions.terminalWindow("chromium"))
+    verify(!TextActions.terminalWindow(""))
+    compare(TextActions.beginDecision({ pending: false, initialized: true,
+      supported: true, ownSurface: false, sensitive: false, terminal: true,
+      target: "0xdeadbeef" }), "terminal")
   }
 
   function test_movingBetweenSurfacesKeepsTheActionButClosingDropsIt() {

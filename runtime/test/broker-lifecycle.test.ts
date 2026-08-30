@@ -67,6 +67,27 @@ describe("broker lifecycle cleanup", () => {
     expect(cleaned).toContain("provider-session-0");
   }, 20_000);
 
+  it("returns a text action without persisting a chat or provider session", async () => {
+    const fixture = await setup();
+    const cleaned: string[] = [];
+    const broker = new OmaPilotBroker(fixture.events.push.bind(fixture.events), {
+      history: fixture.history, images: new ImageStore(fixture.paths), env: fixture.env,
+      sessionCleaner: (_provider, sessionId) => { cleaned.push(sessionId); return Promise.resolve(true); }
+    });
+    await broker.handle({ type: "initialize", protocolVersion: 2, harness: "codex" });
+    await broker.handle({
+      type: "submit", id: "text-action", question: "Fix teh sentence", provider: "codex",
+      displayQuestion: "Fix spelling and grammar", saveToHistory: false
+    });
+
+    expect(await fixture.history.list()).toEqual([]);
+    expect(fixture.events).toContainEqual({
+      type: "complete", id: "text-action", answer: expect.any(String)
+    });
+    expect(fixture.events.some((event) => event.type === "complete" && "chat" in event)).toBe(false);
+    expect(cleaned).toHaveLength(1);
+  }, 20_000);
+
   it("uses OpenCode's native CLI when ACP cannot delete persisted sessions", async () => {
     const root = await mkdtemp(join(tmpdir(), "omapilot-opencode-delete-")); roots.push(root);
     const audit = join(root, "session-audit.txt");

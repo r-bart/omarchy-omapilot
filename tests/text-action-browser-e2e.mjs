@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import { execFile, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
+import { createInterface } from "node:readline";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -19,7 +21,8 @@ const port = await new Promise((resolvePort, reject) => {
     else server.close(() => resolvePort(address.port));
   });
 });
-const initial = "teh cat sat on teh mat";
+const initial = (process.env.OMAPILOT_E2E_INITIAL ?? "teh cat sat on teh mat").replaceAll("\\n", "\n");
+const electron = process.env.OMAPILOT_E2E_ELECTRON === "1";
 let browser;
 let browserClosed;
 const stage = (message) => process.stderr.write(`browser e2e: ${message}\n`);
@@ -70,17 +73,120 @@ async function evaluate(socket, expression) {
   return result;
 }
 
+async function selectField(socket, selector, value) {
+  return evaluate(socket, `(() => {
+    const field = document.querySelector(${JSON.stringify(selector)});
+    if (field.isContentEditable) field.textContent = ${JSON.stringify(value)};
+    else field.value = ${JSON.stringify(value)};
+    field.focus();
+    if (typeof field.select === "function") field.select();
+    else {
+      const range = document.createRange();
+      range.selectNodeContents(field);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    return field.isContentEditable ? field.textContent : field.value;
+  })()`);
+}
+
+async function fieldValue(socket, selector) {
+  return evaluate(socket, `(() => { const field = document.querySelector(${JSON.stringify(selector)}); return field.isContentEditable ? field.textContent : field.value; })()`);
+}
+
+async function replaceThroughBroker(text, address) {
+  const child = spawn(resolve(root, "runtime/bin/omapilot-broker"), [], {
+    env: { ...process.env, XDG_STATE_HOME: profile },
+    stdio: ["pipe", "pipe", "inherit"],
+  });
+  const lines = createInterface({ input: child.stdout });
+  const id = randomUUID();
+  try {
+    return await new Promise((resolveReplace, reject) => {
+      const timer = setTimeout(() => reject(new Error("Broker replacement timed out")), 15_000);
+      lines.on("line", (line) => {
+        const event = JSON.parse(line);
+        if (event.type === "ready") {
+          child.stdin.write(JSON.stringify({ type: "selection_replace", text, address }) + "\n");
+        } else if (event.type === "selection_replaced") {
+          clearTimeout(timer);
+          if (event.replaced) resolveReplace();
+          else reject(new Error(`Broker replacement failed: ${event.reason ?? "unknown"}`));
+        }
+      });
+      child.once("error", reject);
+      child.once("close", (code) => {
+        if (code !== 0 && code !== null) reject(new Error(`Broker exited with ${code}`));
+      });
+      child.stdin.write(JSON.stringify({ type: "initialize", protocolVersion: 2, harness: "builtin", client: id }) + "\n");
+    });
+  } finally {
+    lines.close();
+    child.kill("SIGTERM");
+  }
+}
+
+async function answerAndReplaceThroughBroker(provider, selection, address) {
+  const child = spawn(resolve(root, "runtime/bin/omapilot-broker"), [], {
+    env: { ...process.env, XDG_STATE_HOME: profile },
+    stdio: ["pipe", "pipe", "inherit"],
+  });
+  const lines = createInterface({ input: child.stdout });
+  const id = randomUUID();
+  let answer = "";
+  try {
+    return await new Promise((resolveReplace, reject) => {
+      const timer = setTimeout(() => reject(new Error(`${provider} live replacement timed out`)), 180_000);
+      lines.on("line", (line) => {
+        const event = JSON.parse(line);
+        if (event.type === "ready") {
+          child.stdin.write(JSON.stringify({
+            type: "submit",
+            id,
+            provider,
+            displayQuestion: selection,
+            saveToHistory: false,
+            question: `Correct spelling and grammar. Return only the corrected text, with no quotes or commentary.\nBEGIN SELECTED TEXT\n${selection}\nEND SELECTED TEXT`,
+          }) + "\n");
+        } else if (event.id === id && event.type === "error") {
+          clearTimeout(timer);
+          reject(new Error(`${event.code}: ${event.message}`));
+        } else if (event.type === "complete" && event.id === id) {
+          answer = String(event.answer ?? "").trim();
+          if (answer === "") reject(new Error(`${provider} returned an empty answer`));
+          else child.stdin.write(JSON.stringify({ type: "selection_replace", text: answer, address }) + "\n");
+        } else if (event.type === "selection_replaced") {
+          clearTimeout(timer);
+          if (event.replaced) resolveReplace(answer);
+          else reject(new Error(`Broker replacement failed: ${event.reason ?? "unknown"}`));
+        }
+      });
+      child.once("error", reject);
+      child.stdin.write(JSON.stringify({ type: "initialize", protocolVersion: 2, harness: provider, client: id }) + "\n");
+    });
+  } finally {
+    lines.close();
+    child.kill("SIGTERM");
+  }
+}
+
 try {
-  browser = spawn("chromium", [
+  const executable = electron ? "npx" : "chromium";
+  const args = electron ? [
+    "--yes", "electron@44.0.0", resolve(root, "tests/fixtures/electron-text-editor"),
+    `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, "--ozone-platform=wayland",
+  ] : [
     `--user-data-dir=${profile}`,
     `--remote-debugging-port=${port}`,
     "--no-first-run",
     "--disable-default-apps",
     "--ozone-platform=wayland",
     `--app=${pathToFileURL(join(root, "tests/text-actions-lab.html")).href}`,
-  ], { stdio: "ignore", detached: true });
+  ];
+  browser = spawn(executable, args, { stdio: "ignore", detached: true });
   browserClosed = new Promise((resolveClosed) => browser.once("close", resolveClosed));
-  stage("Chromium launched");
+  stage(`${electron ? "Electron" : "Chromium"} launched`);
 
   const socket = await cdpSocket();
   await new Promise((resolveOpen, reject) => {
@@ -99,7 +205,13 @@ try {
   stage(`lab window found at ${address}`);
 
   await command("hyprctl", ["dispatch", `hl.dsp.focus({ window = "address:${address}" })`]);
-  await evaluate(socket, `(() => { const field = document.querySelector('textarea'); field.value = ${JSON.stringify(initial)}; field.focus(); field.select(); return field.value; })()`);
+  // hyprctl acknowledges the compositor dispatch before Quickshell's
+  // Hyprland.activeToplevel mirror necessarily receives the focus event.
+  // The real hotkey cannot arrive before that event; give the integration
+  // under test the same event boundary instead of racing its state mirror.
+  await new Promise((resolveFocus) => setTimeout(resolveFocus, 500));
+  const primarySelector = "#f-area";
+  await selectField(socket, primarySelector, initial);
   await command("wtype", ["-M", "ctrl", "-k", "a", "-m", "ctrl"]);
   const selected = await until(async () => {
     const { stdout } = await command("wl-paste", ["--primary", "--no-newline"]);
@@ -108,27 +220,80 @@ try {
   if (selected !== initial) throw new Error("The browser did not own the expected primary selection");
   stage("primary selection verified");
 
-  await command("omarchy-shell", ["io.github.spencerbull.omapilot", "fixSelection"]);
-  stage("Fix submitted through shell IPC");
-  await until(async () => {
-    const { stdout } = await command("omarchy-shell", ["io.github.spencerbull.omapilot", "status"]);
-    if (stdout.trim() === "store=error" || stdout.trim() === "store=unavailable")
-      throw new Error(`OmaPilot stopped in ${stdout.trim()}`);
-    return stdout.trim() === "store=complete";
-  }, 120_000, "OmaPilot answer");
-  stage("answer completed");
-
-  const { stdout: replace } = await command("omarchy-shell", ["io.github.spencerbull.omapilot", "replaceSelection"]);
-  if (replace.trim() !== "ok") throw new Error(`Replacement returned ${replace.trim() || "no response"}`);
+  const liveProvider = process.env.OMAPILOT_E2E_LIVE_PROVIDER;
+  if (liveProvider === "ui") {
+    const uiRoute = process.env.OMAPILOT_E2E_UI_ROUTE ?? "direct-fix";
+    const actionState = async () => {
+      const { stdout } = await command("omarchy-shell", ["io.github.spencerbull.omapilot", "textActionState"]);
+      return JSON.parse(stdout);
+    };
+    const before = await actionState();
+    const method = uiRoute === "chooser-translate" ? "textAction" : "fixSelection";
+    const { stdout: startOutput } = await command("omarchy-shell", ["io.github.spencerbull.omapilot", method]);
+    const startDecision = startOutput.trim();
+    if (startDecision !== "start")
+      throw new Error(`OmaPilot refused the text action: ${startDecision || "no response"}`);
+    stage(`${uiRoute} submitted through shell IPC (${startDecision})`);
+    if (uiRoute === "chooser-translate") {
+      await until(async () => (await actionState()).choosing === true, 10_000, "OmaPilot chooser");
+      const { stdout: chooseOutput } = await command("omarchy-shell", [
+        "io.github.spencerbull.omapilot", "chooseTextAction", "translate"
+      ]);
+      if (chooseOutput.trim() !== "ok")
+        throw new Error(`OmaPilot chooser returned ${chooseOutput.trim() || "no response"}`);
+      stage("Translate selected through chooser action route");
+    }
+    const completed = await until(async () => {
+      const current = await actionState();
+      if (current.state === "error" || current.state === "unavailable")
+        throw new Error(`OmaPilot stopped in ${current.state}`);
+      return current.turnId !== "" && current.turnId !== before.turnId && current.state === "complete"
+        ? current : undefined;
+    }, 180_000, "new OmaPilot answer");
+    if (completed.action !== (uiRoute === "chooser-translate" ? "translate" : "fix"))
+      throw new Error(`OmaPilot completed the wrong action: ${completed.action || "none"}`);
+    stage("answer completed");
+    const { stdout: replace } = await command("omarchy-shell", ["io.github.spencerbull.omapilot", "replaceSelection"]);
+    if (replace.trim() !== "ok") throw new Error(`Replacement returned ${replace.trim() || "no response"}`);
+  } else if (liveProvider === "codex" || liveProvider === "opencode" || liveProvider === "builtin") {
+    const answer = await answerAndReplaceThroughBroker(liveProvider, initial, address);
+    stage(`${liveProvider} answer completed: ${answer.length} characters`);
+  } else {
+    await replaceThroughBroker("The cat sat on the mat", address);
+  }
   stage("replacement accepted");
 
   const finalText = await until(async () => {
-    const value = await evaluate(socket, "document.querySelector('textarea').value");
+    const value = await fieldValue(socket, primarySelector);
     return typeof value === "string" && value !== initial ? value : undefined;
   }, 10_000, "browser replacement");
-  if (/\bteh\b/iu.test(finalText)) throw new Error(`Correction still contains the original typo: ${finalText}`);
+  if (finalText === initial) throw new Error("The text action left the selected text unchanged");
+  if (liveProvider !== "ui" || (process.env.OMAPILOT_E2E_UI_ROUTE ?? "direct-fix") === "direct-fix")
+    if (/\bteh\b/iu.test(finalText)) throw new Error(`Correction still contains the original typo: ${finalText}`);
 
-  process.stdout.write(JSON.stringify({ result: "pass", app: "chromium", action: "fix", initial, final: finalText }) + "\n");
+  const controls = [{ selector: primarySelector, kind: "textarea", final: finalText }];
+  if (liveProvider === undefined) {
+    for (const control of [
+      { selector: "#f-text", kind: "text" },
+      { selector: "#f-search", kind: "search" },
+      { selector: "#f-editable", kind: "contenteditable" },
+      { selector: "#f-controlled", kind: "controlled" },
+    ]) {
+      await selectField(socket, control.selector, initial);
+      await command("wtype", ["-M", "ctrl", "-k", "a", "-m", "ctrl"]);
+      await until(async () => (await command("wl-paste", ["--primary", "--no-newline"])).stdout === initial, 5_000, `${control.kind} primary selection`);
+      await replaceThroughBroker("The cat sat on the mat", address);
+      const value = await until(async () => {
+        const current = await fieldValue(socket, control.selector);
+        return current === "The cat sat on the mat" ? current : undefined;
+      }, 5_000, `${control.kind} replacement`);
+      controls.push({ ...control, final: value });
+    }
+  }
+
+  const reportedAction = liveProvider === "ui" && process.env.OMAPILOT_E2E_UI_ROUTE === "chooser-translate"
+    ? "translate" : "fix";
+  process.stdout.write(JSON.stringify({ result: "pass", app: electron ? "electron" : "chromium", action: reportedAction, initial, final: finalText, controls }) + "\n");
   socket.close();
 } finally {
   if (browser?.pid !== undefined) {

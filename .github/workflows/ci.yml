@@ -19,6 +19,8 @@ jobs:
           cache: npm
       - name: Check manifest contract
         run: ./scripts/check-manifest.sh
+      - name: Enforce explicit test-skip contract
+        run: ./scripts/check-test-contract.sh
       - name: Check opt-in hotkey installation
         run: ./tests/test-hotkey-installer.sh
       - name: Validate with pinned Omarchy Quattro
@@ -46,7 +48,8 @@ jobs:
       - name: Run shell lint
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
         with:
-          scandir: scripts
+          scandir: .
+          ignore_paths: node_modules runtime/node_modules .git
       - name: Install development dependencies
         run: npm ci --ignore-scripts
       - name: Confirm binary inspection tools

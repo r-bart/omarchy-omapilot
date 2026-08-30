@@ -195,6 +195,17 @@ Scope {
   readonly property bool builtinAuthBusy: ["starting", "prompt", "info", "browser", "device_code"]
     .indexOf(String(builtinAuth.phase || "")) >= 0
 
+  function textActionStatePayload() {
+    return ({
+      state: state,
+      pending: selectionPending,
+      active: textActionActive,
+      choosing: selectionChoosing,
+      action: selectionAction,
+      turnId: currentId
+    })
+  }
+
   signal answerChanged()
   signal focusComposerRequested()
   signal toastRequested(string message)
@@ -434,6 +445,7 @@ Scope {
       supported: brokerSelectionSupported,
       ownSurface: DesktopContext.activeIsOwnSurface(),
       sensitive: TextActions.sensitiveWindow(where.appId, where.title),
+      terminal: TextActions.terminalWindow(where.appId),
       target: where.address
     })
     if (decision !== "start") {
@@ -609,8 +621,12 @@ Scope {
     // as a chooser over the conversation the user started instead.
     if (!selectionSubmitting && (textActionActive || selectionPending)) endTextAction()
     var shown = String(shownText === undefined || shownText === null ? "" : shownText).trim()
-    var resumeChatId = currentChatId
-    submittedResumeChatId = resumeChatId
+    var committedChatId = currentChatId
+    // A text action must neither learn from nor mutate the conversation that
+    // happened to be open behind it. Keep that chat for the UI to return to,
+    // but start the transformation in a fresh provider session.
+    var resumeChatId = textActionActive ? "" : committedChatId
+    submittedResumeChatId = committedChatId
     currentId = "qml-" + Date.now() + "-" + Math.floor(Math.random() * 100000)
     currentChatId = ""
     question = shown !== "" ? shown : prompt
@@ -635,7 +651,7 @@ Scope {
     var autoApprove = configuredDangerousAutoApprove
     sendCommand(Protocol.submitCommand(
       currentId, prompt, provider, model, context, autoApprove, attachmentSelections, resumeChatId,
-      webHandoffProvider, shown))
+      webHandoffProvider, shown, !textActionActive))
     // Only what was sent is spent. A text action does not carry the capture,
     // so it must not consume it either: the user captured it for the question
     // they have not asked yet.
@@ -1567,6 +1583,13 @@ Scope {
     function fixSelection(): string { return root.startDirectTextAction("fix") }
     function rewriteSelection(): string { return root.startDirectTextAction("rewrite") }
     function translateSelection(): string { return root.startDirectTextAction("translate") }
+    // The scripted equivalent of pressing one chooser chip. It remains gated
+    // by the same choosing flag and calls the same store function as the UI;
+    // this gives desktop E2E a stable route without exposing selected text.
+    function chooseTextAction(action: string): string {
+      if (!root.selectionChoosing) return "no-chooser"
+      return root.runTextAction(action, "") ? "ok" : "refused"
+    }
     // The same call the Replace button makes, so a scripted run — or a
     // hotkey — can accept a correction without a pointer. The guards stay in
     // replaceSelectionWithAnswer; this only reports whether there was
@@ -1590,6 +1613,13 @@ Scope {
     function voiceCancel(): string { root.ipcVoiceCancelRequested(); return "ok" }
     function dismiss(): string { root.ipcAmbientDismissRequested(); return "ok" }
     function status(): string { return "store=" + root.state }
+    // Test and support observability without exposing the selected text, its
+    // window address, the prompt, or the answer. `turnId` lets a caller prove
+    // that complete belongs to the action it just started rather than to the
+    // previous conversation.
+    function textActionState(): string {
+      return JSON.stringify(root.textActionStatePayload())
+    }
   }
 
   // Hotkeys modify user-owned compositor configuration, so this helper starts

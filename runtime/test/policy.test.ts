@@ -222,10 +222,10 @@ describe("provider security profiles", () => {
           if (update.sessionUpdate === "tool_call") observed?.();
         }
       );
-      const result = expect(run.result).rejects.toMatchObject({ code: "cancelled" });
+      const result = run.result.catch((error: unknown) => error);
       await pending;
       await run.cancel();
-      await result;
+      await expect(result).resolves.toMatchObject({ code: "cancelled" });
     } finally {
       await rm(fixture.root, { recursive: true, force: true });
     }

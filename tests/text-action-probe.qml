@@ -96,6 +96,7 @@ ShellRoot {
       } else if (root.stage === 2) {
         // The chip the user pressed is the prompt that leaves, and what the
         // thread shows is the action, not the envelope.
+        s.currentChatId = "10000000-0000-4000-8000-000000000001"
         if (!s.runTextAction("translate", "")) root.fail("translate did not run")
         if (s.selectionChoosing) root.fail("the chooser stayed up after an action ran")
         if (s.question !== "Translate to English")
@@ -112,10 +113,16 @@ ShellRoot {
             root.fail("the envelope lost its warning on the way to the wire")
           if (String(sent.displayQuestion) !== "Translate to English")
             root.fail("the harness was not told what to show instead of the envelope")
+          if (sent.saveToHistory !== false)
+            root.fail("the text action was allowed to become chat history")
+          if (sent.resumeChatId !== undefined)
+            root.fail("the text action resumed the open conversation")
         }
       } else if (root.stage === 3) {
         // Replace sends the answer to the window the action was latched to.
-        root.answer("El gato se sentó en la alfombra.")
+        s.applyEvent({ type: "complete", id: s.currentId, answer: "El gato se sentó en la alfombra." })
+        if (s.currentChatId !== "10000000-0000-4000-8000-000000000001")
+          root.fail("the text action did not restore the conversation behind it")
         s.replaceSelectionWithAnswer()
         var replaces = root.commandsOfType(root.drain(), "selection_replace")
         if (replaces.length !== 1) root.fail("expected one selection_replace, got " + replaces.length)
@@ -443,6 +450,24 @@ ShellRoot {
           root.fail("an accepted replacement did not say so to its caller")
         root.drain()
         s.endTextAction()
+      } else if (root.stage === 21) {
+        s.state = "composing"
+        s.selectionPending = true
+        s.selectionTarget = root.address
+        s.selectionText = root.selection
+        s.selectionChoosing = true
+        s.selectionAction = "translate"
+        s.currentId = "turn-observable"
+        var observable = s.textActionStatePayload()
+        if (observable.state !== "composing" || observable.pending !== true
+            || observable.active !== true || observable.choosing !== true
+            || observable.action !== "translate" || observable.turnId !== "turn-observable")
+          root.fail("the safe text-action state omitted lifecycle identity")
+        if (observable.selectionText !== undefined || observable.selectionTarget !== undefined
+            || observable.question !== undefined || observable.answerMarkdown !== undefined)
+          root.fail("the safe text-action state exposed private action content")
+        s.endTextAction()
+        s.currentId = ""
       } else {
         if (!root.failed) console.log("OMAPILOT_TEXT_ACTION_PROBE_OK")
         Qt.quit()

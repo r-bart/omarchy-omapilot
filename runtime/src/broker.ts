@@ -371,6 +371,17 @@ export class OmaPilotBroker {
         this.#emit({ type: "providers", providers: [...this.#providers.values()].map(publicProvider) });
       }
       const shown = command.displayQuestion ?? command.question;
+      if (command.saveToHistory === false) {
+        // A text transformation has no conversation to resume. Do not leave
+        // the provider's one-shot session or generated files behind either.
+        const cleanup: Promise<unknown>[] = [];
+        if (result.sessionId !== undefined) cleanup.push(this.#sessionCleaner(provider, result.sessionId));
+        for (const image of result.images) cleanup.push(this.#images.remove(image));
+        await Promise.allSettled(cleanup);
+        this.#emit({ type: "complete", id: command.id, answer: result.answer });
+        this.#emit({ type: "state", id: command.id, state: "idle" });
+        return;
+      }
       const chat: ChatRecord = {
         schemaVersion: 1,
         id: randomUUID(),

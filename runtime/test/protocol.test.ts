@@ -41,6 +41,14 @@ describe("NDJSON protocol", () => {
       type: "submit", id: "five", question: "research", provider: "builtin",
       webHandoffProvider: "bing"
     }).success).toBe(false);
+    expect(commandSchema.parse({
+      type: "submit", id: "ephemeral", question: "Fix this", provider: "codex",
+      saveToHistory: false
+    })).toMatchObject({ saveToHistory: false });
+    expect(commandSchema.safeParse({
+      type: "submit", id: "ephemeral", question: "Fix this", provider: "codex",
+      saveToHistory: "false"
+    }).success).toBe(false);
   });
 
   it("accepts a bounded versioned desktop snapshot and rejects unknown context fields", () => {

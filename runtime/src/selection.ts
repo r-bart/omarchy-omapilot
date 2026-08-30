@@ -114,8 +114,13 @@ export function defaultSelectionTools(env: NodeJS.ProcessEnv = process.env): Sel
       const child = text === undefined
         ? spawn(executable, ["--clear"], { env, stdio: "ignore" })
         : spawn(executable, [], { env, stdio: ["pipe", "ignore", "ignore"] });
-      child.once("error", () => resolve(false));
+      const failed = (): void => resolve(false);
+      child.once("error", failed);
       child.once("close", (code) => resolve(code === 0));
+      // A clipboard process may reject or exit before consuming stdin. The
+      // stream emits its own EPIPE in that case; handling only child.error
+      // leaves an uncaught exception behind after this promise resolves.
+      child.stdin?.once("error", failed);
       if (text !== undefined) child.stdin?.end(text);
     }),
     paste: (executable, timeoutMs) => new Promise<boolean>((resolve) => {

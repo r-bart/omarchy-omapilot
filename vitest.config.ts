@@ -14,10 +14,10 @@ export default defineConfig({
       thresholds: {
         // This is a ratchet, not the definition of product completeness. The
         // behavioural matrix in docs/test-matrix.md is the release contract.
-        statements: 70,
+        statements: 71,
         branches: 61,
-        functions: 73,
-        lines: 76,
+        functions: 76,
+        lines: 77,
         "runtime/src/selection.ts": {
           statements: 96,
           branches: 92,

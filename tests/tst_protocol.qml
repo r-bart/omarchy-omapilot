@@ -169,6 +169,14 @@ TestCase {
     verify(withoutTarget.target === undefined)
   }
 
+  function test_hyprlandWindowAddressNormalizesOnlyNativeHexHandles() {
+    compare(Protocol.hyprlandWindowAddress("55843b30cf60"), "0x55843b30cf60")
+    compare(Protocol.hyprlandWindowAddress("0x55843b30cf60"), "0x55843b30cf60")
+    compare(Protocol.hyprlandWindowAddress(" 55843b30cf60"), "")
+    compare(Protocol.hyprlandWindowAddress("window:55843b30cf60"), "")
+    compare(Protocol.hyprlandWindowAddress("../../tmp"), "")
+  }
+
   function test_browserCompanionStatusDefaultsFailClosed() {
     var status = Protocol.normalizedBrowserCompanion({
       phase: "installing", relayInstalled: true, chromiumConnected: true,
@@ -288,7 +296,7 @@ TestCase {
   function test_everyTextActionReasonSaysSomethingDifferentToDo() {
     // Each reason is a different next step for the user, so none of them may
     // collapse into the same sentence.
-    var reasons = ["unsupported", "own_surface", "target", "failed", "empty"]
+    var reasons = ["unsupported", "own_surface", "sensitive", "terminal", "target", "failed", "empty"]
     var seen = ({})
     for (var i = 0; i < reasons.length; i++) {
       var message = Protocol.selectionUnavailableMessage(reasons[i])
@@ -321,9 +329,12 @@ TestCase {
       "turn", envelope, "builtin", "", null, false, [], "", "", "teh cat")
     compare(payload.question, envelope)
     compare(payload.displayQuestion, "teh cat")
+    compare(Protocol.submitCommand(
+      "turn", envelope, "builtin", "", null, false, [], "", "", "teh cat", false).saveToHistory, false)
 
     // An ordinary question sends one string, so nothing else changes shape.
     verify(Protocol.submitCommand("turn", "Explain", "builtin").displayQuestion === undefined)
+    verify(Protocol.submitCommand("turn", "Explain", "builtin").saveToHistory === undefined)
     verify(Protocol.submitCommand(
       "turn", "Explain", "builtin", "", null, false, [], "", "", "Explain").displayQuestion === undefined)
     verify(Protocol.submitCommand(

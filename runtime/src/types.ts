@@ -77,6 +77,9 @@ const submitCommand = z.object({
   // harness receives. A text action wraps the selection in instructions; the
   // panel and the chat record should show the selection, not the wrapper.
   displayQuestion: z.string().trim().min(1).max(8_000).optional(),
+  // Text actions are one-shot transformations, not conversations. Omitted is
+  // the backwards-compatible default: ordinary submissions remain durable.
+  saveToHistory: z.boolean().optional(),
   provider: providerIdSchema,
   resumeChatId: z.string().uuid().optional(),
   model: z.preprocess((value) => typeof value === "string" && value.trim() === "" ? undefined : value, z.string().min(1).max(500).optional()),

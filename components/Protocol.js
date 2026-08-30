@@ -90,7 +90,7 @@ function normalizedAuthEvent(raw) {
   return result
 }
 
-function submitCommand(id, question, provider, model, desktopContext, dangerousAutoApprove, contextAttachments, resumeChatId, webHandoffProvider, displayQuestion) {
+function submitCommand(id, question, provider, model, desktopContext, dangerousAutoApprove, contextAttachments, resumeChatId, webHandoffProvider, displayQuestion, saveToHistory) {
   var payload = command("submit", {
     id: String(id || ""),
     question: String(question || ""),
@@ -99,6 +99,9 @@ function submitCommand(id, question, provider, model, desktopContext, dangerousA
   // Only when it actually differs, so an ordinary question sends one string.
   var shown = String(displayQuestion === undefined || displayQuestion === null ? "" : displayQuestion).trim()
   if (shown !== "" && shown !== String(question || "").trim()) payload.displayQuestion = shown
+  // Persistence is the default and therefore stays off the ordinary wire.
+  // Only an explicitly ephemeral caller needs to say anything.
+  if (saveToHistory === false) payload.saveToHistory = false
   var previousChat = String(resumeChatId || "")
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(previousChat))
     payload.resumeChatId = previousChat
@@ -257,6 +260,15 @@ function windowAddress(value) {
   return /^0x[0-9a-f]{1,30}$/i.test(text) ? text : ""
 }
 
+// Quickshell's typed HyprlandToplevel.address omits the `0x` prefix used by
+// the compositor's JSON IPC object. Accept that one native representation at
+// the trusted API boundary; wire-facing callers keep the strict validator.
+function hyprlandWindowAddress(value) {
+  var text = String(value === undefined || value === null ? "" : value)
+  if (/^[0-9a-f]{1,30}$/i.test(text)) text = "0x" + text
+  return windowAddress(text)
+}
+
 // Selections are multi-line, so this keeps newlines and tabs where
 // safeContextText collapses all whitespace. Control and bidirectional-display
 // characters still go.
@@ -291,6 +303,7 @@ function selectionUnavailableMessage(reason) {
   if (value === "unsupported") return "Install wl-clipboard to work on selected text"
   if (value === "own_surface") return "Go back to the window with your text, then press the hotkey again"
   if (value === "sensitive") return "OmaPilot will not work on text from a password or credential window"
+  if (value === "terminal") return "Text replacement is not safe in terminal windows"
   if (value === "pending") return "Still reading the last selection"
   if (value === "target") return "Select text in a window first"
   if (value === "failed") return "Could not read the selected text"

@@ -239,6 +239,16 @@ function sensitiveWindow(appId, title) {
     .test(String(appId || "") + " " + String(title || ""))
 }
 
+// A terminal's primary selection is owned by the emulator's visual scrollback,
+// not by the shell or editor running inside it. Pasting therefore inserts at
+// the cursor instead of replacing what is highlighted (and Ctrl+V has a
+// different meaning in readline). Refuse before reading anything rather than
+// risk corrupting or executing a command.
+function terminalWindow(appId) {
+  return /^(?:foot(?:client)?|kitty|alacritty|xterm|uxterm|rxvt|urxvt|st|org\.wezfurlong\.wezterm|com\.mitchellh\.ghostty|org\.gnome\.terminal|org\.kde\.konsole|com\.raggesilver\.blackbox)$/i
+    .test(String(appId || "").replace(/\.desktop$/i, ""))
+}
+
 // "start" means go; every other value is a reason that must NOT disturb an
 // action already on screen.
 function beginDecision(context) {
@@ -247,6 +257,7 @@ function beginDecision(context) {
   if (source.initialized !== true || source.supported !== true) return "unsupported"
   if (source.ownSurface === true) return "own_surface"
   if (source.sensitive === true) return "sensitive"
+  if (source.terminal === true) return "terminal"
   if (String(source.target || "") === "") return "target"
   return "start"
 }
