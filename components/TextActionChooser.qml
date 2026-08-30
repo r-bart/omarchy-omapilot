@@ -86,7 +86,7 @@ Item {
       id: chipFlow
       Layout.fillWidth: true
       Layout.preferredHeight: chipFlow.implicitHeight
-      spacing: Style.spacing.md
+      spacing: Style.spacing.controlGap
 
       Repeater {
         model: TextActions.actions
@@ -94,25 +94,43 @@ Item {
         delegate: Button {
           required property var modelData
           readonly property string action: String(modelData.id || "")
-          // The one Enter runs wears the same weight Replace does; the others
-          // are the quiet pair, like Regenerate. No new state, the contrast
-          // that already means primary and secondary here.
+          // Which one Enter runs. Not a hierarchy: these three are peers, and
+          // the first version borrowed the primary/secondary contrast that
+          // Replace and Regenerate use, where one action is the answer and the
+          // other is a fallback. Here it left two of the three drawn as plain
+          // dimmed words, so they read as unavailable rather than as choices.
           readonly property bool preferred: action === root.defaultAction
+          readonly property string description: TextActions.questionLabel(action, "", root.language)
           width: Math.min(implicitWidth, chipFlow.width)
           text: TextActions.chipLabel(action, root.language)
-          // The chip is a word; the tooltip is what that word does. Repeating
-          // the label on hover teaches nothing, and it is also the accessible
-          // name, where "Fix" on its own says even less.
-          tooltipText: TextActions.questionLabel(action, "", root.language)
-            + (preferred ? " (Enter)" : "")
           enabled: root.ready
-          foreground: preferred ? root.foreground : Qt.darker(root.foreground, 1.4)
+          // Colour carries every state, so nothing here changes the metrics:
+          // the row must not shuffle when the remembered action moves. The
+          // shell's Button paints no disabled state of its own, so an
+          // unavailable chip has to say so here or it looks live and does
+          // nothing. The border colour follows the foreground, which is what
+          // marks the preferred chip without giving it a shape of its own.
+          foreground: !root.ready ? Qt.darker(root.foreground, 2.2)
+            : preferred ? root.accent
+            : root.foreground
           background: root.background
           accent: root.accent
           fontFamily: root.fontFamily
-          bordered: preferred
+          // All three, so a chip looks like a chip before the cursor is on it.
+          bordered: true
           focusable: true
-          Accessible.name: tooltipText
+          // The shell's control height is 32, under the 40 a desktop pointer
+          // target wants. Three chips shown once per invocation can afford the
+          // extra four pixels a side that a bar full of buttons cannot.
+          verticalPadding: Style.spacing.controlPaddingY + Style.spacing.sm
+          // No hover tip on a chip. Button draws one above the control, and
+          // the control sits directly under the quote, so it covers the very
+          // text being decided about. It also composes its background from the
+          // theme background, which on this surface is the colour already
+          // behind it, so it reads as text fading in over text. The chip is a
+          // word and the composer below already asks the question; the long
+          // form stays below, where it costs nothing.
+          Accessible.name: description + (preferred ? " (Enter)" : "")
           onClicked: root.actionRequested(action)
         }
       }

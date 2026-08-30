@@ -472,6 +472,16 @@ if grep -Eq 'TextInput|TextEdit|TextField|TextArea' "$repo_dir/components/TextAc
   printf 'The quoted selection must not be editable\n' >&2
   exit 1
 fi
+# The three chips are peers, so all three are drawn as chips at rest. Marking
+# only the one Enter runs left the other two as dimmed words that read as
+# unavailable, and gave them an affordance that existed only under the cursor.
+grep -Fq 'bordered: true' "$repo_dir/components/TextActionChooser.qml"
+# No tooltip on a chip: Button renders it above the control, and the control
+# sits directly under the quote, so the tip covers the text being decided on.
+if grep -Fq 'tooltipText' "$repo_dir/components/TextActionChooser.qml"; then
+  printf 'a chip tooltip is drawn over the quote it explains\n' >&2
+  exit 1
+fi
 # The composer is the fourth action while a selection waits, in both fields.
 test "$(grep -Fc 'What should I do with this text?' "$repo_dir/components/Composer.qml")" -eq 2
 # Both surfaces put the chooser where their empty state already lives, and

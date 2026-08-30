@@ -12,6 +12,11 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint 'runtime/**/*.ts' --max-warnings=0",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:live": "bash scripts/test-live.sh",
+    "test:e2e:browser": "node tests/text-action-browser-e2e.mjs",
+    "test:qml": "bash tests/check-ui-contract.sh",
+    "test:qml:unit": "bash tests/test-qml-units.sh",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "dependencies": {
@@ -24,6 +29,7 @@
   "devDependencies": {
     "@eslint/js": "9.39.2",
     "@types/node": "25.0.10",
+    "@vitest/coverage-v8": "4.1.11",
     "esbuild": "0.28.2",
     "eslint": "9.39.2",
     "typescript": "5.9.3",

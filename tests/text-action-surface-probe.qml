@@ -101,30 +101,42 @@ ShellRoot {
           // Where a translation is going is on the chip, not behind a setting.
           if (buttons[2].text !== "Translate → Spanish")
             root.fail("the translate chip reads '" + buttons[2].text + "'")
-          if (!buttons[0].bordered || buttons[1].bordered || buttons[2].bordered)
-            root.fail("the chip Enter would run is not the one drawn as primary")
-          if (buttons[0].tooltipText.indexOf("(Enter)") < 0)
+          // Every chip is drawn as a chip before the cursor arrives. An
+          // affordance that only exists under the pointer is not one, and the
+          // two that had none read as disabled next to the one that did.
+          for (var b = 0; b < buttons.length; b++)
+            if (!buttons[b].bordered)
+              root.fail("chip " + b + " has no border until it is hovered")
+          // No tooltips: Button draws them above the control, and the control
+          // sits under the quote, so the tip covers the text being decided on.
+          for (var t = 0; t < buttons.length; t++)
+            if (buttons[t].tooltipText !== "")
+              root.fail("chip " + t + " carries a tooltip that covers the quote")
+          // What the word means still reaches a screen reader.
+          if (buttons[0].Accessible.name.indexOf("Fix grammar and syntax") < 0)
+            root.fail("the Fix chip's accessible name only repeats its label")
+          if (buttons[0].Accessible.name.indexOf("(Enter)") < 0)
             root.fail("the default chip does not say Enter runs it")
-          // The tooltip and the accessible name say what the word does.
-          if (buttons[0].tooltipText.indexOf("Fix grammar and syntax") < 0)
-            root.fail("the Fix chip's tooltip only repeats its label")
-          if (buttons[1].tooltipText !== "Rewrite more clearly")
-            root.fail("the Rewrite chip's tooltip reads '" + buttons[1].tooltipText + "'")
-          if (buttons[1].Accessible.name !== buttons[1].tooltipText)
-            root.fail("the chip's accessible name is not what its tooltip says")
-          // A pointer target on the desktop wants 40 pixels of height. The
-          // chips are ordinary shell buttons, so this measures the shell's
-          // own control size rather than anything invented here.
+          if (buttons[1].Accessible.name !== "Rewrite more clearly")
+            root.fail("the Rewrite chip is named '" + buttons[1].Accessible.name + "'")
+          // A desktop pointer target wants 40 pixels of height. The shell's
+          // own control size is 32, so the chooser pads past it: three chips
+          // shown once per invocation can afford what a full bar cannot.
           for (var h = 0; h < buttons.length; h++)
-            if (buttons[h].height < 32)
+            if (buttons[h].height < 40)
               root.fail("chip " + h + " is only " + Math.round(buttons[h].height) + " px tall")
         }
       } else if (root.stage === 2) {
-        // The default follows what the user last ran, so the border moves.
+        // The default follows what the user last ran, so the mark moves with
+        // it. The mark is colour and nothing else: a border that comes and
+        // goes, or a weight that changes, would move the row instead.
+        var plain = String(root.chips()[2].foreground)
         backendStub.textActionDefault = "translate"
         var moved = root.chips()
-        if (moved[0].bordered || !moved[2].bordered)
-          root.fail("the primary chip did not follow the remembered action")
+        if (String(moved[2].foreground) === plain)
+          root.fail("nothing marks the chip Enter would run")
+        if (String(moved[0].foreground) !== plain)
+          root.fail("the chip that lost the default stayed marked")
         backendStub.textActionDefault = "fix"
       } else if (root.stage === 3) {
         // The primary chip is drawn with a border and the others are not, and
@@ -158,14 +170,24 @@ ShellRoot {
           root.fail("pressing a chip asked for '" + root.picked + "'")
       } else if (root.stage === 6) {
         // Nothing is offered while the harness is answering or a replacement
-        // is being typed.
+        // is being typed — and it has to look that way. The shell's Button
+        // paints no disabled state of its own, so a chip that is off stays
+        // exactly as inviting as one that works unless the chooser says
+        // otherwise. Looking live and doing nothing is the worse failure.
+        var live = String(root.chips()[1].foreground)
         backendStub.state = "streaming"
         if (root.chips()[0].enabled) root.fail("a chip stayed live while streaming")
+        if (String(root.chips()[1].foreground) === live)
+          root.fail("a chip that cannot be pressed is drawn exactly like one that can")
         backendStub.state = "composing"
         backendStub.selectionReplacing = true
         if (root.chips()[0].enabled) root.fail("a chip stayed live while replacing")
+        if (String(root.chips()[1].foreground) === live)
+          root.fail("a chip stayed fully lit while a replacement was being typed")
         backendStub.selectionReplacing = false
         if (!root.chips()[0].enabled) root.fail("the chips never came back")
+        if (String(root.chips()[1].foreground) !== live)
+          root.fail("the chips came back still dimmed")
       } else if (root.stage === 7) {
         // In the console the chooser takes the empty state's place; two rows
         // of things to press is a menu, not an empty state.

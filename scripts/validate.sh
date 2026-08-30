@@ -5,13 +5,14 @@ repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo_root"
 
 ./scripts/check-manifest.sh
+./scripts/check-test-contract.sh
 ./tests/test-hotkey-installer.sh
 node ./browser-companion/scripts/check.mjs
 
 if command -v shellcheck >/dev/null && shellcheck --version >/dev/null 2>&1; then
   mapfile -t shell_files < <(find scripts browser-companion -type f \
     \( -name '*.sh' -o -name 'omapilot-browser-companion-host' \) -print | sort)
-  shell_files+=(tests/test-hotkey-installer.sh tests/text-action-run.sh)
+  shell_files+=(tests/test-hotkey-installer.sh tests/test-qml-units.sh tests/text-action-run.sh)
   shellcheck "${shell_files[@]}"
 else
   printf 'validate: shellcheck unavailable; skipping shell lint\n' >&2
